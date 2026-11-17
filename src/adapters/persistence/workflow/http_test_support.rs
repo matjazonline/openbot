@@ -87,11 +87,11 @@ pub(super) async fn setup_scoped(origin: &str, entrance: Entrance, scope: HttpTe
             )
             .await
             .unwrap();
-            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-                .bind(channel.id)
-                .execute(fixture.persistence.pool())
-                .await
-                .unwrap();
+            crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+                fixture.persistence.pool(),
+                channel.id,
+            )
+            .await;
             RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(
                 channel.id,
             ))

@@ -1,6 +1,6 @@
 use super::super::reviewer_picker::{ReviewerForm, apply, picker};
 use super::*;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::ports::department::DepartmentWrite;
 use crate::application::workflow::registry;
 use crate::domain::workflow::CompanyId;
@@ -66,10 +66,7 @@ async fn preview_desk(f: &Fixture) -> Uuid {
             name: "Preview".into(),
             slug: "preview".into(),
             enabled: true,
-            ownership: Some(ChannelOwnershipWrite {
-                department_id: Some(Some(department.id)),
-                members_only: Some(false),
-            }),
+            department_id: Some(department.id),
             ..Default::default()
         },
     )

@@ -301,11 +301,10 @@ async fn member(fixture: &Fixture, role: &str) -> Uuid {
 }
 
 async fn allowlist(pool: &sqlx::PgPool, channel: Uuid) {
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(channel)
-        .execute(pool)
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        pool, channel,
+    )
+    .await;
 }
 
 fn constraint(error: sqlx::Error, expected: &str) {

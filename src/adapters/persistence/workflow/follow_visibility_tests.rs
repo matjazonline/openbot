@@ -7,7 +7,7 @@ mod accounts;
 async fn edit(
     f: &FollowFixture,
     emails: Option<Vec<String>>,
-    members_only: Option<bool>,
+    department_id: Option<crate::entities::department::DepartmentId>,
 ) -> AppResult<crate::entities::channel::Channel> {
     ChannelPersistence::update(
         f.people.role.p(),
@@ -19,10 +19,7 @@ async fn edit(
                 slug: "role-intake".into(),
                 enabled: true,
                 participant_emails: emails,
-                ownership: members_only.map(|value| ChannelOwnershipWrite {
-                    members_only: Some(value),
-                    ..Default::default()
-                }),
+                department_id,
                 ..Default::default()
             },
         },
@@ -30,22 +27,45 @@ async fn edit(
     .await
 }
 
-#[tokio::test]
-async fn workflow_reviewer_follow_actual_channel_allowlist_edit_refreshes_and_repairs_without_changing_context()
- {
+/// These email-proof tests need an email-only grant, with no department-derived alternative.
+async fn email_only_fixture() -> FollowFixture {
     let f = Box::pin(fixture()).await;
-    let proposal = f.proposal().await;
-    edit(&f, Some(vec!["other@example.test".into()]), Some(false))
+    let private = crate::adapters::persistence::test_support::empty_channel_department(
+        f.people.role.p().pool(),
+        f.scope.company.as_uuid(),
+    )
+    .await;
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
+        .bind(f.people.users[0])
+        .fetch_one(f.people.role.p().pool())
         .await
         .unwrap();
-    assert!(
-        f.assignment().await.reviewers.is_empty(),
-        "the real channel writer must refresh lost visibility"
+    edit(&f, Some(vec![email]), Some(private)).await.unwrap();
+    assert_eq!(f.assignment().await.reviewers.len(), 1);
+    assert_eq!(
+        f.assignment().await.assignment_revision.get(),
+        1,
+        "the same reviewer remains eligible"
     );
+    f
+}
+
+#[tokio::test]
+async fn workflow_reviewer_follow_actual_configured_grant_edit_refreshes_without_changing_context()
+{
+    let f = Box::pin(email_only_fixture()).await;
+    let proposal = f.proposal().await;
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
+        .bind(f.people.users[0])
+        .fetch_one(f.people.role.p().pool())
+        .await
+        .unwrap();
+    edit(&f, Some(vec!["other@example.test".into()]), None)
+        .await
+        .unwrap();
+    assert!(f.assignment().await.reviewers.is_empty());
     assert_eq!(state(&f).await["state"], "pending");
-    // Clearing the email allowlist restores team visibility. This generic save carries
-    // no department/ownership edit and needs no fabricated verified-email identity.
-    edit(&f, None, None).await.unwrap();
+    edit(&f, Some(vec![email]), None).await.unwrap();
     let repaired = f.assignment().await;
     assert_eq!(repaired.reviewers.len(), 1);
     assert_eq!(repaired.assignment_revision.get(), 3);
@@ -54,16 +74,13 @@ async fn workflow_reviewer_follow_actual_channel_allowlist_edit_refreshes_and_re
     assert_eq!(f.proposal().await, proposal);
 }
 
-async fn ownership(f: &FollowFixture, members_only: bool) {
+async fn ownership(f: &FollowFixture, department: crate::entities::department::DepartmentId) {
     let mut tx = f.people.role.p().pool().begin().await.unwrap();
     crate::adapters::persistence::department_desks::set_desk_ownership_on(
         &mut tx,
         f.scope.company,
         f.people.role.channel,
-        &ChannelOwnershipWrite {
-            members_only: Some(members_only),
-            ..Default::default()
-        },
+        department,
     )
     .await
     .unwrap();
@@ -81,10 +98,15 @@ async fn workflow_reviewer_follow_actual_desk_ownership_writer_refreshes_derived
         1,
         "department membership still grants view"
     );
-    ownership(&f, false).await;
+    let private = crate::adapters::persistence::test_support::empty_channel_department(
+        f.people.role.p().pool(),
+        f.scope.company.as_uuid(),
+    )
+    .await;
+    ownership(&f, private).await;
     assert!(f.assignment().await.reviewers.is_empty());
     assert_eq!(state(&f).await["state"], "pending");
-    ownership(&f, true).await;
+    ownership(&f, f.people.role.department).await;
     assert_eq!(f.assignment().await.reviewers.len(), 1);
     assert_eq!(state(&f).await["state"], "withdrawn");
 }
@@ -94,16 +116,23 @@ async fn workflow_reviewer_follow_competing_channel_writers_commit_matching_visi
  {
     let f = Box::pin(fixture()).await;
     let proposal = f.proposal().await;
+    let private = crate::adapters::persistence::test_support::empty_channel_department(
+        f.people.role.p().pool(),
+        f.scope.company.as_uuid(),
+    )
+    .await;
     let barrier = tokio::sync::Barrier::new(2);
     let close = async {
         barrier.wait().await;
-        edit(&f, Some(vec!["other@example.test".into()]), Some(false))
+        edit(&f, Some(vec!["other@example.test".into()]), Some(private))
             .await
             .unwrap();
     };
     let open = async {
         barrier.wait().await;
-        edit(&f, None, None).await.unwrap();
+        edit(&f, None, Some(f.people.role.department))
+            .await
+            .unwrap();
     };
     tokio::join!(close, open);
     let visible: bool = sqlx::query_scalar("SELECT workflow_follow_reviewer_eligible($1,$2,$3)")
@@ -124,7 +153,7 @@ async fn workflow_reviewer_follow_competing_channel_writers_commit_matching_visi
 }
 
 async fn channel_state(f: &FollowFixture) -> Value {
-    sqlx::query_scalar("SELECT jsonb_build_object('revision',settings_revision,'mode',access_mode,'members_only',members_only) \
+    sqlx::query_scalar("SELECT jsonb_build_object('revision',settings_revision,'mode',access_mode,'department_id',department_id) \
         FROM channels WHERE company_id=$1 AND id=$2")
         .bind(f.scope.company.as_uuid()).bind(f.people.role.channel)
         .fetch_one(f.people.role.p().pool()).await.unwrap()
@@ -134,13 +163,18 @@ async fn channel_state(f: &FollowFixture) -> Value {
 async fn workflow_reviewer_follow_refresh_failure_rolls_back_channel_settings_grants_and_assignments()
  {
     let f = Box::pin(fixture()).await;
+    let private = crate::adapters::persistence::test_support::empty_channel_department(
+        f.people.role.p().pool(),
+        f.scope.company.as_uuid(),
+    )
+    .await;
     let before = channel_state(&f).await;
     let assignment = f.assignment().await;
     sqlx::raw_sql("CREATE FUNCTION channel_follow_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected refresh failure'; END $$; \
         CREATE TRIGGER channel_follow_fault BEFORE INSERT ON workflow_reviewer_assignments FOR EACH ROW EXECUTE FUNCTION channel_follow_fault()")
         .execute(f.people.role.p().pool()).await.unwrap();
     assert!(
-        edit(&f, Some(vec!["other@example.test".into()]), Some(false))
+        edit(&f, Some(vec!["other@example.test".into()]), Some(private))
             .await
             .is_err()
     );

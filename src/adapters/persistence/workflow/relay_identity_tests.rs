@@ -1,12 +1,13 @@
 //! Real frozen agent replies pass through the delivery worker and canonical relay commit.
 use super::*;
 use crate::adapters::persistence::department::PostgresDepartments;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::ports::department::{
     DepartmentPersistence, DepartmentScope, DepartmentWrite,
 };
 
 enum Receiver {
+    Root,
     SameDepartment,
     OtherDepartment,
     PrivateAgent,
@@ -60,6 +61,13 @@ async fn receiving_target(
                 .bind(f.people.role.company().as_uuid()).bind(agent).fetch_one(p.pool()).await.unwrap();
             return AddressTarget::Principal(PrincipalId::new(principal));
         }
+        Receiver::Root => crate::entities::department::DepartmentId::new(
+            sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+                .bind(f.people.role.company().as_uuid())
+                .fetch_one(p.pool())
+                .await
+                .unwrap(),
+        ),
         Receiver::SameDepartment => f.people.role.department,
         Receiver::OtherDepartment => {
             PostgresDepartments::new(
@@ -90,10 +98,7 @@ async fn receiving_target(
             name: "Restricted receiver".into(),
             slug: "restricted-relay".into(),
             enabled: true,
-            ownership: Some(ChannelOwnershipWrite {
-                department_id: Some(Some(department)),
-                members_only: Some(true),
-            }),
+            department_id: Some(department),
             ..Default::default()
         },
     )
@@ -199,4 +204,73 @@ async fn relay_identity_running_agent_cannot_send_as_another_agents_address() {
     );
     assert!(received(&f).await.is_empty());
     assert_eq!(delivered(&f.case, f.delivery).await, "pending");
+}
+
+#[tokio::test]
+async fn relay_identity_root_members_accepts_a_real_agent_only_with_a_participate_grant() {
+    let f = Box::pin(queued(Receiver::Root)).await;
+    let company = f.case.people.role.company().as_uuid();
+    let principal = f.case.created.principal_id.as_uuid();
+    let target = f.target.desk_id().unwrap();
+    let before: bool = sqlx::query_scalar("SELECT relay_desk_can_participate($1,$2,$3)")
+        .bind(company)
+        .bind(target)
+        .bind(principal)
+        .fetch_one(f.case.people.role.p().pool())
+        .await
+        .unwrap();
+    assert!(!before, "this live agent has no root audience grant");
+    sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) VALUES($1,$2,$3,'participate','configured_allowlist')")
+        .bind(company).bind(target).bind(principal).execute(f.case.people.role.p().pool()).await.unwrap();
+    let smtp = Box::pin(deliver(&f.case, relay_threads(f.case.people.role.p()))).await;
+    assert!(smtp.sent().is_empty());
+    assert_eq!(delivered(&f.case, f.delivery).await, "delivered");
+    assert_eq!(
+        received(&f).await,
+        [ReceivedHop {
+            author_principal: principal,
+            sender_principal: principal
+        }]
+    );
+}
+
+#[tokio::test]
+async fn relay_identity_root_members_rejects_view_only_and_revoked_agent_grants_without_smtp() {
+    let f = Box::pin(queued(Receiver::Root)).await;
+    let company = f.case.people.role.company().as_uuid();
+    let principal = f.case.created.principal_id.as_uuid();
+    let target = f.target.desk_id().unwrap();
+    for (capability, allowed) in [("view", false), ("participate", true)] {
+        sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) VALUES($1,$2,$3,$4,'configured_allowlist')")
+            .bind(company).bind(target).bind(principal).bind(capability).execute(f.case.people.role.p().pool()).await.unwrap();
+        let actual: bool = sqlx::query_scalar("SELECT relay_desk_can_participate($1,$2,$3)")
+            .bind(company)
+            .bind(target)
+            .bind(principal)
+            .fetch_one(f.case.people.role.p().pool())
+            .await
+            .unwrap();
+        assert_eq!(
+            actual, allowed,
+            "{capability} alone determines this receiver capability"
+        );
+        sqlx::query("DELETE FROM channel_principal_grants WHERE company_id=$1 AND channel_id=$2 AND principal_id=$3 AND provenance='configured_allowlist'")
+            .bind(company).bind(target).bind(principal).execute(f.case.people.role.p().pool()).await.unwrap();
+    }
+    let smtp = Box::pin(deliver(&f.case, relay_threads(f.case.people.role.p()))).await;
+    assert!(smtp.sent().is_empty());
+    assert_eq!(delivered(&f.case, f.delivery).await, "dead_letter");
+    assert!(
+        received(&f).await.is_empty(),
+        "revocation prevents a canonical receiving hop"
+    );
+    let messages: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM thread_messages WHERE company_id=$1 AND channel_id=$2",
+    )
+    .bind(company)
+    .bind(target)
+    .fetch_one(f.case.people.role.p().pool())
+    .await
+    .unwrap();
+    assert_eq!(messages, 0);
 }

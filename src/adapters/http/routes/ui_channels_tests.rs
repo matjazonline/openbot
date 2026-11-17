@@ -1,9 +1,7 @@
-//! The `/ui` desk form's owner fields (01-departments 04B.1): what ownership change a submission
-//! asks for. Persisting it is `ChannelWrite::ownership`, covered by the p02 desk tests.
-//! `department_ui_desk_form_`.
+//! Desk forms use required ownership and map the Public checkbox to the canonical marker.
 use super::*;
 
-fn form(department_id: Option<&str>, members_only: bool) -> ChannelForm {
+fn form(department_id: Option<&str>, public: bool) -> ChannelForm {
     ChannelForm {
         name: "Inbox".into(),
         description: None,
@@ -14,85 +12,50 @@ fn form(department_id: Option<&str>, members_only: bool) -> ChannelForm {
         enabled: Some("true".into()),
         add_3rd_party: Some("true".into()),
         department_id: department_id.map(str::to_owned),
-        members_only: members_only.then(|| "true".to_owned()),
+        public: public.then(|| "true".to_owned()),
     }
-}
-
-fn stored(department_id: Option<Uuid>, members_only: bool) -> Channel {
-    Channel {
-        id: Uuid::new_v4(),
-        company_id: Uuid::new_v4(),
-        name: "Inbox".into(),
-        description: None,
-        slug: "inbox".into(),
-        alias_slugs: Vec::new(),
-        participant_emails: None,
-        access_mode: crate::entities::channel::ChannelAccessMode::Team,
-        principal_grants: Vec::new(),
-        enabled: true,
-        add_3rd_party: true,
-        created_by: crate::entities::creation::CreationProvenance::system(),
-        created_at: chrono::Utc::now(),
-        settings_revision: 0,
-        department_id: department_id.map(DepartmentId::new),
-        members_only,
-    }
-}
-
-fn ownership(
-    form: ChannelForm,
-    desk: Option<&Channel>,
-) -> AppResult<Option<ChannelOwnershipWrite>> {
-    SubmittedChannel::new(form)
-        .write(desk)
-        .map(|write| write.ownership)
 }
 
 #[test]
-fn department_ui_desk_form_asks_only_for_the_ownership_it_changes() {
-    let sales = Uuid::new_v4();
-    let owned = stored(Some(sales), true);
-    // Unchanged: no ownership write, so a plain save takes no department lock.
+fn access_mode_ui_owner_is_optional_in_a_write_but_cannot_be_cleared() {
+    let department = Uuid::new_v4();
+    let submitted = SubmittedChannel::new(form(Some(&department.to_string()), false));
     assert_eq!(
-        ownership(form(Some(&sales.to_string()), true), Some(&owned)).unwrap(),
+        submitted.write().unwrap().department_id,
+        Some(DepartmentId::new(department))
+    );
+    assert_eq!(submitted.draft().department_id, Some(department));
+    assert_eq!(
+        SubmittedChannel::new(form(None, false))
+            .write()
+            .unwrap()
+            .department_id,
         None
     );
-    // A form without the owner select (the classic page) never touches ownership.
-    assert_eq!(ownership(form(None, false), Some(&owned)).unwrap(), None);
-    // Clearing the select detaches the desk and drops members-only with it.
+    for invalid in ["", " ", "sales"] {
+        assert!(matches!(
+            SubmittedChannel::new(form(Some(invalid), false)).write(),
+            Err(AppError::BadRequest(_))
+        ));
+    }
+}
+
+#[test]
+fn access_mode_ui_public_checkbox_preserves_named_addresses_and_can_close_intake() {
+    let mut opened = form(None, true);
+    opened.participant_emails = Some("person@example.test".into());
+    let opened = SubmittedChannel::new(opened);
+    assert!(opened.write().unwrap().is_public());
     assert_eq!(
-        ownership(form(Some(""), true), Some(&owned)).unwrap(),
-        Some(ChannelOwnershipWrite {
-            department_id: Some(None),
-            members_only: Some(false),
-        })
+        opened.write().unwrap().participant_emails.unwrap(),
+        ["person@example.test", "@public"]
     );
-    // Assigning a department to an unowned desk, members-only ticked.
-    let plain = stored(None, false);
+    let mut closed = form(None, false);
+    closed.participant_emails = Some("person@example.test, @public".into());
+    let closed = SubmittedChannel::new(closed);
+    assert!(!closed.write().unwrap().is_public());
     assert_eq!(
-        ownership(form(Some(&sales.to_string()), true), Some(&plain)).unwrap(),
-        Some(ChannelOwnershipWrite {
-            department_id: Some(Some(DepartmentId::new(sales))),
-            members_only: Some(true),
-        })
+        closed.write().unwrap().participant_emails.unwrap(),
+        ["person@example.test"]
     );
-    // Members-only without a department is ignored, so nothing changes.
-    assert_eq!(ownership(form(Some(""), true), Some(&plain)).unwrap(), None);
-    // A new desk asks for ownership only when a department is chosen.
-    assert_eq!(ownership(form(Some(""), false), None).unwrap(), None);
-    assert!(
-        ownership(form(Some(&sales.to_string()), false), None)
-            .unwrap()
-            .is_some()
-    );
-    // A value that is not an id is refused, not ignored.
-    assert!(matches!(
-        ownership(form(Some("sales"), false), Some(&plain)),
-        Err(AppError::BadRequest(_))
-    ));
-    // The draft a refused save re-renders keeps the choice.
-    let submitted = SubmittedChannel::new(form(Some(&sales.to_string()), true));
-    let draft = submitted.draft();
-    assert_eq!(draft.department_id, Some(sales));
-    assert!(draft.members_only);
 }

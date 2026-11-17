@@ -156,11 +156,11 @@ async fn run_board_read_route_hides_channels_the_caller_cannot_see() {
     .await
     .unwrap()
     .id;
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(channel)
-        .execute(f.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        f.persistence.pool(),
+        channel,
+    )
+    .await;
     let hidden = Uuid::new_v4();
     let (status, configured) = f
         .configure_on(

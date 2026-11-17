@@ -11,12 +11,11 @@ async fn channel_reply_binding_rechecks_current_run_as_private_channel_visibilit
         .await
         .unwrap();
     let binding = s.binding(MessageTrigger::Any, Some(run_as)).await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
-        .bind(s.fixture.target.company.as_uuid())
-        .bind(s.channel)
-        .execute(s.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        s.pool(),
+        s.channel,
+    )
+    .await;
     assert!(
         s.p()
             .configure_channel_reply(selection(&s, binding, None).await)

@@ -245,8 +245,8 @@ async fn department_schema_grant_provenance_check_accepts_every_variant() {
     };
     let channel = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO channels (id, company_id, name, access_mode, created_by) \
-         VALUES ($1, $2, 'Grants', 'allowlist', $3)",
+        "INSERT INTO channels (id, company_id, name, access_mode, created_by, department_id) \
+         VALUES ($1, $2, 'Grants', 'members', $3, (SELECT id FROM departments WHERE company_id=$2 AND is_root))",
     )
     .bind(channel)
     .bind(f.company)

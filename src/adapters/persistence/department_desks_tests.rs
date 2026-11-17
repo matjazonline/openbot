@@ -1,9 +1,6 @@
-//! Desks owned by departments against PostgreSQL (01-departments p02): `department_desk_ownership_`
-//! for assigning and detaching a desk, `department_desk_members_only_` for who a members-only
-//! desk admits as membership, roles and the tree change, and `department_desk_competing_` for the
-//! writers that race them.
+//! Required desk ownership, one-step derived grants and their competing production writers.
 use super::*;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
 use crate::entities::access_level::AccessLevel;
 use crate::entities::channel::{Channel, ChannelAccessMode};
 use crate::entities::company_member::CompanyMembership;
@@ -12,6 +9,9 @@ use crate::entities::participant::{
 };
 use crate::use_cases::agent::SpamScanning;
 use crate::use_cases::channel::ChannelUseCases;
+
+#[path = "access_mode_scale_tests.rs"]
+mod access_mode_scale;
 
 fn channels(f: &Departments) -> ChannelUseCases {
     ChannelUseCases::new(
@@ -22,26 +22,19 @@ fn channels(f: &Departments) -> ChannelUseCases {
     )
 }
 
-fn owned(department: DepartmentId, members_only: bool) -> Option<ChannelOwnershipWrite> {
-    Some(ChannelOwnershipWrite {
-        department_id: Some(Some(department)),
-        members_only: Some(members_only),
-    })
-}
-
-fn desk_write(slug: &str, ownership: Option<ChannelOwnershipWrite>) -> ChannelWrite {
+fn desk_write(slug: &str, department_id: Option<DepartmentId>) -> ChannelWrite {
     ChannelWrite {
         name: slug.into(),
         slug: slug.into(),
         enabled: true,
-        ownership,
+        department_id,
         ..ChannelWrite::default()
     }
 }
 
-async fn desk(f: &Departments, slug: &str, ownership: Option<ChannelOwnershipWrite>) -> Channel {
+async fn desk(f: &Departments, slug: &str, department_id: Option<DepartmentId>) -> Channel {
     channels(f)
-        .create_channel(f.owner, f.company, desk_write(slug, ownership), false)
+        .create_channel(f.owner, f.company, desk_write(slug, department_id), false)
         .await
         .expect("the owner creates a desk")
 }
@@ -50,7 +43,7 @@ async fn desk(f: &Departments, slug: &str, ownership: Option<ChannelOwnershipWri
 async fn save(
     f: &Departments,
     desk: &Channel,
-    ownership: Option<ChannelOwnershipWrite>,
+    department_id: Option<DepartmentId>,
     emails: Option<Vec<&str>>,
 ) -> AppResult<Channel> {
     channels(f)
@@ -61,7 +54,7 @@ async fn save(
             ChannelWrite {
                 participant_emails: emails
                     .map(|emails| emails.into_iter().map(String::from).collect()),
-                ..desk_write(desk.slug.as_str(), ownership)
+                ..desk_write(desk.slug.as_str(), department_id)
             },
             false,
         )
@@ -134,10 +127,15 @@ async fn admits(
     )
 }
 
-/// A teammate whose person principal owns their account email identity, so an allowlist entry
+/// A verified teammate whose person principal owns their account email identity, so an allowlist entry
 /// for that address resolves to them.
 async fn teammate_with_address(f: &Departments, label: &str) -> (Uuid, PrincipalId, String) {
     let user = user(f.pool(), label).await;
+    sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
+        .bind(user)
+        .execute(f.pool())
+        .await
+        .unwrap();
     let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
         .bind(user)
         .fetch_one(f.pool())
@@ -184,10 +182,10 @@ async fn lead(f: &Departments, department: DepartmentId, principal: PrincipalId)
         .unwrap();
 }
 
-// --- department_desk_ownership_ ---------------------------------------------------------------
+// --- access_mode_ownership_ ---------------------------------------------------------------
 
 #[tokio::test]
-async fn department_desk_ownership_refuses_another_companys_department() {
+async fn access_mode_ownership_refuses_another_companys_department() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -197,73 +195,58 @@ async fn department_desk_ownership_refuses_another_companys_department() {
             .unwrap(),
     );
     let plain = desk(&f, "plain", None).await;
-    let refused = save(&f, &plain, owned(foreign, false), None).await;
+    let refused = save(&f, &plain, Some(foreign), None).await;
     assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
     let created = channels(&f)
         .create_channel(
             f.owner,
             f.company,
-            desk_write("stray", owned(foreign, false)),
+            desk_write("stray", Some(foreign)),
             false,
         )
         .await;
     assert!(matches!(created, Err(AppError::NotFound(_))), "{created:?}");
-    assert_eq!(reload(&f, plain.id).await.department_id, None);
+    assert_eq!(reload(&f, plain.id).await.department_id, f.root_id().await);
 }
 
 #[tokio::test]
-async fn department_desk_ownership_blocks_deleting_its_department_until_detached() {
+async fn access_mode_ownership_blocks_deletion_until_reassigned() {
     let Some(f) = Departments::new().await else {
         return;
     };
     let sales = f.create("Sales", None).await;
+    let root = f.root_id().await;
     let plain = desk(&f, "pipeline", None).await;
-    let assigned = save(&f, &plain, owned(sales.id, false), None)
-        .await
-        .unwrap();
-    assert_eq!(assigned.department_id, Some(sales.id));
-    assert!(!assigned.members_only);
-    assert!(
-        assigned.settings_revision > plain.settings_revision,
-        "an ownership edit is a settings edit"
-    );
-
-    // A save from a form that knows nothing of departments keeps the ownership.
+    assert_eq!(plain.department_id, root, "new desks default to root");
+    let assigned = save(&f, &plain, Some(sales.id), None).await.unwrap();
+    assert_eq!(assigned.department_id, sales.id);
+    assert_eq!(assigned.settings_revision, plain.settings_revision + 1);
     let kept = save(&f, &assigned, None, None).await.unwrap();
-    assert_eq!(
-        (kept.department_id, kept.members_only),
-        (Some(sales.id), false)
-    );
-
+    assert_eq!(kept.department_id, sales.id, "omitting owner preserves it");
+    assert_eq!(kept.settings_revision, assigned.settings_revision + 1);
     let refused = f
         .use_cases
         .delete_department(f.owner, f.company, sales.id)
         .await;
     assert!(matches!(refused, Err(AppError::Conflict(_))), "{refused:?}");
-
-    let detach = Some(ChannelOwnershipWrite {
-        department_id: Some(None),
-        members_only: None,
-    });
-    let detached = save(&f, &kept, detach, None).await.unwrap();
-    assert_eq!(detached.department_id, None);
-    assert!(detached.settings_revision > kept.settings_revision);
-    // Its own desk too (01DEP-P03-D8): with it gone, the department owns no desk.
+    let reassigned = save(&f, &kept, Some(root), None).await.unwrap();
+    assert_eq!(reassigned.department_id, root);
+    assert_eq!(reassigned.settings_revision, kept.settings_revision + 1);
     f.drop_desk(sales.id).await;
     f.use_cases
         .delete_department(f.owner, f.company, sales.id)
         .await
-        .expect("a department with no desks deletes");
+        .unwrap();
 }
 
 #[tokio::test]
-async fn department_desk_ownership_company_teardown_takes_owned_desks_with_it() {
+async fn access_mode_ownership_company_teardown_takes_owned_desks_with_it() {
     let Some(f) = Departments::new().await else {
         return;
     };
     let ops = f.create("Ops", None).await;
     add(&f, ops.id, f.member_principal).await;
-    desk(&f, "ops-desk", owned(ops.id, true)).await;
+    desk(&f, "ops-desk", Some(ops.id)).await;
     let refused = sqlx::query("DELETE FROM departments WHERE id = $1")
         .bind(ops.id.as_uuid())
         .execute(f.pool())
@@ -281,7 +264,7 @@ async fn department_desk_ownership_company_teardown_takes_owned_desks_with_it() 
 /// DEP-P02-D4 invariant (G1-F3): only members-only desks hold derived grants, and moving a desk
 /// replaces the old department's with the new one's.
 #[tokio::test]
-async fn department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants() {
+async fn access_mode_grants_reassignment_and_public_keep_the_current_department_audience() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -289,33 +272,23 @@ async fn department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants
     let second = f.create("Second", None).await;
     add(&f, first.id, f.member_principal).await;
     add(&f, second.id, f.agent_principal).await;
-    let shared = desk(&f, "shared", owned(first.id, true)).await;
-    assert_eq!(shared.access_mode, ChannelAccessMode::Allowlist);
+    let shared = desk(&f, "shared", Some(first.id)).await;
+    assert_eq!(shared.access_mode, ChannelAccessMode::Members);
     assert_eq!(derived(&shared), both(&[f.member_principal]));
-
-    let moved = save(&f, &shared, owned(second.id, true), None)
-        .await
-        .unwrap();
+    let moved = save(&f, &shared, Some(second.id), None).await.unwrap();
     assert_eq!(derived(&moved), both(&[f.agent_principal]));
-
-    let opened = save(&f, &moved, owned(second.id, false), None)
-        .await
-        .unwrap();
-    assert_eq!(derived(&opened), Vec::new());
-    assert_eq!(
-        opened.access_mode,
-        ChannelAccessMode::Team,
-        "the email list decides again"
-    );
-    // A later membership change does not bring them back on a desk that is not members-only.
+    let public = save(&f, &moved, None, Some(vec!["@public"])).await.unwrap();
+    assert_eq!(public.access_mode, ChannelAccessMode::Public);
+    assert_eq!(derived(&public), both(&[f.agent_principal]));
     add(&f, second.id, f.member_principal).await;
-    assert_eq!(derived(&reload(&f, shared.id).await), Vec::new());
+    assert_eq!(
+        derived(&reload(&f, shared.id).await),
+        both(&[f.agent_principal, f.member_principal])
+    );
 }
 
-// --- department_desk_members_only_ ------------------------------------------------------------
-
 #[tokio::test]
-async fn department_desk_members_only_admits_members_and_the_owner_only() {
+async fn access_mode_grants_admits_members_and_the_owner_only() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -323,7 +296,7 @@ async fn department_desk_members_only_admits_members_and_the_owner_only() {
     add(&f, finance.id, f.member_principal).await;
     add(&f, finance.id, f.agent_principal).await;
     let (_, outsider) = teammate(f.pool(), f.company, "member").await;
-    let books = desk(&f, "books", owned(finance.id, true)).await;
+    let books = desk(&f, "books", Some(finance.id)).await;
     assert_eq!(
         derived(&books),
         both(&[f.member_principal, f.agent_principal]),
@@ -346,13 +319,13 @@ async fn department_desk_members_only_admits_members_and_the_owner_only() {
 }
 
 #[tokio::test]
-async fn department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit() {
+async fn access_mode_grants_removal_revokes_access_and_notifications_in_one_commit() {
     let Some(f) = Departments::new().await else {
         return;
     };
     let legal = f.create("Legal", None).await;
     add(&f, legal.id, f.member_principal).await;
-    let cases = desk(&f, "cases", owned(legal.id, true)).await;
+    let cases = desk(&f, "cases", Some(legal.id)).await;
     let event: Uuid = sqlx::query_scalar(
         "INSERT INTO notification_events (company_id, source_kind, source_id, action_kind, \
            source_generation) VALUES ($1, 'delivery', $2, 'delivery_failure', 1) RETURNING id",
@@ -398,7 +371,7 @@ async fn department_desk_members_only_removal_revokes_access_and_notifications_i
 
 /// One step both ways (01DEP-C002): the parent's lead and each child's lead, nobody further.
 #[tokio::test]
-async fn department_desk_members_only_reaches_one_step_up_and_down() {
+async fn access_mode_grants_reaches_one_step_up_and_down() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -416,7 +389,7 @@ async fn department_desk_members_only_reaches_one_step_up_and_down() {
     let [grand_lead, parent_lead, child_lead, grandchild_lead] = leads[..] else {
         unreachable!()
     };
-    let room = desk(&f, "room", owned(middle.id, true)).await;
+    let room = desk(&f, "room", Some(middle.id)).await;
     assert_eq!(derived(&room), both(&[parent_lead, child_lead]));
     for (principal, expected) in [
         (parent_lead, true),
@@ -446,8 +419,8 @@ async fn department_desk_members_only_reaches_one_step_up_and_down() {
     );
     // The middle department's own lead reaches the room, its parent's and its child's desks.
     let (_, middle_lead) = teammate(f.pool(), f.company, "member").await;
-    let up = desk(&f, "grand-room", owned(grand.id, true)).await;
-    let down = desk(&f, "child-room", owned(child.id, true)).await;
+    let up = desk(&f, "grand-room", Some(grand.id)).await;
+    let down = desk(&f, "child-room", Some(child.id)).await;
     lead(&f, middle.id, middle_lead).await;
     for room in [room.id, up.id, down.id] {
         assert!(
@@ -477,12 +450,12 @@ async fn department_desk_members_only_reaches_one_step_up_and_down() {
 /// G1-F1: a department grant and an allowlist entry for the same person are separate rows, so
 /// neither removes the access the other gave, in either order.
 #[tokio::test]
-async fn department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart() {
+async fn access_mode_grants_keeps_an_allowlist_entry_and_a_membership_apart() {
     let Some(f) = Departments::new().await else {
         return;
     };
     let audit = f.create("Audit", None).await;
-    let room = desk(&f, "audit-room", owned(audit.id, true)).await;
+    let room = desk(&f, "audit-room", Some(audit.id)).await;
 
     // Allowlisted first, then a member; a save dropping the email keeps the member's access.
     let (_, first, first_email) = teammate_with_address(&f, "first").await;
@@ -501,11 +474,10 @@ async fn department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_
     let unlisted = save(&f, &reload(&f, room.id).await, None, Some(vec![]))
         .await
         .unwrap();
-    assert_eq!(unlisted.access_mode, ChannelAccessMode::Allowlist);
+    assert_eq!(unlisted.access_mode, ChannelAccessMode::Members);
     assert_eq!(
-        unlisted.participant_emails,
-        Some(vec![]),
-        "a derived holder is not shown as an allowlist email (02B.3)"
+        unlisted.participant_emails, None,
+        "a derived holder is not shown as an allowlist email"
     );
     assert_eq!(derived(&unlisted), both(&[first]));
     assert!(
@@ -552,55 +524,38 @@ async fn department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_
 
 /// DEP-P02-D2 (G1-F2): every save applies the members-only rule to the desk's ownership.
 #[tokio::test]
-async fn department_desk_public_selection_clears_members_only_and_keeps_ownership() {
+async fn access_mode_public_selection_preserves_owner_and_materialized_grants() {
     let Some(f) = Departments::new().await else {
         return;
     };
     let hr = f.create("HR", None).await;
-    let people = desk(&f, "people", owned(hr.id, true)).await;
+    add(&f, hr.id, f.member_principal).await;
+    let people = desk(&f, "people", Some(hr.id)).await;
     let saved = save(&f, &people, None, Some(vec![])).await.unwrap();
-    assert_eq!(
-        (saved.access_mode, saved.members_only),
-        (ChannelAccessMode::Allowlist, true)
-    );
-    let unowned = save(
-        &f,
-        &saved,
-        Some(ChannelOwnershipWrite {
-            department_id: Some(None),
-            members_only: None,
-        }),
-        None,
-    )
-    .await;
-    assert!(
-        matches!(unowned, Err(AppError::BadRequest(_))),
-        "{unowned:?}"
-    );
-    assert_eq!(
-        reload(&f, people.id).await.department_id,
-        Some(hr.id),
-        "nothing changed"
-    );
+    assert_eq!(saved.access_mode, ChannelAccessMode::Members);
+    assert_eq!(saved.department_id, hr.id);
+    assert_eq!(derived(&saved), both(&[f.member_principal]));
     let public = save(&f, &saved, None, Some(vec!["@public"])).await.unwrap();
+    assert_eq!(public.access_mode, ChannelAccessMode::Public);
+    assert_eq!(public.department_id, hr.id);
+    assert_eq!(derived(&public), derived(&saved));
     assert_eq!(
-        (public.access_mode, public.members_only),
-        (ChannelAccessMode::Public, false)
+        public.principal_grants, saved.principal_grants,
+        "unchanged grants retain creation identity"
     );
-    assert_eq!(public.department_id, Some(hr.id));
-    assert_eq!(reload(&f, people.id).await, public);
+    let members = save(&f, &public, None, None).await.unwrap();
+    assert_eq!(members.access_mode, ChannelAccessMode::Members);
+    assert_eq!(members.principal_grants, public.principal_grants);
 }
 
-/// DEP-P02-D5: a teammate removed from the company loses their derived grants with their
-/// department places; an allowlist entry on the same principal stays.
 #[tokio::test]
-async fn department_desk_members_only_removing_a_teammate_drops_only_derived_grants() {
+async fn access_mode_grants_removing_a_teammate_drops_only_derived_grants() {
     use crate::use_cases::company_invite::CompanyInvitePersistence;
     let Some(f) = Departments::new().await else {
         return;
     };
     let support = f.create("Support", None).await;
-    let room = desk(&f, "support-room", owned(support.id, true)).await;
+    let room = desk(&f, "support-room", Some(support.id)).await;
     let (user, leaving, email) = teammate_with_address(&f, "leaving").await;
     add(&f, support.id, leaving).await;
     save(
@@ -643,7 +598,7 @@ async fn department_desk_members_only_removing_a_teammate_drops_only_derived_gra
 }
 
 #[tokio::test]
-async fn department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path() {
+async fn access_mode_grants_set_desk_ownership_on_takes_the_desk_edit_path() {
     use crate::adapters::persistence::department_desks::set_desk_ownership_on;
     let Some(f) = Departments::new().await else {
         return;
@@ -657,22 +612,14 @@ async fn department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_
         .execute(&mut *tx)
         .await
         .unwrap();
-    set_desk_ownership_on(
-        &mut tx,
-        CompanyId::new(f.company),
-        plain.id,
-        &ChannelOwnershipWrite {
-            department_id: Some(Some(crew.id)),
-            members_only: Some(true),
-        },
-    )
-    .await
-    .unwrap();
+    set_desk_ownership_on(&mut tx, CompanyId::new(f.company), plain.id, crew.id)
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
     let after = reload(&f, plain.id).await;
     assert_eq!(
-        (after.department_id, after.members_only, after.access_mode),
-        (Some(crew.id), true, ChannelAccessMode::Allowlist)
+        (after.department_id, after.access_mode),
+        (crew.id, ChannelAccessMode::Members)
     );
     assert_eq!(derived(&after), both(&[f.member_principal]));
 }
@@ -688,7 +635,7 @@ async fn department_desk_competing_membership_and_ownership_edit_agree() {
     };
     let f = Arc::new(Departments::on(database.pool.clone()).await);
     let team = f.create("Team", None).await;
-    let room = desk(&f, "team-room", owned(team.id, false)).await;
+    let room = desk(&f, "team-room", Some(team.id)).await;
     let blocker = super::competing::hold_company(&f).await;
     let joining = tokio::spawn({
         let f = f.clone();
@@ -701,7 +648,7 @@ async fn department_desk_competing_membership_and_ownership_edit_agree() {
     let closing = tokio::spawn({
         let f = f.clone();
         let room = room.clone();
-        async move { save(&f, &room, owned(team.id, true), None).await.map(drop) }
+        async move { save(&f, &room, Some(team.id), None).await.map(drop) }
     });
     wait_until_backends_are_blocked(f.pool(), 2).await;
     blocker.commit().await.unwrap();
@@ -726,7 +673,7 @@ async fn department_desk_competing_rederivation_behind_a_demotion_leaves_it_out(
     let f = Arc::new(Departments::on(database.pool.clone()).await);
     let unit = f.create("Unit", None).await;
     add(&f, unit.id, f.member_principal).await;
-    let room = desk(&f, "unit-room", owned(unit.id, true)).await;
+    let room = desk(&f, "unit-room", Some(unit.id)).await;
     assert_eq!(derived(&room), both(&[f.member_principal]));
     let mut demotion = f.pool().begin().await.unwrap();
     sqlx::query("UPDATE principals SET kind = 'external', user_id = NULL WHERE id = $1")
@@ -763,7 +710,7 @@ async fn department_desk_competing_removal_and_demotion_of_one_principal_both_co
     let unit = f.create("Pair", None).await;
     add(&f, unit.id, f.member_principal).await;
     lead(&f, unit.id, f.member_principal).await;
-    let room = desk(&f, "pair-room", owned(unit.id, true)).await;
+    let room = desk(&f, "pair-room", Some(unit.id)).await;
     assert_eq!(derived(&room), both(&[f.member_principal]));
     sqlx::query(&format!(
         r#"CREATE FUNCTION pause_department_removal() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -822,41 +769,145 @@ async fn department_desk_competing_removal_and_demotion_of_one_principal_both_co
 }
 
 #[tokio::test]
-async fn department_desk_raw_public_with_members_only_is_refused() {
+async fn access_mode_raw_null_owner_and_removed_modes_are_refused() {
     let Some(f) = Departments::new().await else {
         return;
     };
-    let hr = f.create("HR", None).await;
-    let people = desk(&f, "raw-private", owned(hr.id, true)).await;
-    let result = ChannelPersistence::update(
-        &f.persistence,
-        crate::application::ports::channel::ChannelUpdate {
-            company_id: f.company,
-            channel_id: people.id,
-            write: ChannelWrite {
-                participant_emails: Some(vec!["@public".into()]),
-                ..desk_write(people.slug.as_str(), owned(hr.id, true))
-            },
-        },
-    )
-    .await;
-    assert!(matches!(result, Err(AppError::BadRequest(_))), "{result:?}");
-    let error =
-        sqlx::query("UPDATE channels SET access_mode='public' WHERE company_id=$1 AND id=$2")
+    let people = desk(&f, "raw-private", None).await;
+    let error = sqlx::query("UPDATE channels SET department_id=NULL WHERE company_id=$1 AND id=$2")
+        .bind(f.company)
+        .bind(people.id)
+        .execute(f.pool())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.as_database_error().unwrap().code().as_deref(),
+        Some("23502")
+    );
+    for mode in ["team", "allowlist", "unknown"] {
+        let error = sqlx::query("UPDATE channels SET access_mode=$3 WHERE company_id=$1 AND id=$2")
             .bind(f.company)
             .bind(people.id)
-            .execute(f.persistence.pool())
+            .bind(mode)
+            .execute(f.pool())
             .await
             .unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().constraint(),
+            Some("channels_access_mode_check")
+        );
+    }
     assert_eq!(
-        error.as_database_error().unwrap().constraint(),
-        Some("channels_members_only_allowlist")
+        reload(&f, people.id).await,
+        people,
+        "invalid writes leave settings/grants unchanged"
     );
-    let stored = reload(&f, people.id).await;
+}
+
+#[tokio::test]
+async fn access_mode_grants_default_root_desk_admits_root_members_but_child_requires_its_grant() {
+    let Some(f) = Departments::new().await else {
+        return;
+    };
+    let root = desk(&f, "company-room", None).await;
+    assert_eq!(root.department_id, f.root_id().await);
     assert_eq!(
-        (stored.access_mode, stored.members_only),
-        (ChannelAccessMode::Allowlist, true)
+        admits(&f, root.id, f.member_principal, CompanyMembership::Member).await,
+        (true, true, true)
     );
-    assert_eq!(stored.settings_revision, people.settings_revision);
-    assert_eq!(stored.department_id, Some(hr.id));
+    let child = f.create("Restricted", None).await;
+    let private = desk(&f, "private-child", Some(child.id)).await;
+    assert_eq!(
+        admits(
+            &f,
+            private.id,
+            f.member_principal,
+            CompanyMembership::Member
+        )
+        .await,
+        (false, false, false)
+    );
+    add(&f, child.id, f.member_principal).await;
+    assert_eq!(
+        admits(
+            &f,
+            private.id,
+            f.member_principal,
+            CompanyMembership::Member
+        )
+        .await,
+        (true, true, true)
+    );
+}
+
+#[tokio::test]
+async fn access_mode_grants_sql_and_domain_keep_membership_but_withhold_unverified_email_grants() {
+    let Some(f) = Departments::new().await else {
+        return;
+    };
+    let account: Uuid =
+        sqlx::query_scalar("SELECT user_id FROM principals WHERE company_id=$1 AND id=$2")
+            .bind(f.company)
+            .bind(f.member_principal.as_uuid())
+            .fetch_one(f.pool())
+            .await
+            .unwrap();
+    sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
+        .bind(account)
+        .execute(f.pool())
+        .await
+        .unwrap();
+    let email: String = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
+        .bind(account)
+        .fetch_one(f.pool())
+        .await
+        .unwrap();
+    let root = desk(&f, "unverified-root", None).await;
+    let child = f.create("Email grants", None).await;
+    let private = desk(&f, "private-email-grants", Some(child.id)).await;
+    let configured = save(&f, &private, None, Some(vec![&email])).await.unwrap();
+    assert!(
+        configured
+            .principal_grants
+            .iter()
+            .any(|grant| grant.principal_id == f.member_principal
+                && grant.provenance == GrantProvenance::ConfiguredAllowlist)
+    );
+    sqlx::query("UPDATE users SET email_verified_at=NULL WHERE id=$1")
+        .bind(account)
+        .execute(f.pool())
+        .await
+        .unwrap();
+    let mut actor = context(f.member_principal, CompanyMembership::Member);
+    actor.grant_authority = PrincipalGrantAuthority::WithheldUnverifiedEmail;
+    for (channel, expected) in [(&root, true), (&configured, false)] {
+        assert_eq!(channel.viewer_access(actor), expected);
+        assert_eq!(channel.participant_access(actor).authorized, expected);
+        let sql: bool = sqlx::query_scalar("SELECT notification_principal_can_view($1,$2,$3)")
+            .bind(f.company)
+            .bind(channel.id)
+            .bind(f.member_principal.as_uuid())
+            .fetch_one(f.pool())
+            .await
+            .unwrap();
+        assert_eq!(
+            sql, expected,
+            "SQL view agrees with authenticated grant provenance"
+        );
+    }
+    add(&f, child.id, f.member_principal).await;
+    let member = reload(&f, private.id).await;
+    assert!(member.viewer_access(actor));
+    assert!(member.participant_access(actor).authorized);
+    let sql: bool = sqlx::query_scalar("SELECT notification_principal_can_view($1,$2,$3)")
+        .bind(f.company)
+        .bind(member.id)
+        .bind(f.member_principal.as_uuid())
+        .fetch_one(f.pool())
+        .await
+        .unwrap();
+    assert!(
+        sql,
+        "the child department grant also comes from the current principal, not email proof"
+    );
 }

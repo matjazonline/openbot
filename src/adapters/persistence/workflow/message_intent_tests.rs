@@ -1720,11 +1720,11 @@ async fn thread_attribution_links_require_access_to_the_producing_run() {
             .inspectable
             .is_empty()
     );
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(s.channel)
-        .execute(s.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        s.pool(),
+        s.channel,
+    )
+    .await;
     assert!(
         s.p()
             .thread_runs(company, s.thread, admin)

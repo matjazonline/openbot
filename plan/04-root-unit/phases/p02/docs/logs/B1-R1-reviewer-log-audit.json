@@ -1,0 +1,228 @@
+{
+  "review": "04RU-P02-B1-R1",
+  "inspected_execution_summaries": {
+    "B1-core-consumer-tests.txt": [
+      "test result: FAILED. 291 passed; 88 failed; 1 ignored; 0 measured; 4364 filtered out; finished in 117.63s"
+    ],
+    "B1-r2-core-security-tests3.txt": [
+      "test result: FAILED. 482 passed; 1 failed; 1 ignored; 0 measured; 4262 filtered out; finished in 120.00s"
+    ],
+    "B1-targeted-corrections.txt": [
+      "test result: ok. 79 passed; 0 failed; 2 ignored; 0 measured; 4665 filtered out; finished in 48.59s"
+    ],
+    "B1-remaining-consumers.txt": [
+      "test result: FAILED. 901 passed; 8 failed; 7 ignored; 0 measured; 3830 filtered out; finished in 437.46s"
+    ],
+    "B1-remaining-failures-corrected2.txt": [
+      "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 4737 filtered out; finished in 3.89s"
+    ],
+    "B1-final-workflow-authorization.txt": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4739 filtered out; finished in 0.20s"
+    ],
+    "B1-final-focused-stock-stack.txt": [
+      "test result: ok. 206 passed; 0 failed; 3 ignored; 0 measured; 4537 filtered out; finished in 71.25s"
+    ],
+    "B1-final-relay-and-initial-grants2.txt": [
+      "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 4733 filtered out; finished in 25.06s"
+    ]
+  },
+  "historical_failed_names": 97,
+  "unresolved_failed_names_after_replacement_mapping": [],
+  "renamed_failure_proof": [
+    {
+      "removed": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_needs_a_department_only_while_active",
+      "replacement": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_company_requires_context_but_default_desk_has_root_context",
+      "disposition": "Removed optional-owner/members_only behavior intentionally; replacement asserts required owner/reassignment and current grant policy.",
+      "exercised_evidence": "B1-r2-core-security-tests3.txt"
+    }
+  ],
+  "dispositions": [
+    {
+      "removed": "adapters::http::pages::tests::department_ui::department_ui_desk_form_offers_the_department_and_members_only",
+      "replacement": "adapters::http::pages::tests::department_ui::access_mode_ui_desk_form_requires_owner_defaults_root_and_offers_public",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent",
+      "replacement": "adapters::http::routes::channel::department_tests::access_mode_json_owner_is_preserved_and_can_be_reassigned_but_not_cleared",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::http::routes::ui_channels::tests::department_ui_desk_form_asks_only_for_the_ownership_it_changes",
+      "replacement": "adapters::http::routes::ui_channels::tests::access_mode_ui_owner_is_optional_in_a_write_but_cannot_be_cleared",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_members_only_admits_members_and_the_owner_only",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_grants_admits_members_and_the_owner_only",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_grants_keeps_an_allowlist_entry_and_a_membership_apart",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_members_only_reaches_one_step_up_and_down",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_grants_reaches_one_step_up_and_down",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_grants_removal_revokes_access_and_notifications_in_one_commit",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_grants_removing_a_teammate_drops_only_derived_grants",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_grants_set_desk_ownership_on_takes_the_desk_edit_path",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_ownership_blocks_deleting_its_department_until_detached",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_ownership_blocks_deletion_until_reassigned",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_ownership_company_teardown_takes_owned_desks_with_it",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_grants_reassignment_and_public_keep_the_current_department_audience",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_ownership_refuses_another_companys_department",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_ownership_refuses_another_companys_department",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_public_selection_clears_members_only_and_keeps_ownership",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_public_selection_preserves_owner_and_materialized_grants",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::desks::department_desk_raw_public_with_members_only_is_refused",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_raw_null_owner_and_removed_modes_are_refused",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::lead_desks::department_lead_desk_blocks_deleting_its_department_until_detached",
+      "replacement": "adapters::persistence::department::tests::lead_desks::department_lead_desk_blocks_deleting_its_department_until_reassigned",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department::tests::lead_desks::department_lead_desk_survives_a_rename_and_is_left_once_detached",
+      "replacement": "adapters::persistence::department::tests::lead_desks::department_lead_desk_survives_a_rename_and_is_left_once_reassigned",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department_desks::tests::a_desk_that_is_not_members_only_follows_its_email_list",
+      "replacement": "adapters::persistence::department::tests::desks::access_mode_public_selection_preserves_owner_and_materialized_grants",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department_desks::tests::a_members_only_desk_stores_allowlist_whatever_its_email_list",
+      "replacement": "application::use_cases::channel::public_settings_tests::access_mode_members_normalization_preserves_explicit_owner",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::department_desks::tests::an_ownership_edit_keeps_what_it_does_not_name",
+      "replacement": "adapters::http::routes::channel::department_tests::access_mode_json_owner_is_preserved_and_can_be_reassigned_but_not_cleared",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_channel_allowlist_edit_refreshes_and_repairs_without_changing_context",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_configured_grant_edit_refreshes_without_changing_context",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers",
+      "replacement": "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_required_owner",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_blocks_both_detach_writers_until_deactivation",
+      "replacement": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_preserves_required_owner_and_allows_reassignment",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_competing_activation_and_detachment_preserve_eligibility",
+      "replacement": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_competing_activation_and_reassignment_keep_required_context",
+      "successful_named_result": true
+    },
+    {
+      "removed": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_needs_a_department_only_while_active",
+      "replacement": "adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_company_requires_context_but_default_desk_has_root_context",
+      "successful_named_result": true
+    },
+    {
+      "removed": "application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only",
+      "replacement": "application::use_cases::channel::public_settings_tests::access_mode_members_normalization_preserves_explicit_owner",
+      "successful_named_result": true
+    },
+    {
+      "removed": "application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting",
+      "replacement": "application::use_cases::channel::public_settings_tests::access_mode_public_normalization_keeps_an_omitted_owner_omitted",
+      "successful_named_result": true
+    },
+    {
+      "removed": "application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag",
+      "replacement": "application::use_cases::channel::public_settings_tests::access_mode_public_normalization_preserves_explicit_owner",
+      "successful_named_result": true
+    },
+    {
+      "removed": "application::use_cases::thread::tests::department_desk_relay::department_desk_members_only_thread_party_keeps_replying_after_removal",
+      "replacement": "application::use_cases::thread::tests::department_desk_relay::department_desk_members_thread_party_keeps_replying_after_removal",
+      "successful_named_result": true
+    },
+    {
+      "removed": "application::use_cases::thread::tests::department_desk_relay::department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_only_grants",
+      "replacement": "application::use_cases::thread::tests::department_desk_relay::department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_grants",
+      "successful_named_result": true
+    },
+    {
+      "removed": "domain::entities::channel::tests::a_team_channel_is_readable_by_the_team_and_nobody_else",
+      "replacement": "domain::entities::channel::tests::access_mode_root_members_read_through_their_materialized_grants",
+      "successful_named_result": true
+    },
+    {
+      "removed": "domain::entities::channel::tests::a_team_channel_takes_the_team_s_mail_and_no_one_else_s",
+      "replacement": "domain::entities::channel::tests::access_mode_root_members_send_through_their_materialized_grants",
+      "successful_named_result": true
+    },
+    {
+      "removed": "domain::entities::channel::tests::an_allowlist_channel_is_narrower_than_the_team",
+      "replacement": "domain::entities::channel::tests::access_mode_child_members_requires_a_view_grant_even_for_admins",
+      "successful_named_result": true
+    },
+    {
+      "removed": "domain::entities::channel::tests::an_allowlist_channel_still_takes_its_owner_s_mail",
+      "replacement": "domain::entities::channel::tests::access_mode_members_preserves_owner_and_named_participant_access",
+      "successful_named_result": true
+    },
+    {
+      "removed": "domain::entities::channel::tests::an_unresolved_actor_holds_no_grant",
+      "replacement": "domain::entities::channel::tests::access_mode_unresolved_actor_holds_no_grant",
+      "successful_named_result": true
+    },
+    {
+      "removed": "domain::entities::channel::tests::public_lets_a_stranger_write_without_trusting_them",
+      "replacement": "domain::entities::channel::tests::access_mode_public_accepts_outsiders_without_trusting_them",
+      "successful_named_result": true
+    },
+    {
+      "removed": "domain::entities::channel::tests::public_opens_a_channel_to_mail_not_to_readers",
+      "replacement": "domain::entities::channel::tests::access_mode_public_opens_mail_but_never_outsider_reads",
+      "successful_named_result": true
+    }
+  ],
+  "runtime_reexecuted_by_reviewer": false,
+  "limitation": "Retained results prove exercised paths only; classic generated form to parser contract is missing and fails by source inspection (F1). Full p03 suites/external journeys remain pending."
+}

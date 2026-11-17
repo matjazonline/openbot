@@ -103,6 +103,26 @@ pub(in crate::adapters::persistence::workflow::tests) async fn member(
     user
 }
 
+pub(in crate::adapters::persistence::workflow::tests) async fn verify_email(
+    fixture: &Fixture,
+    user: Uuid,
+) {
+    let mut tx = fixture.persistence.pool().begin().await.unwrap();
+    let email: String = sqlx::query_scalar(
+        "UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1 RETURNING email::text",
+    )
+    .bind(user)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    crate::adapters::persistence::account_identity::rekey_account_identity_on(
+        &mut tx, user, &email, &email,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+}
+
 /// Destinations by role, resolved to ids once the fixture exists.
 #[derive(Clone, Copy)]
 pub(super) enum To {

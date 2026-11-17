@@ -71,11 +71,11 @@ async fn conversation_reads_refuse_foreign_scope_and_private_channels() {
         return;
     };
     let thread = h.thread("Private").await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(h.channel_id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        h.persistence.pool(),
+        h.channel_id,
+    )
+    .await;
     crate::adapters::persistence::test_support::insert_root_member(
         h.persistence.pool(),
         crate::domain::workflow::CompanyId::new(h.company_id),

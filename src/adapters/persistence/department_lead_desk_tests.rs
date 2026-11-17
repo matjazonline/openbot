@@ -2,9 +2,24 @@
 //! `department_desk_` for the desk a department is created with and how it follows its lead, and
 //! `department_lead_desk_competing_` for lead changes that race.
 use super::*;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::workflow::compiler::agent_reference_steps;
 use crate::application::workflow::templates::REPLY_AGENT_STEP;
+
+/// These scenarios exercise an administrator who is also admitted to this private desk.
+async fn admit_member(f: &Departments, department: DepartmentId, user: Uuid) {
+    let principal =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+            .bind(f.company)
+            .bind(user)
+            .fetch_one(f.pool())
+            .await
+            .unwrap();
+    f.use_cases
+        .add_member(f.owner, f.company, department, PrincipalId::new(principal))
+        .await
+        .unwrap();
+}
 
 /// The department's `department:{id}` record.
 async fn record(f: &Departments, department: DepartmentId) -> serde_json::Value {
@@ -24,9 +39,9 @@ fn uuid(value: &serde_json::Value) -> Option<Uuid> {
 }
 
 /// The desk: primary address, name, owning department, members-only.
-async fn desk_row(f: &Departments, desk: Uuid) -> (String, String, Option<Uuid>, bool) {
+async fn desk_row(f: &Departments, desk: Uuid) -> (String, String, Uuid) {
     sqlx::query_as(
-        "SELECT slug.slug::text, channel.name, channel.department_id, channel.members_only \
+        "SELECT slug.slug::text, channel.name, channel.department_id \
            FROM channels AS channel \
            JOIN addresses AS slug ON slug.company_id = channel.company_id \
             AND slug.channel_id = channel.id AND slug.is_primary \
@@ -185,8 +200,7 @@ async fn department_lead_desk_with_an_agent_lead_answers_on_it() {
         (
             "ops-room".into(),
             "Ops Room".into(),
-            Some(department.id.as_uuid()),
-            false
+            department.id.as_uuid()
         )
     );
     assert_eq!(
@@ -222,12 +236,7 @@ async fn department_lead_desk_with_a_person_lead_or_none_is_a_plain_team_desk() 
         assert_eq!(record["binding_id"], serde_json::Value::Null);
         assert_eq!(
             desk_row(&f, desk).await,
-            (
-                name.to_lowercase(),
-                name.into(),
-                Some(department.id.as_uuid()),
-                false
-            )
+            (name.to_lowercase(), name.into(), department.id.as_uuid())
         );
         assert_eq!(desk_bindings(&f, desk).await, 0);
         assert_eq!(selected(&f, desk).await, None);
@@ -311,7 +320,7 @@ async fn address_namespace_a_department_desk_cannot_take_a_persons_address() {
 /// 03B.2: renaming the department keeps its desk, and the desk still follows the lead; once the
 /// desk is detached, a lead change touches no desk.
 #[tokio::test]
-async fn department_lead_desk_survives_a_rename_and_is_left_once_detached() {
+async fn department_lead_desk_survives_a_rename_and_is_left_once_reassigned() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -356,10 +365,7 @@ async fn department_lead_desk_survives_a_rename_and_is_left_once_detached() {
         &mut detach,
         CompanyId::new(f.company),
         desk,
-        &ChannelOwnershipWrite {
-            department_id: Some(None),
-            members_only: None,
-        },
+        f.root_id().await,
     )
     .await
     .unwrap();
@@ -369,7 +375,7 @@ async fn department_lead_desk_survives_a_rename_and_is_left_once_detached() {
         .unwrap();
     assert!(
         !bound(&f, binding).await.active,
-        "a detached desk is no longer followed"
+        "a reassigned desk is no longer followed"
     );
     assert_eq!(
         selected(&f, desk).await.map(|selected| selected.0),
@@ -395,6 +401,7 @@ async fn department_lead_desk_agent_to_agent_repoints_the_same_binding() {
         own_inbox(&f, f.agent_principal).await,
         own_inbox(&f, closer).await,
     );
+    admit_member(&f, department.id, f.admin).await;
     lead(&f, f.admin, department.id, closer).await.unwrap();
     assert_eq!(
         (
@@ -512,6 +519,8 @@ async fn department_lead_desk_run_as_moves_to_the_admin_who_changes_the_lead() {
     let department = create_led(&f, "Night", Some(f.member_principal))
         .await
         .unwrap();
+    admit_member(&f, department.id, f.admin).await;
+    admit_member(&f, department.id, second_admin).await;
     lead(&f, f.admin, department.id, f.agent_principal)
         .await
         .unwrap();
@@ -642,10 +651,7 @@ async fn department_lead_desk_refuses_lead_changes_it_cannot_follow() {
         &mut restrict,
         CompanyId::new(f.company),
         desk,
-        &ChannelOwnershipWrite {
-            department_id: None,
-            members_only: Some(true),
-        },
+        department.id,
     )
     .await
     .unwrap();
@@ -717,7 +723,7 @@ async fn department_lead_desk_follows_an_agent_created_as_its_lead() {
 
 /// Decision 9: a department whose agent-led desk is still its own is not deleted; detached, it is.
 #[tokio::test]
-async fn department_lead_desk_blocks_deleting_its_department_until_detached() {
+async fn department_lead_desk_blocks_deleting_its_department_until_reassigned() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -741,10 +747,7 @@ async fn department_lead_desk_blocks_deleting_its_department_until_detached() {
         &mut detach,
         CompanyId::new(f.company),
         desk,
-        &ChannelOwnershipWrite {
-            department_id: Some(None),
-            members_only: None,
-        },
+        f.root_id().await,
     )
     .await
     .unwrap();

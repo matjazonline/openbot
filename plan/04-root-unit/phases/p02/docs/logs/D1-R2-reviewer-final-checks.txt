@@ -1,0 +1,6 @@
+entry/final snapshot bytes identical: PASS
+expected artifact: PASS
+HEAD/base matches: PASS
+branch matches: PASS
+D1/r2 SHA matches: PASS
+coordination8 pin matches: PASS

@@ -1,7 +1,7 @@
 use super::*;
 use crate::adapters::persistence::credentials::CredentialCipher;
 use crate::application::agent::DependencyManifest;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::ports::department::DepartmentWrite;
 use crate::application::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::application::use_cases::company::CompanyModelConnectionWrite;
@@ -90,10 +90,7 @@ impl RoleFixture {
                 name: "Role intake".into(),
                 slug: "role-intake".into(),
                 enabled: true,
-                ownership: Some(ChannelOwnershipWrite {
-                    department_id: Some(Some(department)),
-                    members_only: Some(true),
-                }),
+                department_id: Some(department),
                 ..Default::default()
             },
         )

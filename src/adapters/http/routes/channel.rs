@@ -26,7 +26,7 @@ use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
 use crate::application::message_outcomes::MessageOutcomeReader;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::entities::channel::Channel;
 use crate::entities::cursor::ThreadCursor;
 use crate::entities::department::DepartmentId;
@@ -120,10 +120,32 @@ pub struct ChannelForm {
     #[serde(default)]
     pub department_id: Option<String>,
     #[serde(default)]
-    pub members_only: Option<String>,
+    pub public: Option<String>,
 }
 
 impl ChannelForm {
+    pub(super) fn department(&self) -> AppResult<Option<DepartmentId>> {
+        self.department_id
+            .as_deref()
+            .map(|value| {
+                Uuid::parse_str(value.trim())
+                    .map(DepartmentId::new)
+                    .map_err(|_| AppError::BadRequest("Choose a valid owning department.".into()))
+            })
+            .transpose()
+    }
+
+    /// The checkbox maps to the existing canonical marker; only named addresses remain
+    /// in the text field, so unchecking Public also removes a previously stored marker.
+    pub(super) fn emails(&self) -> Option<Vec<String>> {
+        let mut emails = parse_emails_form(self.participant_emails.clone()).unwrap_or_default();
+        emails.retain(|email| !email.eq_ignore_ascii_case("@public"));
+        if checkbox_ticked(self.public.as_deref()) {
+            emails.push("@public".into());
+        }
+        (!emails.is_empty()).then_some(emails)
+    }
+
     /// Whether the "Channel enabled" box was ticked.
     ///
     /// An unchecked checkbox submits no key at all, and every channel form posts its whole field
@@ -196,35 +218,17 @@ pub struct ChannelJsonPayload {
     pub enabled: Option<bool>,
     /// Omitted means on, for the same reason as `enabled`.
     pub add_3rd_party: Option<bool>,
-    /// Unlike every field above, ownership is kept when absent: `null` detaches the desk from its
-    /// department, an id assigns it, and leaving the key out changes nothing.
+    /// Missing preserves the owner on edit and defaults to root on create; null is invalid.
     #[serde(default, deserialize_with = "present")]
-    pub department_id: Option<Option<Uuid>>,
-    /// Kept when absent, like `department_id`.
-    pub members_only: Option<bool>,
+    pub department_id: Option<DepartmentId>,
 }
 
-/// A field that is present, even as `null`, is `Some`; an absent one stays `None` via `default`.
-fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: Deserialize<'de>,
 {
-    Option::<T>::deserialize(deserializer).map(Some)
-}
-
-impl ChannelJsonPayload {
-    /// The ownership change this payload asks for, if it names either field.
-    fn ownership(&self) -> Option<ChannelOwnershipWrite> {
-        (self.department_id.is_some() || self.members_only.is_some()).then(|| {
-            ChannelOwnershipWrite {
-                department_id: self
-                    .department_id
-                    .map(|department| department.map(DepartmentId::new)),
-                members_only: self.members_only,
-            }
-        })
-    }
+    T::deserialize(deserializer).map(Some)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -395,6 +399,8 @@ async fn create_channel_handler(
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
     let add_3rd_party = form.add_3rd_party();
+    let department_id = form.department()?;
+    let emails = form.emails();
     let write = ChannelWrite {
         enabled,
         add_3rd_party,
@@ -402,9 +408,9 @@ async fn create_channel_handler(
         description: parse_text_form(form.description),
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
-        participant_emails: parse_emails_form(form.participant_emails),
+        participant_emails: emails,
         created_by: None,
-        ownership: None,
+        department_id,
     };
     if let Err(err) = channel_use_cases
         .create_channel(user.id, company_id, write, confirm_spam_disabled)
@@ -487,6 +493,7 @@ async fn edit_channel_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(config): State<Arc<AppConfig>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
@@ -498,10 +505,14 @@ async fn edit_channel_form(
         channel_id,
     )
     .await?;
+    let departments = department_use_cases
+        .list_departments(user.id, company_id)
+        .await?;
     Ok(Html(pages::channel_edit_fragment(
         &company,
         &config.app_domain_name,
         &channel,
+        &departments,
         config.is_spam_scan_enabled(),
     )))
 }
@@ -566,7 +577,8 @@ async fn update_channel_handler(
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
     let add_3rd_party = form.add_3rd_party();
-    let emails = parse_emails_form(form.participant_emails);
+    let department_id = form.department()?;
+    let emails = form.emails();
 
     let write = ChannelWrite {
         name: form.name,
@@ -577,7 +589,7 @@ async fn update_channel_handler(
         enabled,
         add_3rd_party,
         created_by: None,
-        ownership: None,
+        department_id,
     };
 
     let updated = match channel_use_cases
@@ -775,7 +787,7 @@ async fn create_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
-    let ownership = payload.ownership();
+    let department_id = payload.department_id;
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
@@ -785,7 +797,7 @@ async fn create_channel_json(
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         created_by: None,
-        ownership,
+        department_id,
     };
 
     let channel = channel_use_cases
@@ -831,7 +843,7 @@ pub(super) async fn update_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
-    let ownership = payload.ownership();
+    let department_id = payload.department_id;
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
@@ -841,7 +853,7 @@ pub(super) async fn update_channel_json(
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         created_by: None,
-        ownership,
+        department_id,
     };
 
     let channel = channel_use_cases
@@ -927,13 +939,12 @@ mod tests {
             slug: "auto-dispatcher".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["agent@test.com".into()]),
-            access_mode: crate::entities::channel::ChannelAccessMode::Allowlist,
+            access_mode: crate::entities::channel::ChannelAccessMode::Members,
             principal_grants: Vec::new(),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         };
 
         let channels = [channel.clone()];
@@ -1014,7 +1025,7 @@ mod tests {
         );
         assert!(next_threads.contains("hx-swap-oob=\"outerHTML\""));
 
-        let edit_html = pages::channel_edit_fragment(&company, "example.com", &channel, true);
+        let edit_html = pages::channel_edit_fragment(&company, "example.com", &channel, &[], true);
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
         assert!(!edit_html.contains("Custom Channel Agent"));
@@ -1291,3 +1302,7 @@ mod authorization_tests;
 #[cfg(test)]
 #[path = "channel_department_tests.rs"]
 mod department_tests;
+
+#[cfg(test)]
+#[path = "channel_classic_form_tests.rs"]
+mod classic_form_tests;

@@ -5,7 +5,7 @@ async fn cancel_uses_stored_association_and_reader_errors_propagate() {
     let company_id = company();
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 128));
-    let channel = channel(company_id, ChannelAccessMode::Team);
+    let channel = channel(company_id, ChannelAccessMode::Members);
     store
         .state
         .lock()

@@ -1,53 +1,43 @@
 use super::*;
 
 #[test]
-fn public_desk_private_agent_public_selection_clears_only_the_members_only_flag() {
-    let department = crate::entities::department::DepartmentId::new(Uuid::new_v4());
+fn access_mode_public_normalization_preserves_explicit_owner() {
+    let department = crate::entities::department::DepartmentId::random();
     let mut write = ChannelWrite {
         name: "Public intake".into(),
         slug: "intake".into(),
         participant_emails: Some(vec![" @PUBLIC ".into()]),
-        ownership: Some(crate::application::ports::channel::ChannelOwnershipWrite {
-            department_id: Some(Some(department)),
-            members_only: Some(true),
-        }),
-        ..ChannelWrite::default()
+        department_id: Some(department),
+        ..Default::default()
     };
     write.normalize().unwrap();
-    let ownership = write.ownership.unwrap();
-    assert_eq!(ownership.department_id, Some(Some(department)));
-    assert_eq!(ownership.members_only, Some(false));
+    assert_eq!(write.department_id, Some(department));
     assert!(write.is_public());
 }
 
 #[test]
-fn public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting() {
+fn access_mode_public_normalization_keeps_an_omitted_owner_omitted() {
     let mut write = ChannelWrite {
         name: "Public intake".into(),
         slug: "intake".into(),
         participant_emails: Some(vec!["@public".into()]),
-        ..ChannelWrite::default()
+        ..Default::default()
     };
     write.normalize().unwrap();
-    let ownership = write.ownership.unwrap();
-    assert_eq!(
-        ownership.department_id, None,
-        "keep the existing department"
-    );
-    assert_eq!(ownership.members_only, Some(false));
+    assert_eq!(write.department_id, None);
+    assert!(write.is_public());
 }
 
 #[test]
-fn public_desk_private_agent_private_selection_preserves_members_only() {
+fn access_mode_members_normalization_preserves_explicit_owner() {
+    let department = crate::entities::department::DepartmentId::random();
     let mut write = ChannelWrite {
         name: "Private intake".into(),
         slug: "intake".into(),
-        ownership: Some(crate::application::ports::channel::ChannelOwnershipWrite {
-            department_id: None,
-            members_only: Some(true),
-        }),
-        ..ChannelWrite::default()
+        department_id: Some(department),
+        ..Default::default()
     };
     write.normalize().unwrap();
-    assert_eq!(write.ownership.unwrap().members_only, Some(true));
+    assert_eq!(write.department_id, Some(department));
+    assert!(!write.is_public());
 }

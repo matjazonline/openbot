@@ -15,14 +15,15 @@ use crate::use_cases::schedule::ScheduleBindingChoice;
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
 pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        // The spam interlock only applies to a channel anyone can write to, so the confirmation
-        // stays inert until the participants field actually names @public.
+        // stays inert until the Public checkbox is selected.
         function toggleChannelSpamConfirm(input) {
             var form = input.closest('form');
             if (!form) return;
             var box = form.querySelector('.spam-confirm-box');
             if (!box) return;
             var checkbox = box.querySelector('input[type="checkbox"]');
-            var isPublic = input.value.toLowerCase().includes('@public');
+            var publicInput = form.querySelector('input[name="public"]');
+            var isPublic = !!publicInput && publicInput.checked;
             box.classList.toggle('opacity-40', !isPublic);
             box.classList.toggle('pointer-events-none', !isPublic);
             if (checkbox) {
@@ -31,18 +32,15 @@ pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        // The spam interlo
             }
         }
 
-        // The members-only box means something only for a desk a department owns.
-        function toggleDeskMembersOnly(select) {
-            var form = select.closest('form');
-            if (!form) return;
-            var box = form.querySelector('.desk-members-only');
-            if (!box) return;
-            box.classList.toggle('hidden', !select.value);
-            if (!select.value) {
-                var checkbox = box.querySelector('input[type="checkbox"]');
-                if (checkbox) checkbox.checked = false;
-            }
-        }
+        document.addEventListener('reset', function (event) {
+            var form = event.target;
+            if (!(form instanceof HTMLFormElement)) return;
+            queueMicrotask(function () {
+                var input = form.querySelector('input[name="public"]');
+                if (input) toggleChannelSpamConfirm(input);
+            });
+        });
+
 "##;
 
 /// The channel list in the sidebar — the only part of the workspace a write has to refresh.
@@ -83,11 +81,8 @@ pub struct ChannelDraft<'a> {
     pub enabled: bool,
     /// Whether CC'd outsiders may join this channel's threads. Starts on, like `enabled`.
     pub add_3rd_party: bool,
-    /// The department that owns the desk, if any.
+    /// Selected owner; absent on a new draft selects the company root.
     pub department_id: Option<Uuid>,
-    /// Only the department's people (and the neighbouring leads) may use the desk; meaningful
-    /// only with a department.
-    pub members_only: bool,
 }
 
 impl Default for ChannelDraft<'_> {
@@ -101,7 +96,6 @@ impl Default for ChannelDraft<'_> {
             enabled: true,
             add_3rd_party: true,
             department_id: None,
-            members_only: false,
         }
     }
 }
@@ -230,32 +224,31 @@ pub fn grouped_by_department<'c>(
     channels: &'c [Channel],
     departments: &[Department],
 ) -> Vec<(Option<String>, Vec<&'c Channel>)> {
-    let owned =
-        |department: Option<crate::entities::department::DepartmentId>| -> Vec<&'c Channel> {
-            channels
-                .iter()
-                .filter(|channel| channel.department_id == department)
-                .collect()
-        };
+    let owned = |department: crate::entities::department::DepartmentId| -> Vec<&'c Channel> {
+        channels
+            .iter()
+            .filter(|channel| channel.department_id == department)
+            .collect()
+    };
     let known: std::collections::HashSet<_> =
         departments.iter().map(|department| department.id).collect();
     let mut groups: Vec<(Option<String>, Vec<&'c Channel>)> =
         crate::entities::department::department_tree(departments)
             .into_iter()
-            .map(|(_, department)| (Some(department.name.clone()), owned(Some(department.id))))
+            .map(|(_, department)| (Some(department.name.clone()), owned(department.id)))
             .filter(|(_, desks)| !desks.is_empty())
             .collect();
-    // A desk whose department is not in `departments` (deleted since the list was read) is shown
-    // with the unowned ones rather than dropped.
+    // A permitted desk may have an owner absent from this separately read department list.
+    // Keep the desk visible without asserting that it has no owner.
     let rest: Vec<&Channel> = channels
         .iter()
-        .filter(|channel| channel.department_id.is_none_or(|id| !known.contains(&id)))
+        .filter(|channel| !known.contains(&channel.department_id))
         .collect();
     if groups.is_empty() {
         return vec![(None, rest)];
     }
     if !rest.is_empty() {
-        groups.push((Some("No department".to_owned()), rest));
+        groups.push((Some("Other desks".to_owned()), rest));
     }
     groups
 }
@@ -441,71 +434,56 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
 }
 
 /// Everything about a channel except which URL its form submits to.
-struct ChannelFields<'a> {
-    company: &'a Company,
-    app_domain_name: &'a str,
-    draft: &'a ChannelDraft<'a>,
-    spam_scan_enabled: bool,
-    departments: &'a [Department],
+pub(super) struct ChannelFields<'a> {
+    pub(super) company: &'a Company,
+    pub(super) app_domain_name: &'a str,
+    pub(super) draft: &'a ChannelDraft<'a>,
+    pub(super) spam_scan_enabled: bool,
+    pub(super) departments: &'a [Department],
 }
 
-/// The owning department and, once one is picked, whether only its people may use the desk.
-///
-/// The members-only box stays hidden until a department is chosen (`toggleDeskMembersOnly`), and
-/// the route ignores it without one, so a desk is never members-only of nobody.
+/// Required owner, root by default. The same one-step audience applies to every desk.
 fn department_fields(departments: &[Department], draft: &ChannelDraft<'_>) -> String {
-    if departments.is_empty() && draft.department_id.is_none() {
-        return String::new();
-    }
+    let selected = draft.department_id.or_else(|| {
+        departments
+            .iter()
+            .find(|department| department.is_root)
+            .map(|department| department.id.as_uuid())
+    });
     let options: String = crate::entities::department::department_tree(departments)
         .into_iter()
         .map(|(depth, department)| {
             let id = department.id.as_uuid();
             format!(
                 r#"<option value="{id}"{selected}>{indent}{name}</option>"#,
-                selected = if draft.department_id == Some(id) {
+                selected = if selected == Some(id) {
                     " selected"
                 } else {
                     ""
                 },
                 indent = "&nbsp;&nbsp;".repeat(depth),
-                name = escape_html_text(&department.name),
+                name = escape_html_text(&department.name)
             )
         })
         .collect();
     format!(
-        r##"
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Department</span></div>
-                        <select name="department_id" class="select w-full" data-input="desk-members-only">
-                            <option value="">No department</option>{options}
-                        </select>
-                        <div class="label"><span class="text-[11px] opacity-60">The department that owns this desk. Ownership alone changes nobody's access.</span></div>
-                    </label>
-                    <div class="desk-members-only form-control w-full{hidden}">
-                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
-                            <input type="checkbox" name="members_only" value="true" class="checkbox checkbox-sm mt-0.5"{checked}>
-                            <span class="text-xs">
-                                <span class="font-semibold">Members only</span>
-                                <span class="block opacity-70">Only the department's members, its lead, the lead of its parent department, the leads of its direct child departments and the addresses in Participant Emails can use this desk. Everyone else in the company, and anyone outside it, is refused. Other desks in the company can still hand work to it.</span>
-                            </span>
-                        </label>
-                    </div>"##,
-        hidden = if draft.department_id.is_some() {
-            ""
-        } else {
-            " hidden"
-        },
-        checked = if draft.members_only && draft.department_id.is_some() {
-            " checked"
-        } else {
-            ""
-        },
+        r#"<label class="form-control w-full">
+        <div class="label"><span class="text-xs opacity-70">Department</span></div>
+        <select name="department_id" required class="select w-full">{options}</select>
+        <div class="label"><span class="text-[11px] opacity-60">Members and role holders of this department, its parent Lead and direct child Leads can use this desk. Other agents need an explicit grant.</span></div>
+    </label>"#
     )
 }
 
-fn channel_fields(fields: &ChannelFields<'_>) -> String {
+pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
     let draft = fields.draft;
+    let named_emails = draft
+        .participant_emails
+        .split(',')
+        .map(str::trim)
+        .filter(|email| !email.is_empty() && !email.eq_ignore_ascii_case("@public"))
+        .collect::<Vec<_>>()
+        .join(", ");
     let slug_field = format!(
         r##"<label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Address (@{company_slug}.{app_domain_name})</span></div>
@@ -541,13 +519,20 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                         <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this desk, and replies go back out from the address it arrived on.</span></div>
                     </label>
                     <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Participant Emails</span></div>
+                        <div class="label"><span class="text-xs opacity-70">Also allow these addresses</span></div>
                         <input type="text" name="participant_emails" value="{participant_emails}" autocomplete="off"
                             data-input="channel-spam-confirm"
-                            placeholder="Leave blank for the company team, @public for anyone, or comma-separated emails"
+                            placeholder="person@example.com, another@example.com"
                             class="input w-full">
-                        <div class="label"><span class="text-[11px] opacity-60">Blank means the company team. Use <code class="font-mono">@public</code> to let anyone write in.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">These addresses add to the department audience. They do not remove department access.</span></div>
                     </label>
+                    <div class="form-control w-full">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="public" value="true" data-input="channel-spam-confirm" class="checkbox checkbox-sm mt-0.5"{public_checked}>
+                            <span class="text-xs"><span class="font-semibold">Open to anyone</span>
+                            <span class="block opacity-70">Anyone can send mail to this desk. Reading still requires company membership.</span></span>
+                        </label>
+                    </div>
                     <div class="form-control w-full">
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
                             <input type="checkbox" name="enabled" value="true" class="checkbox checkbox-sm mt-0.5"{enabled_checked}>
@@ -576,7 +561,8 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         app_domain_name = escape_html_text(fields.app_domain_name),
         slug_field = slug_field,
         alias_slugs = escape_html_text(draft.alias_slugs),
-        participant_emails = escape_html_text(draft.participant_emails),
+        participant_emails = escape_html_attr(&named_emails),
+        public_checked = if draft.is_public() { " checked" } else { "" },
         enabled_checked = if draft.enabled { " checked" } else { "" },
         add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
         spam_html = spam_disabled_confirmation(fields.spam_scan_enabled, draft.is_public()),
@@ -604,10 +590,10 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
                     <div class="spam-confirm-box alert alert-warning text-sm transition-opacity{dimmed}">
                         <div class="space-y-2">
                             <div class="font-semibold">Spam scanning is disabled in server configuration</div>
-                            <div class="text-xs">A desk with no participant restrictions receives mail without spam filtering.</div>
+                            <div class="text-xs">A Public desk accepts mail from anyone without spam filtering.</div>
                             <label class="flex cursor-pointer items-center gap-3">
                                 <input type="checkbox" name="confirm_spam_disabled" value="true" class="checkbox checkbox-sm"{disabled}>
-                                <span class="text-xs">I understand, and confirm saving a <code class="font-mono">@public</code> desk anyway.</span>
+                                <span class="text-xs">I understand, and confirm opening this desk to anyone.</span>
                             </label>
                         </div>
                     </div>
@@ -619,7 +605,7 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
 ///
 /// The channel's list-valued fields are rendered as form text and passed in so the draft can stay
 /// a pure set of borrows.
-fn stored_channel_draft<'a>(
+pub(super) fn stored_channel_draft<'a>(
     channel: &'a Channel,
     participant_emails: &'a str,
     alias_slugs: &'a str,
@@ -632,8 +618,7 @@ fn stored_channel_draft<'a>(
         participant_emails,
         enabled: channel.enabled,
         add_3rd_party: channel.add_3rd_party,
-        department_id: channel.department_id.map(|department| department.as_uuid()),
-        members_only: channel.members_only,
+        department_id: Some(channel.department_id.as_uuid()),
     }
 }
 

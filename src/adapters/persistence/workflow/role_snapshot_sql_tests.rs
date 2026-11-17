@@ -212,6 +212,13 @@ async fn workflow_role_admission_retained_department_refuses_delete_with_a_histo
         })
         .await
         .unwrap();
+    let root = crate::entities::department::DepartmentId::new(
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(f.company().as_uuid())
+            .fetch_one(f.p().pool())
+            .await
+            .unwrap(),
+    );
     ChannelPersistence::update(
         f.p(),
         ChannelUpdate {
@@ -221,10 +228,7 @@ async fn workflow_role_admission_retained_department_refuses_delete_with_a_histo
                 name: "Role intake".into(),
                 slug: "role-intake".into(),
                 enabled: true,
-                ownership: Some(ChannelOwnershipWrite {
-                    department_id: Some(None),
-                    members_only: Some(false),
-                }),
+                department_id: Some(root),
                 ..Default::default()
             },
         },
@@ -252,10 +256,7 @@ async fn workflow_role_admission_retained_department_refuses_delete_with_a_histo
                     name: current.name,
                     slug: current.slug.to_string(),
                     enabled: current.enabled,
-                    ownership: Some(ChannelOwnershipWrite {
-                        department_id: Some(None),
-                        members_only: Some(false),
-                    }),
+                    department_id: Some(root),
                     ..Default::default()
                 },
             },

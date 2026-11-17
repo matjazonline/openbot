@@ -909,22 +909,17 @@ CREATE TABLE public.channels (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     name text NOT NULL,
-    access_mode text DEFAULT 'team'::text NOT NULL,
+    access_mode text DEFAULT 'members'::text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     add_3rd_party boolean DEFAULT true NOT NULL,
     created_by jsonb NOT NULL,
     description text,
     settings_revision bigint DEFAULT 0 NOT NULL,
-    department_id uuid,
-    members_only boolean DEFAULT false NOT NULL,
-    CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
+    department_id uuid NOT NULL,
+    CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['members'::text, 'public'::text]))),
     CONSTRAINT channels_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
-    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text)),
-    -- A members-only desk belongs to a department and is an allowlist desk, so channel policy
-    -- needs no rule of its own: its department's grants are its allowlist (01-departments p02).
-    CONSTRAINT channels_members_only_owned CHECK (((NOT members_only) OR (department_id IS NOT NULL))),
-    CONSTRAINT channels_members_only_allowlist CHECK (((NOT members_only) OR (access_mode = 'allowlist'::text)))
+    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text))
 );
 
 
@@ -995,13 +990,15 @@ END $$;
 CREATE FUNCTION public.notification_principal_can_view(checked_company uuid, checked_channel uuid, checked_principal uuid) RETURNS boolean
     LANGUAGE sql STABLE AS $$
     SELECT EXISTS (SELECT 1 FROM public.principals AS principal
+        JOIN public.users AS account ON account.id=principal.user_id
         JOIN LATERAL public.membership_of(principal.user_id, principal.company_id) AS member ON true
         LEFT JOIN public.channels AS channel ON channel.company_id=principal.company_id AND channel.id=checked_channel
         WHERE principal.company_id=checked_company AND principal.id=checked_principal AND principal.kind='person'
           AND ((checked_channel IS NULL AND member.role IN ('owner','admin')) OR (channel.id IS NOT NULL AND (
-            member.role='owner' OR channel.access_mode IN ('team','public') OR EXISTS (
+            member.role='owner' OR channel.access_mode='public' OR EXISTS (
                 SELECT 1 FROM public.channel_principal_grants AS permission WHERE permission.company_id=checked_company
-                  AND permission.channel_id=checked_channel AND permission.principal_id=checked_principal AND permission.capability='view')))))
+                  AND permission.channel_id=checked_channel AND permission.principal_id=checked_principal AND permission.capability='view'
+                  AND (permission.provenance='department_membership' OR account.email_verified_at IS NOT NULL))))))
 $$;
 
 
@@ -15691,13 +15688,12 @@ CREATE UNIQUE INDEX department_roles_one_lead ON public.department_roles USING b
     WHERE (role = 'lead'::text);
 CREATE INDEX department_roles_principal_idx ON public.department_roles USING btree (company_id, principal_id);
 
--- A desk may belong to a department (p02). Deleting a department that still owns a desk is
--- refused; detach or delete the desk first. Deleting the desk is never blocked by its owner.
+-- Every desk belongs to a department. Reassign or delete its desks before deleting a
+-- department. The tenant participates in the FK; ownership cannot cross a company boundary.
 ALTER TABLE ONLY public.channels
     ADD CONSTRAINT channels_department_fk FOREIGN KEY (company_id, department_id)
         REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
-CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id)
-    WHERE (department_id IS NOT NULL);
+CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id);
 
 -- Why `checked_department` may not sit under `proposed_parent`, or NULL when it may: 'cycle' when
 -- the parent is the department itself or one of its descendants; 'depth' when the department's
@@ -16649,10 +16645,10 @@ CREATE FUNCTION public.workflow_follow_reviewer_eligible(company uuid, run_ident
         WHERE principal.company_id=company AND principal.id=person AND principal.kind='person'
           AND ((run.principal_id IS NOT NULL AND public.principal_direct_can_view(company,run.principal_id,principal.id))
             OR (run.principal_id IS NULL AND (tenant.user_id=principal.user_id OR (run.channel_id IS NULL AND run.principal_id IS NULL AND member.role IN ('owner','admin'))
-            OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public')
+            OR (run.channel_id IS NOT NULL AND (channel.access_mode='public'
               OR EXISTS (SELECT 1 FROM public.channel_principal_grants AS access_grant WHERE access_grant.company_id=company
                 AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id
-                AND account.email_verified_at IS NOT NULL AND access_grant.capability='view'))))))
+                AND (access_grant.provenance='department_membership' OR account.email_verified_at IS NOT NULL) AND access_grant.capability='view'))))))
           AND (run.thread_id IS NULL OR EXISTS (SELECT 1 FROM public.threads AS thread WHERE thread.company_id=company
             AND thread.channel_id IS NOT DISTINCT FROM run.channel_id AND thread.principal_id IS NOT DISTINCT FROM run.principal_id AND thread.id=run.thread_id)))
 $$;
@@ -18621,8 +18617,7 @@ CREATE FUNCTION public.relay_desk_can_participate(tenant uuid, target uuid, writ
 RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT COALESCE((SELECT desk.enabled AND CASE desk.access_mode
         WHEN 'public' THEN true
-        WHEN 'team' THEN actor.kind='agent'
-        WHEN 'allowlist' THEN actor.kind='agent' AND EXISTS(
+        WHEN 'members' THEN actor.kind='agent' AND EXISTS(
             SELECT 1 FROM public.channel_principal_grants AS permission
             WHERE permission.company_id=tenant AND permission.channel_id=desk.id
                 AND permission.principal_id=actor.id AND permission.capability='participate')

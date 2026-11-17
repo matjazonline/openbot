@@ -412,7 +412,7 @@ async fn department_ui_owner_writes_render_and_refusals_land_on_their_form() {
             .fetch_one(f.persistence.pool())
             .await
             .unwrap();
-    sqlx::query("UPDATE channels SET department_id = NULL, members_only = false WHERE id = $1")
+    sqlx::query("UPDATE channels SET department_id=(SELECT id FROM departments WHERE company_id=channels.company_id AND is_root) WHERE id=$1")
         .bind(leaf_desk)
         .execute(f.persistence.pool())
         .await

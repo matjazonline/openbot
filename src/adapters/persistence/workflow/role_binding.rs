@@ -35,16 +35,6 @@ pub(super) async fn check_on(
     Ok(())
 }
 
-/// Both ownership writers call this only when removing an existing department, with the
-/// company write lock and channel UPDATE lock held. Concurrent activation shares these locks.
-pub(crate) async fn check_detach_on(
-    tx: &mut PgConnection,
-    company: CompanyId,
-    channel: Uuid,
-) -> AppResult<()> {
-    check_without_context_on(tx, company, AddressTarget::Desk(channel)).await
-}
-
 /// Roster mutations hold the company write lock, just like activation. Validate the final
 /// placements, including the previous single-holder role occupant, before committing any edit.
 pub(crate) async fn check_principals_on(

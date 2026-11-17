@@ -12,7 +12,8 @@ use crate::transport::InboundOrigin;
 use crate::transport::{MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS};
 use crate::use_cases::company_test_support::{MockCompanyPersistence, TeamByAddress};
 use crate::use_cases::participant::test_support::{
-    InMemoryParticipantDirectory, email_allowlist_grants, email_allowlist_policy,
+    InMemoryParticipantDirectory, department_membership_grants, email_allowlist_grants,
+    email_allowlist_policy,
 };
 use crate::use_cases::thread::test_support::InMemoryThreads;
 use chrono::Utc;
@@ -167,13 +168,12 @@ async fn test_inter_channel_hop_limit_rejection() {
                 slug: "inbound".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -185,13 +185,12 @@ async fn test_inter_channel_hop_limit_rejection() {
                 slug: "source".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -267,8 +266,7 @@ async fn test_spf_authentication_failure_rejection() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -338,8 +336,7 @@ async fn test_high_spam_score_rejection() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -402,13 +399,12 @@ async fn access_level_dmarc_failure_rejects_a_known_member_address() {
             slug: "inbound".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
-            access_mode: ChannelAccessMode::Team,
+            access_mode: ChannelAccessMode::Members,
             principal_grants: Vec::new(),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -482,13 +478,12 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             slug: "restricted".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["alice@example.com".into()]),
-            access_mode: ChannelAccessMode::Allowlist,
+            access_mode: ChannelAccessMode::Members,
             principal_grants: email_allowlist_grants(company_id, &["alice@example.com"]),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -552,13 +547,12 @@ async fn test_participant_sender_bypasses_spam_checks() {
             slug: "restricted".into(),
             alias_slugs: Vec::new(),
             participant_emails: Some(vec!["alice@example.com".into()]),
-            access_mode: ChannelAccessMode::Allowlist,
+            access_mode: ChannelAccessMode::Members,
             principal_grants: email_allowlist_grants(company_id, &["alice@example.com"]),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -623,13 +617,12 @@ async fn test_channel_in_cc_resolves_properly() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
-            access_mode: ChannelAccessMode::Team,
-            principal_grants: Vec::new(),
+            access_mode: ChannelAccessMode::Members,
+            principal_grants: department_membership_grants(company_id, &["customer@client.com"]),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -699,13 +692,15 @@ async fn test_multi_channel_to_and_cc_execution() {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
-                principal_grants: Vec::new(),
+                access_mode: ChannelAccessMode::Members,
+                principal_grants: department_membership_grants(
+                    company_id,
+                    &["customer@client.com"],
+                ),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -717,13 +712,15 @@ async fn test_multi_channel_to_and_cc_execution() {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
-                principal_grants: Vec::new(),
+                access_mode: ChannelAccessMode::Members,
+                principal_grants: department_membership_grants(
+                    company_id,
+                    &["customer@client.com"],
+                ),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -821,13 +818,15 @@ async fn test_pipeline_address_chaining_execution() {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
-                principal_grants: Vec::new(),
+                access_mode: ChannelAccessMode::Members,
+                principal_grants: department_membership_grants(
+                    company_id,
+                    &["customer@client.com"],
+                ),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -839,13 +838,15 @@ async fn test_pipeline_address_chaining_execution() {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
-                principal_grants: Vec::new(),
+                access_mode: ChannelAccessMode::Members,
+                principal_grants: department_membership_grants(
+                    company_id,
+                    &["customer@client.com"],
+                ),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -857,13 +858,15 @@ async fn test_pipeline_address_chaining_execution() {
                 slug: "legal".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
-                principal_grants: Vec::new(),
+                access_mode: ChannelAccessMode::Members,
+                principal_grants: department_membership_grants(
+                    company_id,
+                    &["customer@client.com"],
+                ),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -938,13 +941,12 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -956,13 +958,12 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -1080,13 +1081,15 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
-            access_mode: ChannelAccessMode::Team,
-            principal_grants: Vec::new(),
+            access_mode: ChannelAccessMode::Members,
+            principal_grants: department_membership_grants(
+                company_id,
+                &["customer@client.com", "manager@client.com"],
+            ),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -1204,13 +1207,15 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 slug: "team-only".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None, // Default = Company Team
-                access_mode: ChannelAccessMode::Team,
-                principal_grants: Vec::new(),
+                access_mode: ChannelAccessMode::Members,
+                principal_grants: department_membership_grants(
+                    company_id,
+                    &["team_member@acme.com"],
+                ),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -1223,12 +1228,14 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 alias_slugs: Vec::new(),
                 participant_emails: Some(vec!["@public".into()]), // Public
                 access_mode: ChannelAccessMode::Public,
-                principal_grants: Vec::new(),
+                principal_grants: department_membership_grants(
+                    company_id,
+                    &["team_member@acme.com"],
+                ),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -1240,13 +1247,12 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 slug: "explicit-flow".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: Some(vec!["allowed@external.com".into()]), // Explicit list
-                access_mode: ChannelAccessMode::Allowlist,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: email_allowlist_grants(company_id, &["allowed@external.com"]),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -1365,8 +1371,7 @@ async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -1469,13 +1474,12 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -1487,13 +1491,12 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -1560,13 +1563,12 @@ async fn a_pure_workflow_hop_to_a_public_channel_is_relayed() {
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -1583,8 +1585,7 @@ async fn a_pure_workflow_hop_to_a_public_channel_is_relayed() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -1642,13 +1643,12 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 slug: "agent-a".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: true,
@@ -1660,13 +1660,12 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ]),
     });
@@ -1731,13 +1730,12 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None, // Default = company team members
-            access_mode: ChannelAccessMode::Team,
-            principal_grants: Vec::new(),
+            access_mode: ChannelAccessMode::Members,
+            principal_grants: department_membership_grants(company_id, &["team@acme.com"]),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -1913,13 +1911,12 @@ async fn test_context_only_quiet_mode_ingestion() {
             slug: "support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
-            access_mode: ChannelAccessMode::Team,
-            principal_grants: Vec::new(),
+            access_mode: ChannelAccessMode::Members,
+            principal_grants: department_membership_grants(company_id, &["team@acme.com"]),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -2060,8 +2057,14 @@ fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>)
     } = spec;
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
-    let (access_mode, principal_grants) =
+    let (access_mode, mut principal_grants) =
         email_allowlist_policy(company_id, participant_emails.as_deref());
+    if participant_emails
+        .as_ref()
+        .is_none_or(|emails| emails.is_empty())
+    {
+        principal_grants.extend(department_membership_grants(company_id, &["team@acme.com"]));
+    }
 
     let company_persistence = Arc::new(company_double_with_team(
         vec![Company {
@@ -2093,8 +2096,7 @@ fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>)
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -2893,8 +2895,16 @@ fn use_cases_with_departments(
         .enumerate()
         .map(|(index, spec)| {
             let owner = owners.get(index).copied().flatten().map(|owner| ids[owner]);
-            let (access_mode, principal_grants) =
+            let (access_mode, mut principal_grants) =
                 email_allowlist_policy(company_id, spec.participant_emails.as_deref());
+            if spec
+                .participant_emails
+                .as_ref()
+                .is_none_or(|emails| emails.is_empty())
+            {
+                principal_grants
+                    .extend(department_membership_grants(company_id, &["team@acme.com"]));
+            }
             Channel {
                 id: Uuid::new_v4(),
                 company_id,
@@ -2910,8 +2920,8 @@ fn use_cases_with_departments(
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
-                department_id: owner,
-                members_only: false,
+                department_id: owner
+                    .unwrap_or_else(crate::entities::department::DepartmentId::random),
             }
         })
         .collect();
@@ -3443,8 +3453,7 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -3544,8 +3553,7 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 
@@ -3625,8 +3633,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }]),
     });
 

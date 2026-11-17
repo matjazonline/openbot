@@ -1,0 +1,27 @@
+{
+  "round": "04RU-P02-D1-R1",
+  "decision": "04RU-P02-D1/r1",
+  "phase": "p02",
+  "reviewer": "/root/p04_reviewer",
+  "requested_model": "Astra/high",
+  "actual_settings": "unexposed",
+  "HEAD": "334e79c74b383dffd8e0d565c33a77c6ac24c94d",
+  "start_commit": "334e79c74b383dffd8e0d565c33a77c6ac24c94d",
+  "review_base": "334e79c74b383dffd8e0d565c33a77c6ac24c94d",
+  "artifact": "54bfc2c64c4b501ee0539b514f0e0e26432a2ac823b0de55d9ef6a14fd588cdc",
+  "decision_sha256": "158e38af4621c3addba3d98a07a4f1aca0920a66d2da55af4050ac5ded9bc0d4",
+  "coordination_revision": 7,
+  "coordination_sha256": "e156912dffedbf3f4bb29fff15295a12f0db9ac1841073b602b38d0cca843ee9",
+  "notices": [
+    "04RU-C001/r1",
+    "04RU-C002/r1",
+    "04RU-C003/r2",
+    "01DEP-C002/r1"
+  ],
+  "snapshot_exclusions": [
+    "plan/04-root-unit/phases/p02/docs",
+    "plan/04-root-unit/COORDINATION.md"
+  ],
+  "reviewer_runtime": false,
+  "outcome": "PASS (decision only)"
+}

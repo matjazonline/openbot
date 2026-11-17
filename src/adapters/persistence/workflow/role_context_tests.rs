@@ -31,10 +31,7 @@ async fn workflow_reviewer_follow_context_is_original_desk_not_chosen_ancestor()
             &mut tx,
             f.company(),
             f.channel,
-            &ChannelOwnershipWrite {
-                department_id: Some(Some(department)),
-                members_only: None,
-            },
+            department,
         )
         .await
         .unwrap();

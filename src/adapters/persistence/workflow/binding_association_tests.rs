@@ -41,11 +41,11 @@ async fn security_email_identity_workflow_channel_and_thread_need_current_addres
     )
     .await
     .unwrap();
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(channel.id)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        channel.id,
+    )
+    .await;
     sqlx::query("INSERT INTO channel_principal_grants (company_id, channel_id, principal_id, capability, provenance) VALUES ($1, $2, $3, 'view', 'configured_allowlist')")
         .bind(company.as_uuid()).bind(channel.id).bind(principal_id)
         .execute(p.pool()).await.unwrap();
@@ -168,6 +168,11 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
     )
     .await
     .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        channel.id,
+    )
+    .await;
     let association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
     for role in ["admin", "member"] {
         sqlx::query("WITH cleared AS (DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id = $1 AND member.root_user_id = $2 AND $3::text='member') INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.company_id = $1 AND member.root_user_id = $2 AND $3::text='admin' ON CONFLICT DO NOTHING")
@@ -177,7 +182,7 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
             .execute(p.pool())
             .await
             .unwrap();
-        for mode in ["team", "public", "allowlist"] {
+        for mode in ["members", "public"] {
             sqlx::query("UPDATE channels SET access_mode = $2 WHERE id = $1")
                 .bind(channel.id)
                 .bind(mode)
@@ -310,11 +315,11 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
         .execute(p.pool())
         .await
         .unwrap();
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(channel.id)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        channel.id,
+    )
+    .await;
     let principal: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND user_id = $2")
             .bind(f.target.company.as_uuid())

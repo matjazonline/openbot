@@ -84,6 +84,11 @@ impl RejoinCase {
         )
         .await
         .unwrap();
+        crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+            self.fixture.pool(),
+            desk.id,
+        )
+        .await;
         let thread = ThreadPersistence::create_thread(
             &self.fixture.persistence,
             self.fixture.company.id,

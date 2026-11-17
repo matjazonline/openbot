@@ -20,11 +20,11 @@ async fn channel_fixture() -> (DecisionFixture, Uuid) {
     .await
     .unwrap()
     .id;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(channel)
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        f.persistence().pool(),
+        channel,
+    )
+    .await;
     sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) SELECT $1,$2,id,'view','configured_allowlist' FROM principals WHERE company_id=$1 AND user_id=$3")
         .bind(f.scope.company.as_uuid()).bind(channel).bind(f.users[0]).execute(f.persistence().pool()).await.unwrap();
     sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")

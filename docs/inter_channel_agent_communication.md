@@ -11,9 +11,9 @@ independent workflow bindings and access settings.
 accepts only a sender proven by the stored delivery: the run's source desk address or the running
 agent's own principal address. A run cannot borrow another agent's identity. The receiving message
 carries the authenticated agent principal, and current principal grants decide admission to a
-department's restricted desk. Membership and role-derived grants apply to agent senders too.
-A desk-only relay retains the desk's existing internal authorization; it cannot impersonate an
-agent to gain the agent's grants.
+Members desk, including a root desk. Membership and role-derived grants apply to agent senders too.
+A desk-only or system relay cannot impersonate an agent or bypass a receiving Members desk's
+grants. Public intake follows its normal admission rule.
 
 Agent direct addresses accept company senders and authenticated internal agents. Outside senders
 need that agent's **Allow external messages** setting. This control is independent of a desk being

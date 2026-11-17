@@ -284,8 +284,7 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
         )
         .await
         .unwrap();
-    // The member reads none of `hidden`'s desks (its own desk is a team desk they could read,
-    // so take it out of what they read here).
+    // Hidden has no member or role grant for this person.
     let seen = departments
         .desk_departments(f.member.id, f.company.id, &[])
         .await
@@ -298,6 +297,8 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
         .fetch_one(f.persistence.pool())
         .await
         .unwrap();
+    sqlx::query("INSERT INTO channel_principal_grants (company_id,channel_id,principal_id,capability,provenance) VALUES($1,$2,$3,'view','configured_allowlist')")
+        .bind(f.company.id).bind(hidden_desk).bind(member).execute(f.persistence.pool()).await.unwrap();
     let through_desk = departments
         .desk_departments(f.member.id, f.company.id, &[hidden_desk])
         .await
@@ -332,9 +333,8 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
     .await
     .unwrap();
     assert!(listed.0.items.is_empty());
-    // `hidden`'s own desk is a team desk the member can read, so it is named — make it
-    // members-only of `hidden` first, which takes it out of what the member reads.
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist', members_only = true WHERE id = $1")
+    // Removing the explicit grant makes the real attention reader stop revealing this department.
+    sqlx::query("DELETE FROM channel_principal_grants WHERE channel_id=$1 AND provenance='configured_allowlist'")
         .bind(hidden_desk)
         .execute(f.persistence.pool())
         .await

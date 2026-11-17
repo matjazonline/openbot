@@ -87,11 +87,11 @@ async fn restrict_channel(f: &AdmissionFixture, c: &Conversation) -> Uuid {
         crate::entities::company_member::CompanyAccessRole::Admin,
     )
     .await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(c.channel)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        c.channel,
+    )
+    .await;
     let principal: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
             .bind(f.binding.target.company.as_uuid())

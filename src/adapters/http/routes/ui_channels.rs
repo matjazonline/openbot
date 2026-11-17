@@ -25,7 +25,7 @@ use crate::adapters::http::auth::AuthenticatedUser;
 use crate::adapters::http::pages;
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::company::CompanyAccess;
@@ -39,9 +39,7 @@ use crate::use_cases::schedule::ScheduleUseCases;
 use crate::use_cases::user::UserUseCases;
 
 use super::{
-    channel::{
-        ChannelForm, checkbox_ticked, parse_emails_form, parse_list_form, parse_text_form, slugify,
-    },
+    channel::{ChannelForm, parse_list_form, parse_text_form, slugify},
     ui::{load_account, load_managed_company, workspace_user},
 };
 
@@ -262,7 +260,7 @@ async fn create_channel(
         Ok(Html(view.create_pane(&submitted.draft(), Some(&message))).into_response())
     };
 
-    let created = match submitted.write(None) {
+    let created = match submitted.write() {
         Ok(write) => {
             workspace
                 .channel_use_cases
@@ -307,7 +305,7 @@ async fn update_channel(
         .into_response())
     };
 
-    let saved = match submitted.write(Some(&stored)) {
+    let saved = match submitted.write() {
         Ok(write) => {
             workspace
                 .channel_use_cases
@@ -474,6 +472,7 @@ impl ChannelSettingsView<'_> {
 struct SubmittedChannel {
     form: ChannelForm,
     slug: String,
+    participant_emails: String,
 }
 
 impl SubmittedChannel {
@@ -486,7 +485,12 @@ impl SubmittedChannel {
             .map(String::from)
             .unwrap_or_else(|| slugify(&form.name));
 
-        Self { form, slug }
+        let participant_emails = form.emails().unwrap_or_default().join(", ");
+        Self {
+            form,
+            slug,
+            participant_emails,
+        }
     }
 
     fn draft(&self) -> pages::ChannelDraft<'_> {
@@ -495,73 +499,29 @@ impl SubmittedChannel {
             description: self.form.description.as_deref().unwrap_or(""),
             slug: &self.slug,
             alias_slugs: self.form.alias_slugs.as_deref().unwrap_or(""),
-            participant_emails: self.form.participant_emails.as_deref().unwrap_or(""),
+            participant_emails: &self.participant_emails,
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
-            department_id: self.department().ok().flatten(),
-            members_only: self.members_only(),
+            department_id: self.department().ok().flatten().map(DepartmentId::as_uuid),
         }
     }
 
-    /// The owner select's value: blank is no department.
-    fn department(&self) -> AppResult<Option<Uuid>> {
-        match self
-            .form
-            .department_id
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            None => Ok(None),
-            Some(value) => Uuid::parse_str(value)
-                .map(Some)
-                .map_err(|_| AppError::BadRequest("That department is not valid.".into())),
-        }
-    }
-
-    /// Members-only needs a department; without one the box is ignored.
-    fn members_only(&self) -> bool {
-        checkbox_ticked(self.form.members_only.as_deref())
-            && self
-                .form
-                .department_id
-                .as_deref()
-                .is_some_and(|id| !id.trim().is_empty())
-    }
-
-    /// The ownership change the form asks for against `stored` (`None` for a new desk): `None`
-    /// when it matches, so a save that does not touch ownership takes no department lock. A form
-    /// without the owner select changes nothing.
-    fn ownership(&self, stored: Option<&Channel>) -> AppResult<Option<ChannelOwnershipWrite>> {
-        if self.form.department_id.is_none() {
-            return Ok(None);
-        }
-        let department = self.department()?.map(DepartmentId::new);
-        let members_only = self.members_only();
-        let (current_department, current_members_only) = stored.map_or((None, false), |channel| {
-            (channel.department_id, channel.members_only)
-        });
-        if department == current_department && members_only == current_members_only {
-            return Ok(None);
-        }
-        Ok(Some(ChannelOwnershipWrite {
-            department_id: Some(department),
-            members_only: Some(members_only),
-        }))
+    fn department(&self) -> AppResult<Option<DepartmentId>> {
+        self.form.department()
     }
 
     /// The write this submission asks for, against the stored desk when there is one.
-    fn write(&self, stored: Option<&Channel>) -> AppResult<ChannelWrite> {
+    fn write(&self) -> AppResult<ChannelWrite> {
         Ok(ChannelWrite {
             name: self.form.name.clone(),
             description: parse_text_form(self.form.description.clone()),
             slug: self.slug.clone(),
             alias_slugs: parse_list_form(self.form.alias_slugs.clone()),
-            participant_emails: parse_emails_form(self.form.participant_emails.clone()),
+            participant_emails: self.form.emails(),
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
             created_by: None,
-            ownership: self.ownership(stored)?,
+            department_id: self.department()?,
         })
     }
 }

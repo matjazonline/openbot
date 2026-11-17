@@ -51,6 +51,17 @@ async fn authorized_session_on(
 
 const VIEW_SQL: &str = "jsonb_build_object('operation',jsonb_build_object('id',operation.id,'command',operation.command,'deadline',operation.deadline,'payload_digest',operation.payload_digest,'dispatch',operation.dispatch,'outcome',operation.outcome),'origin',operation.origin,'output',operation.output,'output_truncated',operation.output_truncated,'observed_turn_state',operation.observed_turn_state,'measured_usage',operation.measured_usage)";
 
+fn profile_delete_error(error: sqlx::Error) -> AppError {
+    if error
+        .as_database_error()
+        .is_some_and(|error| error.is_foreign_key_violation())
+    {
+        AppError::Conflict("Profile is referenced by a session or workflow".into())
+    } else {
+        error.into()
+    }
+}
+
 async fn operation_on(
     db: &mut PgConnection,
     company: Uuid,
@@ -152,17 +163,8 @@ impl LocalAgentManagementStore for PostgresPersistence {
             .bind(id.as_uuid())
             .execute(&mut *tx)
             .await
-            .map_err(|error| {
-                if error
-                    .as_database_error()
-                    .is_some_and(|error| error.is_foreign_key_violation())
-                {
-                    AppError::Conflict("Profile is referenced by a session or workflow".into())
-                } else {
-                    error.into()
-                }
-            })?;
-        tx.commit().await?;
+            .map_err(profile_delete_error)?;
+        tx.commit().await.map_err(profile_delete_error)?;
         Ok(())
     }
     async fn start_session(&self, request: &StartSession) -> AppResult<LocalOperationView> {

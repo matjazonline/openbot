@@ -108,10 +108,13 @@ pub(crate) async fn update_channel_on(
 ) -> AppResult<()> {
     bound_statements_on(tx, budget).await?;
     let company = CompanyId::new(request.company_id);
-    // A generic allowlist save also changes reviewer visibility. Reuse the ownership prefix
-    // before the gate even when this form leaves department/members-only settings untouched.
-    let ownership = request.write.ownership.unwrap_or_default();
-    prelock_ownership_on(tx, company, Some(request.channel_id), &ownership).await?;
+    let department = prelock_ownership_on(
+        tx,
+        company,
+        Some(request.channel_id),
+        request.write.department_id,
+    )
+    .await?;
     acquire_channel_gate_on(
         tx,
         ChannelGateKey::new(request.company_id, request.channel_id),
@@ -119,10 +122,15 @@ pub(crate) async fn update_channel_on(
     )
     .await?;
     lock_channel_on(tx, request).await?;
-    write_channel_settings_on(tx, request.company_id, request.channel_id, &request.write).await?;
-    if request.write.ownership.is_some() {
-        sync_desk_grants_on(tx, company, request.channel_id).await?;
-    }
+    write_channel_settings_on(
+        tx,
+        request.company_id,
+        request.channel_id,
+        &request.write,
+        department,
+    )
+    .await?;
+    sync_desk_grants_on(tx, company, request.channel_id).await?;
     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
 }
 

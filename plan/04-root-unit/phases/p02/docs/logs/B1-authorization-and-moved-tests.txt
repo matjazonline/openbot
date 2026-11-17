@@ -1,0 +1,58 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 24s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 45 tests
+test application::use_cases::channel::tests::address_slug_shape_matches_the_format_constraint ... ok
+test application::use_cases::channel::tests::a_platform_address_splits_into_its_company_and_untouched_local_part ... ok
+test adapters::http::routes::channel::tests::test_slugify ... ok
+test application::use_cases::channel::tests::address_slug_onboarding_names_are_unchanged_by_the_shared_helper ... ok
+test adapters::http::routes::channel::tests::thread_cursor_round_trips ... ok
+test application::use_cases::channel::tests::address_slug_derivation_keeps_the_database_shape ... ok
+test application::use_cases::channel::tests::normalize_canonicalizes_and_dedupes_alias_slugs ... ok
+test application::use_cases::channel::tests::normalize_rejects_an_alias_ending_in_a_reserved_suffix ... ok
+test application::use_cases::channel::tests::rejected_slugs_are_bad_requests_that_name_the_field_and_the_reason ... ok
+test application::use_cases::channel::tests::parse_recipient_address_works ... ok
+test application::use_cases::channel::tests::admins_manage_channels_while_members_cannot ... ok
+test application::use_cases::channel::tests::reads_and_writes_refuse_a_foreign_channel_exactly_like_a_missing_one ... ok
+test application::use_cases::channel::tests::test_channel_creation_spam_disabled_confirmation ... ok
+test application::use_cases::channel::tests::test_slug_validation_reserved_suffixes ... ok
+test application::use_cases::channel::tests::the_platform_domain_test_is_wider_than_the_address_parser ... ok
+test application::use_cases::channel::tests::company_owner_channel_crud_flow_works ... ok
+test application::use_cases::channel::tests::process_inbound_email_resolves_company_and_channel ... ok
+test application::use_cases::channel::tests::security_email_identity_unverified_account_cannot_read_participant_channel ... ok
+test application::use_cases::channel::tests::test_levenshtein_and_fuzzy_channel_suggestions ... ok
+test adapters::http::routes::channel::tests::test_channel_form_deserialization ... ok
+test adapters::http::routes::channel::tests::channel_pages_and_fragments_render_correctly ... ok
+test domain::entities::channel::tests::a_channel_without_aliases_answers_on_one_address_only ... ok
+test domain::entities::channel::tests::access_mode_child_members_requires_a_view_grant_even_for_admins ... ok
+test domain::entities::channel::tests::access_mode_members_preserves_owner_and_named_participant_access ... ok
+test domain::entities::channel::tests::access_mode_parses_only_members_and_public ... ok
+test domain::entities::channel::tests::access_mode_public_accepts_outsiders_without_trusting_them ... ok
+test domain::entities::channel::tests::access_mode_public_opens_mail_but_never_outsider_reads ... ok
+test domain::entities::channel::tests::access_mode_root_members_read_through_their_materialized_grants ... ok
+test domain::entities::channel::tests::access_mode_root_members_send_through_their_materialized_grants ... ok
+test domain::entities::channel::tests::access_mode_unresolved_actor_holds_no_grant ... ok
+test domain::entities::channel::tests::access_mode_unverified_account_can_use_only_its_department_grants ... ok
+test domain::entities::channel::tests::addresses_list_the_canonical_slug_first ... ok
+test domain::entities::channel::tests::matches_slug_accepts_canonical_and_alias_case_insensitively ... ok
+test domain::entities::channel::tests::the_preferred_approver_is_the_first_principal_granted_a_view ... ok
+test application::workflow::tests::authorization_cases::reader_errors::admission_reader_failures_propagate_without_writes ... ok
+test application::workflow::tests::authorization_cases::cancellation::cancel_uses_stored_association_and_reader_errors_propagate ... ok
+test application::workflow::tests::authorization_cases::association::related_ids_and_thread_channel_must_match_loaded_records ... ok
+test application::workflow::tests::authorization_cases::replay::replay_reauthorizes_and_association_is_part_of_dedup ... ok
+test application::workflow::tests::authorization_cases::membership::current_manager_membership_controls_admit_and_cancel_before_reads ... ok
+test application::workflow::tests::authorization_cases::visibility::channel_visibility_is_independent_of_management_access ... ok
+test application::workflow::tests::authorization_cases::resources::unresolved_resources_cannot_enter_admission_configuration ... ok
+test adapters::persistence::channel::tests::a_channel_form_round_trips_its_email_allowlist_through_principal_grants ... ok
+test adapters::persistence::channel::tests::an_enabled_channel_needs_no_agent ... ok
+test adapters::persistence::channel::tests::postgres_channel_persistence_works ... ok
+test adapters::persistence::channel::tests::alias_slugs_are_unique_within_a_company_and_free_across_companies ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 4701 filtered out; finished in 0.45s
+

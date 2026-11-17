@@ -1,0 +1,29 @@
+{
+  "required": 21,
+  "passed": 21,
+  "missing_or_failed": [],
+  "names": [
+    "adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors",
+    "adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation",
+    "adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants",
+    "adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see",
+    "adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys",
+    "adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks",
+    "adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members",
+    "adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids",
+    "adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure",
+    "adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures",
+    "adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members",
+    "adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate",
+    "adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger",
+    "adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys",
+    "adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden",
+    "adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope",
+    "adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes",
+    "adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback",
+    "adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden",
+    "adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden",
+    "adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities"
+  ],
+  "source_logs": "test runner exact successful test names across retained B1 logs"
+}

@@ -1,0 +1,202 @@
+src/adapters/http/pages/channels.rs
+74: 
+75:                 <div>
+76:                     <label for="participant_emails" class="block text-xs font-medium text-base-content/80 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
+77:                     <input type="text" id="participant_emails" name="participant_emails" data-company-id="{company_id}" data-input="spam-warning" autocomplete="off"
+78:                         class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-success"
+79:                         placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
+80:                     <p class="text-[11px] text-base-content/70 mt-1">Leave blank for Company Team members. Use <code class="text-primary">@public</code> to allow anyone, or specify email addresses.</p>
+81:                 </div>
+475: pub fn channel_edit_fragment(
+476:     company: &Company,
+477:     app_domain_name: &str,
+478:     channel: &Channel,
+479:     spam_scan_enabled: bool,
+480: ) -> String {
+481:     let emails_str = match &channel.participant_emails {
+482:         Some(emails) => emails.join(", "),
+483:         None => String::new(),
+484:     };
+485:     let alias_slugs_str = super::channel_settings::stored_alias_slugs(channel);
+486:     let is_public = channel
+487:         .participant_emails
+488:         .as_ref()
+489:         .map(|emails| {
+490:             emails
+491:                 .iter()
+492:                 .any(|e| e.trim().eq_ignore_ascii_case("@public"))
+493:         })
+494:         .unwrap_or(false);
+495:     let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, !is_public);
+496: 
+497:     format!(
+498:         r##"
+499:         <form id="channel-{channel_id}" hx-put="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" data-company-id="{company_id}"
+500:             class="bg-base-100 border border-success/40 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
+501:             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+520:             </div>
+521: 
+522:             <div>
+523:                 <label class="block text-xs font-medium text-base-content/80 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
+524:                 <input type="text" name="participant_emails" value="{emails_str}" data-company-id="{company_id}" data-input="spam-warning" autocomplete="off"
+525:                     class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-success"
+526:                     placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
+527:                 <p class="text-[11px] text-base-content/70 mt-1">Leave blank for Company Team members. Use <code class="text-primary">@public</code> to allow anyone, or specify email addresses.</p>
+528:             </div>
+529:             <div>
+src/adapters/http/routes/channel.rs
+54: pub fn router() -> Router<AppState> {
+55:     Router::new()
+56:         .route(
+57:             "/companies/{company_id}/channels",
+58:             get(list_channels_page).post(create_channel_handler),
+59:         )
+60:         .route(
+61:             "/companies/{company_id}/channels/{id}",
+62:             put(update_channel_handler).delete(delete_channel_handler),
+63:         )
+64:         .route(
+65:             "/companies/{company_id}/channels/{id}/edit",
+66:             get(edit_channel_form),
+67:         )
+68:         .route(
+69:             "/companies/{company_id}/channels/{id}/cancel",
+109: pub struct ChannelForm {
+110:     pub name: String,
+111:     pub description: Option<String>,
+112:     pub slug: Option<String>,
+113:     pub alias_slugs: Option<String>,
+114:     pub participant_emails: Option<String>,
+115:     pub confirm_spam_disabled: Option<String>,
+116:     pub enabled: Option<String>,
+117:     pub add_3rd_party: Option<String>,
+118:     /// The `/ui` desk form's owner select: blank for no department. Absent on a form without it,
+119:     /// which then leaves the ownership as it is.
+120:     #[serde(default)]
+121:     pub department_id: Option<String>,
+122:     #[serde(default)]
+123:     pub public: Option<String>,
+124: }
+125: 
+126: impl ChannelForm {
+127:     pub(super) fn department(&self) -> AppResult<Option<DepartmentId>> {
+128:         self.department_id
+129:             .as_deref()
+130:             .map(|value| {
+131:                 Uuid::parse_str(value.trim())
+132:                     .map(DepartmentId::new)
+133:                     .map_err(|_| AppError::BadRequest("Choose a valid owning department.".into()))
+134:             })
+135:             .transpose()
+136:     }
+137: 
+138:     /// The checkbox maps to the existing canonical marker; only named addresses remain
+139:     /// in the text field, so unchecking Public also removes a previously stored marker.
+140:     pub(super) fn emails(&self) -> Option<Vec<String>> {
+141:         let mut emails = parse_emails_form(self.participant_emails.clone()).unwrap_or_default();
+142:         emails.retain(|email| !email.eq_ignore_ascii_case("@public"));
+143:         if checkbox_ticked(self.public.as_deref()) {
+144:             emails.push("@public".into());
+145:         }
+146:         (!emails.is_empty()).then_some(emails)
+147:     }
+399:     let confirm_spam_disabled = form.confirm_spam_disabled();
+400:     let enabled = form.enabled();
+401:     let add_3rd_party = form.add_3rd_party();
+402:     let department_id = form.department()?;
+403:     let emails = form.emails();
+404:     let write = ChannelWrite {
+405:         enabled,
+406:         add_3rd_party,
+407:         name: form.name,
+408:         description: parse_text_form(form.description),
+409:         slug,
+410:         alias_slugs: parse_list_form(form.alias_slugs),
+411:         participant_emails: emails,
+412:         created_by: None,
+413:         department_id,
+414:     };
+415:     if let Err(err) = channel_use_cases
+416:         .create_channel(user.id, company_id, write, confirm_spam_disabled)
+492: async fn edit_channel_form(
+493:     State(company_use_cases): State<Arc<CompanyUseCases>>,
+494:     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+495:     State(config): State<Arc<AppConfig>>,
+496:     user: AuthenticatedUser,
+497:     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+498: ) -> AppResult<Html<String>> {
+499:     let (company, channel) = managed_channel(
+500:         &company_use_cases,
+501:         &channel_use_cases,
+502:         user.id,
+503:         company_id,
+504:         channel_id,
+505:     )
+506:     .await?;
+507:     Ok(Html(pages::channel_edit_fragment(
+508:         &company,
+509:         &config.app_domain_name,
+510:         &channel,
+511:         config.is_spam_scan_enabled(),
+512:     )))
+513: }
+572:     let confirm_spam_disabled = form.confirm_spam_disabled();
+573:     let enabled = form.enabled();
+574:     let add_3rd_party = form.add_3rd_party();
+575:     let department_id = form.department()?;
+576:     let emails = form.emails();
+577: 
+578:     let write = ChannelWrite {
+579:         name: form.name,
+580:         description: parse_text_form(form.description),
+581:         slug,
+582:         alias_slugs: parse_list_form(form.alias_slugs),
+583:         participant_emails: emails,
+584:         enabled,
+585:         add_3rd_party,
+586:         created_by: None,
+587:         department_id,
+src/adapters/persistence/channel.rs
+192: 
+193:     for email in participant_emails.unwrap_or_default() {
+194:         let normalized = email.trim().to_lowercase();
+195:         if normalized.is_empty() {
+196:             continue;
+197:         }
+198:         if normalized == "@public" {
+199:             is_public = true;
+200:         } else if seen.insert(normalized.clone()) {
+201:             participants.push(normalized);
+202:         }
+203:     }
+204: 
+205:     let mode = if is_public {
+206:         ChannelAccessMode::Public
+207:     } else {
+208:         ChannelAccessMode::Members
+209:     };
+210: 
+211:     (mode, participants)
+src/adapters/http/pages/layout.rs
+201:         function toggleSpamWarning(input) {
+202:             var form = input.closest('form');
+203:             if (!form) return;
+204:             var box = form.querySelector('.spam-disabled-box');
+205:             if (!box) return;
+206:             var checkbox = box.querySelector('input[type="checkbox"]');
+207:             var isPublic = input.value.toLowerCase().includes('@public');
+208:             if (isPublic) {
+209:                 box.classList.remove('opacity-40', 'pointer-events-none', 'grayscale');
+210:                 if (checkbox) {
+211:                     checkbox.disabled = false;
+212:                 }
+213:             } else {
+214:                 box.classList.add('opacity-40', 'pointer-events-none', 'grayscale');
+215:                 if (checkbox) {
+216:                     checkbox.disabled = true;
+217:                     checkbox.checked = false;
+218:                 }
+219:             }
+220:         }
+221: 
+222:         window.companyTeamCache = window.companyTeamCache || {};

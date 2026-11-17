@@ -9,11 +9,8 @@
 use super::*;
 use crate::adapters::persistence::agent_publication::publish_initial_on;
 use crate::adapters::persistence::company_agent::refusal_error;
-use crate::adapters::persistence::department_desks::{
-    prelock_ownership_on, set_desk_ownership_on, sync_desk_grants_on,
-};
+use crate::adapters::persistence::department_desks::set_desk_ownership_on;
 use crate::application::agent::AgentPublicationScope;
-use crate::application::ports::channel::ChannelOwnershipWrite;
 use crate::application::workflow::channel_reply::{
     ChannelReplySettings, ConfigureChannelReply, ConfigureResponder,
 };
@@ -25,13 +22,6 @@ use crate::entities::transport::PrincipalId;
 /// The command key that records a department's desk and the binding it owns.
 pub(crate) fn department_desk_key(department: DepartmentId) -> String {
     format!("department:{department}")
-}
-
-fn owned_by(department: DepartmentId) -> ChannelOwnershipWrite {
-    ChannelOwnershipWrite {
-        department_id: Some(Some(department)),
-        members_only: Some(false),
-    }
 }
 
 /// The agent a lead principal is, when it is one: its id and slug.
@@ -90,7 +80,7 @@ pub(crate) async fn provision_department_desk_on(
         .as_str()
         .and_then(|id| Uuid::parse_str(id).ok())
         .ok_or_else(|| AppError::Internal("A department desk result has no channel id".into()))?;
-    set_desk_ownership_on(tx, company, desk, &owned_by(department.id)).await
+    set_desk_ownership_on(tx, company, desk, department.id).await
 }
 
 /// A plain team desk through the owned-desk create sequence `ChannelPersistence::create` uses,
@@ -111,19 +101,17 @@ async fn plain_desk_on(
             .bind(company.as_uuid())
             .fetch_one(&mut **tx)
             .await?;
-    let ownership = owned_by(department.id);
     let mut write = ChannelWrite {
         name: department.name.clone(),
         slug,
         enabled: true,
         add_3rd_party,
         created_by: Some(CreationProvenance::user(actor.user_id())),
-        ownership: Some(ownership),
+        department_id: Some(department.id),
         ..ChannelWrite::default()
     };
     write.normalize()?;
     let desk = Uuid::new_v4();
-    prelock_ownership_on(tx, company, None, &ownership).await?;
     // In a savepoint: a desk created meanwhile by a writer that takes no company lock claims the
     // address with a unique violation, which is then the conflict (as `provision_guarded`).
     let mut savepoint = sqlx::Acquire::begin(&mut **tx).await?;
@@ -173,7 +161,7 @@ async fn insert_plain_desk_on(
     insert_channel_row_on(tx, company.as_uuid(), desk, write).await?;
     insert_desk_addresses(tx, company.as_uuid(), desk, &write.slug, &write.alias_slugs).await?;
     write_channel_email_binding(tx, company.as_uuid(), desk, write).await?;
-    sync_desk_grants_on(tx, company, desk).await
+    Ok(())
 }
 
 /// The department's recorded desk and the binding it owns, while the desk still belongs to it.

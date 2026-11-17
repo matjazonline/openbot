@@ -157,10 +157,25 @@ identity, prior and resulting principal association, reason, and time; collision
 
 ## Access and disclosure model
 
-App UI reads retain both checks:
+The company is the tenant boundary and has one root department. Company membership is root
+membership; the owner is `companies.user_id` and its root owner-role mirror, and admins hold the
+root admin role. Every business desk has a required owning department, root by default.
 
-1. the person is a member of the company; and
-2. the desk's principal ACL permits the requested capability.
+Members desks admit the owning department's materialized one-step audience (its members and
+role holders, parent Lead and direct child Leads), plus explicit principal grants and the owner
+exemption. Root membership does not grant every child department. Public intake accepts outside
+mail and trusts granted principals/current company members. Public never grants outsider UI reads.
+
+App UI reads require current company membership and, for Members desks, a current view grant;
+the company owner is exempt from the desk grant. The access modes are `members` and `public`.
+Named email entries produce additional `configured_allowlist` grants in either mode.
+Authenticated account-ID membership grants remain usable when email proof is withheld; other
+channel grant provenances require current email proof. Identity qualification and incarnation
+fences still apply, and direct-principal policy is independent.
+
+Authenticated internal agents need the receiving Members desk's participate grant on root and
+child desks alike. Internal source proof does not replace authorization, and admission does not
+itself grant history reads. Tenant, identity-incarnation, hop and cycle fences remain enforced.
 
 An observed external identity or membership in a provider workspace satisfies neither check.
 

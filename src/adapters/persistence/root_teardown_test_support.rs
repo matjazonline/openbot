@@ -141,17 +141,17 @@ pub(crate) async fn tree_and_document(p: &PostgresPersistence, company: CompanyI
             name: "Restricted teardown desk".into(),
             slug: "teardown-restricted".into(),
             enabled: true,
-            ownership: Some(ChannelOwnershipWrite {
-                department_id: Some(Some(leaf)),
-                members_only: Some(true),
-            }),
+            department_id: Some(leaf),
             ..Default::default()
         },
     )
     .await
     .unwrap();
-    assert_eq!(desk.department_id, Some(leaf));
-    assert!(desk.members_only);
+    assert_eq!(desk.department_id, leaf);
+    assert_eq!(
+        desk.access_mode,
+        crate::entities::channel::ChannelAccessMode::Members
+    );
     let documents = KnowledgeDocuments::replace(
         p,
         KnowledgeScope {

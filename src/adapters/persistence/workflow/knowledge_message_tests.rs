@@ -119,13 +119,11 @@ async fn knowledge_run_level_verified_member_email_uses_current_member_level() {
     .execute(setup.pool())
     .await
     .unwrap();
-    sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
-        .bind(setup.user)
-        .execute(setup.pool())
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO participant_identities(id,company_id,principal_id,transport,namespace,subject,status,claim_metadata,provenance) SELECT $1,$2,principal.id,'email','email',account.email,'verified','{\"version\":1,\"kind\":\"account\"}'::jsonb,'account' FROM principals AS principal JOIN users AS account ON account.id=principal.user_id WHERE principal.company_id=$2 AND principal.user_id=$3")
-        .bind(Uuid::new_v4()).bind(company).bind(setup.user).execute(setup.pool()).await.unwrap();
+    crate::adapters::persistence::workflow::tests::message_tests::support::verify_email(
+        &setup.fixture,
+        setup.user,
+    )
+    .await;
     raise(&setup, AccessLevel::L5).await;
     assert!(matches!(
         setup.runtime().execute(&setup.kind, &setup.claim).await,

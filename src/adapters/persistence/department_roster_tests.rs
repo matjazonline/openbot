@@ -144,7 +144,7 @@ async fn department_context_roster_lists_the_desks_around_the_department() {
     let member = context(&f, desk, worker_agent).await.unwrap();
     assert!(!member.lead);
     assert_eq!(member.roster, lead.roster);
-    // Explicit unowned shared desks still have no department context.
+    // Default-created shared desks receive their root department context.
     let unowned = crate::application::ports::channel::ChannelPersistence::create(
         &f.persistence,
         f.company,
@@ -156,7 +156,17 @@ async fn department_context_roster_lists_the_desks_around_the_department() {
     )
     .await
     .unwrap();
-    assert_eq!(context(&f, unowned.id, worker_agent).await, None);
+    let root_context = context(&f, unowned.id, worker_agent)
+        .await
+        .expect("root owns every default desk");
+    let root_name: String =
+        sqlx::query_scalar("SELECT name FROM departments WHERE company_id=$1 AND is_root")
+            .bind(f.company)
+            .fetch_one(f.pool())
+            .await
+            .unwrap();
+    assert_eq!(root_context.name, root_name);
+    assert!(!root_context.lead);
 
     sqlx::query("UPDATE channels SET access_mode = 'public' WHERE id = $1")
         .bind(desk)

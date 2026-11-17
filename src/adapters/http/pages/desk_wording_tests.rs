@@ -70,8 +70,9 @@ fn desk_wording_desks_page_heading() {
         r#"<h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Desks</h3>"#
     ));
     assert!(html.contains("Add New Desk"));
-    assert!(html.contains(">Desk Name</label>"));
-    assert!(html.contains("Desks without participant email restrictions"));
+    assert!(html.contains("Desk Name"));
+    assert!(!html.contains("Channel Name"));
+    assert!(html.contains("A Public desk accepts mail from anyone without spam filtering."));
     assert!(html.contains(r#"hx-confirm="Are you sure you want to delete desk 'Inbox'?""#));
     // Identifiers are not copy.
     assert!(html.contains(r#"id="channel-list""#));

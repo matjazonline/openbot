@@ -459,14 +459,13 @@ async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
     let pool = f.persistence().pool();
     let mut rival = pool.begin().await.unwrap();
     let rival_channel = Uuid::new_v4();
-    let write = ChannelWrite {
-        name: "Rival".into(),
-        slug: "raced".into(),
-        ..ChannelWrite::default()
-    };
-    insert_channel_row_on(&mut rival, company(&f).as_uuid(), rival_channel, &write)
-        .await
-        .unwrap();
+    // The production creator now takes the company lock. Deliberate direct SQL models
+    // a namespace competitor outside that protocol, so this still reaches the unique
+    // constraint after the service's pre-check instead of merely waiting before it.
+    sqlx::query("INSERT INTO channels(id,company_id,name,enabled,created_by,department_id) VALUES($1,$2,'Rival',false,$3,(SELECT id FROM departments WHERE company_id=$2 AND is_root))")
+        .bind(rival_channel).bind(company(&f).as_uuid())
+        .bind(serde_json::to_value(crate::entities::creation::CreationProvenance::system()).unwrap())
+        .execute(&mut *rival).await.unwrap();
     insert_desk_addresses(
         &mut rival,
         company(&f).as_uuid(),
@@ -481,24 +480,17 @@ async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
         let request = request.clone();
         async move { service.dispatch_local(&request).await }
     });
-    // Wait until the provisioning insert is blocked on the rival's address.
-    for _ in 0..100 {
-        let waiting: i64 = sqlx::query_scalar(
-            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' \
-             AND query LIKE '%INSERT INTO addresses%' AND datname = current_database()",
-        )
-        .fetch_one(pool)
-        .await
-        .unwrap();
-        if waiting > 0 {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    crate::adapters::persistence::test_support::wait_until_backends_are_blocked(pool, 1).await;
+    let waiting:i64=sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%INSERT INTO addresses%' AND datname=current_database()")
+        .fetch_one(pool).await.unwrap();
     rival.commit().await.unwrap();
     let LocalDispatchResult::Committed(receipt) = provisioning.await.unwrap().unwrap() else {
         panic!("the refusal is committed")
     };
+    assert!(
+        waiting > 0,
+        "the actual address INSERT must have competed after pre-check"
+    );
     assert_eq!(receipt.result["error"]["code"], PROVISIONING_CONFLICT);
     // Only the rival's address is new.
     assert_eq!(
@@ -649,6 +641,52 @@ async fn command_fixture() -> AdmissionFixture {
 
 fn service(f: &AdmissionFixture) -> AssistantChannelService {
     AssistantChannelService::new(f.persistence().clone(), templates())
+}
+
+#[tokio::test]
+async fn access_mode_provisioned_assistant_has_root_audience_from_initial_commit() {
+    use crate::application::ports::channel::ChannelPersistence;
+    use crate::application::ports::participant::PrincipalAccessPersistence;
+
+    let f = command_fixture().await;
+    let member = person(&f, "member").await;
+    let created = service(&f)
+        .create_assistant_channel(company(&f), owner(&f), command("root-audience", "desk"))
+        .await
+        .unwrap()
+        .unwrap();
+    let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
+    let desk = sqlx::query_scalar("SELECT channel_id FROM workflow_bindings WHERE id=$1")
+        .bind(binding)
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap();
+    let desk = ChannelPersistence::get_by_id(f.persistence(), desk)
+        .await
+        .unwrap()
+        .unwrap();
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(company(&f).as_uuid())
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+    assert_eq!(desk.department_id.as_uuid(), root);
+    let viewer = f
+        .persistence()
+        .access_context_for_user(company(&f).as_uuid(), member.user_id())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(desk.viewer_access(viewer));
+    assert!(desk.participant_access(viewer).authorized);
+    for capability in ["participate", "view"] {
+        assert!(desk.principal_grants.iter().any(|grant| {
+            Some(grant.principal_id) == viewer.principal_id
+                && grant.capability.as_str() == capability
+                && grant.provenance.as_str() == "department_membership"
+        }));
+    }
 }
 
 /// D2.4, F041: the command record decides replay and conflict; a retry returns the stored result

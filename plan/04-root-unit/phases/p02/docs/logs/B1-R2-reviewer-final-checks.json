@@ -1,0 +1,19 @@
+{
+  "entry_final_snapshot_equal": true,
+  "author_snapshot_equal": true,
+  "coordination10_equal": true,
+  "head": "334e79c74b383dffd8e0d565c33a77c6ac24c94d",
+  "branch": "feature/plan03_04",
+  "D1r1": "158e38af4621c3addba3d98a07a4f1aca0920a66d2da55af4050ac5ded9bc0d4",
+  "D1r2": "c3cccfe77156a647c5f9515a491bbcc3ede1c1145d9b2b6fcd6157248c9bbe11",
+  "test_inventory": {
+    "before": 4747,
+    "after": 4749,
+    "removed": [],
+    "added": [
+      "adapters::http::routes::channel::classic_form_tests::access_mode_classic_rendered_create_requires_spam_confirmation_and_selects_its_owner",
+      "adapters::http::routes::channel::classic_form_tests::access_mode_classic_rendered_edit_preserves_public_owner_and_can_close_intake"
+    ]
+  },
+  "implementation_whitespace_exit": 0
+}

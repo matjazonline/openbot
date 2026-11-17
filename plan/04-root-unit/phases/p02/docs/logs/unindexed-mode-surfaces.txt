@@ -1,0 +1,11 @@
+migrations/20260817000000_init_schema.sql:912:    access_mode text DEFAULT 'team'::text NOT NULL,
+migrations/20260817000000_init_schema.sql:920:    members_only boolean DEFAULT false NOT NULL,
+migrations/20260817000000_init_schema.sql:921:    CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
+migrations/20260817000000_init_schema.sql:924:    -- A members-only desk belongs to a department and is an allowlist desk, so channel policy
+migrations/20260817000000_init_schema.sql:926:    CONSTRAINT channels_members_only_owned CHECK (((NOT members_only) OR (department_id IS NOT NULL))),
+migrations/20260817000000_init_schema.sql:927:    CONSTRAINT channels_members_only_allowlist CHECK (((NOT members_only) OR (access_mode = 'allowlist'::text)))
+migrations/20260817000000_init_schema.sql:1002:            member.role='owner' OR channel.access_mode IN ('team','public') OR EXISTS (
+migrations/20260817000000_init_schema.sql:8717:CREATE TRIGGER notification_channel_policy_recheck AFTER UPDATE OF access_mode ON public.channels FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_channel_access();
+migrations/20260817000000_init_schema.sql:15842:    -- The members-only access those rows gave goes too, or an address that still resolves to the
+migrations/20260817000000_init_schema.sql:16652:            OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public')
+migrations/20260817000000_init_schema.sql:18622:    SELECT COALESCE((SELECT desk.enabled AND CASE desk.access_mode

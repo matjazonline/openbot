@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::ports::department::DepartmentWrite;
 use crate::entities::department::DepartmentRole;
 use crate::entities::transport::PrincipalId;
@@ -157,10 +157,7 @@ async fn role_department(fixture: &Fixture) -> RoleDepartment {
             name: "Protected action".into(),
             slug: "protected-action".into(),
             enabled: true,
-            ownership: Some(ChannelOwnershipWrite {
-                department_id: Some(Some(department)),
-                ..Default::default()
-            }),
+            department_id: Some(department),
             ..Default::default()
         },
     )

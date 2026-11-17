@@ -454,11 +454,18 @@ async fn permissions_are_shared_rechecked_and_scoped_to_the_managed_company() {
     let reader = ControlledReader::new(false);
     let mut ws = workspace(&f, reader.clone(), events.clone(), monitor.clone());
     ws.viewer = viewer.clone();
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE company_id = $1")
+    let channels: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM channels WHERE company_id=$1")
         .bind(f.company_id)
-        .execute(f.persistence.pool())
+        .fetch_all(f.persistence.pool())
         .await
         .unwrap();
+    for channel in channels {
+        crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+            f.persistence.pool(),
+            channel,
+        )
+        .await;
+    }
     assert!(
         ws.channels
             .list_managed_readable_channels(&viewer, f.company_id)

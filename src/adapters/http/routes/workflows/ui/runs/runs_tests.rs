@@ -288,11 +288,11 @@ impl Fixture {
         .unwrap()
         .id;
         if restricted {
-            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-                .bind(channel)
-                .execute(self.persistence.pool())
-                .await
-                .unwrap();
+            crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+                self.persistence.pool(),
+                channel,
+            )
+            .await;
         }
         channel
     }

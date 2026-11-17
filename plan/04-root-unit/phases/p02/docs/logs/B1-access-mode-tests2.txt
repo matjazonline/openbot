@@ -1,0 +1,45 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 13s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 32 tests
+test adapters::http::routes::ui_channels::tests::access_mode_ui_owner_is_optional_in_a_write_but_cannot_be_cleared ... ok
+test adapters::http::routes::ui_channels::tests::access_mode_ui_public_checkbox_preserves_named_addresses_and_can_close_intake ... ok
+test adapters::http::routes::channel::department_tests::access_mode_json_department_rejects_explicit_null_and_invalid_ids ... ok
+test adapters::http::pages::tests::department_ui::access_mode_ui_desk_form_requires_owner_defaults_root_and_offers_public ... ok
+test adapters::http::routes::channel::department_tests::access_mode_json_owner_is_preserved_and_can_be_reassigned_but_not_cleared ... ok
+test adapters::persistence::department::tests::desks::access_mode_ownership_refuses_another_companys_department ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_set_desk_ownership_on_takes_the_desk_edit_path ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_removal_revokes_access_and_notifications_in_one_commit ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_admits_members_and_the_owner_only ... ok
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_scale_1000_members_200_desks ... ignored, explicit 1000-member/200-desk scale measurement; run focused with --ignored
+test application::use_cases::channel::public_settings_tests::access_mode_members_normalization_preserves_explicit_owner ... ok
+test application::use_cases::channel::public_settings_tests::access_mode_public_normalization_keeps_an_omitted_owner_omitted ... ok
+test application::use_cases::channel::public_settings_tests::access_mode_public_normalization_preserves_explicit_owner ... ok
+test domain::entities::channel::tests::access_mode_child_members_requires_a_view_grant_even_for_admins ... ok
+test domain::entities::channel::tests::access_mode_members_preserves_owner_and_named_participant_access ... ok
+test domain::entities::channel::tests::access_mode_parses_only_members_and_public ... ok
+test domain::entities::channel::tests::access_mode_public_accepts_outsiders_without_trusting_them ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_default_root_desk_admits_root_members_but_child_requires_its_grant ... ok
+test domain::entities::channel::tests::access_mode_public_opens_mail_but_never_outsider_reads ... ok
+test domain::entities::channel::tests::access_mode_root_members_read_through_their_materialized_grants ... ok
+test domain::entities::channel::tests::access_mode_unresolved_actor_holds_no_grant ... ok
+test domain::entities::channel::tests::access_mode_root_members_send_through_their_materialized_grants ... ok
+test adapters::persistence::department::tests::desks::access_mode_ownership_company_teardown_takes_owned_desks_with_it ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_reassignment_and_public_keep_the_current_department_audience ... ok
+test adapters::persistence::department::tests::desks::access_mode_ownership_blocks_deletion_until_reassigned ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_removing_a_teammate_drops_only_derived_grants ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_keeps_an_allowlist_entry_and_a_membership_apart ... ok
+test adapters::persistence::department::tests::desks::access_mode_public_selection_preserves_owner_and_materialized_grants ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_reaches_one_step_up_and_down ... ok
+test adapters::persistence::department::tests::desks::access_mode_raw_null_owner_and_removed_modes_are_refused ... ok
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_competing_root_join_and_default_desk_creation_keep_every_grant ... ok
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_join_and_removal_write_only_the_delta ... ok
+
+test result: ok. 31 passed; 0 failed; 1 ignored; 0 measured; 4712 filtered out; finished in 2.43s
+

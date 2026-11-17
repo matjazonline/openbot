@@ -1,0 +1,339 @@
+{
+  "version": 1,
+  "round": "04RU-P02-B1-R1",
+  "artifact": "7ce85fba312130879a9e00c49febd3e48f54e71f42483284637524f51ed72539",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC9"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "fresh pa04_p02_schema2 on task PostgreSQL18:51167",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-r2-migration.txt",
+          "sha256": "0dd73fce5b4336624fc5050a9dc0dd1e25ff93a288a335125375b4c3f21fc9c7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (original core/consumer selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-core-consumer-tests.txt",
+          "sha256": "b4fa2aef1dc28eabbc9a4b979ee03ee1cc2c0af11af857b2b29cb1006f3066bf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (r2 core/security selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-r2-core-security-tests3.txt",
+          "sha256": "5bb44eb6261b56d0bdfc83d2568bf269cfe74a3d587afec328eb4673190ae3a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4",
+        "AC5",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (targeted mode/provisioning correction selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-targeted-corrections.txt",
+          "sha256": "248348500b2d8487314dc89d97df5f9de0fcf4f7de2ecff5cf5e3d79db125a7f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (remaining affected consumer selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-remaining-consumers.txt",
+          "sha256": "e9e59157facfbca2c7fd7d5e2aa1b75ffad948a59b8e94eac7626ceeed62e7f5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- direct_thread_changed_email_rejoin cloudroom_management_private_and_foreign cloudroom_commands_live_actor_withdrawal agent_history_identity_principal_deletion knowledge_view_delivery_subjects knowledge_view_notification_email_and_in_app knowledge_run_level_verified_member_email",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-remaining-failures-corrected2.txt",
+          "sha256": "cd2bbd320dca05018cd85118c4ae522fc6204572f423f189e4f4d23b7df7fa78"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- authorization_cases",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-workflow-authorization.txt",
+          "sha256": "7dfea98ce7206a637654d0e6570eecc43a5f1989664dfb3761e9fb6b18cae5f6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4",
+        "AC5",
+        "AC7",
+        "AC9"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib -- access_mode_ provisioning_ workflow_escalation_binding_roundtrip_update_and_required_owner authorization_cases direct_thread_changed_email_rejoin direct_competing_personal_rejoin_claimants direct_thread_identity_adoption cloudroom_management_ cloudroom_commands_ agent_history_identity_ knowledge_view_ knowledge_run_level_verified_member_email department_desk_ department_lead_ department_schema_ department_roster_ department_agent_ adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-focused-stock-stack.txt",
+          "sha256": "30f3c15fc919451b2dc4a2821e276ad01d15a30e1565b192d24acdfca61e059a"
+        },
+        {
+          "path": "logs/B1-final-focused-command.json",
+          "sha256": "ce709cd5b19d01a49a5761542d4bd7331db166336ed9567866a4b8deac3b015e"
+        },
+        {
+          "path": "logs/B1-http-authorization-final.json",
+          "sha256": "c7e06f08005933c632a1509d0bf3aa0c8dc4b6f06a9e5f2f67964f4851a567c5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC6",
+        "AC7"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib -- access_mode_provisioned_assistant access_mode_grants_join_and_removal_write_only_the_delta relay_identity_ department_desk_relay",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-relay-and-initial-grants2.txt",
+          "sha256": "eb60130f9358a57cbf0f1b481ada939c9fd05f12cb5e47552eabfa960d9aba47"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib access_mode_grants_scale_1000_members_200_desks -- --ignored --nocapture (unchanged-production baseline)",
+      "fixture": "owned baseline scale database; source54bfc2c6; original full-rewrite policy, not current implementation",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/baseline-scale-run2.txt",
+          "sha256": "33b55aa6951d6dfa69483ebd8020a06ea716645f55902e01bfe3720f70be52d9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib access_mode_grants_scale_1000_members_200_desks -- --ignored --nocapture",
+      "fixture": "own_database automatically dropped; actual production invite/removal,1000members/200desks/400000grants, quiescent run",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-pruned-scale.txt",
+          "sha256": "71e7342abe5c5a08c5ac9fd4aa86dad05f23175c677dbe02138dd49df885bcb6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "rollback-only EXPLAIN(ANALYZE,BUFFERS,SETTINGS) on actual migrated grant table; original versus pruned INSERT_MISSING",
+      "fixture": "46000real grant rows;2000desired;work_mem4MB; forced generic plan; already-complete desk; no new row trigger claim",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-live-reconciliation-plan.sql",
+          "sha256": "bf8bc13ccff4caa0c192fed169202b055eea597bf0a5c9aff2498eb4b8de6259"
+        },
+        {
+          "path": "logs/B1-live-reconciliation-plan.txt",
+          "sha256": "9d8bcda319d286227c67e9707b6c22e12bc2372d6cd9690729a9c767027d6942"
+        },
+        {
+          "path": "logs/B1-scale-active-query.txt",
+          "sha256": "fc35c59832087d76f27c33ec13fde09465490d52295825cb6debc7784aa18bba"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list; compare baseline/extraction/final inventories",
+      "fixture": "actual libtest runner inventory4739baseline/4746extraction/4747final",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-before-test-inventory.txt",
+          "sha256": "0fa5c8c831fcafcd6b9e8c5f65e9a61238e635e5992210711c6faebb254896ff"
+        },
+        {
+          "path": "logs/B1-before-test-extraction-inventory.txt",
+          "sha256": "f8bd7edf942fc2000c5b1e97b9eb530e10273f5c5acd0a8faadbe4a1c9e3d227"
+        },
+        {
+          "path": "logs/B1-after-test-extraction-inventory.txt",
+          "sha256": "12f137ff8721bd7b8c8458b36f95b0bd7827ba47eadb7c90f2009b6c4b120de1"
+        },
+        {
+          "path": "logs/B1-final-test-inventory.txt",
+          "sha256": "702be651a54396c96886dc6cfb9c6809a6411225a2a0549470ff853a51cae65c"
+        },
+        {
+          "path": "logs/B1-test-dispositions.json",
+          "sha256": "d6b14fa1c15fd46ecc664e6183c0e455702c9977c95fe486ebb64bc7bdd5bf7c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets --locked --offline",
+      "fixture": "fresh pa04_p02_schema2; all targets; no .sqlx diff",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-sqlx-prepare3.txt",
+          "sha256": "1cb847467de1835395fdace9d62764eb3ceb788c9ceb33a718f72e55f7766597"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "local Cargo source-module target roots",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-source-modules.txt",
+          "sha256": "3ce6028bc036dccbc9d1022343e9d752a7cf64b91072ce04bedbd6a21f30c05d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC9"
+      ],
+      "command": "npm run build:css; npm run check:css",
+      "fixture": "Node24/Tailwind4.1.12/daisyUI5.0.50; no generated asset diff",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-css-build.txt",
+          "sha256": "657782e26981fb1a51c2e151f71b4d6942f46ae1fd8de55ab76100e281fbda31"
+        },
+        {
+          "path": "logs/B1-final-css-check.txt",
+          "sha256": "c62690567d97e0a6d8f54496856952f6fe54c2982b8b8bf179a4b638d9e5d61a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "current working source tree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-format2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "git diff --check",
+      "fixture": "current working source tree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-whitespace2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "trail build",
+      "fixture": "deterministic local graph",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-trail-build.txt",
+          "sha256": "19512dc0a28f19e6084641a984a4aaa0236827b55c4cf1aabbdd31a9dd59c970"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "trail check",
+      "fixture": "lexical false positive l-2cfeeacd vs preserved native FK; explicit TASK/commit disposition;400KB heuristic cap",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-final-trail-check.txt",
+          "sha256": "e7199e718d36aa72430ab7af205ec67842dea33aeffa5421ffde8cd6ed2f1f64"
+        }
+      ]
+    }
+  ]
+}

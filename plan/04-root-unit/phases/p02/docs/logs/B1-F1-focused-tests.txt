@@ -1,0 +1,204 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 09s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 172 tests
+test adapters::http::pages::tests::a_generated_prompt_swaps_into_the_field_without_a_script ... ok
+test adapters::http::pages::tests::a_member_sees_the_team_but_none_of_its_invites ... ok
+test adapters::http::pages::tests::a_section_waiting_on_a_code_asks_for_it_instead_of_offering_its_form_again ... ok
+test adapters::http::pages::tests::a_pending_address_is_never_shown_as_the_account_s_own ... ok
+test adapters::http::pages::tests::a_rejected_profile_shows_what_was_typed_rather_than_what_is_stored ... ok
+test adapters::http::pages::tests::a_pending_password_change_leaves_the_account_details_form_alone ... ok
+test adapters::http::pages::tests::a_streamed_thread_row_is_identical_to_one_rendered_with_the_column ... ok
+test adapters::http::pages::tests::a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not ... ok
+test adapters::http::pages::tests::a_thread_row_carries_its_own_activity_slot ... ok
+test adapters::http::pages::tests::a_detail_column_with_nothing_open_says_so ... ok
+test adapters::http::pages::tests::agent_settings_list_targets_the_pane_and_swaps_out_of_band ... ok
+test adapters::http::pages::tests::a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_keys ... ok
+test adapters::http::pages::tests::a_streamed_bubble_is_identical_to_one_rendered_with_the_page ... ok
+test adapters::http::pages::tests::a_rejected_company_save_keeps_the_picture_that_was_picked ... ok
+test adapters::http::pages::tests::agent_edit_pane_keeps_a_rejected_save_in_the_form ... ok
+test adapters::http::pages::tests::an_empty_library_leaves_no_easy_tab_to_open ... ok
+test adapters::http::pages::tests::an_attachment_is_offered_as_a_download_scoped_to_its_thread ... ok
+test adapters::http::pages::tests::an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter ... ok
+test adapters::http::pages::tests::appended_thread_page_swaps_pagination_out_of_band ... ok
+test adapters::http::pages::tests::an_oauth_only_profile_can_add_password_and_connect_available_providers ... ok
+test adapters::http::pages::tests::channel_actions_swap_out_of_band_so_picking_a_channel_reveals_edit_channel ... ok
+test adapters::http::pages::tests::agent_edit_pane_prefills_the_stored_agent_and_offers_delete ... ok
+test adapters::http::pages::tests::agent_create_pane_opens_on_the_tab_that_was_submitted ... ok
+test adapters::http::pages::tests::channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft ... ok
+test adapters::http::pages::tests::channel_settings_list_targets_the_pane_and_swaps_out_of_band ... ok
+test adapters::http::pages::tests::channel_edit_pane_reflects_the_stored_third_party_setting ... ok
+test adapters::http::pages::tests::cancelling_a_channel_form_dismisses_the_pane ... ok
+test adapters::http::pages::tests::channel_edit_pane_keeps_a_rejected_save_in_the_form ... ok
+test adapters::http::pages::tests::company_edit_pane_keeps_a_rejected_save_in_the_form ... ok
+test adapters::http::pages::tests::company_settings_list_saves_selection_in_the_url_and_swaps_out_of_band ... ok
+test adapters::http::pages::tests::company_member_can_open_company_without_edit_controls_or_api_key ... ok
+test adapters::http::pages::tests::an_agent_reply_is_drawn_as_its_channel_address_and_an_inbound_message_as_its_sender ... ok
+test adapters::http::pages::tests::company_edit_pane_prefills_the_stored_company_and_offers_delete ... ok
+test adapters::http::pages::tests::compose_pane_shows_the_channel_address_and_errors ... ok
+test adapters::http::pages::tests::a_message_renders_for_every_transport_including_none_at_all ... ok
+test adapters::http::pages::tests::a_message_from_another_channel_is_marked_and_keeps_its_own_sender ... ok
+test adapters::http::pages::tests::delivery_list_says_when_nothing_matches_and_pages_only_when_there_is_more ... ok
+test adapters::http::pages::tests::delivery_pane_distinguishes_an_unconfirmed_outcome_from_a_dead_letter ... ok
+test adapters::http::pages::tests::delivery_query_carries_only_what_was_chosen ... ok
+test adapters::http::pages::tests::delivery_pane_lists_every_part_and_its_provider_key ... ok
+test adapters::http::pages::tests::company_settings_page_without_a_company_still_offers_the_create_form ... ok
+test adapters::http::pages::tests::company_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon ... ok
+test adapters::http::pages::tests::dark_theme_recuts_the_blues_at_the_logos_hue ... ok
+test adapters::http::pages::tests::channels_page_opens_the_form_the_mailbox_asked_for ... ok
+test adapters::http::pages::tests::compose_button_lives_in_the_thread_column_of_the_selected_channel ... ok
+test adapters::http::pages::tests::a_workspace_names_its_list_and_detail_columns_for_the_compact_layout ... ok
+test adapters::http::pages::tests::department_ui::department_ui_company_pane_has_a_departments_tab_and_count ... ok
+test adapters::http::pages::tests::deliveries_page_lists_queued_work_and_escapes_its_subject ... ok
+test adapters::http::pages::tests::channel_sidebar_lists_addresses_and_offers_channel_actions ... ok
+test adapters::http::pages::tests::a_reply_in_the_open_thread_quiets_that_thread_s_activity_mark ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_company_workspace_count ... ok
+test adapters::http::pages::tests::department_ui::department_ui_tree_orders_each_root_before_its_children ... ok
+test adapters::http::pages::tests::department_ui::access_mode_ui_desk_form_requires_owner_defaults_root_and_offers_public ... ok
+test adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_direct_address_and_departments ... ok
+test adapters::http::pages::tests::department_ui::department_views_usage_page_groups_by_department ... ok
+test adapters::http::pages::tests::department_ui::department_ui_desk_lists_group_by_department_with_a_badge ... ok
+test adapters::http::pages::tests::dump_application_javascript ... ignored, developer aid: dumps /assets/app.js so it can be syntax-checked with node
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... ignored, browser protocol fixture: write the server-rendered forms, alerts, and shipped JavaScript
+test adapters::http::pages::tests::desk_wording::desk_wording_flash_messages_say_desk ... ok
+test adapters::http::pages::tests::department_ui::department_ui_member_sees_their_departments_without_forms ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_nav_names_the_desks_link ... ok
+test adapters::http::pages::tests::each_agent_form_owns_its_own_picker ... ok
+test adapters::http::pages::tests::each_profile_banner_belongs_to_the_form_that_earned_it ... ok
+test adapters::http::pages::tests::department_ui::department_ui_refusal_renders_on_the_form_that_made_it ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_settings_breadcrumb ... ok
+test adapters::http::pages::tests::every_workspace_rail_link_closes_live_streams_before_navigation ... ok
+test adapters::http::pages::tests::department_ui::department_ui_pane_indents_the_tree_and_shows_the_selected_department ... ok
+test adapters::http::pages::tests::internal_note_markup_is_unmistakable_escaped_and_hides_removed_text ... ok
+test adapters::http::pages::tests::knowledge_views::knowledge_view_visibility_covers_all_levels ... ok
+test adapters::http::pages::tests::knowledge_views::knowledge_view_matching_level_and_owner_keep_full_message ... ok
+test adapters::http::pages::tests::department_ui::department_views_run_board_filters_by_department_and_waits_on_people ... ok
+test adapters::http::pages::tests::knowledge_views::knowledge_view_simulation_outcomes_remove_run_choices_and_model_metadata ... ok
+test adapters::http::pages::tests::knowledge_views::knowledge_view_placeholder_contains_only_safe_attribution_and_position ... ok
+test adapters::http::pages::tests::library_agent_fields_reuse_the_advanced_editor_and_avatar_picker ... ok
+test adapters::http::pages::tests::legacy_agent_fields_and_confirmation_attribute_are_escaped ... ok
+test adapters::http::pages::tests::legacy_company_form_does_not_collect_ignored_model_credentials ... ok
+test adapters::http::pages::tests::message_pane_omits_the_resume_cursor_for_an_empty_thread ... ok
+test adapters::http::pages::tests::message_pane_streams_new_messages_from_where_it_was_rendered ... ok
+test adapters::http::pages::tests::no_pane_leaks_a_placeholder_constant_into_its_markup ... ok
+test adapters::http::pages::tests::mailbox_page_renders_three_columns_and_escapes_thread_subjects ... ok
+test adapters::http::pages::tests::only_streamed_rows_say_who_spoke_last ... ok
+test adapters::http::pages::tests::only_a_running_agent_gets_a_spinner ... ok
+test adapters::http::pages::tests::only_the_company_owner_is_offered_the_simulator ... ok
+test adapters::http::pages::tests::message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left ... ok
+test adapters::http::pages::tests::every_ui_workspace_first_column_renders_a_sidebar_header ... ok
+test adapters::http::pages::tests::page_timestamps_preserve_utc_instants_for_local_browser_rendering ... ok
+test adapters::http::pages::tests::opening_or_receiving_a_message_scrolls_to_the_start_of_the_newest_bubble ... ok
+test adapters::http::pages::tests::rejected_company_edit_gets_key_status_only_from_stored_metadata ... ok
+test adapters::http::pages::tests::prompt_generator_names_the_pane_it_answers_into ... ok
+test adapters::http::pages::tests::security_email_identity_profile_displays_current_address_proof ... ok
+test adapters::http::pages::tests::reply_pane_fixes_the_subject_to_the_thread_it_continues ... ok
+test adapters::http::pages::tests::icon_rail_lights_the_workspace_the_response_belongs_to ... ok
+test adapters::http::pages::tests::only_your_own_member_pane_offers_the_avatar_field ... ok
+test adapters::http::pages::tests::spam_confirmation_is_inert_until_the_channel_is_public ... ok
+test adapters::http::pages::tests::the_account_chip_swaps_name_address_and_face_as_one ... ok
+test adapters::http::pages::tests::team_settings_list_groups_members_and_invites_and_swaps_out_of_band ... ok
+test adapters::http::pages::tests::simulation_attribute_values_and_message_ids_are_escaped ... ok
+test adapters::http::pages::tests::the_avatar_picker_escapes_what_it_sends_back_up ... ok
+test adapters::http::pages::tests::the_agent_library_reaches_the_account_menu_only_for_an_operator ... ok
+test adapters::http::pages::tests::the_avatar_picker_uploads_the_picked_file_and_carries_the_url_hidden ... ok
+test adapters::http::pages::tests::test_render_markdown_formats_content_and_removes_unsafe_html ... ok
+test adapters::http::pages::tests::the_channel_form_offers_a_description_and_escapes_what_was_typed_into_it ... ok
+test adapters::http::pages::tests::the_column_marks_a_delegated_thread_without_being_told ... ok
+test adapters::http::pages::tests::the_diagnostic_pane_qualifies_every_provider_key_by_its_interface ... ok
+test adapters::http::pages::tests::the_company_form_picks_a_picture_and_saves_it_with_the_rest_of_the_settings ... ok
+test adapters::http::pages::tests::the_diagnostic_pane_says_when_no_transport_carried_a_message ... ok
+test adapters::http::pages::tests::the_create_form_deselects_the_list_without_emptying_the_rail ... ok
+test adapters::http::pages::tests::the_dashboard_shows_a_placeholder_with_one_initial_writer ... ok
+test adapters::http::pages::tests::the_easy_tab_creates_the_picked_library_agents ... ok
+test adapters::http::pages::tests::the_invite_pane_only_edits_an_invite_that_is_still_pending ... ok
+test adapters::http::pages::tests::the_invite_forms_keep_a_rejected_submit_in_the_form ... ok
+test adapters::http::pages::tests::the_message_pane_has_a_slot_for_the_activity_strip ... ok
+test adapters::http::pages::tests::the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner ... ok
+test adapters::http::pages::tests::the_out_of_band_thread_list_stays_live ... ok
+test adapters::http::pages::tests::the_icon_rail_only_advertises_company_workspaces_the_role_can_open ... ok
+test adapters::http::pages::tests::the_open_thread_is_identifiable_from_the_pane ... ok
+test adapters::http::pages::tests::the_rail_badge_can_be_sent_back_out_of_band_after_a_company_is_saved ... ok
+test adapters::http::pages::tests::the_profile_pane_offers_the_account_its_own_details_and_never_its_password ... ok
+test adapters::http::pages::tests::no_function_name_is_declared_twice_in_the_bundle ... ok
+test adapters::http::pages::tests::the_profile_offers_the_decision_and_delivery_failure_email_toggles ... ok
+test adapters::http::pages::tests::the_team_tab_sits_inside_its_company_pane_and_lights_the_company_rail_icon ... ok
+test adapters::http::pages::tests::the_profile_page_renders_through_the_ui_shell_with_or_without_a_company ... ok
+test adapters::http::pages::tests::thread_column_omits_the_resume_cursor_for_an_empty_channel ... ok
+test adapters::http::pages::tests::the_top_bar_names_the_selected_company_between_the_brand_and_the_account ... ok
+test adapters::http::pages::tests::thread_column_streams_touched_threads_from_where_it_was_rendered ... ok
+test adapters::http::pages::tests::thread_row_marks_only_the_selected_thread ... ok
+test adapters::http::pages::tests::the_rail_ends_on_the_company_it_is_scoped_to_rather_than_on_a_way_out ... ok
+test adapters::http::pages::tests::the_ui_shell_carries_the_placeholder_machinery_for_its_swap_targets ... ok
+test adapters::http::pages::tests::top_bar_shows_the_logo_and_the_signed_in_account ... ok
+test adapters::http::pages::tests::top_bar_carries_a_theme_controller_that_survives_a_reload ... ok
+test adapters::http::pages::tests::workflow_conversation_tests::a_visible_reply_does_not_offer_a_link_to_an_inaccessible_producer ... ok
+test adapters::http::pages::tests::the_ui_shell_reports_live_update_interruptions_without_replacing_sse_retries ... ok
+test adapters::http::pages::tests::workspace_navigation_cleanup_uses_the_htmx_sse_extension_lifecycle ... ok
+test adapters::http::pages::tests::workflow_conversation_tests::conversations_identify_each_run_and_its_own_reply ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_scan_reads_text_nodes_in_every_literal_form ... ok
+test adapters::http::pages::tests::no_page_reaches_for_a_class_daisyui_5_removed ... ok
+test adapters::http::pages::tests::every_delegated_action_has_a_branch_in_the_bundle ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading ... FAILED
+test adapters::http::pages::tests::channel_edit_pane_prefills_the_stored_channel_and_offers_delete ... FAILED
+test adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript ... ok
+test adapters::http::routes::channel::department_tests::access_mode_json_department_rejects_explicit_null_and_invalid_ids ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_page_sources_keep_channel_out_of_text_nodes ... ok
+test adapters::http::routes::channel::tests::channel_pages_and_fragments_render_correctly ... ok
+test adapters::http::routes::channel::tests::test_channel_form_deserialization ... ok
+test adapters::http::routes::channel::tests::test_slugify ... ok
+test adapters::http::routes::channel::tests::thread_cursor_round_trips ... ok
+test adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation ... ok
+test adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors ... ok
+test adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks ... ok
+test adapters::http::routes::ui_channels::tests::access_mode_ui_owner_is_optional_in_a_write_but_cannot_be_cleared ... ok
+test adapters::http::routes::ui_channels::tests::access_mode_ui_public_checkbox_preserves_named_addresses_and_can_close_intake ... ok
+test adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids ... ok
+test adapters::http::routes::channel::department_tests::access_mode_json_owner_is_preserved_and_can_be_reassigned_but_not_cleared ... ok
+test adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members ... ok
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys ... ok
+test adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate ... ok
+test adapters::http::routes::channel::classic_form_tests::access_mode_classic_rendered_create_requires_spam_confirmation_and_selects_its_owner ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see ... ok
+test adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger ... ok
+test adapters::http::routes::channel::classic_form_tests::access_mode_classic_rendered_edit_preserves_public_owner_and_can_close_intake ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden ... ok
+test adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities ... ok
+
+failures:
+
+---- adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading stdout ----
+
+thread 'adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading' (28822228) panicked at src/adapters/http/pages/desk_wording_tests.rs:73:5:
+assertion failed: html.contains(">Desk Name</label>")
+
+---- adapters::http::pages::tests::channel_edit_pane_prefills_the_stored_channel_and_offers_delete stdout ----
+
+thread 'adapters::http::pages::tests::channel_edit_pane_prefills_the_stored_channel_and_offers_delete' (28822198) panicked at src/adapters/http/pages/tests.rs:1488:5:
+assertion failed: html.contains("value=\"person@example.com, @public\"")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::pages::tests::channel_edit_pane_prefills_the_stored_channel_and_offers_delete
+    adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading
+
+test result: FAILED. 168 passed; 2 failed; 2 ignored; 0 measured; 4577 filtered out; finished in 3.85s
+
+error: test failed, to rerun pass `--lib`

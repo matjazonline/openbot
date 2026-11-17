@@ -122,7 +122,7 @@ impl AttentionUseCases {
             visible_channel_ids: visible.iter().map(|channel| channel.id).collect(),
             desk_departments: visible
                 .iter()
-                .map(|channel| (channel.id, channel.department_id))
+                .map(|channel| (channel.id, Some(channel.department_id)))
                 .collect(),
         })
     }

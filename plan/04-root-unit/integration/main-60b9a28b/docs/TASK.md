@@ -122,3 +122,12 @@ Real browser SSO/final repository gates remain for final Plan04; not claimed her
 Root will publish coordination3 with C001 integration response satisfied (same
 requirement r1) and commit this reviewed small integration with documented Trail
 false-positive disposition, then start p02. No Plan04 push or full completion yet.
+
+## Latest user continuation supersedes prior scope limits
+
+User2026-11-16: finish Plan04 with required verification, push to main, then start
+Plans05 and06 in order under the same Astra review workflow; no scope beyond06.
+Prior stop-before05 wording is historical and superseded. Coordination4 notice
+04RU-C002/r1 is acknowledged by root; current task remains completing Plan04.
+Main integration is committed334e79c74b383dffd8e0d565c33a77c6ac24c94d and accepted
+at source09f2972f…d22c4a8, independent04RU-MAIN-B1-R1/N1. Next Plan04p02.

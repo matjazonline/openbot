@@ -88,3 +88,12 @@ preserve pa04_p01_schema5/core5_test and earlier artifacts. Own Docker profile
 openbot-plan04 available via pa04-docker-env.sh; default context unchanged. No task
 test process active. Other workspace workers must not be stopped. Final full suite
 only after p02/p03. External journeys remain unexercised; Doop deferred C008r1.
+
+## Latest user continuation supersedes prior scope limits
+
+User2026-11-16: finish Plan04 with required verification, push to main, then start
+Plans05 and06 in order under the same Astra review workflow; no scope beyond06.
+Prior stop-before05 wording is historical and superseded. Coordination4 notice
+04RU-C002/r1 is acknowledged by root; current task remains completing Plan04.
+Main integration is committed334e79c74b383dffd8e0d565c33a77c6ac24c94d and accepted
+at source09f2972f…d22c4a8, independent04RU-MAIN-B1-R1/N1. Next Plan04p02.

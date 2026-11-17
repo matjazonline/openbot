@@ -38,6 +38,10 @@
 //! behind breaks whichever test claims it next. [`own_database`] hands one test a database of its
 //! own, migrated, and drops it when the handle goes out of scope — on a panic too.
 
+#[path = "channel_access_test_support.rs"]
+mod channel_access;
+pub use channel_access::{empty_channel_department, restrict_channel_to_configured_grants};
+
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, PgConnection, PgPool};
 use tokio::sync::{Mutex, OnceCell};

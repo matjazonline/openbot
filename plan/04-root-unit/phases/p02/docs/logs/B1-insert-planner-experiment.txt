@@ -1,0 +1,134 @@
+BEGIN
+CREATE TABLE
+INSERT 0 400000
+ANALYZE
+  rows  | table_bytes | index_bytes 
+--------+-------------+-------------
+ 400000 |    48570368 |   105431040
+(1 row)
+
+PREPARE
+PREPARE
+SET
+         experiment         
+----------------------------
+ force_custom_plan/original
+(1 row)
+
+                                                                                                       QUERY PLAN                                                                                                       
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on channel_principal_grants  (cost=0.43..86.35 rows=0 width=0) (actual time=10.605..10.605 rows=0.00 loops=1)
+   Conflict Resolution: NOTHING
+   Conflict Arbiter Indexes: channel_principal_grants_pkey
+   Tuples Inserted: 2000
+   Conflicting Tuples: 0
+   Buffers: local hit=26857 read=1071 dirtied=1080 written=188
+   ->  Nested Loop Anti Join  (cost=0.43..86.35 rows=8 width=120) (actual time=0.080..4.667 rows=2000.00 loops=1)
+         Buffers: local hit=4937 read=1063 written=107
+         ->  Nested Loop  (cost=0.01..11.46 rows=10 width=64) (actual time=0.069..0.366 rows=2000.00 loops=1)
+               ->  Function Scan on audience  (cost=0.01..11.26 rows=5 width=32) (actual time=0.068..0.148 rows=1000.00 loops=1)
+                     Filter: (channel_id = ANY ('{ffffffff-ffff-ffff-ffff-ffffffffffff}'::uuid[]))
+               ->  Function Scan on unnest capability  (cost=0.00..0.02 rows=2 width=32) (actual time=0.000..0.000 rows=2.00 loops=1000)
+         ->  Index Scan using channel_principal_grants_company_id_principal_id_channel_id_idx on channel_principal_grants permission  (cost=0.42..8.45 rows=1 width=40) (actual time=0.002..0.002 rows=0.00 loops=2000)
+               Index Cond: ((company_id = '00000000-0000-0000-0000-000000000001'::uuid) AND (principal_id = audience.principal_id) AND (channel_id = audience.channel_id) AND (capability = capability.value))
+               Filter: (provenance = 'department_membership'::text)
+               Index Searches: 2000
+               Buffers: local hit=4937 read=1063 written=107
+ Planning:
+   Buffers: shared hit=115 read=1
+ Planning Time: 0.941 ms
+ Execution Time: 10.623 ms
+(21 rows)
+
+DELETE 2000
+        experiment        
+--------------------------
+ force_custom_plan/pruned
+(1 row)
+
+                                                                                                                     QUERY PLAN                                                                                                                      
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on channel_principal_grants  (cost=0.43..96.10 rows=0 width=0) (actual time=16.335..16.336 rows=0.00 loops=1)
+   Conflict Resolution: NOTHING
+   Conflict Arbiter Indexes: channel_principal_grants_pkey
+   Tuples Inserted: 2000
+   Conflicting Tuples: 0
+   Buffers: local hit=35183 read=1001 dirtied=1036 written=1069
+   ->  Nested Loop Anti Join  (cost=0.43..96.10 rows=8 width=120) (actual time=0.080..7.437 rows=2000.00 loops=1)
+         Join Filter: (permission.capability = capability.value)
+         Buffers: local hit=9030 read=999 written=997
+         ->  Nested Loop  (cost=0.01..11.46 rows=10 width=64) (actual time=0.064..0.447 rows=2000.00 loops=1)
+               ->  Function Scan on audience  (cost=0.01..11.26 rows=5 width=32) (actual time=0.063..0.194 rows=1000.00 loops=1)
+                     Filter: (channel_id = ANY ('{ffffffff-ffff-ffff-ffff-ffffffffffff}'::uuid[]))
+               ->  Function Scan on unnest capability  (cost=0.00..0.02 rows=2 width=32) (actual time=0.000..0.000 rows=2.00 loops=1000)
+         ->  Index Scan using channel_principal_grants_company_id_principal_id_channel_id_idx on channel_principal_grants permission  (cost=0.42..8.45 rows=1 width=40) (actual time=0.003..0.003 rows=0.00 loops=2000)
+               Index Cond: ((company_id = '00000000-0000-0000-0000-000000000001'::uuid) AND (principal_id = audience.principal_id) AND (channel_id = audience.channel_id) AND (channel_id = ANY ('{ffffffff-ffff-ffff-ffff-ffffffffffff}'::uuid[])))
+               Filter: (provenance = 'department_membership'::text)
+               Index Searches: 2000
+               Buffers: local hit=9030 read=999 written=997
+ Planning Time: 0.766 ms
+ Execution Time: 16.346 ms
+(20 rows)
+
+DELETE 2000
+SET
+         experiment          
+-----------------------------
+ force_generic_plan/original
+(1 row)
+
+                                                                                                       QUERY PLAN                                                                                                       
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on channel_principal_grants  (cost=0.43..592.86 rows=0 width=0) (actual time=18.014..18.014 rows=0.00 loops=1)
+   Conflict Resolution: NOTHING
+   Conflict Arbiter Indexes: channel_principal_grants_pkey
+   Tuples Inserted: 2000
+   Conflicting Tuples: 0
+   Buffers: local hit=39206 read=1000 dirtied=1033 written=1064
+   ->  Nested Loop Anti Join  (cost=0.43..592.86 rows=56 width=120) (actual time=0.074..7.655 rows=2000.00 loops=1)
+         Buffers: local hit=9000 read=1000 written=998
+         ->  Nested Loop  (cost=0.01..1.63 rows=70 width=64) (actual time=0.064..0.390 rows=2000.00 loops=1)
+               ->  Function Scan on audience  (cost=0.01..0.23 rows=7 width=32) (actual time=0.063..0.155 rows=1000.00 loops=1)
+                     Filter: (channel_id = ANY ($2))
+               ->  Function Scan on unnest capability  (cost=0.00..0.10 rows=10 width=32) (actual time=0.000..0.000 rows=2.00 loops=1000)
+         ->  Index Scan using channel_principal_grants_company_id_principal_id_channel_id_idx on channel_principal_grants permission  (cost=0.42..8.45 rows=1 width=40) (actual time=0.003..0.003 rows=0.00 loops=2000)
+               Index Cond: ((company_id = $1) AND (principal_id = audience.principal_id) AND (channel_id = audience.channel_id) AND (capability = capability.value))
+               Filter: (provenance = $6)
+               Index Searches: 2000
+               Buffers: local hit=9000 read=1000 written=998
+ Planning Time: 0.744 ms
+ Execution Time: 18.023 ms
+(19 rows)
+
+DELETE 2000
+        experiment         
+---------------------------
+ force_generic_plan/pruned
+(1 row)
+
+                                                                                                       QUERY PLAN                                                                                                        
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on channel_principal_grants  (cost=0.43..3389.77 rows=0 width=0) (actual time=17.854..17.855 rows=0.00 loops=1)
+   Conflict Resolution: NOTHING
+   Conflict Arbiter Indexes: channel_principal_grants_pkey
+   Tuples Inserted: 2000
+   Conflicting Tuples: 0
+   Buffers: local hit=52124 read=1004 dirtied=1029 written=1062
+   ->  Nested Loop Anti Join  (cost=0.43..3389.77 rows=56 width=120) (actual time=0.075..8.065 rows=2000.00 loops=1)
+         Join Filter: (permission.capability = capability.value)
+         Buffers: local hit=17996 read=1004 written=1002
+         ->  Nested Loop  (cost=0.01..1.63 rows=70 width=64) (actual time=0.064..0.376 rows=2000.00 loops=1)
+               ->  Function Scan on audience  (cost=0.01..0.23 rows=7 width=32) (actual time=0.063..0.147 rows=1000.00 loops=1)
+                     Filter: (channel_id = ANY ($2))
+               ->  Function Scan on unnest capability  (cost=0.00..0.10 rows=10 width=32) (actual time=0.000..0.000 rows=2.00 loops=1000)
+         ->  Index Scan using channel_principal_grants_company_id_principal_id_channel_id_idx on channel_principal_grants permission  (cost=0.42..48.39 rows=1 width=40) (actual time=0.004..0.004 rows=0.00 loops=2000)
+               Index Cond: ((company_id = $1) AND (principal_id = audience.principal_id) AND (channel_id = audience.channel_id) AND (channel_id = ANY ($2)))
+               Filter: (provenance = $6)
+               Index Searches: 2000
+               Buffers: local hit=17996 read=1004 written=1002
+ Planning Time: 0.744 ms
+ Execution Time: 17.863 ms
+(20 rows)
+
+DELETE 2000
+ROLLBACK

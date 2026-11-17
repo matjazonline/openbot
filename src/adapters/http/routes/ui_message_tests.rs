@@ -19,11 +19,11 @@ async fn invite_journey_member(h: &Harness) -> crate::entities::user::User {
     .await
     .as_uuid();
 
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(h.channel_id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        h.persistence.pool(),
+        h.channel_id,
+    )
+    .await;
     sqlx::query("INSERT INTO channel_principal_grants (company_id, channel_id, principal_id, capability, provenance) VALUES ($1, $2, $3, 'view', 'configured_allowlist')")
         .bind(h.company_id)
         .bind(h.channel_id)
@@ -424,11 +424,11 @@ async fn refuses_other_scopes(h: &Harness, other: &Harness, query: MessageQuery)
             Err(AppError::NotFound(_))
         ));
     }
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(h.channel_id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        h.persistence.pool(),
+        h.channel_id,
+    )
+    .await;
     crate::adapters::persistence::test_support::insert_root_member(
         h.persistence.pool(),
         crate::domain::workflow::CompanyId::new(h.company_id),

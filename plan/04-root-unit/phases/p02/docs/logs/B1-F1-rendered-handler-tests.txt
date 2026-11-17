@@ -1,0 +1,25 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0782]: expected a type, found a trait
+   --> src/adapters/http/routes/channel_classic_form_tests.rs:186:9
+    |
+186 |         ChannelPersistence::get_by_slug(
+    |         ^^^^^^^^^^^^^^^^^^
+    |
+help: you can add the `dyn` keyword if you want a trait object
+    |
+186 |         <dyn ChannelPersistence>::get_by_slug(
+    |         ++++                   +
+
+error[E0782]: expected a type, found a trait
+   --> src/adapters/http/routes/channel_classic_form_tests.rs:208:17
+    |
+208 |     let saved = ChannelPersistence::get_by_slug(
+    |                 ^^^^^^^^^^^^^^^^^^
+    |
+help: you can add the `dyn` keyword if you want a trait object
+    |
+208 |     let saved = <dyn ChannelPersistence>::get_by_slug(
+    |                 ++++                   +
+
+For more information about this error, try `rustc --explain E0782`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

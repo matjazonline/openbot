@@ -1,0 +1,24 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 1 test
+
+thread 'adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_scale_1000_members_200_desks' (27825767) panicked at src/adapters/persistence/access_mode_scale_tests.rs:175:10:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_scale_1000_members_200_desks ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_scale_1000_members_200_desks
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4738 filtered out; finished in 17.80s
+
+error: test failed, to rerun pass `--lib`

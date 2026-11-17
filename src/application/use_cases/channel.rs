@@ -53,11 +53,6 @@ impl ChannelWrite {
             });
         }
 
-        if self.is_public() {
-            // Selecting public intake also clears a department's narrower members-only setting.
-            self.ownership.get_or_insert_default().members_only = Some(false);
-        }
-
         Ok(())
     }
 
@@ -719,8 +714,7 @@ mod tests {
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }
     }
 
@@ -1281,13 +1275,12 @@ mod tests {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: false,
@@ -1299,13 +1292,12 @@ mod tests {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ];
 
@@ -1352,6 +1344,7 @@ mod tests {
                 company_id,
                 ChannelWrite {
                     name: "Support Flow".into(),
+                    participant_emails: Some(vec!["customer@example.com".into()]),
                     slug: "support".into(),
                     enabled: false,
                     ..ChannelWrite::default()

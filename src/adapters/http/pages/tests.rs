@@ -141,13 +141,12 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         slug: "inbox".into(),
         alias_slugs: Vec::new(),
         participant_emails: Some(vec!["person@example.com".into()]),
-        access_mode: crate::entities::channel::ChannelAccessMode::Allowlist,
+        access_mode: crate::entities::channel::ChannelAccessMode::Members,
         principal_grants: Vec::new(),
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
         settings_revision: 0,
-        department_id: None,
-        members_only: false,
+        department_id: crate::entities::department::DepartmentId::random(),
     }
 }
 
@@ -1486,7 +1485,9 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     )));
     assert!(html.contains("value=\"Inbox\""));
     assert!(html.contains("value=\"inbox\""));
-    assert!(html.contains("value=\"person@example.com, @public\""));
+    assert!(html.contains("value=\"person@example.com\""));
+    assert!(!html.contains("value=\"person@example.com, @public\""));
+    assert!(html.contains(r#"name="public""#));
     assert!(!html.contains("name=\"provider\""));
     assert!(!html.contains("name=\"channel_config\""));
 
@@ -1621,7 +1622,7 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
     assert!(!public.contains("opacity-40"));
     assert!(public.contains("class=\"checkbox checkbox-sm\">"));
 
-    // The participants field is what drives the toggle from there on.
+    // The Public checkbox drives the toggle from there on.
     assert!(public.contains(r##"data-input="channel-spam-confirm""##));
 }
 
@@ -4922,7 +4923,10 @@ fn dump_html_injection_browser_fixtures() {
             error_alert("Registration failed: <svg/onload=fetch('/exfil')>"),
         ),
     ];
-    for (name, body) in files {
+    for (name, body) in files
+        .into_iter()
+        .chain(department_ui::desk_access_browser_fixtures())
+    {
         std::fs::write(output.join(name), body).expect("write fixture");
     }
 }

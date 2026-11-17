@@ -1,0 +1,21 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0433]: cannot find `message_test_support` in `tests`
+   --> src/adapters/persistence/workflow/agent_history_identity_tests.rs:158:70
+    |
+158 |     let replacement = crate::adapters::persistence::workflow::tests::message_test_support::member(
+    |                                                                      ^^^^^^^^^^^^^^^^^^^^ could not find `message_test_support` in `tests`
+
+error[E0433]: cannot find `message_test_support` in `tests`
+   --> src/adapters/persistence/workflow/knowledge_message_tests.rs:122:52
+    |
+122 |     crate::adapters::persistence::workflow::tests::message_test_support::verify_email(
+    |                                                    ^^^^^^^^^^^^^^^^^^^^ could not find `message_test_support` in `tests`
+
+error[E0433]: cannot find `message_test_support` in `tests`
+  --> src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs:24:52
+   |
+24 |     crate::adapters::persistence::workflow::tests::message_test_support::verify_email(
+   |                                                    ^^^^^^^^^^^^^^^^^^^^ could not find `message_test_support` in `tests`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

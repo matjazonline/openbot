@@ -88,10 +88,8 @@ pub fn email_allowlist_policy(
     let grants = email_allowlist_grants(company_id, &listed);
     let mode = if is_public {
         ChannelAccessMode::Public
-    } else if grants.is_empty() {
-        ChannelAccessMode::Team
     } else {
-        ChannelAccessMode::Allowlist
+        ChannelAccessMode::Members
     };
     (mode, grants)
 }
@@ -117,6 +115,21 @@ pub fn email_allowlist_grants(company_id: Uuid, addresses: &[&str]) -> Vec<Chann
                     created_at: Utc::now(),
                 }
             })
+        })
+        .collect()
+}
+
+/// Materialized membership rows for the finite audience declared by a desk fixture.
+/// Real persistence derives these from department placement, not from email syntax.
+pub fn department_membership_grants(
+    company_id: Uuid,
+    members: &[&str],
+) -> Vec<ChannelPrincipalGrant> {
+    email_allowlist_grants(company_id, members)
+        .into_iter()
+        .map(|mut grant| {
+            grant.provenance = GrantProvenance::DepartmentMembership;
+            grant
         })
         .collect()
 }

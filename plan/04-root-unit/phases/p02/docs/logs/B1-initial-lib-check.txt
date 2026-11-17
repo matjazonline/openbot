@@ -1,0 +1,191 @@
+    Checking tokio-rustls v0.26.4
+    Checking tower-http v0.6.11
+    Checking sqlx-core v0.8.6
+    Checking hickory-proto v0.24.4
+    Checking tokio-tungstenite v0.26.2
+    Checking hyper-rustls v0.27.9
+    Checking lettre v0.11.23
+    Checking axum v0.8.4
+    Checking reqwest v0.13.4
+    Checking rig-core v0.42.0
+    Checking rmcp v1.8.0
+    Checking axum-extra v0.10.1
+    Checking sqlx-postgres v0.8.6
+    Checking hickory-resolver v0.24.4
+    Checking mail-auth v0.6.1
+    Checking sqlx v0.8.6
+    Checking rig-agent v0.42.0
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0585]: found a documentation comment that doesn't document anything
+  --> src/domain/entities/channel.rs:81:5
+   |
+44 | pub struct Channel {
+   |            ------- while parsing this struct
+...
+81 |     /// department-derived grants are the allowlist, beside any configured email entries.
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: doc comments must come before what they document, if a comment was intended use `//`
+
+error: unexpected end of input, expected identifier
+  --> src/domain/entities/channel.rs:82:1
+   |
+82 | }
+   | ^
+
+error[E0425]: cannot find value `department_id` in this scope
+   --> src/adapters/http/routes/channel.rs:405:9
+    |
+405 |         department_id,
+    |         ^^^^^^^^^^^^^ not found in this scope
+
+warning: unused imports: `checkbox_ticked` and `parse_emails_form`
+  --> src/adapters/http/routes/ui_channels.rs:43:22
+   |
+43 |         ChannelForm, checkbox_ticked, parse_emails_form, parse_list_form, parse_text_form, slugify,
+   |                      ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0277]: the trait bound `(StatusCode, Json<Vec<Channel>>): IntoResponse` is not satisfied
+   --> src/adapters/http/routes/channel.rs:736:35
+    |
+736 |   ) -> AppResult<impl IntoResponse> {
+    |  ___________________________________^
+737 | |     let channels = channel_use_cases
+738 | |         .list_company_channels(user.id, company_id)
+739 | |         .await?;
+740 | |     Ok((StatusCode::OK, Json(channels)))
+741 | | }
+    | |_^ the trait `axum::response::IntoResponse` is not implemented for `(reqwest::StatusCode, axum::Json<Vec<domain::entities::channel::Channel>>)`
+    |
+    = help: the following other types implement trait `axum::response::IntoResponse`:
+              ()
+              (R,)
+              (T1, R)
+              (axum::http::response::Parts, R)
+              (reqwest::StatusCode, R)
+              (rig_core::http_client::Response<()>, R)
+              (T1, T2, R)
+              (axum::http::response::Parts, T1, R)
+            and 61 others
+    = note: the full name for the type has been written to '/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-be3d30bb5df1769c.long-type-12095443803587179468.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `(StatusCode, Json<Vec<Channel>>): IntoResponse` is not satisfied
+   --> src/adapters/http/routes/channel.rs:736:16
+    |
+736 | ) -> AppResult<impl IntoResponse> {
+    |                ^^^^^^^^^^^^^^^^^ the trait `axum::response::IntoResponse` is not implemented for `(reqwest::StatusCode, axum::Json<Vec<domain::entities::channel::Channel>>)`
+    |
+    = help: the following other types implement trait `axum::response::IntoResponse`:
+              ()
+              (R,)
+              (T1, R)
+              (axum::http::response::Parts, R)
+              (reqwest::StatusCode, R)
+              (rig_core::http_client::Response<()>, R)
+              (T1, T2, R)
+              (axum::http::response::Parts, T1, R)
+            and 61 others
+    = note: the full name for the type has been written to '/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-be3d30bb5df1769c.long-type-12095443803587179468.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `(StatusCode, Json<Channel>): IntoResponse` is not satisfied
+   --> src/adapters/http/routes/channel.rs:808:35
+    |
+808 |   ) -> AppResult<impl IntoResponse> {
+    |  ___________________________________^
+809 | |     let channel = channel_use_cases
+810 | |         .get_company_channel(user.id, company_id, channel_id)
+811 | |         .await?
+...   |
+814 | |     Ok((StatusCode::OK, Json(channel)))
+815 | | }
+    | |_^ the trait `axum::response::IntoResponse` is not implemented for `(reqwest::StatusCode, axum::Json<domain::entities::channel::Channel>)`
+    |
+    = help: the following other types implement trait `axum::response::IntoResponse`:
+              ()
+              (R,)
+              (T1, R)
+              (axum::http::response::Parts, R)
+              (reqwest::StatusCode, R)
+              (rig_core::http_client::Response<()>, R)
+              (T1, T2, R)
+              (axum::http::response::Parts, T1, R)
+            and 61 others
+    = note: the full name for the type has been written to '/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-be3d30bb5df1769c.long-type-10133187597626971612.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `(StatusCode, Json<Channel>): IntoResponse` is not satisfied
+   --> src/adapters/http/routes/channel.rs:808:16
+    |
+808 | ) -> AppResult<impl IntoResponse> {
+    |                ^^^^^^^^^^^^^^^^^ the trait `axum::response::IntoResponse` is not implemented for `(reqwest::StatusCode, axum::Json<domain::entities::channel::Channel>)`
+    |
+    = help: the following other types implement trait `axum::response::IntoResponse`:
+              ()
+              (R,)
+              (T1, R)
+              (axum::http::response::Parts, R)
+              (reqwest::StatusCode, R)
+              (rig_core::http_client::Response<()>, R)
+              (T1, T2, R)
+              (axum::http::response::Parts, T1, R)
+            and 61 others
+    = note: the full name for the type has been written to '/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-be3d30bb5df1769c.long-type-10133187597626971612.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `domain::entities::channel::Channel: serde::Serialize` is not satisfied
+    --> src/adapters/http/routes/channel.rs:228:24
+     |
+ 228 | #[derive(Debug, Clone, Serialize)]
+     |                        ^^^^^^^^^ unsatisfied trait bound
+...
+ 231 |     pub channel: Channel,
+     |     --- required by a bound introduced by this call
+     |
+help: the trait `memory_service::_::_serde::Serialize` is not implemented for `domain::entities::channel::Channel`
+    --> src/domain/entities/channel.rs:44:1
+     |
+  44 | pub struct Channel {
+     | ^^^^^^^^^^^^^^^^^^
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `domain::entities::channel::Channel` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `memory_service::_::_serde::Serialize`:
+               &'a T
+               &'a mut T
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (T0, T1, T2, T3)
+               (T0, T1, T2, T3, T4)
+             and 1611 others
+note: required by a bound in `memory_service::_::_serde::ser::SerializeStruct::serialize_field`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/ser/mod.rs:1917:21
+     |
+1915 |     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+     |        --------------- required by a bound in this associated function
+1916 |     where
+1917 |         T: ?Sized + Serialize;
+     |                     ^^^^^^^^^ required by this bound in `SerializeStruct::serialize_field`
+     = note: this error originates in the derive macro `Serialize` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/channel.rs:87:28
+   |
+87 |             department_id: DepartmentId::new(db.department_id),
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<DepartmentId>`, found `DepartmentId`
+   |
+   = note: expected enum `std::option::Option<DepartmentId>`
+            found struct `DepartmentId`
+help: try wrapping the expression in `Some`
+   |
+87 |             department_id: Some(DepartmentId::new(db.department_id)),
+   |                            +++++                                   +
+
+Some errors have detailed explanations: E0277, E0308, E0425, E0585.
+For more information about an error, try `rustc --explain E0277`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 9 previous errors; 1 warning emitted

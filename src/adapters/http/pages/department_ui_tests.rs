@@ -438,10 +438,16 @@ fn department_ui_company_pane_has_a_departments_tab_and_count() {
 }
 
 #[test]
-fn department_ui_desk_form_offers_the_department_and_members_only() {
+fn access_mode_ui_desk_form_requires_owner_defaults_root_and_offers_public() {
     let tree = tree();
-    let all = tree.all();
-    let channel = mailbox_channel(tree.company.id);
+    let mut root = tree.sales.clone();
+    root.id = crate::entities::department::DepartmentId::random();
+    root.parent_id = None;
+    root.is_root = true;
+    root.name = "Company root".into();
+    let mut sales = tree.sales.clone();
+    sales.parent_id = Some(root.id);
+    let all = vec![root.clone(), sales.clone()];
     let plain = channel_create_pane(&ChannelCreatePane {
         company: &tree.company,
         app_domain_name: "example.com",
@@ -450,20 +456,18 @@ fn department_ui_desk_form_offers_the_department_and_members_only() {
         error: None,
         departments: &all,
     });
-    assert!(plain.contains(
-        r#"<select name="department_id" class="select w-full" data-input="desk-members-only">"#
-    ));
-    assert!(plain.contains(r#"<option value="">No department</option>"#));
-    // Without a department the members-only box is hidden and unticked.
-    assert!(plain.contains(r#"class="desk-members-only form-control w-full hidden""#));
-    assert!(!plain.contains(
-        r#"name="members_only" value="true" class="checkbox checkbox-sm mt-0.5" checked"#
-    ));
-
+    assert!(plain.contains(r#"<select name="department_id" required class="select w-full">"#));
+    assert!(plain.contains(&format!(
+        r#"<option value="{}" selected>Company root</option>"#,
+        root.id
+    )));
+    assert!(!plain.contains("No department"));
+    assert!(!plain.contains("members_only"));
+    assert!(plain.contains("Open to anyone"));
+    assert!(plain.contains("Also allow these addresses"));
     let owned = Channel {
-        department_id: Some(tree.sales.id),
-        members_only: true,
-        ..channel
+        department_id: sales.id,
+        ..mailbox_channel(tree.company.id)
     };
     let html = channel_edit_pane(&ChannelEditPane {
         company: &tree.company,
@@ -478,29 +482,11 @@ fn department_ui_desk_form_offers_the_department_and_members_only() {
     });
     assert!(html.contains(&format!(
         r#"<option value="{}" selected>&nbsp;&nbsp;Sales &lt;team&gt;</option>"#,
-        tree.sales.id
+        sales.id
     )));
-    assert!(html.contains(r#"class="desk-members-only form-control w-full""#));
-    assert!(html.contains(
-        r#"name="members_only" value="true" class="checkbox checkbox-sm mt-0.5" checked"#
-    ));
-    // Who gets access, one step up and down (COORDINATION C002), and that relays stay (C001).
-    // Participant Emails still admit their addresses on a members-only desk (F2).
-    assert!(html.contains("Only the department's members, its lead, the lead of its parent department, the leads of its direct child departments and the addresses in Participant Emails can use this desk."));
-    assert!(html.contains("Other desks in the company can still hand work to it."));
-
-    // A company without departments sees no owner fields at all.
-    let none = channel_create_pane(&ChannelCreatePane {
-        company: &tree.company,
-        app_domain_name: "example.com",
-        spam_scan_enabled: true,
-        draft: &ChannelDraft::default(),
-        error: None,
-        departments: &[],
-    });
-    assert!(!none.contains("department_id"));
-    // The script that shows the box is in the shared layout's handler.
-    assert!(CHANNEL_SETTINGS_SCRIPT.contains("function toggleDeskMembersOnly(select)"));
+    assert!(html.contains("its parent Lead and direct child Leads"));
+    assert!(html.contains("Other agents need an explicit grant"));
+    assert!(!CHANNEL_SETTINGS_SCRIPT.contains("toggleDeskMembersOnly"));
 }
 
 #[test]
@@ -511,7 +497,10 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
         id: Uuid::new_v4(),
         name: name.into(),
         slug: slug.into(),
-        department_id: owner.map(|department| department.id),
+        department_id: owner.map_or_else(
+            crate::entities::department::DepartmentId::random,
+            |department| department.id,
+        ),
         ..mailbox_channel(tree.company.id)
     };
     let channels = vec![
@@ -540,7 +529,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
         heading("Revenue"),
         heading("Sales &lt;team&gt;"),
         heading("Support"),
-        heading("No department"),
+        heading("Other desks"),
     );
     assert!(
         revenue < sales && sales < support && support < none,
@@ -551,7 +540,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
     // Inside sales owns no desk, so it has no heading.
     assert!(!list.contains("Inside sales"));
 
-    // A company whose desks have no department keeps a flat list.
+    // A separately read list without the permitted desk owner keeps that desk visible.
     let flat = channel_settings_list(
         &ChannelSettingsList {
             company: &tree.company,
@@ -566,7 +555,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
 
     // The classic desks page groups the same way and badges each owned desk.
     let page = channel_list_fragment(&tree.company, "example.com", &channels, &all);
-    let none = page.find(">No department</h4>").unwrap();
+    let none = page.find(">Other desks</h4>").unwrap();
     assert!(page.find(">Revenue</h4>").unwrap() < none);
     let row = channel_row_fragment(
         &tree.company,
@@ -787,4 +776,77 @@ fn department_views_usage_page_groups_by_department() {
     let none = html.find("No department").expect("the unowned row");
     assert!(sales < none);
     assert!(!html.contains("Sales <team>"));
+}
+
+fn desk_browser_workspace(company: &Company, content: &str) -> String {
+    let email = crate::entities::value_objects::EmailAddress::from("owner@example.com");
+    let user = mailbox_user(&email);
+    ui_shell(&UiShell {
+        title: "Desk",
+        user: &user,
+        company: Some(company),
+        section: UiSection::Channels,
+        content,
+    })
+}
+
+/// Real controls from both live page producers, also used by the shipped-JavaScript browser gate.
+pub(super) fn desk_access_browser_fixtures() -> [(&'static str, String); 4] {
+    let mut company = mailbox_company();
+    company.id = Uuid::parse_str("00000000-0000-4000-8000-000000000001").unwrap();
+    let mut root = department(company.id, "Company root", "company", None);
+    root.is_root = true;
+    let child = department(company.id, "Dispatch", "dispatch", Some(&root));
+    let departments = [root, child.clone()];
+    let mut channel = mailbox_channel(company.id);
+    channel.department_id = child.id;
+    channel.access_mode = crate::entities::channel::ChannelAccessMode::Public;
+    channel.participant_emails = Some(vec!["@public".into(), "listed@example.test".into()]);
+    let classic_create = channels_page(&ChannelsPage {
+        company: &company,
+        app_domain_name: "example.test",
+        channels: &[],
+        departments: &departments,
+        spam_scan_enabled: false,
+        focus: ChannelsPageFocus {
+            create_form_open: true,
+            editing_channel_id: None,
+        },
+    });
+    let classic_edit =
+        channel_edit_fragment(&company, "example.test", &channel, &departments, false);
+    let modern_create = channel_create_pane(&ChannelCreatePane {
+        company: &company,
+        app_domain_name: "example.test",
+        departments: &departments,
+        spam_scan_enabled: false,
+        draft: &ChannelDraft::default(),
+        error: None,
+    });
+    let modern_edit = channel_edit_pane(&ChannelEditPane {
+        company: &company,
+        app_domain_name: "example.test",
+        channel: &channel,
+        departments: &departments,
+        schedules: &[],
+        schedule_bindings: &[],
+        spam_scan_enabled: false,
+        draft: None,
+        error: None,
+    });
+    [
+        ("desk-classic-create.html", classic_create),
+        (
+            "desk-classic-edit.html",
+            base_layout("Edit desk", &classic_edit),
+        ),
+        (
+            "desk-modern-create.html",
+            desk_browser_workspace(&company, &modern_create),
+        ),
+        (
+            "desk-modern-edit.html",
+            desk_browser_workspace(&company, &modern_edit),
+        ),
+    ]
 }

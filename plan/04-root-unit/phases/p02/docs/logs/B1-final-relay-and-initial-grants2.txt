@@ -1,0 +1,27 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 15s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 14 tests
+test adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_members_thread_party_keeps_replying_after_removal ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_grants ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::system_relay::relay_identity_pure_workflow_system_reply_cannot_enter_a_team_only_desk ... ok
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_join_and_removal_write_only_the_delta ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::access_mode_provisioned_assistant_has_root_audience_from_initial_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_department_member_uses_its_agent_grant_and_keeps_its_author ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_root_members_accepts_a_real_agent_only_with_a_participate_grant ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::private_agent::relay_identity_actual_agent_to_private_agent_admits_ordinary_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_running_agent_cannot_send_as_another_agents_address ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_root_members_rejects_view_only_and_revoked_agent_grants_without_smtp ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_nonmember_agent_is_refused_without_a_canonical_hop_or_smtp ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_target_revocation_after_observation_refuses_commit_and_redelivery ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_source_rename_after_observation_refuses_commit_and_redelivery ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 4733 filtered out; finished in 25.06s
+

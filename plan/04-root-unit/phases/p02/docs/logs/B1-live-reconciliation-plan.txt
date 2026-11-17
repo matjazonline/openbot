@@ -1,0 +1,61 @@
+BEGIN
+SET
+4MB
+46000|1000|5758976|13123584
+PREPARE
+original
+Insert on channel_principal_grants  (cost=0.42..33.55 rows=0 width=0) (actual time=4021.167..4021.168 rows=0.00 loops=1)
+  Conflict Resolution: NOTHING
+  Conflict Arbiter Indexes: channel_principal_grants_pkey
+  Tuples Inserted: 0
+  Conflicting Tuples: 0
+  Buffers: shared hit=1668
+  ->  Nested Loop Anti Join  (cost=0.42..33.55 rows=70 width=120) (actual time=4021.166..4021.167 rows=0.00 loops=1)
+        Join Filter: ((permission.channel_id = audience.channel_id) AND (permission.principal_id = audience.principal_id) AND (permission.capability = capability.value))
+        Rows Removed by Join Filter: 85999000
+        Buffers: shared hit=1668
+        ->  Nested Loop  (cost=0.01..1.63 rows=70 width=64) (actual time=0.079..0.609 rows=2000.00 loops=1)
+              ->  Function Scan on audience  (cost=0.01..0.23 rows=7 width=32) (actual time=0.077..0.276 rows=1000.00 loops=1)
+                    Filter: (channel_id = ANY ($2))
+              ->  Function Scan on unnest capability  (cost=0.00..0.10 rows=10 width=32) (actual time=0.000..0.000 rows=2.00 loops=1000)
+        ->  Materialize  (cost=0.41..30.35 rows=1 width=64) (actual time=0.000..0.898 rows=43000.50 loops=2000)
+              Storage: Memory  Maximum Storage: 3354kB
+              Buffers: shared hit=1668
+              ->  Index Only Scan using channel_principal_grants_pkey on channel_principal_grants permission  (cost=0.41..30.35 rows=1 width=64) (actual time=0.030..8.343 rows=44000.00 loops=1)
+                    Index Cond: ((company_id = $1) AND (provenance = $6))
+                    Heap Fetches: 45365
+                    Index Searches: 1
+                    Buffers: shared hit=1668
+Settings: plan_cache_mode = 'force_generic_plan'
+Planning:
+  Buffers: shared hit=253
+Planning Time: 1.097 ms
+Execution Time: 4021.206 ms
+PREPARE
+pruned
+Insert on channel_principal_grants  (cost=0.42..51.49 rows=0 width=0) (actual time=97.535..97.535 rows=0.00 loops=1)
+  Conflict Resolution: NOTHING
+  Conflict Arbiter Indexes: channel_principal_grants_pkey
+  Tuples Inserted: 0
+  Conflicting Tuples: 0
+  Buffers: shared hit=80
+  ->  Nested Loop Anti Join  (cost=0.42..51.49 rows=70 width=120) (actual time=97.534..97.535 rows=0.00 loops=1)
+        Join Filter: ((permission.channel_id = audience.channel_id) AND (permission.principal_id = audience.principal_id) AND (permission.capability = capability.value))
+        Rows Removed by Join Filter: 1999000
+        Buffers: shared hit=80
+        ->  Nested Loop  (cost=0.01..1.63 rows=70 width=64) (actual time=0.068..0.396 rows=2000.00 loops=1)
+              ->  Function Scan on audience  (cost=0.01..0.23 rows=7 width=32) (actual time=0.067..0.158 rows=1000.00 loops=1)
+                    Filter: (channel_id = ANY ($2))
+              ->  Function Scan on unnest capability  (cost=0.00..0.10 rows=10 width=32) (actual time=0.000..0.000 rows=2.00 loops=1000)
+        ->  Materialize  (cost=0.41..48.29 rows=1 width=64) (actual time=0.000..0.021 rows=1000.50 loops=2000)
+              Storage: Memory  Maximum Storage: 149kB
+              Buffers: shared hit=80
+              ->  Index Only Scan using channel_principal_grants_pkey on channel_principal_grants permission  (cost=0.41..48.28 rows=1 width=64) (actual time=0.050..0.554 rows=2000.00 loops=1)
+                    Index Cond: ((company_id = $1) AND (channel_id = ANY ($2)) AND (provenance = $6))
+                    Heap Fetches: 2000
+                    Index Searches: 1
+                    Buffers: shared hit=80
+Settings: plan_cache_mode = 'force_generic_plan'
+Planning Time: 0.834 ms
+Execution Time: 97.553 ms
+ROLLBACK

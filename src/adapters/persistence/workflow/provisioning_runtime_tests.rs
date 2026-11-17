@@ -714,7 +714,22 @@ async fn department_lead_desk_answers_through_its_current_lead() {
     .fetch_one(p.pool())
     .await
     .unwrap();
-    let (_, email) = person(&d, "admin").await;
+    let (sender, email) = person(&d, "admin").await;
+    let principal =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+            .bind(company.as_uuid())
+            .bind(sender)
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    departments
+        .add_member(
+            scope,
+            department.id,
+            crate::entities::transport::PrincipalId::new(principal),
+        )
+        .await
+        .unwrap();
     write(
         &d,
         &email,
@@ -870,7 +885,22 @@ async fn department_context_reaches_the_lead_on_its_department_desk() {
     .fetch_one(p.pool())
     .await
     .unwrap();
-    let (_, email) = person(&d, "admin").await;
+    let (sender, email) = person(&d, "admin").await;
+    let principal =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+            .bind(company.as_uuid())
+            .bind(sender)
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    departments
+        .add_member(
+            scope,
+            department.id,
+            crate::entities::transport::PrincipalId::new(principal),
+        )
+        .await
+        .unwrap();
     write(
         &d,
         &email,

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="h-full bg-base-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acme Desks - Mail Agents</title>
+    <link href="/assets/app.css?v=5af46e07fd91cedf" rel="stylesheet" type="text/css" />
+    <style>
+        .loading-spinner {
+            -webkit-mask-image: none;
+            mask-image: none;
+            background-color: transparent;
+            box-sizing: border-box;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-rotate 0.7s linear infinite;
+        }
+        @keyframes spinner-rotate { to { transform: rotate(360deg); } }
+
+        .loading-dots { animation: loading-fade 1.2s ease-in-out infinite; }
+        @keyframes loading-fade { 50% { opacity: 0.35; } }
+
+        /* An icon-only button has no room beside its glyph, so the spinner stands in for it
+           rather than crowding in next to it. */
+        [data-busy-icon-only] > :not([data-request-spinner]) { display: none !important; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .loading-spinner { animation-duration: 2s; }
+            .loading-dots { animation-duration: 3s; }
+        }
+
+        .brand-logo-on-light { display: none; }
+        [data-theme="light"] .brand-logo-on-dark { display: none; }
+        [data-theme="light"] .brand-logo-on-light { display: block; }
+</style>
+    <script src="/assets/theme-init.js?v=ef0341756532658d"></script>
+    <script src="/assets/htmx-2.0.4.min.js" defer></script>
+</head>
+<body class="h-full font-sans antialiased text-base-content flex flex-col items-center p-4 md:p-8">
+    
+        <div id="request-error-toast" role="alert" aria-live="assertive" aria-atomic="true"
+            class="toast toast-top toast-center z-50 hidden max-w-[calc(100vw-2rem)]">
+            <div class="alert alert-error shadow-lg">
+                <span id="request-error-message" class="text-sm font-medium break-words"></span>
+                <button type="button" class="btn btn-ghost btn-xs" data-action="dismiss-request-error"
+                    aria-label="Dismiss">&times;</button>
+            </div>
+        </div>
+        
+    <div class="w-full max-w-4xl">
+        <nav class="flex items-center justify-between mb-8 pb-4 border-b border-base-300">
+            <a href="/companies" class="flex items-center" title="BusyBots">
+                
+                <img src="/assets/busybots-logo-dark-hor.png" alt="BusyBots"
+                    class="brand-logo brand-logo-on-light h-10 w-auto">
+                <img src="/assets/busybots-logo-light.png?v=b6b75fa297b67777" alt="BusyBots"
+                    class="brand-logo brand-logo-on-dark h-10 w-auto">
+
+            </a>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                
+                <a id="nav-channels" href="#" class="hidden text-base-content/80 hover:text-base-content transition">Desks</a>
+                <a id="nav-agents" href="#" class="hidden text-base-content/80 hover:text-base-content transition">Agents</a>
+                <details class="relative">
+                    <summary class="list-none text-base-content/80 hover:text-base-content transition cursor-pointer [&::-webkit-details-marker]:hidden">Account</summary>
+                    <div class="absolute right-0 z-50 mt-2 w-36 overflow-hidden rounded-lg border border-base-300 bg-base-200 shadow-xl">
+                        <a href="/companies" class="block px-4 py-2.5 text-base-content/80 hover:bg-base-300 hover:text-base-content transition">Companies</a>
+                        <a href="/ui/invites" class="block px-4 py-2.5 text-base-content/80 hover:bg-base-300 hover:text-base-content transition">My Invites</a>
+                        <form method="post" action="/logout" class="border-t border-base-300">
+                            <button type="submit" class="w-full px-4 py-2.5 text-left text-base-content/80 hover:bg-base-300 hover:text-base-content transition cursor-pointer">Log Out</button>
+                        </form>
+                    </div>
+                </details>
+        
+                
+                <label class="swap swap-rotate btn btn-ghost btn-circle" title="Switch between light and dark">
+                    <input id="theme-toggle" type="checkbox" class="theme-controller" value="light"
+                        aria-label="Switch between light and dark"
+                        data-action="theme-toggle" />
+                    <svg class="swap-off h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+                    </svg>
+                    <svg class="swap-on h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                    </svg>
+                </label>
+
+            </div>
+        </nav>
+        <div class="bg-base-200 backdrop-blur-md border border-base-300 rounded-2xl shadow-2xl p-6 md:p-8">
+            
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <a href="/companies" class="text-xs text-primary hover:text-primary font-medium mb-1 inline-block">&larr; Back to Companies</a>
+                <h2 class="text-2xl font-bold text-base-content">Acme Desks</h2>
+                <p class="text-base-content/70 text-sm mt-0.5">Manage desks for <span class="font-mono text-primary">@acme.example.test</span></p>
+            </div>
+            <button id="channel-form-toggle" type="button" aria-controls="channel-form-card" aria-expanded="true"
+                data-action="toggle-form-card" data-card="channel-form-card"
+                class="px-4 py-2 bg-success hover:bg-success/90 text-success-content text-sm font-semibold rounded-lg shadow-md shadow-success/20 transition cursor-pointer">
+                Add Desk
+            </button>
+        </div>
+
+        <div id="response-message" class="mb-6"></div>
+
+        <!-- Create Channel Card -->
+        <div id="channel-form-card" class=" bg-base-100 border border-base-300 rounded-xl p-5 mb-8">
+            <div class="flex items-center justify-between mb-4 border-b border-base-300 pb-3">
+                <h3 class="text-md font-semibold text-base-content flex items-center gap-2">
+                    <span class="text-base-content">+</span> Add New Desk
+                </h3>
+            </div>
+
+<form id="advanced-channel-form" hx-post="/companies/00000000-0000-4000-8000-000000000001/channels" hx-target="#channel-list" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4" data-company-id="00000000-0000-4000-8000-000000000001"
+                data-after-request="reset-and-collapse" data-card="channel-form-card" data-toggle="channel-form-toggle">
+            
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Desk Name</span></div>
+                            <input type="text" name="name" required value="" placeholder="Inbound Email Handler" data-input="slugify"
+                                class="input w-full">
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Address (@acme.example.test)</span></div>
+                            <input type="text" name="slug" required value="" placeholder="inbound-email-handler"
+                                class="input w-full font-mono">
+                        </label>
+                    </div>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Description</span></div>
+                        <input type="text" name="description" value="" autocomplete="off"
+                            placeholder="Answers supplier capacity and delivery-date questions."
+                            class="input w-full">
+                        <div class="label"><span class="text-[11px] opacity-60">What this desk is for, in one line. Shown to teammates who mail an address that does not exist, so they can find the desk they meant.</span></div>
+                    </label>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Alias Addresses (@acme.example.test)</span></div>
+                        <input type="text" name="alias_slugs" value="" autocomplete="off"
+                            placeholder="sales, help, contact"
+                            class="input w-full font-mono">
+                        <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this desk, and replies go back out from the address it arrived on.</span></div>
+                    </label>
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Also allow these addresses</span></div>
+                        <input type="text" name="participant_emails" value="" autocomplete="off"
+                            data-input="channel-spam-confirm"
+                            placeholder="person@example.com, another@example.com"
+                            class="input w-full">
+                        <div class="label"><span class="text-[11px] opacity-60">These addresses add to the department audience. They do not remove department access.</span></div>
+                    </label>
+                    <div class="form-control w-full">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="public" value="true" data-input="channel-spam-confirm" class="checkbox checkbox-sm mt-0.5">
+                            <span class="text-xs"><span class="font-semibold">Open to anyone</span>
+                            <span class="block opacity-70">Anyone can send mail to this desk. Reading still requires company membership.</span></span>
+                        </label>
+                    </div>
+                    <div class="form-control w-full">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="enabled" value="true" class="checkbox checkbox-sm mt-0.5" checked>
+                            <span class="text-xs">
+                                <span class="font-semibold">Desk enabled</span>
+                                <span class="block opacity-70">Unticking this keeps the desk and its threads, but mail sent to its address bounces back to the sender, and other desks can no longer hand work to it.</span>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="form-control w-full">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5" checked>
+                            <span class="text-xs">
+                                <span class="font-semibold">Add CC'd outsiders to threads</span>
+                                <span class="block opacity-70">Unticking this keeps the desk internal: people outside your team who are CC'd on a message are never added to the thread and are never copied on the agent's reply, and mail they send to this desk bounces.</span>
+                            </span>
+                        </label>
+                    </div>
+                    <label class="form-control w-full">
+        <div class="label"><span class="text-xs opacity-70">Department</span></div>
+        <select name="department_id" required class="select w-full"><option value="a9f73134-44ac-4632-be19-87cf31051c15" selected>Company root</option><option value="0e2d0e31-1091-44ce-a116-9fa505c11f59">&nbsp;&nbsp;Dispatch</option></select>
+        <div class="label"><span class="text-[11px] opacity-60">Members and role holders of this department, its parent Lead and direct child Leads can use this desk. Other agents need an explicit grant.</span></div>
+    </label>
+                    
+                    <div class="spam-confirm-box alert alert-warning text-sm transition-opacity opacity-40 pointer-events-none">
+                        <div class="space-y-2">
+                            <div class="font-semibold">Spam scanning is disabled in server configuration</div>
+                            <div class="text-xs">A desk with no participant restrictions receives mail without spam filtering.</div>
+                            <label class="flex cursor-pointer items-center gap-3">
+                                <input type="checkbox" name="confirm_spam_disabled" value="true" class="checkbox checkbox-sm" disabled>
+                                <span class="text-xs">I understand, and confirm saving a <code class="font-mono">@public</code> desk anyway.</span>
+                            </label>
+                        </div>
+                    </div>
+    
+        
+            <div class="flex justify-end">
+                <button type="submit" class="btn btn-success">Create Desk</button>
+            </div>
+        </form>
+        </div>
+
+
+        <!-- Channels List Section -->
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/70 mb-3">Desks</h3>
+            <div id="channel-list" class="space-y-3">
+                
+            <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-8 text-center">
+                <p class="text-base-content/70 text-sm">No desks configured yet. Use Add Desk to create your first one.</p>
+            </div>
+        
+            </div>
+        </div>
+        
+        </div>
+    </div>
+    <script src="/assets/app.js?v=1277a1583962d13b"></script>
+</body>
+</html>

@@ -92,3 +92,12 @@ Current continuation is integration/main-60b9a28b/docs/HANDOFF.md under coordina
 notice04RU-C001/r1. Adapt imported attribution readers of the removed table and
 preserve new terminal lifecycle evidence before p02. Historical p01 acceptance
 remains retained; combined integration is not yet accepted and Plan04 not pushed.
+
+## Latest user continuation supersedes prior scope limits
+
+User2026-11-16: finish Plan04 with required verification, push to main, then start
+Plans05 and06 in order under the same Astra review workflow; no scope beyond06.
+Prior stop-before05 wording is historical and superseded. Coordination4 notice
+04RU-C002/r1 is acknowledged by root; current task remains completing Plan04.
+Main integration is committed334e79c74b383dffd8e0d565c33a77c6ac24c94d and accepted
+at source09f2972f…d22c4a8, independent04RU-MAIN-B1-R1/N1. Next Plan04p02.

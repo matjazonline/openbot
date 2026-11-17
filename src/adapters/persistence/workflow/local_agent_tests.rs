@@ -87,8 +87,17 @@ impl Setup {
             TestAssociation::Company => RelatedAssociation::Company,
             TestAssociation::PrivateConversation => {
                 let thread = local.conversation(local.company).await;
-                let channel:Uuid=sqlx::query_scalar("UPDATE channels SET access_mode='allowlist' WHERE id=(SELECT channel_id FROM threads WHERE id=$1) RETURNING id")
-                    .bind(thread).fetch_one(&local.database.pool).await.unwrap();
+                let channel: Uuid =
+                    sqlx::query_scalar("SELECT channel_id FROM threads WHERE id=$1")
+                        .bind(thread)
+                        .fetch_one(&local.database.pool)
+                        .await
+                        .unwrap();
+                crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+                    &local.database.pool,
+                    channel,
+                )
+                .await;
                 RelatedAssociation::Thread {
                     target: crate::entities::address::AddressTarget::Desk(channel),
                     thread_id: crate::application::workflow::RelatedThreadId::new(thread),
