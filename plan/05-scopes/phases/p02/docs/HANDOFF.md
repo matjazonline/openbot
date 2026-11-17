@@ -1,4 +1,4 @@
-# Plan05 p02 — accepted in phase; commit then start03
+# Plan05 p02 — accepted and committed locally; start03
 
 Continue implement-astra-reviewed-2-3. Root/A /root user-confirmed Sol6.1/xhigh;
 independent B /root/p05_reviewer requested Astra/high, idle after R2 PASS. Actual
@@ -8,7 +8,8 @@ REVIEW/notes/findings. No worker or root check process remains.
 ## Accepted identity and proof
 
 Worktree /Users/mac02/orca/workspaces/openbot/plan03-04, branch feature/plan05-scopes.
-Start/base/reviewbase/HEAD e6eb5bc8fff93492f23935b9c84114905801824c (accepted01).
+Start/base/reviewbase e6eb5bc8fff93492f23935b9c84114905801824c (accepted01).
+Accepted implementation commit 2edd0a73cbe76bac2d559c52f8c4c5025402c88b; source accepted before commit.
 Accepted source7a555e95283fa22b7face97a1463d8efdfb6cf8c2ab92a3b77e5eae734ab51a5,
 102paths, exact exclusions plan/05-scopes/phases/p02/docs and exact
 plan/05-scopes/COORDINATION.md. Independent05SC-P02-B1-R2-N1 PASS; root reproduced
@@ -33,18 +34,17 @@ repository/CI-green claim; required full source gate remains03before publication
 ## Authority and next action
 
 Authoritative absolute plan/05-scopes/COORDINATION.md here: root writer, current
-revision10(records accepted02only), acceptance pinned9. C001–C004/r1 and C005/r2
+revision11(records accepted02commit), acceptance pinned9. C001–C004/r1 and C005/r2
 unchanged; acknowledged/satisfied p02obligations. No pre-existing dirty source.
 No03records/source yet; main remains d748c2ff64309903449a3d860377a5e0385377a4 at
 latest remote check. No Plan05 push. Existing commit/push authorization persists.
 
-1. Commit accepted02normally after staged whitespace/retained-evidence checks.
-   Include all p02source/records/coordination and3new Trail learnings. Explain the
-   five unrelated lexical trail conflicts (bulk SQL spill, RcDom ownership, X.509
-   authority, cascade ordering, browser cleanup); scope DDL implements none of them.
-   Keep l-aa159407 replacing l-b603fb20 only for SQL function-name correction; new
-   l-9091bbc9 records F1. No skill/AGENTS changes. Do not ask permission again.
-2. Record actual accepted local commit identity; then start03with its own records,
+1. Accepted02 implementation committed normally as 2edd0a73cbe76bac2d559c52f8c4c5025402c88b.
+   Staged whitespace passed;165retained evidence manifests passed tracked validation.
+   All source/records/3Trail learnings are included. Commit message explains the five
+   unrelated lexical Trail conflicts and prepared-version note correction. No skill/
+   AGENTS or Doop changes. No main push. This metadata record adds no runtime change.
+2. Start03with its own records using the accepted implementation commit above,
    acknowledged coordination and independently reviewed architecture gate before
    schema/auth/transaction edits. Knowledge consumes this exact per-actor/base unit
    set; principal namespaces never own knowledge. Read original03requirements.

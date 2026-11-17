@@ -1,6 +1,6 @@
 # Plan05 p02 — frozen run scopes, memory vocabulary and subject provenance
 
-Status: ACCEPTED IN PHASE at R2 source; local commit and later phase03 publication pending.
+Status: ACCEPTED IN PHASE and committed locally as 2edd0a73cbe76bac2d559c52f8c4c5025402c88b; main publication at phase03 remains pending.
 Workflow implement-astra-reviewed-2-3. Root/A /root user-confirmed Sol6.1/xhigh;
 B /root/p05_reviewer independent requestedAstra/high, retained from p01. Root owns
 TASK/HANDOFF/coordination; B owns REVIEW/notes/findings. Context telemetry/default
@@ -810,3 +810,7 @@ prerequisite. Main integration not yet performed. Root owns normal accepted comm
 user publication checkpoint is03, then04docs/evidence andSTOP before06. Coordinator
 will record accepted dependency and later local commit identity. No pre-existing
 source was swept in, and R1 acceptance was never claimed for the deficient artifact.
+
+Accepted implementation commit 2edd0a73cbe76bac2d559c52f8c4c5025402c88b includes source/records/learned
+constraints; clean checkout after commit. Staged whitespace and all165tracked
+evidence manifests validated. No Plan05 push yet;03may start from this prerequisite.

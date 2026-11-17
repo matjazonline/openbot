@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md
 - Writer: /root in /Users/mac02/orca/workspaces/openbot/plan03-04
-- Revision: 10
+- Revision: 11
 
 ## Plan-wide instructions
 
@@ -42,7 +42,7 @@
 | Phase | Owner/session | Worktree | Authoritative records |
 | --- | --- | --- | --- |
 | p01 accepted in phase; main integration pending | root/A /root; B /root/p05_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p01/docs/{TASK,HANDOFF}.md |
-| p02 accepted in phase; local commit pending; main integration at03 | root/A /root; B /root/p05_reviewer | same sequential checkout | phases/p02/docs/{TASK,HANDOFF}.md |
+| p02 accepted and locally committed2edd0a73; main integration at03 | root/A /root; B /root/p05_reviewer | same sequential checkout | phases/p02/docs/{TASK,HANDOFF}.md |
 | p03 planned | /root | same sequential checkout | phases/p03/docs/ when started |
 | p04 planned | /root | same sequential checkout | phases/p04/docs/ when started |
 
@@ -171,3 +171,7 @@
 - Revision10changes execution/prerequisite status only; no applicable requirement
   changed after p02's pinned revision9independent review. Source digest excludes
   this exact mutable coordination file; no source changed after B's PASS.
+
+- Accepted p02 implementation commit 2edd0a73cbe76bac2d559c52f8c4c5025402c88b (source7a555e95…b51a5,
+  independent05SC-P02-B1-R2-N1 PASS). Closed02HANDOFF records the commit; no runtime
+  change in revision11. P03may start. Main remains Plan04 until03publication.
