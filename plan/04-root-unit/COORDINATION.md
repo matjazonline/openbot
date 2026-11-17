@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/04-root-unit/COORDINATION.md
 - Writer: /root in /Users/mac02/orca/workspaces/openbot/plan03-04
-- Revision: 15
+- Revision: 16
 
 ## Plan-wide instructions
 
@@ -27,7 +27,7 @@
 
 | p02 (accepted) | /root; A root; B /root/p04_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p02/docs/{TASK,HANDOFF}.md |
 
-| p03 (accepted) | /root; A root; B /root/p04_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p03/docs/{TASK,HANDOFF}.md |
+| p03 (published) | /root; A root; B /root/p04_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p03/docs/{TASK,HANDOFF}.md |
 
 ## Inherited accepted contract
 
@@ -205,3 +205,12 @@ unverified/failed and whole CI is not claimed green. Scope notices unchanged.
 Normal main publication is already authorized. Retain implementation/remote SHA,
 then STOP. Do not start05/06 or investigate Doop further. Only disposable p03
 resources may be cleaned; preserve prior phase/shared services and review records.
+
+## Plan04 published; execution stopped (revision16)
+
+Accepted implementation 86d225cc38e07f1263fab2d1f5b4c2f4f8b9832b normally published to main; exact
+remote SHA confirmed by ls-remote. P03 PUB1 retains proof and review identity
+04RU-P03-B1-R1-S1/N1/source9b394b31…e2f0e. All in-scope Plan04 work is complete.
+C005r1 satisfied by explicit separate Doop follow-up, failures/assertions/CI kept;
+C002r2 satisfied by publication and STOP. No05/06 work. Subsequent commit carries
+only these final publication records; no accepted source change or new scope.

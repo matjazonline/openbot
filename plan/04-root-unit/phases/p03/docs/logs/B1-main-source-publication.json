@@ -1,0 +1,11 @@
+{
+  "observed_at": "2026-11-17T11:25:31.041827+00:00",
+  "source_commit": "86d225cc38e07f1263fab2d1f5b4c2f4f8b9832b",
+  "observed_remote_main": "86d225cc38e07f1263fab2d1f5b4c2f4f8b9832b",
+  "accepted_artifact": "9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e",
+  "independent_review": "04RU-P03-B1-R1-S1/N1",
+  "scope": "verified Plan04 core; Doop separately user-deferred by04RU-C005/r1",
+  "push": "normal origin HEAD:main",
+  "result": "PASS",
+  "next_action": "STOP; no Plans05/06 or further Doop work"
+}

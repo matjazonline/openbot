@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "round": "04RU-P03-PUB1",
+  "artifact": "9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e",
+  "checks": [
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "git push origin HEAD:main; git ls-remote origin refs/heads/main",
+      "fixture": "normal remote main; reviewed implementation commit86d225cc",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-main-source-publication.json",
+          "sha256": "a72eec482bf486bd20283e9b5cb83376b7c177d786e7eeef45de77be7d139d3e"
+        }
+      ]
+    }
+  ]
+}

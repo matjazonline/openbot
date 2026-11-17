@@ -1,6 +1,6 @@
 # Plan04 p03 — final documentation, integration and publication
 
-Status: accepted in phase under C005/r1; normal main publication pending.
+Status: COMPLETE and published for verified Plan04 core under C005/r1; STOP.
 Workflow implement-astra-reviewed-2-3; phasep03, record root this docs directory.
 Root/A /root user-confirmedSol6.1/xhigh; retained B /root/p04_reviewer requested
 Astra/high, actual settings unexposed, completed p02 review and idle. Root owns
@@ -328,3 +328,18 @@ confirmation. All checks/processes finished, reviewer has no resources. Next cle
 only owned disposable fixtures, stage final evidence, validate tracked manifests,
 commit accepted source/records with Trail scope-conflict explanation, normally
 push main, retain publication identity and STOP. No05/06 or further Doop work.
+
+## COMPLETE — Plan04 source published, stop here
+
+Reviewed implementation commit 86d225cc38e07f1263fab2d1f5b4c2f4f8b9832b was normally pushed to main and
+independently confirmed by git ls-remote at the exact same SHA. Publication proof
+and PUB1manifest are retained in logs/B1-main-source-publication.json and
+logs/B1-publication.evidence.json. AC5 fulfilled. All159 prior tracked evidence
+manifests validated; accepted source/tree identity verified before commit.
+
+These final workflow records are the only subsequent publication changes. All
+Plan04 owned disposable PG/container/image resources were cleaned (cleanup log);
+shared/previous phase PG, DBs, Docker profile and build/model caches preserved.
+No reviewer or root check process remains. Doop is explicitly user-deferred, not
+fixed/unrelated/passing; full-suite/CI-green is not claimed. Latest user scopes
+C005r1 and C002r2 satisfied. STOP: do not start Plans05/06 or investigate Doop.
