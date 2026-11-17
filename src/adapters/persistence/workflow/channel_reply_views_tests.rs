@@ -223,10 +223,10 @@ async fn classified_intents() -> Intents {
         .await
         .unwrap();
     crate::adapters::persistence::company::join_root_on(
-        &mut *tx,
+        &mut tx,
         crate::adapters::persistence::company::RootJoin {
             company: crate::domain::workflow::CompanyId::new(company),
-            user: user,
+            user,
             role: crate::entities::company_member::CompanyAccessRole::Member,
             access_level: crate::entities::access_level::AccessLevel::try_from(5_i16).unwrap(),
         },

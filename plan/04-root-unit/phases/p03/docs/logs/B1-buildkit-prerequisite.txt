@@ -1,0 +1,1 @@
+github.com/docker/buildx v0.39.0 Homebrew

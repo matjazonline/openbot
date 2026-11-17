@@ -1,0 +1,226 @@
+{
+  "command": "scripts/check.sh",
+  "exit_code": 1,
+  "gates": [
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Runner test coverage"
+    },
+    {
+      "status": "PASS",
+      "seconds": 21,
+      "gate": "Local-agent plugin tests and guards"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 1,
+      "gate": "Reproducible plugin package and runtime install"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Generated CSS is current"
+    },
+    {
+      "status": "PASS",
+      "seconds": 47,
+      "gate": "Frontend protocols"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Deployment script tests"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Knowledge artifact preparation tests"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 7,
+      "gate": "Doop runner boundaries"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Doop probe protocols"
+    },
+    {
+      "status": "PASS",
+      "seconds": 4,
+      "gate": "Formatting"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Patch whitespace"
+    },
+    {
+      "status": "PASS",
+      "seconds": 8,
+      "gate": "Transport abstraction boundary"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Workflow sample boundary tests"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Workflow sample boundary"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Integration boundary tests"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Integration boundary"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Integration documentation"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Workflow evidence validator fixtures"
+    },
+    {
+      "status": "PASS",
+      "seconds": 66,
+      "gate": "Retained workflow evidence"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1,
+      "gate": "Fetch locked Rust dependencies"
+    },
+    {
+      "status": "PASS",
+      "seconds": 23,
+      "gate": "Offline compilation"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 119,
+      "gate": "Clippy"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Test database for this run"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Migrations"
+    },
+    {
+      "status": "PASS",
+      "seconds": 18,
+      "gate": "SQLx metadata matches migrated schema"
+    },
+    {
+      "status": "PASS",
+      "seconds": 34,
+      "gate": "Compile tests"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0,
+      "gate": "Query statistics prerequisites"
+    },
+    {
+      "status": "PASS",
+      "seconds": 4,
+      "gate": "Integration conformance families are registered"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 1951,
+      "gate": "Database-backed test suite (isolated network)"
+    },
+    {
+      "status": "PASS",
+      "seconds": 153,
+      "gate": "Ignored browser fixture producers"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 382,
+      "gate": "Browser protocols using native markup"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 2153,
+      "gate": "Stack budget"
+    },
+    {
+      "status": "PASS",
+      "seconds": 277,
+      "gate": "Lease budget"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 77,
+      "gate": "Knowledge production image"
+    },
+    {
+      "status": "PASS",
+      "seconds": 4,
+      "gate": "Memory model preparation"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 4,
+      "gate": "Memory extracted service suite"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 0,
+      "gate": "Memory backup and restore"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 19,
+      "gate": "Memory standalone journey"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 0,
+      "gate": "OpenBot and memory integration"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 0,
+      "gate": "Memory production image"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 55,
+      "gate": "Attribution extracted service and contracts"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 23,
+      "gate": "Attribution browser integration"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 2,
+      "gate": "Attribution production image"
+    },
+    {
+      "status": "FAIL",
+      "seconds": 0,
+      "gate": "Managed Doop service and private integration"
+    }
+  ]
+}

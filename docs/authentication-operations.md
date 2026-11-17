@@ -54,6 +54,27 @@ Application tracing omits raw callback URIs. Review the ingress proxy's access-l
 separately; [deployment guidance](deploy.md#request-traces-and-ingress-access-logs) explains why
 application redaction cannot alter an upstream log or remove a signed path token from it.
 
+## Company membership and desk authority
+
+A signed-in session identifies an account. Company membership is read from that account's current
+principal and membership in the company's root department. Access levels live on root member rows;
+admin status is the root `admin` role. The owner remains `companies.user_id`, mirrored by the
+root's `owner` role. Root team and admin-role administration is owner-only; owners and admins
+manage ordinary departments through the existing management checks.
+
+Members desks read their owning department's materialized grants and explicit grants. Company
+owners retain their exemption; a company admin needs a view grant to read a child department's
+Members desk. Public intake admits outside mail while UI reads require current company
+membership. A signed-in current principal may use its genuine department-membership grants with
+an unverified email; email-derived permissions require proof of its current address. Authenticated
+agent relays require the receiving Members desk's participate grant, including on root desks.
+
+Membership, role and desk changes update derived grants and their settings revision in the same
+transaction. Current access checks and persistence guards use these facts alongside tenant,
+principal-incarnation and classification fences. See [department access](departments.md#members-and-public)
+for the one-step audience and [internal communication](inter_channel_agent_communication.md) for
+agent source proof and relay limits.
+
 ## Browser session storage
 
 `AUTH_ATTEMPT_SECRET` is required, must contain at least 32 bytes, and must differ from

@@ -1,0 +1,385 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 986B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#2 ...
+
+#3 [internal] load metadata for docker.io/library/debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+#3 DONE 0.8s
+
+#2 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#2 DONE 0.8s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 100B done
+#4 DONE 0.0s
+
+#5 [stage-1 1/3] FROM docker.io/library/debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+#5 resolve docker.io/library/debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3 0.0s done
+#5 CACHED
+
+#6 [build 1/4] FROM docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#6 resolve docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 0.0s done
+#6 DONE 0.0s
+
+#7 [build 2/4] WORKDIR /app
+#7 CACHED
+
+#8 [internal] load build context
+#8 transferring context: 1.28MB 0.0s done
+#8 DONE 0.0s
+
+#9 [build 3/4] COPY . .
+#9 DONE 0.0s
+
+#10 [build 4/4] RUN --mount=type=cache,target=/usr/local/cargo/registry     --mount=type=cache,target=/app/target     cargo build --release --locked --bin attribution-service     && cp target/release/attribution-service /app/attribution-service
+#10 0.278 info: syncing channel updates for 1.95.0-aarch64-unknown-linux-gnu
+#10 1.133 info: latest update on 2026-04-16 for version 1.95.0 (59807616e 2026-04-14)
+#10 1.143 info: downloading component clippy
+#10 3.227     Updating crates.io index
+#10 4.382  Downloading crates ...
+#10 ...
+
+#11 [stage-1 2/3] RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates     && rm -rf /var/lib/apt/lists/*     && groupadd --gid 10001 attribution     && useradd --uid 10001 --gid attribution --no-create-home --shell /usr/sbin/nologin attribution
+#11 0.368 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#11 0.415 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#11 0.454 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+#11 0.494 Get:4 http://deb.debian.org/debian bookworm/main arm64 Packages [8689 kB]
+#11 1.362 Get:5 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [6936 B]
+#11 1.362 Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [374 kB]
+#11 2.031 Fetched 9312 kB in 2s (4962 kB/s)
+#11 2.031 Reading package lists...
+#11 2.324 Reading package lists...
+#11 2.626 Building dependency tree...
+#11 2.710 Reading state information...
+#11 2.794 The following additional packages will be installed:
+#11 2.794   libssl3 openssl
+#11 2.810 The following NEW packages will be installed:
+#11 2.813   ca-certificates libssl3 openssl
+#11 2.875 0 upgraded, 3 newly installed, 0 to remove and 3 not upgraded.
+#11 2.875 Need to get 3400 kB of archives.
+#11 2.875 After this operation, 8942 kB of additional disk space will be used.
+#11 2.875 Get:1 http://deb.debian.org/debian-security bookworm-security/main arm64 libssl3 arm64 3.0.22-1~deb12u2 [1829 kB]
+#11 3.120 Get:2 http://deb.debian.org/debian-security bookworm-security/main arm64 openssl arm64 3.0.22-1~deb12u2 [1410 kB]
+#11 3.269 Get:3 http://deb.debian.org/debian-security bookworm-security/main arm64 ca-certificates all 20250419~deb12u2 [161 kB]
+#11 3.345 debconf: delaying package configuration, since apt-utils is not installed
+#11 3.361 Fetched 3400 kB in 0s (7362 kB/s)
+#11 3.387 Selecting previously unselected package libssl3:arm64.
+#11 3.387 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6090 files and directories currently installed.)
+#11 3.391 Preparing to unpack .../libssl3_3.0.22-1~deb12u2_arm64.deb ...
+#11 3.406 Unpacking libssl3:arm64 (3.0.22-1~deb12u2) ...
+#11 3.555 Selecting previously unselected package openssl.
+#11 3.556 Preparing to unpack .../openssl_3.0.22-1~deb12u2_arm64.deb ...
+#11 3.560 Unpacking openssl (3.0.22-1~deb12u2) ...
+#11 3.655 Selecting previously unselected package ca-certificates.
+#11 3.656 Preparing to unpack .../ca-certificates_20250419~deb12u2_all.deb ...
+#11 3.661 Unpacking ca-certificates (20250419~deb12u2) ...
+#11 3.711 Setting up libssl3:arm64 (3.0.22-1~deb12u2) ...
+#11 3.726 Setting up openssl (3.0.22-1~deb12u2) ...
+#11 3.746 Setting up ca-certificates (20250419~deb12u2) ...
+#11 3.791 debconf: unable to initialize frontend: Dialog
+#11 3.791 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#11 3.791 debconf: falling back to frontend: Readline
+#11 3.791 debconf: unable to initialize frontend: Readline
+#11 3.791 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/aarch64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/aarch64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/aarch64-linux-gnu/perl-base /usr/lib/aarch64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
+#11 3.791 debconf: falling back to frontend: Teletype
+#11 4.068 Updating certificates in /etc/ssl/certs...
+#11 4.342 148 added, 0 removed; done.
+#11 4.355 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#11 4.364 Processing triggers for ca-certificates (20250419~deb12u2) ...
+#11 4.366 Updating certificates in /etc/ssl/certs...
+#11 4.572 0 added, 0 removed; done.
+#11 4.572 Running hooks in /etc/ca-certificates/update.d...
+#11 4.573 done.
+#11 DONE 4.6s
+
+#10 [build 4/4] RUN --mount=type=cache,target=/usr/local/cargo/registry     --mount=type=cache,target=/app/target     cargo build --release --locked --bin attribution-service     && cp target/release/attribution-service /app/attribution-service
+#10 4.626   Downloaded aead v0.6.1
+#10 4.662   Downloaded find-msvc-tools v0.1.15
+#10 4.670   Downloaded tagptr v0.2.0
+#10 4.670   Downloaded lazy_static v1.5.1
+#10 4.677   Downloaded itoa v1.0.19
+#10 4.680   Downloaded equivalent v1.0.3
+#10 4.685   Downloaded block-buffer v0.12.1
+#10 4.692   Downloaded thread_local v1.1.10
+#10 4.713   Downloaded universal-hash v0.6.1
+#10 4.722   Downloaded http-body v1.1.0
+#10 4.751   Downloaded num-iter v0.1.46
+#10 4.753   Downloaded crypto-common v0.2.2
+#10 4.756   Downloaded sha1 v0.10.7
+#10 4.757   Downloaded inout v0.2.6
+#10 4.766   Downloaded utf_types v1.0.0
+#10 4.767   Downloaded crossbeam-queue v0.3.14
+#10 4.798   Downloaded rustls-pki-types v1.16.0
+#10 4.802   Downloaded utf8_iter v1.1.0
+#10 4.809   Downloaded openssl-probe v0.2.2
+#10 4.812   Downloaded zeroize v1.9.1
+#10 4.828   Downloaded critical-section v1.2.0
+#10 4.833   Downloaded tinystr v0.8.5
+#10 4.834   Downloaded mime v0.3.18
+#10 4.835   Downloaded http-body-util v0.1.5
+#10 4.838   Downloaded errno v0.3.15
+#10 4.840   Downloaded siphasher v1.0.4
+#10 4.847   Downloaded unicode-ident v1.0.27
+#10 4.849   Downloaded smallvec v1.16.5
+#10 4.851   Downloaded either v1.19.0
+#10 4.861   Downloaded poly1305 v0.9.1
+#10 4.879   Downloaded icu_provider v2.4.0
+#10 4.891   Downloaded ctutils v0.4.8
+#10 4.893   Downloaded crossbeam-utils v0.8.23
+#10 4.903   Downloaded cipher v0.5.2
+#10 4.909   Downloaded cmov v0.5.4
+#10 4.914   Downloaded zerovec-derive v0.11.7
+#10 4.916   Downloaded rustls-native-certs v0.8.5
+#10 4.916   Downloaded yoke v0.8.4
+#10 4.936   Downloaded unicode-properties v0.1.5
+#10 4.945   Downloaded hybrid-array v0.4.15
+#10 4.960   Downloaded log v0.4.35
+#10 5.003   Downloaded num-integer v0.1.47
+#10 5.005   Downloaded prefix-trie v0.8.4
+#10 5.008   Downloaded tinyvec v1.13.3
+#10 5.010   Downloaded chacha20poly1305 v0.11.0
+#10 5.043   Downloaded icu_normalizer_data v2.4.0
+#10 5.052   Downloaded rustls-webpki v0.103.17
+#10 5.055   Downloaded rand v0.8.8
+#10 5.057   Downloaded icu_locale_core v2.4.0
+#10 5.060   Downloaded uuid v1.29.2
+#10 5.087   Downloaded icu_collections v2.4.0
+#10 5.106   Downloaded indexmap v2.14.2
+#10 5.117   Downloaded mio v1.2.5
+#10 5.120   Downloaded aho-corasick v1.1.5
+#10 5.124   Downloaded rand v0.10.4
+#10 5.126   Downloaded crossbeam-channel v0.5.17
+#10 5.131   Downloaded zerovec v0.11.9
+#10 5.136   Downloaded unicode-normalization v0.1.26
+#10 5.140   Downloaded hyper-util v0.1.21
+#10 5.148   Downloaded hickory-net v0.26.3
+#10 5.155   Downloaded icu_properties v2.4.0
+#10 5.160   Downloaded tokio-util v0.7.20
+#10 5.207   Downloaded hyper v1.12.0
+#10 5.211   Downloaded hickory-resolver v0.26.3
+#10 5.218   Downloaded cc v1.11.2
+#10 5.223   Downloaded serde_json v1.0.154
+#10 5.239   Downloaded axum v0.8.9
+#10 5.268   Downloaded tracing-subscriber v0.3.23
+#10 5.273   Downloaded portable-atomic v1.15.0
+#10 5.278   Downloaded webpki-roots v1.0.12
+#10 5.281   Downloaded icu_properties_data v2.4.0
+#10 5.306   Downloaded aws-lc-rs v1.19.0
+#10 5.313   Downloaded moka v0.12.16
+#10 5.361   Downloaded syn v3.0.10
+#10 5.367   Downloaded zerocopy v0.8.63
+#10 5.380   Downloaded hickory-proto v0.26.3
+#10 5.401   Downloaded rustls v0.23.46
+#10 5.439   Downloaded icu_normalizer v2.4.0
+#10 5.515   Downloaded libc v0.2.191
+#10 5.568   Downloaded tokio v1.54.1
+#10 6.344   Downloaded aws-lc-sys v0.47.0
+#10 6.596    Compiling proc-macro2 v1.0.107
+#10 6.596    Compiling unicode-ident v1.0.27
+#10 6.596    Compiling libc v0.2.191
+#10 6.596    Compiling cfg-if v1.0.5
+#10 6.623    Compiling find-msvc-tools v0.1.15
+#10 6.637    Compiling typenum v1.20.1
+#10 6.702    Compiling icu_normalizer_data v2.4.0
+#10 6.771    Compiling icu_properties_data v2.4.0
+#10 7.011    Compiling quote v1.0.47
+#10 7.040    Compiling autocfg v1.5.1
+#10 7.106    Compiling syn v3.0.10
+#10 7.190    Compiling pin-project-lite v0.2.17
+#10 7.213    Compiling jobserver v0.1.35
+#10 7.226    Compiling stable_deref_trait v1.2.1
+#10 7.230    Compiling syn v2.0.119
+#10 7.258    Compiling portable-atomic v1.15.0
+#10 7.368    Compiling cc v1.11.2
+#10 7.440    Compiling futures-core v0.3.34
+#10 7.684    Compiling itoa v1.0.19
+#10 7.765    Compiling critical-section v1.2.0
+#10 7.793    Compiling getrandom v0.4.3
+#10 7.897    Compiling once_cell v1.21.4
+#10 7.985    Compiling errno v0.3.15
+#10 8.048    Compiling rand_core v0.10.1
+#10 8.105    Compiling parking_lot_core v0.9.12
+#10 8.166    Compiling ring v0.17.14
+#10 8.285    Compiling signal-hook-registry v1.4.8
+#10 8.392    Compiling synstructure v0.14.0
+#10 8.522    Compiling mio v1.2.5
+#10 8.623    Compiling socket2 v0.6.5
+#10 8.829    Compiling litemap v0.8.3
+#10 8.898    Compiling zerocopy v0.8.63
+#10 9.027    Compiling writeable v0.6.4
+#10 9.028    Compiling serde_derive v1.0.229
+#10 9.043    Compiling zerofrom-derive v0.1.8
+#10 9.050    Compiling yoke-derive v0.8.4
+#10 9.128    Compiling zerovec-derive v0.11.7
+#10 9.546    Compiling displaydoc v0.2.7
+#10 9.647    Compiling zerofrom v0.1.8
+#10 9.689    Compiling yoke v0.8.4
+#10 9.751    Compiling zerovec v0.11.9
+#10 9.769    Compiling tracing-attributes v0.1.31
+#10 9.900    Compiling tokio-macros v2.7.2
+#10 10.00    Compiling tinystr v0.8.5
+#10 10.08    Compiling utf_types v1.0.0
+#10 10.17    Compiling utf8_iter v1.1.0
+#10 10.23    Compiling icu_locale_core v2.4.0
+#10 10.24    Compiling tokio v1.54.1
+#10 10.29    Compiling serde v1.0.229
+#10 10.36    Compiling potential_utf v0.1.6
+#10 10.42    Compiling zerotrie v0.2.5
+#10 10.57    Compiling smallvec v1.16.5
+#10 10.67    Compiling cmake v0.1.58
+#10 10.79    Compiling pkg-config v0.3.34
+#10 10.82    Compiling serde_json v1.0.154
+#10 10.99    Compiling aws-lc-sys v0.47.0
+#10 11.11    Compiling icu_provider v2.4.0
+#10 11.40    Compiling icu_collections v2.4.0
+#10 11.54    Compiling getrandom v0.2.17
+#10 11.64    Compiling zeroize v1.9.1
+#10 11.72    Compiling futures-sink v0.3.34
+#10 11.76    Compiling thiserror v2.0.21
+#10 11.87    Compiling futures-macro v0.3.34
+#10 11.90    Compiling tracing-core v0.1.36
+#10 12.24    Compiling num-traits v0.2.19
+#10 12.32    Compiling hybrid-array v0.4.15
+#10 12.41    Compiling futures-task v0.3.34
+#10 12.48    Compiling futures-io v0.3.34
+#10 12.57    Compiling log v0.4.35
+#10 12.66    Compiling slab v0.4.12
+#10 12.73    Compiling futures-util v0.3.34
+#10 12.80    Compiling generic-array v0.14.7
+#10 13.04    Compiling icu_properties v2.4.0
+#10 13.89    Compiling icu_normalizer v2.4.0
+#10 14.11    Compiling rustls-pki-types v1.16.0
+#10 14.58    Compiling thiserror-impl v2.0.21
+#10 14.71    Compiling aws-lc-rs v1.19.0
+#10 15.50    Compiling idna_adapter v1.2.2
+#10 15.55    Compiling tracing v0.1.44
+#10 16.16    Compiling idna v1.1.0
+#10 16.29    Compiling block-buffer v0.10.4
+#10 16.34    Compiling crypto-common v0.1.7
+#10 16.38    Compiling crypto-common v0.2.2
+#10 16.97    Compiling http v1.5.0
+#10 17.37    Compiling crossbeam-utils v0.8.23
+#10 17.87    Compiling digest v0.10.7
+#10 17.95    Compiling url v2.5.8
+#10 18.91    Compiling rustls v0.23.46
+#10 19.61    Compiling http-body v1.1.0
+#10 19.66    Compiling inout v0.2.6
+#10 19.70    Compiling futures-channel v0.3.34
+#10 19.73    Compiling ipnet v2.12.2
+#10 19.82    Compiling equivalent v1.0.3
+#10 20.46    Compiling lock_api v0.4.14
+#10 21.71    Compiling block-buffer v0.12.1
+#10 21.81    Compiling either v1.19.0
+#10 22.12    Compiling tinyvec v1.13.3
+#10 22.32    Compiling hashbrown v0.15.5
+#10 22.55    Compiling ppv-lite86 v0.2.21
+#10 22.66    Compiling cipher v0.5.2
+#10 23.06    Compiling parking_lot v0.12.5
+#10 23.83    Compiling rustls-webpki v0.103.17
+#10 24.22    Compiling webpki-roots v1.0.12
+#10 24.26    Compiling rand_core v0.6.4
+#10 24.37    Compiling cpufeatures v0.2.17
+#10 24.41    Compiling iana-time-zone v0.1.65
+#10 24.54    Compiling crc-catalog v2.5.0
+#10 24.59    Compiling unicode-normalization v0.1.26
+#10 24.59    Compiling crc v3.4.0
+#10 24.66    Compiling chrono v0.4.45
+#10 24.79    Compiling event-listener v5.4.2
+#10 24.89    Compiling indexmap v2.14.2
+#10 26.01    Compiling sha2 v0.10.9
+#10 26.14    Compiling want v0.3.2
+#10 26.26    Compiling rand_chacha v0.3.1
+#10 26.28    Compiling webpki-roots v0.26.11
+#10 26.42    Compiling tokio-stream v0.1.19
+#10 26.68    Compiling crossbeam-queue v0.3.14
+#10 26.76    Compiling futures-intrusive v0.5.0
+#10 26.93    Compiling chacha20 v0.10.2
+#10 27.08    Compiling hashlink v0.10.0
+#10 27.11    Compiling hmac v0.12.1
+#10 27.24    Compiling uuid v1.29.2
+#10 27.30    Compiling sync_wrapper v1.0.2
+#10 27.38    Compiling unicode-properties v0.1.5
+#10 27.53    Compiling hyper v1.12.0
+#10 27.89    Compiling sqlx-core v0.8.6
+#10 28.71    Compiling stringprep v0.1.5
+#10 29.52    Compiling hkdf v0.12.4
+#10 29.57    Compiling rand v0.8.8
+#10 29.86    Compiling atoi v2.0.0
+#10 29.90    Compiling http-body-util v0.1.5
+#10 29.93    Compiling md-5 v0.10.6
+#10 29.98    Compiling home v0.5.12
+#10 29.98    Compiling cmov v0.5.4
+#10 30.01    Compiling bitflags v2.13.2
+#10 30.02    Compiling crossbeam-epoch v0.9.21
+#10 30.10    Compiling sqlx-postgres v0.8.6
+#10 30.20    Compiling ctutils v0.4.8
+#10 30.29    Compiling hyper-util v0.1.21
+#10 31.33    Compiling tower v0.5.3
+#10 31.67    Compiling rand v0.10.4
+#10 32.08    Compiling prefix-trie v0.8.4
+#10 32.62    Compiling ryu v1.0.23
+#10 32.64    Compiling openssl-probe v0.2.2
+#10 32.74    Compiling siphasher v1.0.4
+#10 32.79    Compiling data-encoding v2.11.1
+#10 32.83    Compiling regex-syntax v0.8.11
+#10 32.95    Compiling hickory-proto v0.26.3
+#10 34.35    Compiling regex-automata v0.4.18
+#10 36.83    Compiling phf_shared v0.12.1
+#10 38.17    Compiling serde_urlencoded v0.7.1
+#10 38.30    Compiling rustls-native-certs v0.8.5
+#10 38.80    Compiling sqlx-macros-core v0.8.6
+#10 38.88    Compiling universal-hash v0.6.1
+#10 39.13    Compiling crossbeam-channel v0.5.17
+#10 39.50    Compiling thiserror-impl v1.0.69
+#10 39.55    Compiling async-trait v0.1.92
+#10 39.56    Compiling serde_path_to_error v0.1.20
+#10 39.81    Compiling lazy_static v1.5.1
+#10 39.83    Compiling byteorder v1.5.0
+#10 39.95    Compiling tagptr v0.2.0
+#10 40.02    Compiling mime v0.3.18
+#10 40.07    Compiling hickory-net v0.26.3
+#10 40.13    Compiling thiserror v1.0.69
+#10 40.17    Compiling axum-core v0.5.6
+#10 40.24    Compiling moka v0.12.16
+#10 40.85    Compiling sharded-slab v0.1.7
+#10 41.14    Compiling sqlx-macros v0.8.6
+#10 41.30    Compiling poly1305 v0.9.1
+#10 41.40    Compiling phf v0.12.1
+#10 41.49    Compiling matchers v0.2.0
+#10 41.55    Compiling tower-http v0.6.11
+#10 41.73    Compiling aead v0.6.1
+#10 41.79    Compiling tokio-util v0.7.20
+#10 41.94    Compiling tracing-serde v0.2.0
+#10 42.00    Compiling thread_local v1.1.10
+#10 42.15    Compiling axum v0.8.9
+#10 42.56    Compiling tracing-subscriber v0.3.23
+#10 43.18    Compiling chacha20poly1305 v0.11.0
+#10 43.23    Compiling chrono-tz v0.10.4
+#10 45.51    Compiling hickory-resolver v0.26.3
+#10 45.93    Compiling oauth2 v5.0.0
+#10 49.80    Compiling tokio-rustls v0.26.6
+#10 49.80    Compiling rustls-platform-verifier v0.7.1
+#10 49.98    Compiling hyper-rustls v0.27.10
+#10 50.10    Compiling reqwest v0.13.4
+#10 55.04    Compiling sqlx v0.8.6
+#10 55.09    Compiling attribution_service v0.1.0 (/app)
+#10 71.58     Finished `release` profile [optimized] target(s) in 1m 08s
+#10 DONE 71.7s
+
+#12 [stage-1 3/3] COPY --from=build /app/attribution-service /usr/local/bin/attribution-service
+#12 DONE 0.0s
+
+#13 exporting to image
+#13 exporting layers
+#13 exporting layers 0.4s done
+#13 exporting manifest sha256:a31f4d471e7bade191dd6729e9f76ca1a7bdbfc833db557692c18c23c4816520 done
+#13 exporting config sha256:c565b42a115422f62d5ed3db3426eeccd3ebd10268047fba60ecd7985392a5ad done
+#13 exporting attestation manifest sha256:912aed83f786056f7a58caa5d37ef7ba696eabab8f4579cb42b17f25e70de328 0.0s done
+#13 exporting manifest list sha256:d67140f1f5795ef47bac240f2b9208bc36cef64845c7050cb70a09b46fd13eab done
+#13 naming to docker.io/library/openbot-plan04-p03-attribution:20261117 done
+#13 unpacking to docker.io/library/openbot-plan04-p03-attribution:20261117 0.1s done
+#13 DONE 0.6s

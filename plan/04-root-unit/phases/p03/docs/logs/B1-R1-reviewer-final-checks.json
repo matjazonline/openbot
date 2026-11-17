@@ -1,0 +1,28 @@
+{
+  "round": "04RU-P03-B1-R1",
+  "branch": "feature/plan03_04",
+  "head": "4dad1e971e1791f75731da50a7e73e6776177057",
+  "entry_return_equal": true,
+  "author_return_equal": true,
+  "artifact": "9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e",
+  "authority_pins": [
+    {
+      "live": "plan/04-root-unit/COORDINATION.md",
+      "pin": "logs/B1-R1-coordination.md",
+      "match": false,
+      "sha256_live": "984d59173e49abe02e720609bd841ed50fa4e8014db87b9f5111b4b05f7980ec",
+      "sha256_pin": "52fd01faac2c0ec7b68fe6d5edf6dcd2b8a6fc4d0d1b3d34afd1e9921f188d09"
+    },
+    {
+      "live": "plan/01-departments/COORDINATION.md",
+      "pin": "logs/B1-R1-plan01-coordination.md",
+      "match": true,
+      "sha256_live": "35527a0a608edd5de30a74e7e8537ef79227f08e9046a1513e3b58d3ff6c3d37",
+      "sha256_pin": "35527a0a608edd5de30a74e7e8537ef79227f08e9046a1513e3b58d3ff6c3d37"
+    }
+  ],
+  "outcome_under_coordination13": "CHANGES REQUIRED: 04RU-P03-B1-F1",
+  "freshness_disposition": "Final check discovered coordination14/C005r1 explicit user deferral of the named mock failure. Preserve R1 under its pinned scope; fresh scope-addendum review required before final disposition. Parent notified. No further Doop investigation.",
+  "reviewer_source_mutations": false,
+  "reviewer_runtime_resources": []
+}

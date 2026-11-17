@@ -482,12 +482,12 @@ async fn workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_ori
         let mut c = proof_command(&f, &request, &ledger, "admin-final").await;
         c.actor = admin;
         if revoke_actor {
-            sqlx::query("DELETE FROM principals WHERE company_id=$1 AND user_id=$2")
-                .bind(c.scope.company.as_uuid())
-                .bind(f.binding.target.actor.user_id())
-                .execute(f.persistence().pool())
-                .await
-                .unwrap();
+            crate::adapters::persistence::test_support::revoke_membership_now(
+                f.persistence().pool(),
+                c.scope.company.as_uuid(),
+                f.binding.target.actor.user_id(),
+            )
+            .await;
         } else {
             support::grant(&f, f.binding.target.actor, false).await;
         }

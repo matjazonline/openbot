@@ -1,0 +1,479 @@
+{
+  "version": 1,
+  "round": "04RU-P03-B1-R1",
+  "artifact": "9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "first complete Plan04 runner; owned fresh core PG18 database51167, cleaned by runner",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-full-check.txt",
+          "sha256": "fc186977675b496066d266784e2f8abb3082e2816ae5bcc140fe8cd323ae479b"
+        },
+        {
+          "path": "logs/B1-original-runner-summary.json",
+          "sha256": "3df409a4eadce19cc9fbbb5139014ab74d3a6a78a06d4636b178c5c3685fe810"
+        },
+        {
+          "path": "logs/B1-core-initial-failure-dispositions.json",
+          "sha256": "4573ae9dd314f0b107a47673b37114ca259725a6602af9206ebc6b2375e60b94"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib -- changed families",
+      "fixture": "owned pa04_p03_diag_77d937a839e9, PG18:51167",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-correction-focused.txt",
+          "sha256": "48c0ca1ee1035adad8eca85f01726d0e268bbfe97d1df59e523a9e4963de700a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib -- two settings races ::authorization_tests::",
+      "fixture": "owned diag DB;27PASS incl exact21HTTP",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-correction-revisions-http.txt",
+          "sha256": "be8a3a32b90e4910b875efb0dcbc3ec5b8917b232ca3a5d93460425b3e6cb1a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib refusals_and_results_are_both_valid_receipts",
+      "fixture": "owned diag DB;1PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-correction-provisioning.txt",
+          "sha256": "269475f927a3027649c9e1039584d4a3f40ae959f67763472c35b46c0c3737dd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --bins --test source_modules",
+      "fixture": "binary5PASS + reachability8PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-other-targets.txt",
+          "sha256": "dbb85301a09bb3e143935de809990b77a79d0974a718926be390bfb85f87d566"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "current source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-format2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "current source; task Cargo cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-offline-compile.txt",
+          "sha256": "0ceb2d9a7d1d3adf6542d04ddfeb4653555c73a17eb8b89602816a111085b21c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "current source; task Cargo cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-correction-clippy2.txt",
+          "sha256": "db85db57e5093829c80086fb50c14578547a799e274c1d3e54b88f92e112512a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "fresh canonical core schema; metadata unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-correction-sqlx-prepare.txt",
+          "sha256": "99d02745b1890b7e51ae550c572d0e874768d771b5a1b21d180383bc5f65d7e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "command": "node --test --test-concurrency=1 --test-timeout=90000 native browser protocols",
+      "fixture": "exact generated real markup; all18PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-browser-bounded-recheck.txt",
+          "sha256": "a5e05af236f5b3e8349e624e3e4a75a0b32204ce1fe7055c4ec1d3c6b5b71932"
+        },
+        {
+          "path": "logs/B1-browser-stall.txt",
+          "sha256": "7f6af711853f5f0474671705579651b2c6ed51824894150e3f1b5346e73a7eac"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "Linux scripts/tests/network-isolation-scope.py",
+      "fixture": "owned pinned Ubuntu24 image; separate network namespace; real NET_ADMIN group/chain mutations",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-linux-scope-test.txt",
+          "sha256": "e2009a7361ace000cfc1e3b94cb086c820ee44c37fc18a84c5402d76cec7b12b"
+        },
+        {
+          "path": "logs/B1-linux-scope.Dockerfile",
+          "sha256": "a14a3b8b950e035a21a05ced18f09dd84661c42b30a8e1735c0c129fd6bd3805"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline",
+      "fixture": "current full stock2MiB result4719PASS/1Doop notify timeout/29ignored; full log",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-full-check.txt",
+          "sha256": "fc186977675b496066d266784e2f8abb3082e2816ae5bcc140fe8cd323ae479b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline doop_agent_observe_policy_keeps_error_observation_available_to_the_model",
+      "fixture": "isolated current same-case stock2MiB, original unchanged deadline;1PASS in48.30s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-stock-doop-observe-recheck.txt",
+          "sha256": "a41e0845b8f7d59a03328bdb35e3eff07e2f30aa4bd4a839e8027b7b5d0422a9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/lease-budget.sh --offline",
+      "fixture": "original full runner owned core DB;139PASS and unchanged50percent thresholds",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-full-check.txt",
+          "sha256": "fc186977675b496066d266784e2f8abb3082e2816ae5bcc140fe8cd323ae479b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "npm run package; npm ci --omit=dev in fresh unpacked package",
+      "fixture": "pinned Node24.21/npm11.19; owned canonical external proof directory",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-plugin-package-recheck.txt",
+          "sha256": "8e7115992c69c45ae4e2b52457b6e7c431da0841939fc8eec25251288a71a4db"
+        },
+        {
+          "path": "logs/B1-plugin-runtime-install-recheck.txt",
+          "sha256": "dc2b3de353deeb2154fcaa32eeb67003612350b77e3d1a40b3932cd5ac26941a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "python3 -I scripts/tests/doop-test.py",
+      "fixture": "Ubuntu24/Python3.12 with OpenSSL/git/Node18;46PASS/0skip; original Node24 subprocess cases also passed in host run",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-doop-boundaries-ci-python-exec.txt",
+          "sha256": "4c9226bad6d69d1297dbd5a2a63c3c8a8e21d6a82533d2450965cf1d1e6e0587"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "services/memory/scripts/extracted-build.sh",
+      "fixture": "owned pinned CI PG18/pgvector0.8.7:32768 with1GiBshm; real pinned model;175PASS/2ignored",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-memory-extracted2.txt",
+          "sha256": "cf442d02b4b29ef16cf896f559e04b8fc38d71bd127d4e7599a769e14c9584eb"
+        },
+        {
+          "path": "logs/B1-memory-postgres-shm-recreate.txt",
+          "sha256": "dd88470580f2b5fbebfc8b3cf9fb1f6082a22191e21efc4945a933e2d91bc965"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "services/memory/scripts/backup-restore-check.sh",
+      "fixture": "owned PGvector18 with matching PG18 client;1PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-memory-backup.txt",
+          "sha256": "6116f358d1aae5932470ece90832dd2ee75447974545fed742a7cd3deb75923b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "MEMORY_JOURNEY_PROVIDER=stand-in services/memory/scripts/standalone-journey.sh",
+      "fixture": "owned PGvector18, extracted service and pinned model;13stepsPASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-memory-standalone.txt",
+          "sha256": "959ed5732462c90c67d09b2f7935601cac24d1b5f4876e47ca582dd1ccb057c0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4"
+      ],
+      "command": "scripts/memory-integration.sh",
+      "fixture": "same owned PGvector server, separate provisioned roles/databases;6real-service testsPASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-memory-integration.txt",
+          "sha256": "88f00127aea7aab844423276d92df5df9fdc8218b0953b4483c3719ef37b6237"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "memory production BuildKit build and smoke",
+      "fixture": "owned memory image20261117; private Docker config exposes installed Buildx; existing isolated Docker profile",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-memory-image-buildkit.txt",
+          "sha256": "0db5484b09a024ed533c25bcbb0848ab089022f70c5c5e95e7fe20ef79ddfe22"
+        },
+        {
+          "path": "logs/B1-memory-image-smoke.txt",
+          "sha256": "19a8847c24ba247eb5d381dc3ef57b75abef231b8168e9db53f1f1c380907c50"
+        },
+        {
+          "path": "logs/B1-buildkit-prerequisite.txt",
+          "sha256": "5f83c8af45b4c815e60d675d7e7aa0d76612d3fccc28795cf49534535f8c2397"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "knowledge production BuildKit build and smoke",
+      "fixture": "owned knowledge image20261117; private Docker config exposes installed Buildx; existing isolated Docker profile",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-knowledge-image-buildkit.txt",
+          "sha256": "48faa86823856278d04380363b7f09bc6fd6cf67a5e33c54b3eaefb737a4d2d9"
+        },
+        {
+          "path": "logs/B1-knowledge-image-smoke.txt",
+          "sha256": "b5e2a27b504ca2f37d088641b063434b289b211d963a8a6c0743492ffdfb6bf5"
+        },
+        {
+          "path": "logs/B1-buildkit-prerequisite.txt",
+          "sha256": "5f83c8af45b4c815e60d675d7e7aa0d76612d3fccc28795cf49534535f8c2397"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "attribution production BuildKit build and smoke",
+      "fixture": "owned attribution image20261117; private Docker config exposes installed Buildx; existing isolated Docker profile",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-attribution-image-buildkit.txt",
+          "sha256": "d9598cd36e8058133c856c359f89546bffd4b6f564a2774685a841f852a97f32"
+        },
+        {
+          "path": "logs/B1-attribution-image-smoke.txt",
+          "sha256": "b05ff87b3ab96adbc907d7af71e307940e1f63bfd784f4dd0eee6a659d8b854c"
+        },
+        {
+          "path": "logs/B1-buildkit-prerequisite.txt",
+          "sha256": "5f83c8af45b4c815e60d675d7e7aa0d76612d3fccc28795cf49534535f8c2397"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4"
+      ],
+      "command": "check_attribution_service from scripts/check-support.sh",
+      "fixture": "pinned Python contract venv, owning browser package/Chromium; independent source copy and actual service contracts",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-attribution-native-contracts-recheck.txt",
+          "sha256": "8fb38e2a21203f05b50b29ca0e2320dfc1cdb455208c3824a0d31f36f107b681"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4"
+      ],
+      "command": "check_attribution_browser from scripts/check-support.sh",
+      "fixture": "owning browser package/Chromium, own service DBs and real OpenBot server;2service+1SSO/all8assertionsPASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-attribution-browser-recheck.txt",
+          "sha256": "7803fbd915632bbcbeeeae01ba6408544eedf0998d2d20ca5859ad9316ea8f77"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "trail build",
+      "fixture": "current source graph; deterministic refresh",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-trail-build.txt",
+          "sha256": "c426e6c0b6ed6024b70c6dc2961e4436696fd3a5071e360c1390d2f24534fda5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "trail check",
+      "fixture": "branch diff capped400KB; one scope false positive requires explicit commit explanation",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R1-trail-check.txt",
+          "sha256": "8e7f79f4e8b08b35fa0ee3731b7e196694fbaea0a7987963e0f871d0f0548ed6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "command": "coordination13 original requirements and accepted prerequisite review records",
+      "fixture": "C001r1/C002r2/C003r2/C004r1 + inherited01DEP-C002r1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-coordination.md",
+          "sha256": "52fd01faac2c0ec7b68fe6d5edf6dcd2b8a6fc4d0d1b3d34afd1e9921f188d09"
+        },
+        {
+          "path": "logs/B1-R1-plan01-coordination.md",
+          "sha256": "35527a0a608edd5de30a74e7e8537ef79227f08e9046a1513e3b58d3ff6c3d37"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "managed Doop service and four private acceptance profiles",
+      "fixture": "existing user-deferred follow-up under03PA-C008/r1",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Current full runner stops at missing explicit system Chrome; private acceptance remains deferred to plan/fix-doop.md. No PASS or whole-CI-green claim. New mock timeout is separately retained for final independent scope/evidence disposition."
+    }
+  ]
+}

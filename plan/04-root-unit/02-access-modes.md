@@ -6,7 +6,7 @@
 
 ## Outcome
 
-A desk's audience is its owning department, one step up, plus explicit grants; `team`,
+A desk's audience is its owning department, one-step Lead access both ways, plus explicit grants; `team`,
 `allowlist` and `members_only` are gone. Continues in
 [03](03-integration-and-final-verification.md).
 
@@ -20,7 +20,7 @@ A desk's audience is its owning department, one step up, plus explicit grants; `
    still means a grant row. The `is_team()` arms disappear, because root membership is now a
    materialized `department_membership` grant on root desks like any other department.
 3. Grant materialization (`sync_department_grants_on`, 01-departments batch 02B) runs for every
-   desk, root desks included. Root membership changes rewrite grants on root desks; the write
+   desk, root desks included. Root membership changes reconcile grants on root desks; the write
    batches by channel and bumps `settings_revision` once per channel. Measure the cost on a company
    with 1,000 members and 200 root desks before accepting; if it is unacceptable, the fallback is a
    `department_membership` grant that names the department instead of each principal, resolved in

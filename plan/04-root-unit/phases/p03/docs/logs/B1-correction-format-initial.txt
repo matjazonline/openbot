@@ -1,0 +1,23 @@
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/account_identity_tests.rs:570:
+         .collect();
+     assert_eq!(grants.len(), 2);
+     assert!(
+[31m-        grants.iter().all(|grant| grant.principal_id.as_uuid() == person),
+(B[m[32m+        grants
+(B[m[32m+            .iter()
+(B[m[32m+            .all(|grant| grant.principal_id.as_uuid() == person),
+(B[m         "both configured grants now hang on the person"
+     );
+     for capability in [PrincipalCapability::View, PrincipalCapability::Participate] {
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/workflow/decision_authority_tests.rs:499:
+             });
+         let parked = match parked {
+             Err(AppError::Conflict(message)) => {
+[31m-                assert_eq!(message, "Workflow reviewer authority changed during account locking; retry the operation");
+(B[m[32m+                assert_eq!(
+(B[m[32m+                    message,
+(B[m[32m+                    "Workflow reviewer authority changed during account locking; retry the operation"
+(B[m[32m+                );
+(B[m                 assert_eq!(f.counts().await, before, "the stale attempt writes nothing");
+                 f.persistence().park_decision(f.scope, &f.notices).await
+             }

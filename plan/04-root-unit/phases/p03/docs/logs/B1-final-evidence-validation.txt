@@ -1,0 +1,4 @@
+plan/04-root-unit/phases/p03/docs/logs/B1-R1.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 1, "PASS": 24}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/04-root-unit/phases/p03/docs/logs/B1-R1-scope-addendum.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 1}
+1 evidence manifest(s) validated; declared results are not acceptance

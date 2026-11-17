@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "round": "04RU-P03-B1-R1-S1",
+  "artifact": "9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e",
+  "checks": [
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "Apply explicit user scope decision and pin coordination14/C005r1",
+      "fixture": "direct user instruction after named mock timeout was disclosed; no source change",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-scope-addendum-coordination14.md",
+          "sha256": "984d59173e49abe02e720609bd841ed50fa4e8014db87b9f5111b4b05f7980ec"
+        },
+        {
+          "path": "logs/B1-R1-scope-addendum.md",
+          "sha256": "b0ce1f041f0deb2b53c6a36015692609a86490b447da96f6d1ef2be5dc23499d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "Separate Doop follow-up verification",
+      "fixture": "user-deferred Doop scope, including full-stock mock timeout and private acceptance",
+      "status": "NOT EXERCISED",
+      "reason": "User explicitly elected to check Doop separately. Existing failed/exercised results stay FAIL in original R1 evidence; this entry records that the separate follow-up has not been executed."
+    }
+  ]
+}

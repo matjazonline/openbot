@@ -59,14 +59,40 @@ mod direct_company_lifecycle;
 mod multi_task_tests;
 
 /// An answering intent for one channel, with no mention or parent.
-fn intent(channel_id: Uuid, role: RecipientRole) -> InboundAdmissionIntent {
+async fn intent(
+    fixture: &Fixture,
+    channel_id: Uuid,
+    role: RecipientRole,
+) -> InboundAdmissionIntent {
+    let channel = ChannelPersistence::get_by_id(&fixture.persistence, channel_id)
+        .await
+        .unwrap()
+        .expect("the intent names an existing fixture desk");
     InboundAdmissionIntent {
         target: crate::entities::address::AddressTarget::Desk(channel_id),
         role,
         mentioned: false,
         reply_to: None,
-        settings_revision: 0,
+        settings_revision: channel.settings_revision,
     }
+}
+
+async fn matching_intents(
+    fixture: &Fixture,
+    associations: &[ThreadAssociation],
+) -> BoundedVec<InboundAdmissionIntent, { crate::transport::MAX_THREAD_ASSOCIATIONS }> {
+    let mut intents = Vec::new();
+    for association in associations {
+        intents.push(
+            intent(
+                fixture,
+                association.address_target.desk_id().unwrap(),
+                association.role,
+            )
+            .await,
+        );
+    }
+    BoundedVec::parse("matching intents", intents).unwrap()
 }
 
 #[tokio::test]
@@ -209,7 +235,7 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
         .unwrap(),
         intents: BoundedVec::parse(
             "admission intents",
-            vec![intent(fixture.channel_id, RecipientRole::To)],
+            vec![intent(fixture, fixture.channel_id, RecipientRole::To).await],
         )
         .unwrap(),
         admissible: true,
@@ -247,7 +273,7 @@ async fn request_on(
     .unwrap();
     request.intents = BoundedVec::parse(
         "admission intents",
-        vec![intent(channel_id, RecipientRole::To)],
+        vec![intent(fixture, channel_id, RecipientRole::To).await],
     )
     .unwrap();
     request
@@ -627,6 +653,7 @@ async fn a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored()
     switch_on(&fixture).await;
     let rfc = format!("<gate-edit-first-{}@example.com>", fixture.suffix);
     let routed = request(&fixture, &rfc, "Still open?").await;
+    let revision = routed.intents[0].settings_revision;
     let mut edit = fixture.pool.begin().await.unwrap();
     update_channel_on(&mut edit, &disable(&fixture).await, EditBudget::DEFAULT)
         .await
@@ -647,7 +674,7 @@ async fn a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored()
     );
     assert_eq!(message_count(&fixture).await, 0);
     assert_eq!(intent_count(&fixture).await, 0);
-    assert_eq!(channel_settings(&fixture).await, (false, 1));
+    assert_eq!(channel_settings(&fixture).await, (false, revision + 1));
 
     fixture.cleanup().await;
 }
@@ -667,6 +694,7 @@ async fn a_settings_edit_queued_behind_a_commit_applies_after_it() {
     switch_on(&fixture).await;
     let rfc = format!("<gate-commit-first-{}@example.com>", fixture.suffix);
     let routed = request(&fixture, &rfc, "Anyone there?").await;
+    let revision = routed.intents[0].settings_revision;
     let mut admission = fixture.pool.begin().await.unwrap();
     super::inbound::hold_channel_settings(
         &mut admission,
@@ -689,7 +717,7 @@ async fn a_settings_edit_queued_behind_a_commit_applies_after_it() {
     });
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     assert!(!edit.is_finished(), "the edit must wait for the commit");
-    assert_eq!(channel_settings(&fixture).await, (true, 0));
+    assert_eq!(channel_settings(&fixture).await, (true, revision));
 
     // The rest of the commit, under the gate it already holds.
     super::inbound::commit_on(&mut admission, &routed)
@@ -701,7 +729,7 @@ async fn a_settings_edit_queued_behind_a_commit_applies_after_it() {
         .expect("the edit applies once the commit is done");
     assert_eq!(message_count(&fixture).await, 1);
     assert_eq!(intent_count(&fixture).await, 1);
-    assert_eq!(channel_settings(&fixture).await, (false, 1));
+    assert_eq!(channel_settings(&fixture).await, (false, revision + 1));
 
     fixture.cleanup().await;
 }
@@ -893,20 +921,7 @@ async fn inconsistent_multi_binding_message_mappings_are_a_typed_collision() {
     )
     .unwrap();
 
-    combined.intents = BoundedVec::parse(
-        "matching intents",
-        combined
-            .associations
-            .iter()
-            .map(|association| {
-                intent(
-                    association.address_target.desk_id().unwrap(),
-                    association.role,
-                )
-            })
-            .collect(),
-    )
-    .unwrap();
+    combined.intents = matching_intents(&fixture, &combined.associations).await;
 
     let error = fixture
         .persistence
@@ -1114,7 +1129,9 @@ async fn a_commit_that_fails_at_the_intent_leaves_no_thread_message_or_mapping()
     // An intent naming a channel this commit has no association for: refused after the thread,
     // the message and both mappings have been written.
     let mut intents = request.intents.into_inner();
-    intents.push(intent(Uuid::new_v4(), RecipientRole::To));
+    let mut unmatched = intents[0];
+    unmatched.target = crate::entities::address::AddressTarget::Desk(Uuid::new_v4());
+    intents.push(unmatched);
     request.intents = BoundedVec::parse("admission intents", intents).unwrap();
 
     let refused = fixture.persistence.commit_inbound(request).await;
@@ -1241,20 +1258,7 @@ async fn an_association_through_another_channels_binding_names_the_first_bad_pai
     associations.push(misbound(sales, billing_binding, 2));
     request.associations = BoundedVec::parse("thread associations", associations).unwrap();
 
-    request.intents = BoundedVec::parse(
-        "matching intents",
-        request
-            .associations
-            .iter()
-            .map(|association| {
-                intent(
-                    association.address_target.desk_id().unwrap(),
-                    association.role,
-                )
-            })
-            .collect(),
-    )
-    .unwrap();
+    request.intents = matching_intents(&fixture, &request.associations).await;
 
     let error = fixture
         .persistence
@@ -1295,20 +1299,7 @@ async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_b
     });
     request.associations = BoundedVec::parse("thread associations", associations).unwrap();
 
-    request.intents = BoundedVec::parse(
-        "matching intents",
-        request
-            .associations
-            .iter()
-            .map(|association| {
-                intent(
-                    association.address_target.desk_id().unwrap(),
-                    association.role,
-                )
-            })
-            .collect(),
-    )
-    .unwrap();
+    request.intents = matching_intents(&fixture, &request.associations).await;
 
     let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
 
@@ -1362,7 +1353,7 @@ async fn canonical_rows_and_inbox_completion_commit_together() {
     let stored = store_event(&fixture, &mut request, &format!("Ev{}", fixture.suffix)).await;
     request.claimed_event = Some(claim_stored(&fixture, stored).await.lease);
 
-    assert!(fixture.persistence.commit_inbound(request).await.is_ok());
+    fixture.persistence.commit_inbound(request).await.unwrap();
     assert_eq!(message_count(&fixture).await, 1);
     assert_eq!(event_status(&fixture, stored).await, "completed");
 

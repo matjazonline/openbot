@@ -269,12 +269,12 @@ async fn autonomous_agent_publication_requires_current_authority_and_scopes_hist
         ..f.scope
     };
     assert!(f.p.preview_agent(foreign).await.is_err());
-    sqlx::query("DELETE FROM principals WHERE company_id=$1 AND user_id=$2")
-        .bind(f.scope.company.as_uuid())
-        .bind(f.scope.actor.user_id())
-        .execute(f.p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership_now(
+        f.p.pool(),
+        f.scope.company.as_uuid(),
+        f.scope.actor.user_id(),
+    )
+    .await;
     assert!(f.p.publish_agent(request).await.is_err());
     assert_eq!(
         f.counts().await,

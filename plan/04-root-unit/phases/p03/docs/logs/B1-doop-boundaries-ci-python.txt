@@ -1,0 +1,138 @@
+.............E....EE..EEE..EE............s..s..
+======================================================================
+ERROR: test_recovery_refuses_an_active_runner_before_touching_docker_or_files (__main__.DeploymentOwnershipTests.test_recovery_refuses_an_active_runner_before_touching_docker_or_files)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 289, in test_recovery_refuses_an_active_runner_before_touching_docker_or_files
+    PRIVATE.recover(runtime, output, Mock())
+  File "/repo/scripts/doop-test/private_deployment.py", line 208, in recover
+    raise ValueError("Invalid original runner process identity")
+ValueError: Invalid original runner process identity
+
+======================================================================
+ERROR: test_archive_excludes_ignored_secrets_dependencies_and_normalizes_metadata (__main__.ImageAndPackageTests.test_archive_excludes_ignored_secrets_dependencies_and_normalizes_metadata)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 509, in test_archive_excludes_ignored_secrets_dependencies_and_normalizes_metadata
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_explicit_package_reconstructs_changed_lock_binary_empty_files_and_modes (__main__.ImageAndPackageTests.test_explicit_package_reconstructs_changed_lock_binary_empty_files_and_modes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 474, in test_explicit_package_reconstructs_changed_lock_binary_empty_files_and_modes
+    source, package, revision, _identity, _bun = self.managed_fixture(root)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_managed_changed_lock_installs_own_cache_and_reuses_it_without_installing (__main__.ImageAndPackageTests.test_managed_changed_lock_installs_own_cache_and_reuses_it_without_installing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 410, in test_managed_changed_lock_installs_own_cache_and_reuses_it_without_installing
+    source, package, revision, identity, bun = self.managed_fixture(root)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted (__main__.ImageAndPackageTests.test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted) (failure='lock')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 448, in test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted
+    _source, package, revision, identity, bun = self.managed_fixture(root)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted (__main__.ImageAndPackageTests.test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted) (failure='install')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 448, in test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted
+    _source, package, revision, identity, bun = self.managed_fixture(root)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_tls_handshakes_keep_their_sixteen_slots_until_actual_shutdown (__main__.ImageAndPackageTests.test_tls_handshakes_keep_their_sixteen_slots_until_actual_shutdown)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 610, in test_tls_handshakes_keep_their_sixteen_slots_until_actual_shutdown
+    tls = TLS.LocalTLS(Path(temporary) / "tls", RUNNER.execute)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/doop-test/ingress.py", line 34, in __init__
+    execute(command, stdout=output, stderr=output, timeout=15, umask=0o077)
+  File "/repo/scripts/doop-test.py", line 34, in execute
+    process = subprocess.Popen(command, start_new_session=True, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'openssl'
+
+======================================================================
+ERROR: test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes (__main__.ImageAndPackageTests.test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 578, in test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes
+    tls = TLS.LocalTLS(Path(temporary) / "tls", RUNNER.execute)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/doop-test/ingress.py", line 34, in __init__
+    execute(command, stdout=output, stderr=output, timeout=15, umask=0o077)
+  File "/repo/scripts/doop-test.py", line 34, in execute
+    process = subprocess.Popen(command, start_new_session=True, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'openssl'
+
+----------------------------------------------------------------------
+Ran 46 tests in 2.413s
+
+FAILED (errors=8, skipped=2)

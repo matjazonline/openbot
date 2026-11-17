@@ -873,13 +873,13 @@ async fn agent_default_desk_onboarding_without_a_keyed_model_is_rejected() {
         "{outcome:?}"
     );
     assert_eq!(f.totals().await, (0, 0, 0));
-    let departments: i64 =
-        sqlx::query_scalar("SELECT count(*) FROM departments WHERE company_id = $1")
+    let departments: Vec<bool> =
+        sqlx::query_scalar("SELECT is_root FROM departments WHERE company_id = $1")
             .bind(f.company)
-            .fetch_one(&f.db.pool)
+            .fetch_all(&f.db.pool)
             .await
             .unwrap();
-    assert_eq!(departments, 0);
+    assert_eq!(departments, vec![true], "only the preexisting root remains");
 }
 
 /// 01DEP-P03-B1-F6: a resubmission under the same key that names a department for the first time

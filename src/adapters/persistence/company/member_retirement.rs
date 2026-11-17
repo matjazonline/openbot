@@ -53,7 +53,7 @@ pub(crate) async fn retire_member_on(
     )
     .await?;
     super::super::memory::retire_namespaces_on(
-        &mut **tx,
+        tx,
         company.as_uuid(),
         crate::application::memory::NamespaceOwner::User(user),
     )

@@ -1,0 +1,110 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Suggested packages:
+  ca-certificates
+The following NEW packages will be installed:
+  openssl
+0 upgraded, 1 newly installed, 0 to remove and 2 not upgraded.
+Need to get 985 kB of archives.
+After this operation, 1943 kB of additional disk space will be used.
+Get:1 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 openssl arm64 3.0.13-0ubuntu3.16 [985 kB]
+debconf: delaying package configuration, since apt-utils is not installed
+Fetched 985 kB in 1s (1741 kB/s)
+Selecting previously unselected package openssl.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6243 files and directories currently installed.)
+Preparing to unpack .../openssl_3.0.13-0ubuntu3.16_arm64.deb ...
+Unpacking openssl (3.0.13-0ubuntu3.16) ...
+Setting up openssl (3.0.13-0ubuntu3.16) ...
+..................EE..EEE................s..s..
+======================================================================
+ERROR: test_archive_excludes_ignored_secrets_dependencies_and_normalizes_metadata (__main__.ImageAndPackageTests.test_archive_excludes_ignored_secrets_dependencies_and_normalizes_metadata)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 509, in test_archive_excludes_ignored_secrets_dependencies_and_normalizes_metadata
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_explicit_package_reconstructs_changed_lock_binary_empty_files_and_modes (__main__.ImageAndPackageTests.test_explicit_package_reconstructs_changed_lock_binary_empty_files_and_modes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 474, in test_explicit_package_reconstructs_changed_lock_binary_empty_files_and_modes
+    source, package, revision, _identity, _bun = self.managed_fixture(root)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_managed_changed_lock_installs_own_cache_and_reuses_it_without_installing (__main__.ImageAndPackageTests.test_managed_changed_lock_installs_own_cache_and_reuses_it_without_installing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 410, in test_managed_changed_lock_installs_own_cache_and_reuses_it_without_installing
+    source, package, revision, identity, bun = self.managed_fixture(root)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted (__main__.ImageAndPackageTests.test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted) (failure='lock')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 448, in test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted
+    _source, package, revision, identity, bun = self.managed_fixture(root)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+======================================================================
+ERROR: test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted (__main__.ImageAndPackageTests.test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted) (failure='install')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/repo/scripts/tests/doop-test.py", line 448, in test_managed_lock_tamper_fails_before_install_and_partial_cache_is_never_adopted
+    _source, package, revision, identity, bun = self.managed_fixture(root)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/repo/scripts/tests/doop-test.py", line 378, in managed_fixture
+    subprocess.run(["git", "init", "--quiet", str(source)], check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+----------------------------------------------------------------------
+Ran 46 tests in 3.476s
+
+FAILED (errors=5, skipped=2)

@@ -98,7 +98,7 @@ pub(in crate::adapters::persistence) async fn finish_account_deletion_on(
         lifecycle::revoke_company_on(tx, &client_namespace(), &company_binding(company))
             .await
             .map_err(AppError::from)?;
-        super::memory::retire_company_on(&mut **tx, company).await?;
+        super::memory::retire_company_on(tx, company).await?;
         sqlx::query("DELETE FROM companies WHERE id = $1 AND user_id = $2")
             .bind(company)
             .bind(user)

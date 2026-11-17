@@ -1,0 +1,259 @@
+{
+  "original": "B1-full-check.txt (first library run)",
+  "original_result": {
+    "passed": 4689,
+    "failed": 31,
+    "ignored": 29
+  },
+  "current_full_stock_suite": "still running; focused proof does not claim its completion",
+  "dispositions": [
+    {
+      "test": "adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-revisions-http.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_redelivery_returns_the_first_delivery_and_enqueues_nothing_further",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_repeated_key_with_changed_content_is_a_collision_rather_than_a_rewrite",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_reply_observed_before_its_root_wins_the_provider_thread_mapping",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-revisions-http.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_stored_event_key_reused_with_a_different_body_is_a_collision",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::an_association_through_another_channels_binding_names_the_first_bad_pair",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::application_ingress_keeps_identity_locks_and_cannot_fabricate_system_authorship",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::concurrent_different_messages_sharing_a_new_thread_key_open_one_thread",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::inconsistent_multi_binding_message_mappings_are_a_typed_collision",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::multi_task_tests::an_intent_records_disposition_policy_origin_and_relay_trace",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::multi_task_tests::each_association_gets_one_intent_and_redelivery_adds_none",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::multi_task_tests::intent_rows_cannot_reach_across_tenants",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::slack_participant_intents_persist_with_explicit_roles_and_no_email_projection",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::two_concurrent_deliveries_of_one_message_produce_one_of_everything",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_blocks_actual_removal_until_notice_commit",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-focused.txt"
+      ]
+    },
+    {
+      "test": "application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts",
+      "initial": "FAIL",
+      "focused_correction": "PASS",
+      "evidence": [
+        "B1-correction-provisioning.txt"
+      ]
+    }
+  ]
+}

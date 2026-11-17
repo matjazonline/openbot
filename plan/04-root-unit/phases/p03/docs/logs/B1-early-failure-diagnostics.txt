@@ -1,0 +1,25 @@
+
+running 3 tests
+
+thread 'adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together' (29050371) panicked at src/adapters/persistence/thread/inbound_tests.rs:1365:5:
+assertion failed: fixture.persistence.commit_inbound(request).await.is_ok()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks' (29050372) panicked at src/adapters/persistence/workflow/action_tests.rs:233:31:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"department_members\" violates foreign key constraint \"companies_owner_member_fk\" on table \"companies\"", detail: Some("Key (company_id, root_user_id)=(22f42567-b850-4646-ab64-217d51bc1107, e3678455-7e6f-4005-b119-3bbeb6f5eed5) is still referenced from table \"companies\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("companies"), column: None, data_type: None, constraint: Some("companies_owner_member_fk"), file: Some("ri_triggers.c"), line: Some(2865), routine: Some("ri_ReportViolation") })
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit' (29050373) panicked at src/adapters/persistence/workflow/decision_authority_tests.rs:318:14:
+called `Result::unwrap()` on an `Err` value: Elapsed(())
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together
+    adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks
+    adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 4746 filtered out; finished in 3.37s
+

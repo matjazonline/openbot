@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/04-root-unit/COORDINATION.md
 - Writer: /root in /Users/mac02/orca/workspaces/openbot/plan03-04
-- Revision: 11
+- Revision: 15
 
 ## Plan-wide instructions
 
@@ -26,6 +26,8 @@
 | integration-main | /root; A root; B /root/p04_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | integration/main-60b9a28b/docs/{TASK,HANDOFF}.md |
 
 | p02 (accepted) | /root; A root; B /root/p04_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p02/docs/{TASK,HANDOFF}.md |
+
+| p03 (accepted) | /root; A root; B /root/p04_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p03/docs/{TASK,HANDOFF}.md |
 
 ## Inherited accepted contract
 
@@ -144,3 +146,62 @@
   confirm work stops after publication and Plans05/06 remain unstarted.
 - Responses: p02 -> acknowledged r2 in TASK/HANDOFF; p03/publication -> acknowledge
   on startup and stop after normal authorized main push.
+
+
+## P03 startup acknowledgment (revision12)
+
+P03 ACK C001/r1,C002/r2,C003/r2,C004/r1 and inherited01DEP-C002/r1. Accepted
+p02 prerequisite commit4dad1e971e1791f75731da50a7e73e6776177057,
+source6391c0ba46d382417a618bdc9238b32c1b8e1b976a457ee42f60b2382971e660,
+independent04RU-P02-B1-R2/N1 PASS. Existing p01 and main-integration prerequisites
+remain accepted. Finish original03 docs/full required gates, review combined
+integration, push main, STOP; no05/06. Doop C008 remains separately explicit.
+
+## P03 final verification entry (revision13)
+
+All original final gates have executed; failed prerequisites/fixtures and successful
+rechecks are retained in p03 TASK/logs. Current core stock run4719PASS/1Doop notify
+timeout/29ignored, no overflow; isolated same-case stock recheckPASS. This is an
+explicit review disposition question, not an automatic extension of C008 or an
+unrelatedness claim. Normal full run had passed this Doop case; no Doop code,
+assertion or deadline changed. Lease139PASS; all31initial core failures have exact
+successful focused corrections; HTTP21, native/browser/service/image gates have
+successful current proof under their documented prerequisites. Final independent
+whole-p03 integration review and acceptance/publication remain required. No clean
+whole-CI claim. C002/r2 still requires main push then STOP, with no05/06 work.
+
+### 04RU-C005 / r1
+- State: active; explicit user2026-11-17, "we'll check doop separately".
+- Origin: user response to p03 final-review status naming the new full-stock Doop
+  notify timeout; root writer.
+- Targets: p03 final review, Plan04 acceptance/publication, separate Doop follow-up.
+- Instruction/change: Doop checks and remaining Doop failures, including the named
+  mock full-stock timeout, belong to separate follow-up. Finish and independently
+  review verified Plan04 core, push main, then STOP per C002/r2. Do not investigate
+  or fix Doop further as part of Plan04. Keep failures, CI declarations and test
+  assertions visible; deferred means neither PASS nor whole-CI-green.
+- Dependencies/order: all non-Doop Plan04 gates and current independent source/
+  integration review remain required. No runtime/schema/authorization change,
+  deadline increase, assertion removal or permission-policy exception.
+- Evidence/review: direct user decision after the specific Doop gap was disclosed;
+  p03 TASK/HANDOFF and immutable final-review scope addendum pin this revision.
+- Verification: retain current core/service/browser/image proof, both failed full
+  Doop result and isolated recheck, explicit deferred disposition, accepted source
+  identity and normal remote main SHA. No Plans05/06 continuation.
+- Responses: p03 root -> acknowledged r1; final B must acknowledge fresh scope
+  before acceptance. Publication pending normal final review/acceptance.
+
+## P03 accepted for normal publication (revision15)
+
+Root rechecked current requirements and unchanged source digest
+9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e.
+Independent Astra/high04RU-P03-B1-R1-S1/N1 PASS under revision14/C005r1;
+no remaining in-scope findings. F1 is user-deferred, not fixed or confirmed
+unrelated. All original failures and scope history remain retained. Root accepts
+p03/combined Plan04 under unchanged C001r1/C002r2/C003r2/C004r1/inherited01C002r1
+and explicit C005r1. Core criteria have required proof; Doop remains separately
+unverified/failed and whole CI is not claimed green. Scope notices unchanged.
+
+Normal main publication is already authorized. Retain implementation/remote SHA,
+then STOP. Do not start05/06 or investigate Doop further. Only disposable p03
+resources may be cleaned; preserve prior phase/shared services and review records.

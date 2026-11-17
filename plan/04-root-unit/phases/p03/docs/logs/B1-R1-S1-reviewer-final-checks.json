@@ -1,0 +1,40 @@
+{
+  "round": "04RU-P03-B1-R1-S1",
+  "branch": "feature/plan03_04",
+  "head": "4dad1e971e1791f75731da50a7e73e6776177057",
+  "author_and_original_entry_return_equal": true,
+  "artifact": "9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e",
+  "authority_pins": [
+    {
+      "live": "plan/04-root-unit/COORDINATION.md",
+      "pin": "logs/B1-R1-scope-addendum-coordination14.md",
+      "match": true,
+      "sha256": "984d59173e49abe02e720609bd841ed50fa4e8014db87b9f5111b4b05f7980ec"
+    },
+    {
+      "live": "plan/01-departments/COORDINATION.md",
+      "pin": "logs/B1-R1-plan01-coordination.md",
+      "match": true,
+      "sha256": "35527a0a608edd5de30a74e7e8537ef79227f08e9046a1513e3b58d3ff6c3d37"
+    }
+  ],
+  "scope_statement_sha256": "b0ce1f041f0deb2b53c6a36015692609a86490b447da96f6d1ef2be5dc23499d",
+  "manifest_validations": [
+    {
+      "manifest": "B1-R1.evidence.json",
+      "exit": 0,
+      "output": "plan/04-root-unit/phases/p03/docs/logs/B1-R1.evidence.json: retained evidence valid {\"FAIL\": 4, \"NOT EXERCISED\": 1, \"PASS\": 24}\n1 evidence manifest(s) validated; declared results are not acceptance\n"
+    },
+    {
+      "manifest": "B1-R1-scope-addendum.evidence.json",
+      "exit": 0,
+      "output": "plan/04-root-unit/phases/p03/docs/logs/B1-R1-scope-addendum.evidence.json: retained evidence valid {\"FAIL\": 0, \"NOT EXERCISED\": 1, \"PASS\": 1}\n1 evidence manifest(s) validated; declared results are not acceptance\n"
+    }
+  ],
+  "outcome": "PASS under explicit coordination14/C005r1 user scope",
+  "finding_disposition": "04RU-P03-B1-F1 USER-DEFERRED, not fixed or confirmed unrelated",
+  "whole_suite_green": false,
+  "doop_followup_exercised": false,
+  "reviewer_source_mutations": false,
+  "reviewer_runtime_resources": []
+}

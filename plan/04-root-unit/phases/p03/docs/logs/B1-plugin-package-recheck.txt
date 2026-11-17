@@ -1,0 +1,7 @@
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa04-p03-plugin-proof
+
+built 1 plugin entry
+built 1 plugin entry
+{"filename":"bb-plugin-openbot-local-0.2.0.tgz","sha256":"5cdb500a915d6c36a6c51791816f6553e00e80faf4eb71b9b74dc436c36ac10d"}

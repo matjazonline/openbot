@@ -294,8 +294,8 @@ async fn agent_retire_races_agent_principal_upsert() {
     };
     let persistence = PostgresPersistence::new(database.pool.clone());
     let spoken = spoken_agent(&persistence).await;
-    // Start from an agent with no principal yet, so the writer inserts one and its foreign key
-    // check is what holds the agent row.
+    // Start without a principal. Run the deferred FK check before releasing the writer so the
+    // delete must compete with the same agent lock that a successful writer commit takes.
     let agent = AgentPersistence::create(
         &persistence,
         spoken.company_id,
@@ -322,6 +322,10 @@ async fn agent_retire_races_agent_principal_upsert() {
     )
     .await
     .unwrap();
+    sqlx::query("SET CONSTRAINTS principals_company_agent_fk IMMEDIATE")
+        .execute(&mut *writer)
+        .await
+        .unwrap();
     let delete = {
         let persistence = persistence.clone();
         tokio::spawn(async move { AgentPersistence::delete(&persistence, agent.id).await })
@@ -343,18 +347,19 @@ async fn agent_retire_races_agent_principal_upsert() {
 
     // The other order: the agent is gone, so a late writer cannot attach a principal to it.
     let mut late = persistence.pool().begin().await.unwrap();
-    let refused = crate::adapters::persistence::participant::create_agent_principal_on(
+    crate::adapters::persistence::participant::create_agent_principal_on(
         &mut late,
         spoken.company_id,
         agent.id,
         "Racer",
     )
-    .await;
+    .await
+    .unwrap();
+    let refused = late.commit().await;
     assert!(
         refused.is_err(),
         "a principal for a deleted agent is refused"
     );
-    late.rollback().await.unwrap();
     let dangling: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM principals WHERE agent_id = $1")
         .bind(agent.id)
         .fetch_one(persistence.pool())

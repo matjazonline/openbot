@@ -84,10 +84,10 @@ impl Fixture {
         for (user, role) in [(accounts[1], "admin"), (accounts[2], "member")] {
             let mut tx = database.pool.begin().await.unwrap();
             crate::adapters::persistence::company::join_root_on(
-                &mut *tx,
+                &mut tx,
                 crate::adapters::persistence::company::RootJoin {
                     company: crate::domain::workflow::CompanyId::new(companies[0]),
-                    user: user,
+                    user,
                     role: (role).parse().expect("fixture role"),
                     access_level: crate::entities::access_level::AccessLevel::PUBLIC,
                 },

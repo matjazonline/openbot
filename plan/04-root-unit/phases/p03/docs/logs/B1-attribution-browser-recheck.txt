@@ -1,0 +1,38 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.13s
+    Finished `test` profile [unoptimized] target(s) in 0.11s
+     Running unittests src/lib.rs (target/debug/deps/attribution_service-24e48f1414edb70b)
+    Finished `test` profile [unoptimized] target(s) in 0.11s
+     Running unittests src/lib.rs (target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 2 tests
+PASS: setup and catalog browser journey (12 checks): store forms, escaping, DNS proof, public installation, secret once, rotation/revoke, domain/install status, live member view, campaigns/ads/links, lost-response stable retry, product edit, real tracked browser navigation
+
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... ok
+PASS: website SDK and merchant cart journey: consent, AdA/AdB, URL removal, return history, exact retry, viewport duration, immutable server checkout, multiple tabs, competing before-read and before-cleanup writes persist after navigation, withdrawal, no-reference visit, blocked storage, invalid candidate fallbacks, history expiry/bound, cancelled retries, privacy (11 observed browser attempts)
+
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 121 filtered out; finished in 9.76s
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.49s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 1 test
+{"checks":["new-password-login","already-authenticated-login","independent-secure-cookies","current-company-access","local-logout","session-rotation","upstream-revocation","session-recovery"],"result":"PASS"}
+
+test adapters::http::routes::user::attribution_browser_tests::attribution_sso_browser_real_openbot_password_and_existing_session ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4748 filtered out; finished in 3.15s
+

@@ -310,7 +310,7 @@ async fn await_blocked_removal(pool: &sqlx::PgPool) {
         loop {
             // Removal now locks the company before its principal. Observe either
             // real removal statement, depending on which held decision lock it meets.
-            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND (query LIKE 'UPDATE principals%' OR query='SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE') AND cardinality(pg_blocking_pids(pid))>0)")
+            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND (query LIKE 'UPDATE principals%' OR query IN ('SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE', 'SELECT user_id FROM companies WHERE id=$1 FOR NO KEY UPDATE')) AND cardinality(pg_blocking_pids(pid))>0)")
                 .fetch_one(pool).await.unwrap();
             if blocked { break; }
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
@@ -485,6 +485,7 @@ async fn workflow_decision_membership_delete_preserves_settled_history() {
 async fn workflow_decision_park_loses_to_inflight_member_removal() {
     for convert in [false, true] {
         let f = Box::pin(DecisionFixture::new(1, None)).await;
+        let before = f.counts().await;
         let mut removal = f.persistence().pool().begin().await.unwrap();
         if convert {
             sqlx::query("UPDATE principals SET kind='external',user_id=NULL WHERE company_id=$1 AND user_id=$2")
@@ -496,6 +497,17 @@ async fn workflow_decision_park_loses_to_inflight_member_removal() {
                 wait_until_a_backend_is_blocked(f.persistence().pool()).await;
                 removal.commit().await.unwrap();
             });
+        let parked = match parked {
+            Err(AppError::Conflict(message)) => {
+                assert_eq!(
+                    message,
+                    "Workflow reviewer authority changed during account locking; retry the operation"
+                );
+                assert_eq!(f.counts().await, before, "the stale attempt writes nothing");
+                f.persistence().park_decision(f.scope, &f.notices).await
+            }
+            result => result,
+        };
         assert!(parked.unwrap().is_none());
         assert_failed_without_park(&f).await;
     }

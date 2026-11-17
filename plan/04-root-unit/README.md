@@ -4,7 +4,9 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed, 2026-11-09. Fourth of nine organization plans, followed by
+Status: implemented, 2026-11-17. Final verification, independent acceptance and publication
+are recorded in [phase03](phases/p03/docs/TASK.md).
+Fourth of nine organization plans, followed by
 [05-scopes](../05-scopes/README.md); depends on
 [01-departments](../01-departments/README.md), [02-workflow-roles](../02-workflow-roles/README.md)
 and [03-principal-addresses](../03-principal-addresses/README.md).
@@ -15,13 +17,19 @@ There is one tree. Every company has exactly one root department, created with i
 membership is membership in the root; the company admin is the `admin` role on the root; the
 company owner stays `companies.user_id` and holds the `owner` role on the root as a mirror. Every
 desk belongs to a department, the root by default. A desk's audience is then always "the members
-of the department that owns it, one step up", so the `team` and `allowlist` access modes and the
+of the department that owns it, with one-step Lead access both ways", so the `team` and `allowlist` access modes and the
 `members_only` flag from 01-departments collapse into one rule with explicit grants on top.
 
 The company remains the tenant and the hard security boundary. Nothing crosses it; the root is a
 department inside it, not a department above it.
 
 ## Decisions (user, 2026-11-09)
+
+Effective audience clarification: inherited user decision01DEP-C002/r1 (2026-11-10) includes
+own members and all role holders, the parent Lead and direct child Leads, one step both ways.
+User decision04RU-C003/r2 (2026-11-17) requires the actual authenticated sending agent's receiving
+participate grant on every Members desk, root and child. The numbered decisions below carry
+these current contracts.
 
 1. **One root per company, created in the company's transaction.** `departments.is_root` with a
    partial unique index per company; `parent_id IS NULL` iff `is_root`. Onboarding and company
@@ -38,13 +46,14 @@ department inside it, not a department above it.
 4. **Every desk has a department.** `channels.department_id NOT NULL`, defaulting to the root at
    creation. The `access_mode` check becomes `members` or `public`; `allowlist` and
    `members_only` are removed. Access is: members of the owning department, its role holders and
-   the parent's `lead`, plus explicit grants, plus the owner exemption. A root desk is therefore
-   reachable by the whole company, which is what `team` meant.
+   the parent's `lead` and direct child Leads, plus explicit grants and the owner exemption. A
+   root desk grants root members access; agent relays still require their actual receiving grant.
 5. **Explicit grants stay.** `configured_allowlist` grants still admit named outside addresses on
    any desk; `department_membership` grants are still materialized rows, so
    `Channel::participant_access` keeps reading rows and one function.
 6. **The one-step rule is unchanged.** A root member is not thereby a member of every department;
-   a sub-department's members-only desk still needs membership, a role, or the parent lead.
+   a sub-department's Members desk admits its own members/roles, parent Lead and direct child
+   Leads, explicit grants and the owner exemption.
 
 ## What does not change
 

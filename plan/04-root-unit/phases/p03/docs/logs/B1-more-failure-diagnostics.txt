@@ -1,0 +1,47 @@
+
+running 7 tests
+
+thread 'adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address' (29077392) panicked at src/adapters/persistence/account_identity_tests.rs:535:5:
+the grants now hang on the person
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address ... FAILED
+
+thread 'adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history' (29077394) panicked at src/adapters/persistence/agent_publication/tests/publication.rs:277:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"department_members\" violates foreign key constraint \"companies_owner_member_fk\" on table \"companies\"", detail: Some("Key (company_id, root_user_id)=(6411b1e5-8622-48de-ba21-b9b0b3f82e27, bbeee441-f336-4943-9667-53502ebe422d) is still referenced from table \"companies\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("companies"), column: None, data_type: None, constraint: Some("companies_owner_member_fk"), file: Some("ri_triggers.c"), line: Some(2865), routine: Some("ri_ReportViolation") })
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal' (29077396) panicked at src/adapters/persistence/workflow/decision_authority_tests.rs:499:24:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow reviewer authority changed during account locking; retry the operation")
+
+thread 'adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected' (29077395) panicked at src/adapters/persistence/onboarding/tests.rs:882:5:
+assertion `left == right` failed
+  left: 1
+ right: 0
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal ... FAILED
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks' (29077397) panicked at src/adapters/persistence/workflow/control_acceptance_tests.rs:389:27:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"department_members\" violates foreign key constraint \"companies_owner_member_fk\" on table \"companies\"", detail: Some("Key (company_id, root_user_id)=(30cf3fde-d07b-48d0-b560-754f5a21c5ca, 85911a70-37f2-4dc7-8418-3cad4baa1578) is still referenced from table \"companies\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("companies"), column: None, data_type: None, constraint: Some("companies_owner_member_fk"), file: Some("ri_triggers.c"), line: Some(2865), routine: Some("ri_ReportViolation") })
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation' (29077398) panicked at src/adapters/persistence/workflow/harness_store_tests.rs:132:27:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"department_members\" violates foreign key constraint \"companies_owner_member_fk\" on table \"companies\"", detail: Some("Key (company_id, root_user_id)=(950b5de0-1d5f-40dc-a6a3-a13dcbdac283, b5dda6b1-8a43-4904-ad2e-01204b0e003c) is still referenced from table \"companies\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("companies"), column: None, data_type: None, constraint: Some("companies_owner_member_fk"), file: Some("ri_triggers.c"), line: Some(2865), routine: Some("ri_ReportViolation") })
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation ... FAILED
+
+thread 'adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert' (29077393) panicked at src/adapters/persistence/test_support.rs:753:5:
+fewer than 1 backends ever blocked on the locks this test holds
+test adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address
+    adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert
+    adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history
+    adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected
+    adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation
+
+test result: FAILED. 0 passed; 7 failed; 0 ignored; 0 measured; 4742 filtered out; finished in 10.18s
+

@@ -222,12 +222,12 @@ async fn workflow_action_authority_revocation_contender_blocks_then_rechecks() {
         .execute(&mut *revoke)
         .await
         .unwrap();
-    sqlx::query("DELETE FROM principals WHERE company_id=$1 AND user_id=$2")
-        .bind(request.scope.company.as_uuid())
-        .bind(request.context.actor)
-        .execute(&mut *revoke)
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership(
+        &mut revoke,
+        request.scope.company.as_uuid(),
+        request.context.actor,
+    )
+    .await;
     let commit = async {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         revoke.commit().await.unwrap();

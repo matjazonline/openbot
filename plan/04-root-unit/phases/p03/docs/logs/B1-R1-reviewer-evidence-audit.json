@@ -1,0 +1,181 @@
+{
+  "round": "04RU-P03-B1-R1",
+  "artifact": "9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e",
+  "scope": "Independent retention/result mapping audit; no behavioral tests executed by reviewer in this round",
+  "initial_failure_mapping_exact": true,
+  "initial_failure_count": 31,
+  "corrected_tests": [
+    {
+      "test": "adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_redelivery_returns_the_first_delivery_and_enqueues_nothing_further",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_repeated_key_with_changed_content_is_a_collision_rather_than_a_rewrite",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_reply_observed_before_its_root_wins_the_provider_thread_mapping",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::a_stored_event_key_reused_with_a_different_body_is_a_collision",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::an_association_through_another_channels_binding_names_the_first_bad_pair",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::application_ingress_keeps_identity_locks_and_cannot_fabricate_system_authorship",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::concurrent_different_messages_sharing_a_new_thread_key_open_one_thread",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::inconsistent_multi_binding_message_mappings_are_a_typed_collision",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::multi_task_tests::an_intent_records_disposition_policy_origin_and_relay_trace",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::multi_task_tests::each_association_gets_one_intent_and_redelivery_adds_none",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::multi_task_tests::intent_rows_cannot_reach_across_tenants",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::slack_participant_intents_persist_with_explicit_roles_and_no_email_projection",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::thread::inbound_tests::two_concurrent_deliveries_of_one_message_produce_one_of_everything",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_blocks_actual_removal_until_notice_commit",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation",
+      "focused_pass": true,
+      "stock_pass": true
+    },
+    {
+      "test": "application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts",
+      "focused_pass": true,
+      "stock_pass": true
+    }
+  ],
+  "full_log_sha256": "fc186977675b496066d266784e2f8abb3082e2816ae5bcc140fe8cd323ae479b",
+  "full_result_lines": [
+    "test result: FAILED. 4689 passed; 31 failed; 29 ignored; 0 measured; 0 filtered out; finished in 1950.64s",
+    "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4741 filtered out; finished in 2.36s",
+    "test result: FAILED. 4719 passed; 1 failed; 29 ignored; 0 measured; 0 filtered out; finished in 2068.72s",
+    "test result: ok. 139 passed; 0 failed; 0 ignored; 0 measured; 4610 filtered out; finished in 275.50s",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 176 filtered out; finished in 0.11s",
+    "test result: ok. 120 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 12.38s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 121 filtered out; finished in 10.23s",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4748 filtered out; finished in 3.23s"
+  ],
+  "doop_failure_lines": [
+    "document timed out: Some((\"running\", None, [\"notify\", \"verify_final_canvas\", \"final_canvas\", \"read_final\", \"verify_editor\", \"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\", \"get_canvas\", \"get_frame\", \"edit_frame_html\", \"get_canvas\"]"
+  ],
+  "manifest_validator_exit": 0,
+  "core_gap": "New full-stock Doop mock notify timeout remains causally unresolved; isolated pass does not close it; private Doop C008/r1 is separate."
+}
