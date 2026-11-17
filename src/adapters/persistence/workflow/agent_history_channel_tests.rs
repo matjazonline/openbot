@@ -244,6 +244,13 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
         .await
         .unwrap();
     for agent in &agents {
+        let principal = crate::adapters::persistence::memory::agent_principal_on(
+            &mut *pool.acquire().await.unwrap(),
+            company,
+            *agent,
+        )
+        .await
+        .unwrap();
         let namespace = Uuid::new_v4();
         let envelope = d
             .p()
@@ -257,13 +264,13 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
             )
             .unwrap();
         sqlx::query(
-            "INSERT INTO memory_namespaces (company_id, id, scope_kind, agent_id, state, \
+            "INSERT INTO memory_namespaces (company_id, id, scope_kind, principal_id, state, \
                credential_id, credential_envelope) \
-             VALUES ($1, $2, 'agent', $3, 'ready', gen_random_uuid(), $4)",
+             VALUES ($1, $2, 'principal', $3, 'ready', gen_random_uuid(), $4)",
         )
         .bind(company)
         .bind(namespace)
-        .bind(agent)
+        .bind(principal.as_uuid())
         .bind(envelope)
         .execute(pool)
         .await
@@ -302,7 +309,7 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
     let (agent, namespace): (Uuid, Uuid) = sqlx::query_as(
         "SELECT exchange.agent_id, namespace.id FROM agent_history_exchanges AS exchange \
          JOIN memory_namespaces AS namespace ON namespace.company_id = exchange.company_id \
-           AND namespace.agent_id = exchange.agent_id \
+           AND namespace.principal_id = (SELECT id FROM principals WHERE company_id=exchange.company_id AND agent_id=exchange.agent_id) \
          WHERE exchange.company_id = $1 AND exchange.id = $2",
     )
     .bind(company)

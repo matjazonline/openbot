@@ -9,9 +9,9 @@
 //! intent) is `memory::deliveries::enqueue_capture_on`.
 use super::*;
 use crate::adapters::persistence::memory::deliveries::{
-    CaptureEnqueue, CaptureIntent, SaveScope, enqueue_capture_on,
+    CaptureEnqueue, CaptureIntent, enqueue_capture_on,
 };
-use crate::application::memory::MemoryCaptureKind;
+use crate::application::memory::{MemoryCaptureKind, NamespaceOwner};
 use serde_json::Value;
 
 #[derive(sqlx::FromRow)]
@@ -46,7 +46,17 @@ pub(super) async fn capture_on(
     .fetch_one(&mut *db)
     .await?;
     let (kind, target) = match (conversation.scope_kind.as_str(), conversation.attached) {
-        ("thread", _) => (MemoryCaptureKind::Threads, SaveScope::Agent(agent)),
+        ("thread", _) => (
+            MemoryCaptureKind::Threads,
+            NamespaceOwner::Principal(
+                crate::adapters::persistence::memory::agent_principal_on(
+                    db,
+                    scope.company.as_uuid(),
+                    agent,
+                )
+                .await?,
+            ),
+        ),
         ("private_session", Some(false)) => {
             let Some(user) = super::super::checkpoints::memory_tools::user_scope_owner_on(
                 db,
@@ -57,7 +67,17 @@ pub(super) async fn capture_on(
             else {
                 return Ok(CaptureEnqueue::Skipped("ineligible"));
             };
-            (MemoryCaptureKind::PrivateSessions, SaveScope::User(user))
+            (
+                MemoryCaptureKind::PrivateSessions,
+                NamespaceOwner::Principal(
+                    crate::adapters::persistence::memory::person_principal_on(
+                        db,
+                        scope.company.as_uuid(),
+                        user,
+                    )
+                    .await?,
+                ),
+            )
         }
         _ => return Ok(CaptureEnqueue::Skipped("ineligible")),
     };

@@ -88,16 +88,19 @@ async fn deliver(f: &Fixture, http: &Arc<MemoryServiceHttp>) {
 }
 
 /// The ready namespace of `kind` and its opened client credential.
-async fn ready(f: &Fixture, kind: &str) -> (Uuid, ClientCredential) {
+async fn ready(f: &Fixture, owner: NamespaceOwner) -> (Uuid, ClientCredential) {
+    let key = super::namespace_columns(owner);
     let (namespace, id, envelope): (Uuid, Uuid, Option<String>) = sqlx::query_as(
         "SELECT id, credential_id, credential_envelope FROM memory_namespaces \
-         WHERE company_id = $1 AND scope_kind = $2 AND state = 'ready'",
+         WHERE company_id = $1 AND scope_kind = $2 AND unit_id IS NOT DISTINCT FROM $3 AND principal_id IS NOT DISTINCT FROM $4 AND state = 'ready'",
     )
     .bind(f.company)
-    .bind(kind)
+    .bind(key.kind)
+    .bind(key.unit)
+    .bind(key.principal)
     .fetch_one(f.pool())
     .await
-    .unwrap_or_else(|_| panic!("a ready {kind} namespace"));
+    .unwrap_or_else(|_| panic!("a ready {owner:?} namespace"));
     let token = f
         .persistence
         .credential_cipher()
@@ -176,7 +179,10 @@ async fn memory_integration_live_provisioning_save_recall_capture_and_disable() 
         .enable_memory(f.scope(), owner, 0, provisioner)
         .await
         .unwrap();
-    for owner in [NamespaceOwner::Company, NamespaceOwner::Agent(f.agent)] {
+    for owner in [
+        NamespaceOwner::Unit(f.root),
+        NamespaceOwner::Principal(f.agent_principal),
+    ] {
         assert_eq!(
             f.persistence
                 .ensure_namespace(f.scope(), owner)
@@ -186,8 +192,8 @@ async fn memory_integration_live_provisioning_save_recall_capture_and_disable() 
         );
     }
     reconcile(&f, &live, &http).await;
-    let (company_ns, company) = ready(&f, "company").await;
-    let (agent_ns, agent) = ready(&f, "agent").await;
+    let (company_ns, company) = ready(&f, NamespaceOwner::Unit(f.root)).await;
+    let (agent_ns, agent) = ready(&f, NamespaceOwner::Principal(f.agent_principal)).await;
 
     // A frozen save, delivered once and replayed as the same receipt.
     let facts =
@@ -198,7 +204,7 @@ async fn memory_integration_live_provisioning_save_recall_capture_and_disable() 
         execution: ExecutionId::new(Uuid::new_v4()),
         invocation: None,
         wait: None,
-        scope: SaveScope::Company,
+        scope: NamespaceOwner::Unit(f.root),
         key: "ob.s.live-save",
         facts: &facts,
         external_sources: Vec::new(),
@@ -348,7 +354,7 @@ async fn memory_integration_live_provisioning_save_recall_capture_and_disable() 
         exchange,
         agent: f.agent,
         kind: MemoryCaptureKind::Threads,
-        scope: SaveScope::Agent(f.agent),
+        scope: NamespaceOwner::Principal(f.agent_principal),
         input: r#"{"message":"Please renew the contract on net 30 terms."}"#,
         output: r#"{"body":"Renewal booked for March on net 30."}"#,
     };
@@ -486,7 +492,7 @@ async fn memory_integration_live_competing_delivery_workers_deliver_each_intent_
         .unwrap();
     assert_eq!(
         f.persistence
-            .ensure_namespace(f.scope(), NamespaceOwner::Company)
+            .ensure_namespace(f.scope(), NamespaceOwner::Unit(f.root))
             .await
             .unwrap(),
         NamespaceReadiness::NotReady
@@ -504,7 +510,7 @@ async fn memory_integration_live_competing_delivery_workers_deliver_each_intent_
             execution: ExecutionId::new(Uuid::new_v4()),
             invocation: None,
             wait: None,
-            scope: SaveScope::Company,
+            scope: NamespaceOwner::Unit(f.root),
             key,
             facts: &facts,
             external_sources: Vec::new(),
@@ -546,7 +552,7 @@ async fn memory_integration_live_competing_delivery_workers_deliver_each_intent_
     for handle in racing {
         handle.await.unwrap();
     }
-    let (_, company) = ready(&f, "company").await;
+    let (_, company) = ready(&f, NamespaceOwner::Unit(f.root)).await;
     let mut observations = Vec::new();
     for key in &keys {
         let (state, result) = delivery(&f, key).await;
@@ -558,7 +564,7 @@ async fn memory_integration_live_competing_delivery_workers_deliver_each_intent_
                 .unwrap(),
         );
     }
-    let (namespace, _) = ready(&f, "company").await;
+    let (namespace, _) = ready(&f, NamespaceOwner::Unit(f.root)).await;
     let fetched = http
         .fetch(&company, NamespaceExternalId(namespace), 3, &observations)
         .await

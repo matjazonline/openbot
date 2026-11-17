@@ -44,17 +44,24 @@ async fn ready(setup: &AgentSetup) -> (ContractFake, Arc<MemoryServiceHttp>) {
     p.enable_memory(company, setup.fixture.target.actor, 0, PROVISIONER)
         .await
         .unwrap();
+    let principal = crate::adapters::persistence::memory::agent_principal_on(
+        &mut *p.pool().acquire().await.unwrap(),
+        company.as_uuid(),
+        setup.agent,
+    )
+    .await
+    .unwrap();
     assert_eq!(
-        p.ensure_namespace(company, NamespaceOwner::Agent(setup.agent))
+        p.ensure_namespace(company, NamespaceOwner::Principal(principal))
             .await
             .unwrap(),
         NamespaceReadiness::NotReady
     );
     let namespace: Uuid = sqlx::query_scalar(
-        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='agent' AND agent_id=$2",
+        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='principal' AND principal_id=$2",
     )
     .bind(company.as_uuid())
-    .bind(setup.agent)
+    .bind(principal.as_uuid())
     .fetch_one(p.pool())
     .await
     .unwrap();

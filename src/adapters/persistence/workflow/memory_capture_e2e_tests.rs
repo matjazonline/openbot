@@ -66,7 +66,7 @@ async fn generation_intents(t: &Tools) -> Vec<(String, Uuid, Value)> {
 async fn memory_capture_an_accepted_private_session_exchange_is_captured_for_its_creator() {
     let t = private_capture().await;
     let user = t.actor().await;
-    let namespace = t.ready(NamespaceOwner::User(user)).await;
+    let namespace = t.ready(t.person_owner(user).await).await;
     let llm = scripted_llm(vec![
         LlmTurn::tool_call(SEARCH_KNOWLEDGE, json!({"query":"TOOL-ARGUMENT-MARKER"})),
         LlmTurn::text("\"CAPTURED-ANSWER\""),
@@ -151,7 +151,7 @@ async fn memory_capture_an_accepted_private_session_exchange_is_captured_for_its
 async fn memory_capture_a_switched_on_target_is_provisioned_at_preparation() {
     let t = private_capture().await;
     let user = t.actor().await;
-    assert!(t.namespace(NamespaceOwner::User(user)).await.is_none());
+    assert!(t.namespace(t.person_owner(user).await).await.is_none());
     let llm = scripted_llm(vec![LlmTurn::text("\"done\"")]).await;
     register_scripted_agent_base_url(t.s.agent, &llm.base_url);
     let outcome =
@@ -160,15 +160,13 @@ async fn memory_capture_a_switched_on_target_is_provisioned_at_preparation() {
     assert_eq!(outcome.completed_result().unwrap(), json!("done"));
     assert_eq!(llm.finish().await.unwrap(), 1);
     let (_, state) = t
-        .namespace(NamespaceOwner::User(user))
+        .namespace(t.person_owner(user).await)
         .await
         .expect("requested at preparation");
     assert_eq!(state, "provisioning");
     assert!(generation_intents(&t).await.is_empty());
     assert!(
-        t.namespace(NamespaceOwner::Agent(t.s.agent))
-            .await
-            .is_none(),
+        t.namespace(t.agent_owner().await).await.is_none(),
         "only the switched-on kind's target"
     );
 }
@@ -188,7 +186,7 @@ async fn memory_capture_an_agent_without_the_switch_captures_nothing() {
         .await
         .unwrap();
     let user = t.actor().await;
-    t.ready(NamespaceOwner::User(user)).await;
+    t.ready(t.person_owner(user).await).await;
     let llm = scripted_llm(vec![LlmTurn::text("\"done\"")]).await;
     register_scripted_agent_base_url(t.s.agent, &llm.base_url);
     let outcome =
@@ -206,7 +204,7 @@ async fn memory_capture_an_agent_without_the_switch_captures_nothing() {
 async fn memory_capture_nothing_is_captured_without_a_configured_service() {
     let t = private_capture().await;
     let user = t.actor().await;
-    t.ready(NamespaceOwner::User(user)).await;
+    t.ready(t.person_owner(user).await).await;
     let llm = scripted_llm(vec![LlmTurn::text("\"done\"")]).await;
     register_scripted_agent_base_url(t.s.agent, &llm.base_url);
     // The runtime's own default guard: no memory service composed.
@@ -270,7 +268,7 @@ async fn memory_operations_capture_and_delivery_logs_carry_ids_not_content() {
     tracing::callsite::rebuild_interest_cache();
     let t = private_capture().await;
     let user = t.actor().await;
-    t.ready(NamespaceOwner::User(user)).await;
+    t.ready(t.person_owner(user).await).await;
     let llm = scripted_llm(vec![LlmTurn::text("\"HYGIENE-OB-MARKER answer\"")]).await;
     register_scripted_agent_base_url(t.s.agent, &llm.base_url);
     let outcome =

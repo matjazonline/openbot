@@ -67,13 +67,23 @@ pub(in crate::adapters::persistence::workflow::tests) async fn memory_for(
         .unwrap();
     assert_eq!(
         persistence
-            .ensure_namespace(company, NamespaceOwner::Company)
+            .ensure_namespace(
+                company,
+                NamespaceOwner::Unit(
+                    crate::adapters::persistence::company::root_on(
+                        &mut *p.pool().acquire().await.unwrap(),
+                        company
+                    )
+                    .await
+                    .unwrap()
+                )
+            )
             .await
             .unwrap(),
         NamespaceReadiness::NotReady
     );
     let namespace: Uuid = sqlx::query_scalar(
-        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='company'",
+        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='unit'",
     )
     .bind(company.as_uuid())
     .fetch_one(persistence.pool())
@@ -255,7 +265,7 @@ async fn memory_integration_save_and_load_steps_round_trip_through_the_intent() 
     };
     assert_eq!(loaded["items"].as_array().unwrap().len(), 1);
     assert_eq!(loaded["items"][0]["access_level"], 9);
-    assert_eq!(loaded["items"][0]["scope"], "company");
+    assert_eq!(loaded["items"][0]["scope"], "unit");
     assert_eq!(loaded["exposed_level"], 9);
     assert_eq!(
         level(p, next).await,
@@ -444,8 +454,26 @@ async fn memory_operations_settled_save_intents_outlive_every_run_that_can_repla
 /// An agent-scope namespace, ready with a sealed token the fake grants (agent ids are plain ids
 /// on namespaces, so the freeze needs no agent row).
 async fn agent_namespace(m: &Memory, scope: ActivationRequest) -> Uuid {
-    let agent = Uuid::new_v4();
-    let namespace = Uuid::new_v4();
+    let agent = crate::use_cases::agent::AgentPersistence::create(
+        &m.persistence,
+        scope.company.as_uuid(),
+        crate::use_cases::agent::AgentWrite {
+            name: "Memory writer".into(),
+            slug: format!("memory-{}", Uuid::new_v4().simple()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    let principal = crate::adapters::persistence::memory::agent_principal_on(
+        &mut *m.persistence.pool().acquire().await.unwrap(),
+        scope.company.as_uuid(),
+        agent,
+    )
+    .await
+    .unwrap();
+    let namespace: Uuid = sqlx::query_scalar("SELECT id FROM memory_namespaces WHERE company_id=$1 AND principal_id=$2 AND state <> 'removing'").bind(scope.company.as_uuid()).bind(principal.as_uuid()).fetch_one(m.persistence.pool()).await.unwrap();
     let token = m.fake.client_token(scope.company.as_uuid(), namespace);
     let envelope = m
         .persistence
@@ -456,18 +484,25 @@ async fn agent_namespace(m: &Memory, scope: ActivationRequest) -> Uuid {
             &SecretString::from(token),
         )
         .unwrap();
-    sqlx::query("INSERT INTO memory_namespaces (company_id,id,scope_kind,agent_id,state,credential_id,credential_envelope) VALUES ($1,$2,'agent',$3,'ready',gen_random_uuid(),$4)")
-        .bind(scope.company.as_uuid()).bind(namespace).bind(agent).bind(envelope)
+    sqlx::query("UPDATE memory_namespaces SET state='ready',credential_id=gen_random_uuid(),credential_envelope=$3 WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(namespace).bind(envelope)
         .execute(m.persistence.pool()).await.unwrap();
     agent
 }
 
 async fn freeze_on(pool: &sqlx::PgPool, scope: ActivationRequest, agent: Uuid, key: &str) -> Value {
     use crate::adapters::persistence::memory::deliveries::{
-        SaveEnqueue, SaveIntent, SaveScope, enqueue_save_on,
+        SaveEnqueue, SaveIntent, enqueue_save_on,
     };
     let facts = vec!["A remembered fact".to_owned()];
     let mut tx = pool.begin().await.unwrap();
+    let principal = crate::adapters::persistence::memory::agent_principal_on(
+        &mut tx,
+        scope.company.as_uuid(),
+        agent,
+    )
+    .await
+    .unwrap();
     let saved = enqueue_save_on(
         &mut tx,
         &SaveIntent {
@@ -476,7 +511,7 @@ async fn freeze_on(pool: &sqlx::PgPool, scope: ActivationRequest, agent: Uuid, k
             execution: scope.execution,
             invocation: None,
             wait: None,
-            scope: SaveScope::Agent(agent),
+            scope: NamespaceOwner::Principal(principal),
             key,
             facts: &facts,
             external_sources: Vec::new(),
@@ -1035,7 +1070,7 @@ async fn memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_low
         let m = memory(&f, scope).await;
         let p = &m.persistence;
         let namespace: Uuid = sqlx::query_scalar(
-            "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='company'",
+            "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='unit'",
         )
         .bind(scope.company.as_uuid())
         .fetch_one(p.pool())

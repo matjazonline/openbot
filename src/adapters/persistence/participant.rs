@@ -344,6 +344,14 @@ pub(crate) async fn create_person_principal_on(
     display_label: &str,
     email: &str,
 ) -> AppResult<PrincipalId> {
+    let account: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE id=$1 FOR SHARE")
+        .bind(user_id)
+        .fetch_optional(&mut *connection)
+        .await?;
+    if account.is_none() {
+        return Err(AppError::NotFound("Account is unavailable".into()));
+    }
+    lock_principal_company_on(connection, company_id).await?;
     let qualified = account_email_identity(email)?;
 
     let principal_id =
@@ -362,6 +370,12 @@ pub(crate) async fn create_person_principal_on(
         connection,
         company_id,
         principal_id,
+    )
+    .await?;
+    super::memory::ensure_on(
+        connection,
+        company_id,
+        crate::application::memory::NamespaceOwner::Principal(principal_id),
     )
     .await?;
     Ok(principal_id)
@@ -446,12 +460,36 @@ pub(crate) async fn ensure_system_principal_on(
     Ok(PrincipalId::new(stored))
 }
 
+async fn lock_principal_company_on(
+    connection: &mut sqlx::PgConnection,
+    company: Uuid,
+) -> AppResult<()> {
+    let found: Option<Uuid> = sqlx::query_scalar("SELECT id FROM companies WHERE id=$1 FOR SHARE")
+        .bind(company)
+        .fetch_optional(connection)
+        .await?;
+    found
+        .map(|_| ())
+        .ok_or_else(|| AppError::NotFound("Company is unavailable".into()))
+}
+
 pub(crate) async fn create_agent_principal_on(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     agent_id: Uuid,
     display_label: &str,
 ) -> AppResult<PrincipalId> {
+    // Before an existing principal's UPSERT: deletion takes this same prefix first.
+    lock_principal_company_on(connection, company_id).await?;
+    let agent: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM agents WHERE company_id=$1 AND id=$2 FOR SHARE")
+            .bind(company_id)
+            .bind(agent_id)
+            .fetch_optional(&mut *connection)
+            .await?;
+    if agent.is_none() {
+        return Err(AppError::NotFound("Agent is unavailable".into()));
+    }
     let id = PrincipalId::random();
     let stored: Uuid = sqlx::query_scalar(
         r#"INSERT INTO principals (id, company_id, kind, agent_id, display_label)
@@ -468,7 +506,14 @@ pub(crate) async fn create_agent_principal_on(
     .fetch_one(&mut *connection)
     .await
     .map_err(AppError::from)?;
-    Ok(PrincipalId::new(stored))
+    let principal = PrincipalId::new(stored);
+    super::memory::ensure_on(
+        connection,
+        company_id,
+        crate::application::memory::NamespaceOwner::Principal(principal),
+    )
+    .await?;
+    Ok(principal)
 }
 
 #[derive(sqlx::FromRow)]

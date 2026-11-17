@@ -135,22 +135,24 @@ async fn seed_capture(setup: &AgentSetup) {
     .execute(pool)
     .await
     .unwrap();
-    for (kind, agent, user) in [
-        ("user", None, Some(actor)),
-        ("agent", Some(setup.agent), None),
-    ] {
+    let person = crate::adapters::persistence::memory::person_principal_on(
+        &mut *pool.acquire().await.unwrap(),
+        company,
+        actor,
+    )
+    .await
+    .unwrap();
+    let agent = crate::adapters::persistence::memory::agent_principal_on(
+        &mut *pool.acquire().await.unwrap(),
+        company,
+        setup.agent,
+    )
+    .await
+    .unwrap();
+    for principal in [person, agent] {
         sqlx::query(
-            "INSERT INTO memory_namespaces (company_id, id, scope_kind, agent_id, user_id, state, \
-               credential_id, credential_envelope) \
-             VALUES ($1, gen_random_uuid(), $2, $3, $4, 'ready', gen_random_uuid(), 'stand-in')",
-        )
-        .bind(company)
-        .bind(kind)
-        .bind(agent)
-        .bind(user)
-        .execute(pool)
-        .await
-        .unwrap();
+            "INSERT INTO memory_namespaces (company_id,id,scope_kind,principal_id,state,credential_id,credential_envelope) VALUES ($1,gen_random_uuid(),'principal',$2,'ready',gen_random_uuid(),'stand-in')",
+        ).bind(company).bind(principal.as_uuid()).execute(pool).await.unwrap();
     }
     sqlx::query(
         "INSERT INTO memory_agent_capture (company_id, agent_id, kind, enabled, allowance_tokens, \
@@ -282,8 +284,8 @@ async fn journey_with(initial: AccessLevel, capture: bool) {
         assert_eq!(
             captured,
             vec![
-                ("private_session".to_owned(), "user".to_owned()),
-                ("private_session".to_owned(), "user".to_owned())
+                ("private_session".to_owned(), "principal".to_owned()),
+                ("private_session".to_owned(), "principal".to_owned())
             ]
         );
         let texts: String = sqlx::query_scalar(

@@ -15868,31 +15868,76 @@ CREATE TABLE public.memory_tenants (
     changed_by uuid NOT NULL,
     changed_at timestamptz NOT NULL
 );
+-- Shared owner lock protocol for application ensures and direct namespace writes. The
+-- metadata probe chooses the prefix only; the final locked read authenticates it.
+CREATE FUNCTION public.memory_lock_namespace_owner(company uuid, unit uuid, actor uuid)
+RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE owner_kind text; owner_user uuid; owner_agent uuid; found_owner uuid;
+BEGIN
+    IF num_nonnulls(unit,actor) <> 1 THEN RETURN false; END IF;
+    IF actor IS NOT NULL THEN
+        SELECT principal.kind,principal.user_id,principal.agent_id
+          INTO owner_kind,owner_user,owner_agent FROM public.principals AS principal
+         WHERE principal.company_id=company AND principal.id=actor;
+        IF owner_kind IS NULL OR owner_kind NOT IN ('person','agent') THEN RETURN false; END IF;
+        IF owner_user IS NOT NULL THEN
+            PERFORM 1 FROM public.users WHERE id=owner_user FOR SHARE;
+            IF NOT FOUND THEN RETURN false; END IF;
+        END IF;
+    END IF;
+    PERFORM 1 FROM public.companies WHERE id=company FOR SHARE;
+    IF NOT FOUND THEN RETURN false; END IF;
+    IF unit IS NOT NULL THEN
+        SELECT department.id INTO found_owner FROM public.departments AS department
+         WHERE department.company_id=company AND department.id=unit FOR SHARE;
+        RETURN found_owner IS NOT NULL;
+    END IF;
+    IF owner_agent IS NOT NULL THEN
+        PERFORM 1 FROM public.agents WHERE company_id=company AND id=owner_agent FOR SHARE;
+        IF NOT FOUND THEN RETURN false; END IF;
+    END IF;
+    SELECT principal.id INTO found_owner FROM public.principals AS principal
+     WHERE principal.company_id=company AND principal.id=actor AND principal.kind=owner_kind
+       AND principal.user_id IS NOT DISTINCT FROM owner_user
+       AND principal.agent_id IS NOT DISTINCT FROM owner_agent FOR SHARE;
+    RETURN found_owner IS NOT NULL;
+END $$;
 CREATE TABLE public.memory_namespaces (
     company_id uuid NOT NULL REFERENCES public.memory_tenants(company_id) ON DELETE CASCADE,
-    -- The service namespace external id: random, never an encoded scope.
+    -- Random opaque service identity; owner IDs survive their owner's deletion until cleanup.
     id uuid NOT NULL,
-    scope_kind text NOT NULL CHECK (scope_kind IN ('company', 'agent', 'user')),
-    -- Plain ids, not FKs: the owner may be deleted while removal is still reconciling, and the
-    -- owner-row lock protocol (E2) orders provisioning against that deletion instead.
-    agent_id uuid,
-    user_id uuid,
+    scope_kind text NOT NULL CHECK (scope_kind IN ('unit', 'principal')),
+    unit_id uuid,
+    principal_id uuid,
     state text NOT NULL CHECK (state IN ('provisioning', 'ready', 'removing')),
     credential_id uuid,
-    -- `enc:v2` under CredentialContext::memory_client_credential; the envelope records its key version.
     credential_envelope text CHECK (octet_length(credential_envelope) <= 4096),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (company_id, id),
-    CHECK ((scope_kind = 'company' AND agent_id IS NULL AND user_id IS NULL)
-        OR (scope_kind = 'agent' AND agent_id IS NOT NULL AND user_id IS NULL)
-        OR (scope_kind = 'user' AND agent_id IS NULL AND user_id IS NOT NULL)),
+    CHECK ((scope_kind = 'unit' AND unit_id IS NOT NULL AND principal_id IS NULL)
+        OR (scope_kind = 'principal' AND principal_id IS NOT NULL AND unit_id IS NULL)),
     CHECK ((credential_id IS NULL) = (credential_envelope IS NULL)),
     CHECK (state <> 'ready' OR credential_id IS NOT NULL)
 );
--- One live namespace per scope; a returning agent or user gets a new row and id (E9).
 CREATE UNIQUE INDEX memory_namespaces_live_scope ON public.memory_namespaces (company_id, scope_kind,
-    COALESCE(agent_id, '00000000-0000-0000-0000-000000000000'::uuid),
-    COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE state <> 'removing';
+    COALESCE(unit_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(principal_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE state <> 'removing';
+CREATE FUNCTION public.guard_memory_namespace_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='UPDATE' THEN
+        IF (NEW.company_id,NEW.id,NEW.scope_kind,NEW.unit_id,NEW.principal_id)
+           IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.scope_kind,OLD.unit_id,OLD.principal_id) THEN
+            RAISE EXCEPTION 'Memory namespace ownership is immutable'
+                USING ERRCODE='23514',CONSTRAINT='memory_namespace_owner';
+        END IF;
+    ELSIF NOT public.memory_lock_namespace_owner(NEW.company_id,NEW.unit_id,NEW.principal_id) THEN
+        RAISE EXCEPTION 'Memory namespace owner is missing, foreign or ineligible'
+            USING ERRCODE='23514',CONSTRAINT='memory_namespace_owner';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_memory_namespace_owner BEFORE INSERT OR UPDATE ON public.memory_namespaces
+    FOR EACH ROW EXECUTE FUNCTION public.guard_memory_namespace_owner();
 -- Capture policy (E8, U3): per agent and conversation kind, off unless an owner or admin turns it
 -- on. Each change records who, why and when. An agent's final delete removes its rows; capture
 -- locks run → tenant → namespace → this row, so that cascade (after removal's namespace lock)
@@ -15919,7 +15964,7 @@ CREATE TABLE public.memory_lifecycles (
     company_id uuid NOT NULL,
     resource text NOT NULL CHECK (resource IN ('tenant', 'namespace')),
     namespace_id uuid,
-    owner_kind text NOT NULL CHECK (owner_kind IN ('company', 'agent', 'user')),
+    owner_kind text NOT NULL CHECK (owner_kind IN ('company', 'unit', 'principal')),
     owner_id uuid NOT NULL,
     provisioner_credential_id uuid NOT NULL,
     desired text NOT NULL CHECK (desired IN ('present', 'disabled', 'absent')),
@@ -15937,7 +15982,7 @@ CREATE TABLE public.memory_lifecycles (
     outcome_code text CHECK (outcome_code ~ '^[a-z_]{1,64}$'),
     updated_at timestamptz NOT NULL,
     CHECK ((resource = 'namespace') = (namespace_id IS NOT NULL)),
-    CHECK (resource <> 'tenant' OR owner_kind = 'company'),
+    CHECK ((resource = 'tenant') = (owner_kind = 'company')),
     CHECK (owner_kind <> 'company' OR owner_id = company_id),
     -- Only a claimed row carries lease data, and it carries all of it.
     CHECK ((state = 'claimed') = (lease_owner IS NOT NULL)),
@@ -15958,6 +16003,10 @@ CREATE TABLE public.memory_deliveries (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     id uuid NOT NULL,
     namespace_id uuid NOT NULL,
+    -- Retained provenance; owner and subject rows may disappear while delivery reconciles.
+    unit_id uuid,
+    principal_id uuid,
+    subject_principal_id uuid,
     kind text NOT NULL CHECK (kind IN ('save', 'generation')),
     -- Origin: a save comes from a run's execution (and, for a tool, its invocation); a
     -- generation from an agent-history exchange.

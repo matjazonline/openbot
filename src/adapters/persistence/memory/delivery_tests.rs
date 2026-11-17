@@ -51,12 +51,7 @@ async fn ready(f: &Fixture, fake: &ContractFake, owner: NamespaceOwner) -> Uuid 
         f.enable().await.unwrap();
     }
     assert_eq!(f.ensure(owner).await, NamespaceReadiness::NotReady);
-    let kind = match owner {
-        NamespaceOwner::Company => "company",
-        NamespaceOwner::Agent(_) => "agent",
-        NamespaceOwner::User(_) => "user",
-    };
-    let namespace = f.namespaces(kind).await[0].0;
+    let namespace = f.namespaces(owner).await[0].0;
     let token = fake.client_token(f.company, namespace);
     let envelope = f
         .persistence
@@ -88,7 +83,7 @@ fn run(content: AccessLevel, exact: bool) -> LockedRun {
     }
 }
 
-async fn freeze(f: &Fixture, scope: SaveScope, key: &str, levels: LockedRun) -> SaveEnqueue {
+async fn freeze(f: &Fixture, scope: NamespaceOwner, key: &str, levels: LockedRun) -> SaveEnqueue {
     let facts = vec!["Renewal is due in March.\nThe customer asked for net 30.".to_owned()];
     let mut tx = f.pool().begin().await.unwrap();
     let saved = freeze_save_on(&mut tx, &intent(f, scope, key, &facts), levels)
@@ -98,7 +93,12 @@ async fn freeze(f: &Fixture, scope: SaveScope, key: &str, levels: LockedRun) -> 
     saved
 }
 
-fn intent<'a>(f: &Fixture, scope: SaveScope, key: &'a str, facts: &'a [String]) -> SaveIntent<'a> {
+fn intent<'a>(
+    f: &Fixture,
+    scope: NamespaceOwner,
+    key: &'a str,
+    facts: &'a [String],
+) -> SaveIntent<'a> {
     SaveIntent {
         company: f.scope(),
         run: RunId::new(Uuid::new_v4()),
@@ -162,24 +162,24 @@ async fn memory_access_level_saved_label_follows_scope_and_exactness() {
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Agent(f.agent)).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Principal(f.agent_principal)).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     let worker = worker(&f, &fake);
     for (scope, key, levels, expected) in [
         (
-            SaveScope::Agent(f.agent),
+            NamespaceOwner::Principal(f.agent_principal),
             "ob.s.agent-exact",
             run(AccessLevel::L4, true),
             4,
         ),
         (
-            SaveScope::Company,
+            NamespaceOwner::Unit(f.root),
             "ob.s.company-exact",
             run(AccessLevel::L4, true),
             6,
         ),
         (
-            SaveScope::Agent(f.agent),
+            NamespaceOwner::Principal(f.agent_principal),
             "ob.s.agent-inexact",
             run(AccessLevel::L4, false),
             6,
@@ -227,11 +227,11 @@ async fn memory_integration_delivery_resends_the_same_request_after_an_ambiguous
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     let worker = worker(&f, &fake);
     let first = freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.ambiguous",
         run(AccessLevel::L0, true),
     )
@@ -246,7 +246,7 @@ async fn memory_integration_delivery_resends_the_same_request_after_an_ambiguous
     assert_eq!(
         freeze(
             &f,
-            SaveScope::Company,
+            NamespaceOwner::Unit(f.root),
             "ob.s.ambiguous",
             run(AccessLevel::L6, true)
         )
@@ -284,12 +284,12 @@ async fn memory_integration_delivery_settles_unsendable_intents_once_poison_batc
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     let worker = worker(&f, &fake);
     for index in 0..4 {
         freeze(
             &f,
-            SaveScope::Company,
+            NamespaceOwner::Unit(f.root),
             &format!("ob.s.poison-{index}"),
             run(AccessLevel::L0, true),
         )
@@ -331,27 +331,33 @@ async fn memory_integration_delivery_fences_competing_claimants_and_bounds_attem
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.lease-a",
         run(AccessLevel::L0, true),
     )
     .await;
     // The competing intent belongs to another company: a company with a save in flight is
     // not claimable (F7), so two claimants of one company would find one intent.
-    let first = f.company;
+    let (first, first_root) = (f.company, f.root);
     f.company = super::tests::company(&f.persistence, f.owner).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    f.root = crate::adapters::persistence::company::root_on(
+        &mut *f.pool().acquire().await.unwrap(),
+        f.scope(),
+    )
+    .await
+    .unwrap();
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.lease-b",
         run(AccessLevel::L0, true),
     )
     .await;
-    f.company = first;
+    (f.company, f.root) = (first, first_root);
     let store = f.persistence.clone();
     let (a, b) = tokio::join!(
         store.claim_delivery(Uuid::new_v4(), DELIVERY_LEASE),
@@ -413,19 +419,23 @@ async fn memory_integration_disable_fails_and_owner_removal_cancels_open_intents
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Agent(f.agent)).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Principal(f.agent_principal)).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Agent(f.agent),
+        NamespaceOwner::Principal(f.agent_principal),
         "ob.s.agent",
         run(AccessLevel::L0, true),
     )
     .await;
     let mut tx = f.pool().begin().await.unwrap();
-    super::retire_namespaces_on(&mut tx, f.company, NamespaceOwner::Agent(f.agent))
-        .await
-        .unwrap();
+    super::retire_namespaces_on(
+        &mut tx,
+        f.company,
+        NamespaceOwner::Principal(f.agent_principal),
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     let cancelled = row(&f, "ob.s.agent").await;
     assert_eq!(
@@ -434,7 +444,7 @@ async fn memory_integration_disable_fails_and_owner_removal_cancels_open_intents
     );
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.company",
         run(AccessLevel::L0, true),
     )
@@ -459,7 +469,7 @@ fn captured_window(f: &Fixture, exchange: Uuid) -> CaptureIntent<'static> {
         exchange,
         agent: f.agent,
         kind: MemoryCaptureKind::Threads,
-        scope: SaveScope::Agent(f.agent),
+        scope: NamespaceOwner::Principal(f.agent_principal),
         input: "\"question\"",
         output: "\"answer\"",
     }
@@ -475,8 +485,8 @@ async fn memory_integration_disable_races_save_and_capture_then_reenable() {
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
-    ready(&f, &fake, NamespaceOwner::Agent(f.agent)).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
+    ready(&f, &fake, NamespaceOwner::Principal(f.agent_principal)).await;
     sqlx::query("UPDATE memory_tenants SET generation_cap = 100000 WHERE company_id = $1")
         .bind(f.company)
         .execute(f.pool())
@@ -504,7 +514,7 @@ async fn memory_integration_disable_races_save_and_capture_then_reenable() {
     let mut save = f.pool().begin().await.unwrap();
     let saved = freeze_save_on(
         &mut save,
-        &intent(&f, SaveScope::Company, "ob.s.race-first", &facts),
+        &intent(&f, NamespaceOwner::Unit(f.root), "ob.s.race-first", &facts),
         run(AccessLevel::L0, true),
     )
     .await
@@ -570,7 +580,7 @@ async fn memory_integration_disable_races_save_and_capture_then_reenable() {
                 execution: ExecutionId::new(Uuid::new_v4()),
                 invocation: None,
                 wait: None,
-                scope: SaveScope::Company,
+                scope: NamespaceOwner::Unit(f.root),
                 key: "ob.s.race-second",
                 facts: &facts,
                 external_sources: Vec::new(),
@@ -629,18 +639,18 @@ async fn memory_integration_delivery_settles_an_unopenable_credential_poison_bat
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    let poisoned = ready(&f, &fake, NamespaceOwner::Company).await;
-    ready(&f, &fake, NamespaceOwner::Agent(f.agent)).await;
+    let poisoned = ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
+    ready(&f, &fake, NamespaceOwner::Principal(f.agent_principal)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.poisoned",
         run(AccessLevel::L0, true),
     )
     .await;
     freeze(
         &f,
-        SaveScope::Agent(f.agent),
+        NamespaceOwner::Principal(f.agent_principal),
         "ob.s.healthy",
         run(AccessLevel::L0, true),
     )
@@ -686,11 +696,11 @@ async fn memory_integration_delivery_claims_are_fair_across_companies() {
     };
     let fake = ContractFake::start(ADMIN).await;
     let busy = f.company;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     for index in 0..3 {
         freeze(
             &f,
-            SaveScope::Company,
+            NamespaceOwner::Unit(f.root),
             &format!("ob.s.burst-{index}"),
             run(AccessLevel::L2, true),
         )
@@ -700,10 +710,16 @@ async fn memory_integration_delivery_claims_are_fair_across_companies() {
         .bind(busy).execute(f.pool()).await.unwrap();
     let quiet = super::tests::company(&f.persistence, f.owner).await;
     f.company = quiet;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    f.root = crate::adapters::persistence::company::root_on(
+        &mut *f.pool().acquire().await.unwrap(),
+        f.scope(),
+    )
+    .await
+    .unwrap();
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.quiet",
         run(AccessLevel::L2, true),
     )
@@ -866,19 +882,25 @@ async fn memory_integration_delivery_lanes_send_companies_concurrently() {
             return;
         };
         let fake = ContractFake::start(ADMIN).await;
-        ready(&f, &fake, NamespaceOwner::Company).await;
+        ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
         freeze(
             &f,
-            SaveScope::Company,
+            NamespaceOwner::Unit(f.root),
             "ob.s.lane-a",
             run(AccessLevel::L2, true),
         )
         .await;
         f.company = super::tests::company(&f.persistence, f.owner).await;
-        ready(&f, &fake, NamespaceOwner::Company).await;
+        f.root = crate::adapters::persistence::company::root_on(
+            &mut *f.pool().acquire().await.unwrap(),
+            f.scope(),
+        )
+        .await
+        .unwrap();
+        ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
         freeze(
             &f,
-            SaveScope::Company,
+            NamespaceOwner::Unit(f.root),
             "ob.s.lane-b",
             run(AccessLevel::L2, true),
         )
@@ -930,10 +952,10 @@ async fn memory_access_level_delivery_refuses_an_intent_without_its_trusted_ceil
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.ceiling",
         run(AccessLevel::L4, true),
     )
@@ -971,14 +993,19 @@ async fn memory_integration_owner_removal_races_save_freeze_in_both_orders() {
             return;
         };
         let fake = ContractFake::start(ADMIN).await;
-        ready(&f, &fake, NamespaceOwner::Agent(f.agent)).await;
+        ready(&f, &fake, NamespaceOwner::Principal(f.agent_principal)).await;
         let facts = vec!["A fact".to_owned()];
-        let (company, agent, pool) = (f.scope(), f.agent, f.pool().clone());
+        let (company, principal, pool) = (f.scope(), f.agent_principal, f.pool().clone());
         if freeze_first {
             let mut save = f.pool().begin().await.unwrap();
             let saved = freeze_save_on(
                 &mut save,
-                &intent(&f, SaveScope::Agent(agent), "ob.s.owner-race", &facts),
+                &intent(
+                    &f,
+                    NamespaceOwner::Principal(principal),
+                    "ob.s.owner-race",
+                    &facts,
+                ),
                 run(AccessLevel::L0, true),
             )
             .await
@@ -990,7 +1017,7 @@ async fn memory_integration_owner_removal_races_save_freeze_in_both_orders() {
                 super::retire_namespaces_on(
                     &mut tx,
                     company.as_uuid(),
-                    NamespaceOwner::Agent(agent),
+                    NamespaceOwner::Principal(principal),
                 )
                 .await
                 .unwrap();
@@ -1010,9 +1037,13 @@ async fn memory_integration_owner_removal_races_save_freeze_in_both_orders() {
             );
         } else {
             let mut removal = f.pool().begin().await.unwrap();
-            super::retire_namespaces_on(&mut removal, f.company, NamespaceOwner::Agent(agent))
-                .await
-                .unwrap();
+            super::retire_namespaces_on(
+                &mut removal,
+                f.company,
+                NamespaceOwner::Principal(principal),
+            )
+            .await
+            .unwrap();
             let holder = backend_pid(&mut removal).await;
             let freezing = tokio::spawn(async move {
                 let facts = vec!["A fact".to_owned()];
@@ -1023,7 +1054,7 @@ async fn memory_integration_owner_removal_races_save_freeze_in_both_orders() {
                     execution: ExecutionId::new(Uuid::new_v4()),
                     invocation: None,
                     wait: None,
-                    scope: SaveScope::Agent(agent),
+                    scope: NamespaceOwner::Principal(principal),
                     key: "ob.s.owner-race",
                     facts: &facts,
                     external_sources: Vec::new(),
@@ -1060,10 +1091,10 @@ async fn memory_integration_disable_during_an_in_flight_delivery_loses_its_compl
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.in-flight",
         run(AccessLevel::L0, true),
     )
@@ -1115,10 +1146,10 @@ async fn memory_integration_a_completion_behind_a_row_lock_gives_up_and_is_recla
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.locked-completion",
         run(AccessLevel::L0, true),
     )
@@ -1175,10 +1206,10 @@ async fn memory_integration_a_stopped_worker_claims_nothing() {
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Company).await;
+    ready(&f, &fake, NamespaceOwner::Unit(f.root)).await;
     freeze(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.stopped",
         run(AccessLevel::L0, true),
     )

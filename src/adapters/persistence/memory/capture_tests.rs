@@ -56,14 +56,14 @@ const LIMITS: CaptureLimits = CaptureLimits {
 
 /// A ready agent namespace, generation allowed by the operator, and the agent's thread switch.
 async fn capturing(f: &Fixture, fake: &ContractFake) -> Uuid {
-    let namespace = ready(f, fake, NamespaceOwner::Agent(f.agent)).await;
+    let namespace = ready(f, fake, NamespaceOwner::Principal(f.agent_principal)).await;
     cap(f, Some(100_000)).await;
     fake.state.lock().unwrap().generation_cap = 100_000;
     switch(f, MemoryCaptureKind::Threads, true, LIMITS).await;
     namespace
 }
 
-fn window<'a>(f: &Fixture, exchange: Uuid, scope: SaveScope) -> CaptureIntent<'a> {
+fn window<'a>(f: &Fixture, exchange: Uuid, scope: NamespaceOwner) -> CaptureIntent<'a> {
     CaptureIntent {
         company: f.scope(),
         run: RunId::new(Uuid::new_v4()),
@@ -107,7 +107,7 @@ async fn memory_capture_freezes_one_generation_intent_and_delivers_it_once() {
     let fake = ContractFake::start(ADMIN).await;
     let namespace = capturing(&f, &fake).await;
     let exchange = Uuid::new_v4();
-    let intent = window(&f, exchange, SaveScope::Agent(f.agent));
+    let intent = window(&f, exchange, NamespaceOwner::Principal(f.agent_principal));
     let before = chrono::Utc::now();
     let CaptureEnqueue::Enqueued { id, replayed } =
         capture(&f, &intent, run(AccessLevel::L3, false)).await
@@ -159,7 +159,11 @@ async fn memory_capture_freezes_one_generation_intent_and_delivers_it_once() {
     // An exact run sends its content level as consumed.
     let exact = capture(
         &f,
-        &window(&f, Uuid::new_v4(), SaveScope::Agent(f.agent)),
+        &window(
+            &f,
+            Uuid::new_v4(),
+            NamespaceOwner::Principal(f.agent_principal),
+        ),
         run(AccessLevel::L2, true),
     )
     .await;
@@ -217,7 +221,11 @@ async fn memory_capture_a_retry_replays_the_frozen_request() {
     capturing(&f, &fake).await;
     let CaptureEnqueue::Enqueued { id, .. } = capture(
         &f,
-        &window(&f, Uuid::new_v4(), SaveScope::Agent(f.agent)),
+        &window(
+            &f,
+            Uuid::new_v4(),
+            NamespaceOwner::Principal(f.agent_principal),
+        ),
         run(AccessLevel::L1, false),
     )
     .await
@@ -260,7 +268,11 @@ async fn memory_capture_generation_disabled_is_terminal_and_an_expired_intent_is
     fake.state.lock().unwrap().generation_cap = 0;
     let CaptureEnqueue::Enqueued { id, .. } = capture(
         &f,
-        &window(&f, Uuid::new_v4(), SaveScope::Agent(f.agent)),
+        &window(
+            &f,
+            Uuid::new_v4(),
+            NamespaceOwner::Principal(f.agent_principal),
+        ),
         run(AccessLevel::L0, true),
     )
     .await
@@ -281,7 +293,11 @@ async fn memory_capture_generation_disabled_is_terminal_and_an_expired_intent_is
     fake.state.lock().unwrap().generation_cap = 100_000;
     let CaptureEnqueue::Enqueued { id, .. } = capture(
         &f,
-        &window(&f, Uuid::new_v4(), SaveScope::Agent(f.agent)),
+        &window(
+            &f,
+            Uuid::new_v4(),
+            NamespaceOwner::Principal(f.agent_principal),
+        ),
         run(AccessLevel::L0, true),
     )
     .await
@@ -315,8 +331,8 @@ async fn memory_capture_switch_cap_readiness_and_bounds_gate_the_freeze() {
         return;
     };
     let fake = ContractFake::start(ADMIN).await;
-    ready(&f, &fake, NamespaceOwner::Agent(f.agent)).await;
-    let agent = SaveScope::Agent(f.agent);
+    ready(&f, &fake, NamespaceOwner::Principal(f.agent_principal)).await;
+    let agent = NamespaceOwner::Principal(f.agent_principal);
     let levels = run(AccessLevel::L1, true);
     let skipped = |reason| CaptureEnqueue::Skipped(reason);
     cap(&f, Some(100_000)).await;
@@ -347,7 +363,7 @@ async fn memory_capture_switch_cap_readiness_and_bounds_gate_the_freeze() {
     }
     cap(&f, Some(100_000)).await;
     // A scope without a ready namespace.
-    let user = SaveScope::User(f.owner);
+    let user = NamespaceOwner::Principal(f.owner_principal);
     assert_eq!(
         capture(&f, &window(&f, Uuid::new_v4(), user), levels).await,
         skipped("not_ready")
@@ -391,7 +407,11 @@ async fn memory_capture_competing_delivery_claimants_send_once() {
     capturing(&f, &fake).await;
     let CaptureEnqueue::Enqueued { id, .. } = capture(
         &f,
-        &window(&f, Uuid::new_v4(), SaveScope::Agent(f.agent)),
+        &window(
+            &f,
+            Uuid::new_v4(),
+            NamespaceOwner::Principal(f.agent_principal),
+        ),
         run(AccessLevel::L0, true),
     )
     .await
@@ -451,11 +471,12 @@ async fn memory_capture_switch_off_races_the_freeze_in_both_orders() {
             expected_revision: revision,
         };
         let (company, agent, pool) = (f.scope(), f.agent, f.pool().clone());
+        let principal = f.agent_principal;
         if freeze_first {
             let mut tx = f.pool().begin().await.unwrap();
             let captured = freeze_capture_on(
                 &mut tx,
-                &window(&f, Uuid::new_v4(), SaveScope::Agent(agent)),
+                &window(&f, Uuid::new_v4(), NamespaceOwner::Principal(principal)),
                 run(AccessLevel::L0, true),
             )
             .await
@@ -489,7 +510,7 @@ async fn memory_capture_switch_off_races_the_freeze_in_both_orders() {
                     exchange: Uuid::new_v4(),
                     agent,
                     kind: MemoryCaptureKind::Threads,
-                    scope: SaveScope::Agent(agent),
+                    scope: NamespaceOwner::Principal(principal),
                     input: INPUT,
                     output: OUTPUT,
                 };
@@ -519,6 +540,7 @@ async fn memory_capture_agent_delete_races_the_freeze_in_both_orders() {
         let fake = ContractFake::start(ADMIN).await;
         capturing(&f, &fake).await;
         let (company, agent, pool) = (f.scope(), f.agent, f.pool().clone());
+        let principal = f.agent_principal;
         let deleting = move |pool: sqlx::PgPool| async move {
             let mut tx = pool.begin().await.unwrap();
             let locks = lock_agent_delete_on(&mut tx, agent).await.unwrap().unwrap();
@@ -529,7 +551,7 @@ async fn memory_capture_agent_delete_races_the_freeze_in_both_orders() {
             let mut tx = f.pool().begin().await.unwrap();
             let captured = freeze_capture_on(
                 &mut tx,
-                &window(&f, Uuid::new_v4(), SaveScope::Agent(agent)),
+                &window(&f, Uuid::new_v4(), NamespaceOwner::Principal(principal)),
                 run(AccessLevel::L0, true),
             )
             .await
@@ -562,7 +584,7 @@ async fn memory_capture_agent_delete_races_the_freeze_in_both_orders() {
                     exchange: Uuid::new_v4(),
                     agent,
                     kind: MemoryCaptureKind::Threads,
-                    scope: SaveScope::Agent(agent),
+                    scope: NamespaceOwner::Principal(principal),
                     input: INPUT,
                     output: OUTPUT,
                 };
@@ -613,14 +635,19 @@ async fn memory_capture_agent_delete_interleaved_with_a_freeze_does_not_deadlock
     let fake = ContractFake::start(ADMIN).await;
     capturing(&f, &fake).await;
     let (company, agent, pool) = (f.scope(), f.agent, f.pool().clone());
+    let principal = f.agent_principal;
     let mut removal = f.pool().begin().await.unwrap();
     let _locks = lock_agent_delete_on(&mut removal, agent)
         .await
         .unwrap()
         .unwrap();
-    super::super::retire_namespaces_on(&mut removal, f.company, NamespaceOwner::Agent(agent))
-        .await
-        .unwrap();
+    super::super::retire_namespaces_on(
+        &mut removal,
+        f.company,
+        NamespaceOwner::Principal(principal),
+    )
+    .await
+    .unwrap();
     let holder = backend_pid(&mut removal).await;
     let freezing = tokio::spawn(async move {
         let mut tx = pool.begin().await.unwrap();
@@ -631,7 +658,7 @@ async fn memory_capture_agent_delete_interleaved_with_a_freeze_does_not_deadlock
             exchange: Uuid::new_v4(),
             agent,
             kind: MemoryCaptureKind::Threads,
-            scope: SaveScope::Agent(agent),
+            scope: NamespaceOwner::Principal(principal),
             input: INPUT,
             output: OUTPUT,
         };
@@ -676,7 +703,11 @@ async fn memory_capture_agent_delete_during_an_in_flight_delivery_loses_its_comp
     capturing(&f, &fake).await;
     let CaptureEnqueue::Enqueued { id, .. } = capture(
         &f,
-        &window(&f, Uuid::new_v4(), SaveScope::Agent(f.agent)),
+        &window(
+            &f,
+            Uuid::new_v4(),
+            NamespaceOwner::Principal(f.agent_principal),
+        ),
         run(AccessLevel::L0, true),
     )
     .await

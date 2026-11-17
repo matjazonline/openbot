@@ -48,7 +48,7 @@ async fn absent_row(f: &Fixture, namespace: Uuid, days: i32, state: &str) {
         "INSERT INTO memory_lifecycles (id, company_id, resource, namespace_id, owner_kind, \
            owner_id, provisioner_credential_id, desired, observed, generation, fence, state, \
            attempts, available_at, outcome_code, updated_at) \
-         VALUES (gen_random_uuid(), $1, 'namespace', $2, 'company', $1, $3, 'absent', \
+         VALUES (gen_random_uuid(), $1, 'namespace', $2, 'unit', $6, $3, 'absent', \
                  CASE WHEN $5 = 'settled' THEN 'absent' ELSE 'present' END, 1, 0, $5, 0, now(), \
                  CASE WHEN $5 = 'failed' THEN 'namespace_conflict' END, \
                  now() - make_interval(days => $4))",
@@ -58,6 +58,7 @@ async fn absent_row(f: &Fixture, namespace: Uuid, days: i32, state: &str) {
     .bind(PROVISIONER)
     .bind(days)
     .bind(state)
+    .bind(f.root.as_uuid())
     .execute(f.pool())
     .await
     .unwrap();
@@ -65,8 +66,8 @@ async fn absent_row(f: &Fixture, namespace: Uuid, days: i32, state: &str) {
 
 async fn company_namespace(f: &Fixture) -> Uuid {
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Company).await;
-    f.namespaces("company").await[0].0
+    f.ensure(NamespaceOwner::Unit(f.root)).await;
+    f.namespaces(NamespaceOwner::Unit(f.root)).await[0].0
 }
 
 /// A3-1 and A3-2 boundaries: settled intents go after 7 days (a capture, or a save whose run is

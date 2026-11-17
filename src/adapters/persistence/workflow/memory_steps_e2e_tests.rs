@@ -28,13 +28,23 @@ async fn live_memory(
         .await
         .unwrap();
     persistence
-        .ensure_namespace(scope.company, NamespaceOwner::Company)
+        .ensure_namespace(
+            scope.company,
+            NamespaceOwner::Unit(
+                crate::adapters::persistence::company::root_on(
+                    &mut *persistence.pool().acquire().await.unwrap(),
+                    scope.company,
+                )
+                .await
+                .unwrap(),
+            ),
+        )
         .await
         .unwrap();
     let http = client(live);
     reconcile_with(&persistence, live, &http).await;
     let namespace: Uuid = sqlx::query_scalar(
-        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='company' \
+        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='unit' \
          AND state='ready'",
     )
     .bind(scope.company.as_uuid())

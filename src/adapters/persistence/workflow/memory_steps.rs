@@ -6,7 +6,7 @@ use super::http::runtime;
 use super::persistence_bound::{Attempt, End, WriteBound};
 use super::*;
 use crate::adapters::persistence::credentials::CredentialContext;
-use crate::adapters::persistence::memory::deliveries::{self, SaveEnqueue, SaveIntent, SaveScope};
+use crate::adapters::persistence::memory::deliveries::{self, SaveEnqueue, SaveIntent};
 use crate::application::memory::{
     ClientCredential, MemoryDetail, MemoryNamespaces, MemorySaveReceipt, NamespaceExternalId,
     NamespaceOwner, TenantExternalId,
@@ -15,7 +15,9 @@ use crate::application::workflow::{
     actions::ActionScope,
     activation::ActivationRequest,
     lease::{ClaimedWorkflow, LeasePolicy},
-    memory::{LOAD, LoadAuthority, LoadAuthorization, MemoryStepScope, SAVE, SavePark},
+    memory::{
+        LOAD, LoadAuthority, LoadAuthorization, MemoryStepScope, SAVE, SavePark, UnitSelector,
+    },
     polling::WorkflowStepKind,
 };
 use crate::entities::access_level::AccessLevel;
@@ -46,7 +48,7 @@ fn action(claim: &ClaimedWorkflow) -> ActionScope {
 /// The step's literal scope, its agent resolved against the frozen bundle (E4).
 fn step_scope(bundle: &PublishedBundle, inputs: &Value) -> AppResult<MemoryStepScope> {
     match inputs["scope"]["kind"].as_str() {
-        Some("company") => Ok(MemoryStepScope::Company),
+        Some("company") => Ok(MemoryStepScope::Unit(UnitSelector::Root)),
         Some("agent") => {
             let key = inputs["scope"]["agent"].as_str().ok_or_else(invalid)?;
             bundle
@@ -63,11 +65,36 @@ fn step_scope(bundle: &PublishedBundle, inputs: &Value) -> AppResult<MemoryStepS
     }
 }
 
-fn owner_columns(owner: NamespaceOwner) -> (&'static str, Option<Uuid>, Option<Uuid>) {
-    match owner {
-        NamespaceOwner::Company => ("company", None, None),
-        NamespaceOwner::Agent(agent) => ("agent", Some(agent), None),
-        NamespaceOwner::User(user) => ("user", None, Some(user)),
+pub(super) async fn step_owner_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    selector: MemoryStepScope,
+) -> AppResult<NamespaceOwner> {
+    match selector {
+        MemoryStepScope::Unit(UnitSelector::Root) => Ok(NamespaceOwner::Unit(
+            crate::adapters::persistence::company::root_on(db, scope.company).await?,
+        )),
+        MemoryStepScope::Unit(UnitSelector::Own) => {
+            // Role admission already captures the desk/direct target's exact department.
+            // Never infer `own` from the live tree while an admitted run executes.
+            let unit: Option<Uuid> = sqlx::query_scalar(
+                "SELECT manifest.role_context_department_id FROM run_dependency_manifests AS ownership \
+                 JOIN agent_dependency_manifests AS manifest ON manifest.company_id=ownership.company_id AND manifest.id=ownership.manifest_id \
+                 WHERE ownership.company_id=$1 AND ownership.run_id=$2",
+            ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid())
+                .fetch_optional(db).await?.flatten();
+            unit.map(crate::entities::department::DepartmentId::new)
+                .map(NamespaceOwner::Unit)
+                .ok_or_else(|| AppError::NotFound("Memory own-unit scope is unavailable".into()))
+        }
+        MemoryStepScope::Agent(agent) => Ok(NamespaceOwner::Principal(
+            crate::adapters::persistence::memory::agent_principal_on(
+                db,
+                scope.company.as_uuid(),
+                agent,
+            )
+            .await?,
+        )),
     }
 }
 
@@ -96,19 +123,19 @@ pub(super) async fn namespace_on(
     if enabled != Some(true) {
         return Ok(Namespace::NotEnabled);
     }
-    let (kind, agent, user) = owner_columns(owner);
+    let key = crate::adapters::persistence::memory::namespace_columns(owner);
     let ready: Option<(Uuid, Uuid, String)> = sqlx::query_as(
         "SELECT namespace.id, namespace.credential_id, namespace.credential_envelope \
          FROM memory_namespaces AS namespace \
          WHERE namespace.company_id=$1 AND namespace.scope_kind=$2 \
-           AND namespace.agent_id IS NOT DISTINCT FROM $3 \
-           AND namespace.user_id IS NOT DISTINCT FROM $4 \
+           AND namespace.unit_id IS NOT DISTINCT FROM $3 \
+           AND namespace.principal_id IS NOT DISTINCT FROM $4 \
            AND namespace.state='ready' FOR SHARE",
     )
     .bind(company.as_uuid())
-    .bind(kind)
-    .bind(agent)
-    .bind(user)
+    .bind(key.kind)
+    .bind(key.unit)
+    .bind(key.principal)
     .fetch_optional(&mut *db)
     .await?;
     let Some((namespace, credential_id, envelope)) = ready else {
@@ -178,6 +205,7 @@ async fn authorize_on(
     live(tx, claim, bound).await?;
     let inputs = runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(LOAD.into())).await?;
     let scope = step_scope(&facts.bundle, &inputs)?;
+    let owner = step_owner_on(tx, claim.fence.scope, scope).await?;
     let read_ceiling = read_ceiling_on(tx, claim).await?;
     let query = inputs["query"].as_str().ok_or_else(invalid)?.to_owned();
     let limit = inputs["limit"]
@@ -185,9 +213,9 @@ async fn authorize_on(
         .and_then(|limit| u32::try_from(limit).ok())
         .ok_or_else(invalid)?;
     Ok(
-        match namespace_on(persistence, tx, claim.fence.scope.company, scope.owner()).await? {
+        match namespace_on(persistence, tx, claim.fence.scope.company, owner).await? {
             Namespace::NotEnabled => LoadAuthorization::NotEnabled,
-            Namespace::NotReady => LoadAuthorization::NotReady(scope.owner()),
+            Namespace::NotReady => LoadAuthorization::NotReady(owner),
             Namespace::Ready(namespace, credential) => {
                 LoadAuthorization::Ready(Box::new(LoadAuthority {
                     scope,
@@ -270,6 +298,7 @@ async fn park_on(
     live(tx, claim, bound).await?;
     let inputs = runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(SAVE.into())).await?;
     let step = step_scope(&facts.bundle, &inputs)?;
+    let owner = step_owner_on(tx, claim.fence.scope, step).await?;
     let facts_text: Vec<String> = inputs["facts"]
         .as_array()
         .ok_or_else(invalid)?
@@ -286,10 +315,7 @@ async fn park_on(
         execution: scope.execution,
         invocation: None,
         wait: Some(wait),
-        scope: match step {
-            MemoryStepScope::Company => SaveScope::Company,
-            MemoryStepScope::Agent(agent) => SaveScope::Agent(agent),
-        },
+        scope: owner,
         key: &key,
         facts: &facts_text,
         external_sources: Vec::new(),
@@ -306,7 +332,7 @@ async fn park_on(
             Ok(End::Commit(SavePark::Parked(WaitId::new(wait))))
         }
         SaveEnqueue::NotEnabled => Ok(End::Rollback(SavePark::NotEnabled)),
-        SaveEnqueue::NotReady => Ok(End::Rollback(SavePark::NotReady(step.owner()))),
+        SaveEnqueue::NotReady => Ok(End::Rollback(SavePark::NotReady(owner))),
         SaveEnqueue::TooLarge => Ok(End::Rollback(SavePark::TooLarge)),
     }
 }

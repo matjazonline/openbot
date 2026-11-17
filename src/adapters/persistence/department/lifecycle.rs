@@ -42,6 +42,39 @@ pub(crate) async fn create_department_with_id_on(
         let parent = lock_parent_on(tx, company, parent).await?;
         check_shape_on(tx, company, id, &write.name, &parent).await?;
     }
+    let department = insert_department_on(tx, company, id, write, parent_id).await?;
+    // Boxed: an agent lead's desk descends into template compilation and publication.
+    Box::pin(provision_department_desk_on(
+        tx,
+        templates,
+        company,
+        actor,
+        &department,
+        lead,
+    ))
+    .await?;
+    if let Some(lead) = lead {
+        assign_department_role_on(
+            tx,
+            templates,
+            company,
+            actor,
+            department.id,
+            DepartmentRole::Lead,
+            lead,
+        )
+        .await?;
+    }
+    Ok(department)
+}
+
+async fn insert_department_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    id: DepartmentId,
+    write: &DepartmentWrite,
+    parent_id: Option<DepartmentId>,
+) -> AppResult<Department> {
     let created_by = serde_json::to_value(
         write
             .created_by
@@ -66,28 +99,12 @@ pub(crate) async fn create_department_with_id_on(
     .await
     .map_err(|error| slug_conflict(error, &write.slug))?;
     let department = Department::try_from(department)?;
-    // Boxed: an agent lead's desk descends into template compilation and publication.
-    Box::pin(provision_department_desk_on(
+    super::super::memory::ensure_on(
         tx,
-        templates,
-        company,
-        actor,
-        &department,
-        lead,
-    ))
+        company.as_uuid(),
+        crate::application::memory::NamespaceOwner::Unit(department.id),
+    )
     .await?;
-    if let Some(lead) = lead {
-        assign_department_role_on(
-            tx,
-            templates,
-            company,
-            actor,
-            department.id,
-            DepartmentRole::Lead,
-            lead,
-        )
-        .await?;
-    }
     Ok(department)
 }
 
@@ -240,6 +257,12 @@ pub(crate) async fn delete_department_on(
     .fetch_all(&mut **tx)
     .await?;
     lock_principals_on(tx, company, &placed).await?;
+    super::super::memory::retire_namespaces_on(
+        tx,
+        company.as_uuid(),
+        crate::application::memory::NamespaceOwner::Unit(department),
+    )
+    .await?;
     sqlx::query("DELETE FROM departments WHERE company_id = $1 AND id = $2")
         .bind(company.as_uuid())
         .bind(department.as_uuid())

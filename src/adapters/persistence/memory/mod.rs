@@ -5,10 +5,12 @@ pub(crate) mod deliveries;
 pub(crate) mod inventory;
 mod lifecycle;
 mod namespaces;
+mod owners;
 mod retention;
 mod tenants;
 
-pub(crate) use namespaces::retire_namespaces_on;
+pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+pub(crate) use owners::{agent_principal_on, person_principal_on};
 pub(crate) use tenants::retire_company_on;
 
 use crate::app_error::{AppError, AppResult};
@@ -81,3 +83,6 @@ mod retention_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod scope_owner_tests;

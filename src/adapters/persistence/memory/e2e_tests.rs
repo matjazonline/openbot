@@ -10,7 +10,7 @@ use secrecy::ExposeSecret;
 /// Freeze a save from a run with these levels into `scope`.
 async fn freeze(
     f: &Fixture,
-    scope: SaveScope,
+    scope: NamespaceOwner,
     key: &str,
     levels: LockedRun,
     external: Vec<ExternalSourceRef>,
@@ -36,7 +36,7 @@ async fn freeze(
 /// A save that must freeze.
 async fn frozen(
     f: &Fixture,
-    scope: SaveScope,
+    scope: NamespaceOwner,
     key: &str,
     levels: LockedRun,
     external: Vec<ExternalSourceRef>,
@@ -66,7 +66,10 @@ async fn provisioned(f: &Fixture, live: &Live, http: &Arc<MemoryServiceHttp>) {
         )
         .await
         .unwrap();
-    for owner in [NamespaceOwner::Company, NamespaceOwner::Agent(f.agent)] {
+    for owner in [
+        NamespaceOwner::Unit(f.root),
+        NamespaceOwner::Principal(f.agent_principal),
+    ] {
         f.persistence
             .ensure_namespace(f.scope(), owner)
             .await
@@ -220,7 +223,7 @@ async fn memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them() {
     let http = client(&live);
     let f = Fixture::new().await.expect("TEST_DATABASE_URL");
     provisioned(&f, &live, &http).await;
-    let agent = SaveScope::Agent(f.agent);
+    let agent = NamespaceOwner::Principal(f.agent_principal);
     frozen(
         &f,
         agent,
@@ -247,7 +250,7 @@ async fn memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them() {
     .await;
     frozen(
         &f,
-        SaveScope::Company,
+        NamespaceOwner::Unit(f.root),
         "ob.s.e2e-company-4",
         run(AccessLevel::L6, AccessLevel::L4, true),
         vec![],
@@ -270,7 +273,8 @@ async fn memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them() {
     );
 
     // An independent client writes a level-7 memory into the same agent namespace.
-    let (agent_ns, agent_credential) = ready(&f, "agent").await;
+    let (agent_ns, agent_credential) =
+        ready(&f, NamespaceOwner::Principal(f.agent_principal)).await;
     let writer = call(
         &live,
         "admin/v1/credentials/issue",
@@ -389,7 +393,7 @@ async fn memory_e2e_tampered_labels_and_missing_authority_save_nothing() {
     let http = client(&live);
     let f = Fixture::new().await.expect("TEST_DATABASE_URL");
     provisioned(&f, &live, &http).await;
-    let agent = SaveScope::Agent(f.agent);
+    let agent = NamespaceOwner::Principal(f.agent_principal);
     for key in [
         "ob.s.e2e-above",
         "ob.s.e2e-no-ceiling",
@@ -470,7 +474,7 @@ async fn memory_e2e_tampered_labels_and_missing_authority_save_nothing() {
         assert!(state.starts_with("failed("), "{key}: {state}");
         assert!(result.is_none(), "{key}: nothing saved");
     }
-    let (agent_ns, credential) = ready(&f, "agent").await;
+    let (agent_ns, credential) = ready(&f, NamespaceOwner::Principal(f.agent_principal)).await;
     let everything = http
         .search(
             &credential,
@@ -501,7 +505,7 @@ async fn memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once
     let http = client(&live);
     let f = Fixture::new().await.expect("TEST_DATABASE_URL");
     provisioned(&f, &live, &http).await;
-    let (agent_ns, old) = ready(&f, "agent").await;
+    let (agent_ns, old) = ready(&f, NamespaceOwner::Principal(f.agent_principal)).await;
     call(
         &live,
         "admin/v1/credentials/revoke",
@@ -511,7 +515,7 @@ async fn memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once
     .await;
     frozen(
         &f,
-        SaveScope::Agent(f.agent),
+        NamespaceOwner::Principal(f.agent_principal),
         "ob.s.e2e-revoked",
         run(AccessLevel::L6, AccessLevel::L4, true),
         vec![],
@@ -525,7 +529,7 @@ async fn memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once
     assert!(worker.pass(&CancellationToken::new()).await.unwrap());
     assert_eq!(delivery(&f, "ob.s.e2e-revoked").await.0, "pending");
     reconcile_with(&f.persistence, &live, &http).await;
-    let (namespace, new) = ready(&f, "agent").await;
+    let (namespace, new) = ready(&f, NamespaceOwner::Principal(f.agent_principal)).await;
     assert_eq!(namespace, agent_ns, "the namespace stayed the same");
     assert_ne!(new.id, old.id, "a new credential was swapped in");
     sqlx::query(

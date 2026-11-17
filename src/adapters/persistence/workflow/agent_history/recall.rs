@@ -194,22 +194,17 @@ async fn namespace_ready_on(
     company: crate::domain::workflow::CompanyId,
     owner: crate::application::memory::NamespaceOwner,
 ) -> AppResult<bool> {
-    use crate::application::memory::NamespaceOwner;
-    let (kind, agent, user) = match owner {
-        NamespaceOwner::Company => ("company", None, None),
-        NamespaceOwner::Agent(agent) => ("agent", Some(agent), None),
-        NamespaceOwner::User(user) => ("user", None, Some(user)),
-    };
+    let key = crate::adapters::persistence::memory::namespace_columns(owner);
     Ok(sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(SELECT 1 FROM memory_namespaces AS namespace \
            WHERE namespace.company_id = $1 AND namespace.scope_kind = $2 \
-             AND namespace.agent_id IS NOT DISTINCT FROM $3 \
-             AND namespace.user_id IS NOT DISTINCT FROM $4 AND namespace.state = 'ready')",
+             AND namespace.unit_id IS NOT DISTINCT FROM $3 \
+             AND namespace.principal_id IS NOT DISTINCT FROM $4 AND namespace.state = 'ready')",
     )
     .bind(company.as_uuid())
-    .bind(kind)
-    .bind(agent)
-    .bind(user)
+    .bind(key.kind)
+    .bind(key.unit)
+    .bind(key.principal)
     .fetch_one(&mut *tx)
     .await?)
 }

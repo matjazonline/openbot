@@ -297,12 +297,11 @@ impl<'a> MemorySettings<'a> {
     }
 }
 
-/// Who a namespace belongs to. Company scope has no owner beyond the company itself.
+/// Memory follows departments and live person/agent principals, never desks or roles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NamespaceOwner {
-    Company,
-    Agent(Uuid),
-    User(Uuid),
+    Unit(crate::entities::department::DepartmentId),
+    Principal(crate::entities::transport::PrincipalId),
 }
 
 /// The answer of lazy provisioning (E2). Only `Ready` carries a namespace; a run seeing anything

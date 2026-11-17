@@ -76,13 +76,11 @@ async fn owner_live(db: &mut PgConnection, row: &ClaimRow) -> AppResult<bool> {
         }
         (_, kind) => {
             let owner = match kind {
-                "company" => "SELECT 1 FROM companies AS company WHERE company.id = $1",
-                "agent" => {
-                    "SELECT 1 FROM agents AS agent WHERE agent.id = $3 AND agent.company_id = $1"
+                "unit" => {
+                    "SELECT 1 FROM departments AS department WHERE department.company_id=$1 AND department.id=$3"
                 }
-                "user" => {
-                    "SELECT 1 FROM membership_of($3, $1) AS member \
-                     WHERE member.company_id = $1 AND member.user_id = $3"
+                "principal" => {
+                    "SELECT 1 FROM principals AS principal WHERE principal.company_id=$1 AND principal.id=$3 AND principal.kind IN ('person','agent')"
                 }
                 _ => return Err(invalid()),
             };

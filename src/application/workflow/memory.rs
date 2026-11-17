@@ -24,21 +24,21 @@ pub const SAVE: &str = "memory.save";
 
 /// Which namespace a step names; an agent scope is resolved to the bundle's agent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnitSelector {
+    Own,
+    Root,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemoryStepScope {
-    Company,
+    Unit(UnitSelector),
     Agent(Uuid),
 }
 impl MemoryStepScope {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Company => "company",
+            Self::Unit(_) => "unit",
             Self::Agent(_) => "agent",
-        }
-    }
-    pub fn owner(self) -> NamespaceOwner {
-        match self {
-            Self::Company => NamespaceOwner::Company,
-            Self::Agent(agent) => NamespaceOwner::Agent(agent),
         }
     }
 }

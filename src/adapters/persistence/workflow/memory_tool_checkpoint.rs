@@ -191,12 +191,38 @@ pub(in crate::adapters::persistence::workflow) async fn eligible_on(
     fence: WorkflowFence,
     agent: Uuid,
 ) -> AppResult<Vec<(MemoryToolScope, NamespaceOwner)>> {
+    let company = fence.scope.company;
     let mut scopes = vec![
-        (MemoryToolScope::Company, NamespaceOwner::Company),
-        (MemoryToolScope::Agent, NamespaceOwner::Agent(agent)),
+        (
+            MemoryToolScope::Company,
+            NamespaceOwner::Unit(
+                crate::adapters::persistence::company::root_on(tx, company).await?,
+            ),
+        ),
+        (
+            MemoryToolScope::Agent,
+            NamespaceOwner::Principal(
+                crate::adapters::persistence::memory::agent_principal_on(
+                    tx,
+                    company.as_uuid(),
+                    agent,
+                )
+                .await?,
+            ),
+        ),
     ];
     if let Some(user) = private_session_user_on(tx, fence).await? {
-        scopes.push((MemoryToolScope::User, NamespaceOwner::User(user)));
+        scopes.push((
+            MemoryToolScope::User,
+            NamespaceOwner::Principal(
+                crate::adapters::persistence::memory::person_principal_on(
+                    tx,
+                    company.as_uuid(),
+                    user,
+                )
+                .await?,
+            ),
+        ));
     }
     Ok(scopes)
 }
@@ -470,14 +496,8 @@ async fn save_on(
         .into_iter()
         .find(|(eligible, _)| *eligible == scope && scope != MemoryToolScope::Company)
         .map(|(_, owner)| owner);
-    let save_scope = match owner {
-        Some(NamespaceOwner::Agent(agent)) => {
-            crate::adapters::persistence::memory::deliveries::SaveScope::Agent(agent)
-        }
-        Some(NamespaceOwner::User(user)) => {
-            crate::adapters::persistence::memory::deliveries::SaveScope::User(user)
-        }
-        _ => return Ok(End::Rollback(MemorySaveOutcome::ScopeNotAllowed)),
+    let Some(save_scope @ NamespaceOwner::Principal(_)) = owner else {
+        return Ok(End::Rollback(MemorySaveOutcome::ScopeNotAllowed));
     };
     let run = fence.scope;
     let invocation = call.invocation()?.0;

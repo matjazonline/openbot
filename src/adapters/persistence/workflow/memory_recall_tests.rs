@@ -34,8 +34,8 @@ fn role_text(request: &Value, role: &str) -> String {
 /// Company and agent memories (the example input asks to "answer the current request"), one
 /// above the run's ceiling.
 async fn seeded(t: &Tools) -> (Uuid, Uuid) {
-    let company = t.ready(NamespaceOwner::Company).await;
-    let agent = t.ready(NamespaceOwner::Agent(t.s.agent)).await;
+    let company = t.ready(t.root_owner().await).await;
+    let agent = t.ready(t.agent_owner().await).await;
     t.seed(
         company,
         0,
@@ -147,7 +147,7 @@ async fn memory_preparation_recall_freezes_a_ceilinged_pack_into_the_untrusted_c
     );
     // The actor's own manual run is eligible for the user scope (E2/U4): requested, not ready.
     let (_, state) = t
-        .namespace(NamespaceOwner::User(t.actor().await))
+        .namespace(t.person_owner(t.actor().await).await)
         .await
         .expect("user namespace requested by recall");
     assert_ne!(state, "ready");
@@ -395,7 +395,7 @@ async fn memory_preparation_recall_applies_only_to_memory_search_agents_while_en
         } else {
             Tools::new(AccessLevel::L5).await
         };
-        t.ready(NamespaceOwner::Company).await;
+        t.ready(t.root_owner().await).await;
         if case == "disabled" {
             t.p()
                 .disable_memory(t.company(), t.s.fixture.target.actor, 1)
@@ -467,8 +467,8 @@ async fn memory_preparation_resumed_attempts_revalidate_recorded_tool_items() {
     for change in ["corrected", "deleted", "unchanged"] {
         let revoked = change != "unchanged";
         let t = Tools::new(AccessLevel::L5).await;
-        let company = t.ready(NamespaceOwner::Company).await;
-        t.ready(NamespaceOwner::Agent(t.s.agent)).await;
+        let company = t.ready(t.root_owner().await).await;
+        t.ready(t.agent_owner().await).await;
         let note = t.seed(company, 2, "Escalation", "ESCALATION-TWO contact");
         // Attempt 1 prepares and completes a search (its result is in the checkpoint).
         let search = t

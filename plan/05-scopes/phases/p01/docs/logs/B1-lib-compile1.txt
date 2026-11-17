@@ -1,0 +1,128 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0364]: `ensure_on` is private, and cannot be re-exported
+  --> src/adapters/persistence/memory/mod.rs:12:59
+   |
+12 | pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+   |                                                           ^^^^^^^^^
+   |
+note: consider marking `ensure_on` as `pub` in the imported module
+  --> src/adapters/persistence/memory/mod.rs:12:59
+   |
+12 | pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+   |                                                           ^^^^^^^^^
+
+error[E0603]: function import `ensure_on` is private
+   --> src/adapters/persistence/company/root.rs:82:27
+    |
+ 82 |     super::super::memory::ensure_on(
+    |                           ^^^^^^^^^ private function import
+    |
+note: the function import `ensure_on` is defined here...
+   --> src/adapters/persistence/memory/mod.rs:12:59
+    |
+ 12 | pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+    |                                                           ^^^^^^^^^
+note: ...and refers to the function `ensure_on` which is defined here
+   --> src/adapters/persistence/memory/namespaces.rs:53:1
+    |
+ 53 | / pub(super) async fn ensure_on(
+ 54 | |     db: &mut PgConnection,
+ 55 | |     company: Uuid,
+ 56 | |     owner: NamespaceOwner,
+...   |
+153 | |     Ok(NamespaceReadiness::NotReady)
+154 | | }
+    | |_^
+help: import `ensure_on` directly
+    |
+ 82 -     super::super::memory::ensure_on(
+ 82 +     namespaces::ensure_on(
+    |
+
+error[E0603]: function import `ensure_on` is private
+   --> src/adapters/persistence/department/lifecycle.rs:69:27
+    |
+ 69 |     super::super::memory::ensure_on(
+    |                           ^^^^^^^^^ private function import
+    |
+note: the function import `ensure_on` is defined here...
+   --> src/adapters/persistence/memory/mod.rs:12:59
+    |
+ 12 | pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+    |                                                           ^^^^^^^^^
+note: ...and refers to the function `ensure_on` which is defined here
+   --> src/adapters/persistence/memory/namespaces.rs:53:1
+    |
+ 53 | / pub(super) async fn ensure_on(
+ 54 | |     db: &mut PgConnection,
+ 55 | |     company: Uuid,
+ 56 | |     owner: NamespaceOwner,
+...   |
+153 | |     Ok(NamespaceReadiness::NotReady)
+154 | | }
+    | |_^
+help: import `ensure_on` directly
+    |
+ 69 -     super::super::memory::ensure_on(
+ 69 +     namespaces::ensure_on(
+    |
+
+error[E0603]: function import `ensure_on` is private
+   --> src/adapters/persistence/participant.rs:375:20
+    |
+375 |     super::memory::ensure_on(
+    |                    ^^^^^^^^^ private function import
+    |
+note: the function import `ensure_on` is defined here...
+   --> src/adapters/persistence/memory/mod.rs:12:59
+    |
+ 12 | pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+    |                                                           ^^^^^^^^^
+note: ...and refers to the function `ensure_on` which is defined here
+   --> src/adapters/persistence/memory/namespaces.rs:53:1
+    |
+ 53 | / pub(super) async fn ensure_on(
+ 54 | |     db: &mut PgConnection,
+ 55 | |     company: Uuid,
+ 56 | |     owner: NamespaceOwner,
+...   |
+153 | |     Ok(NamespaceReadiness::NotReady)
+154 | | }
+    | |_^
+help: import `ensure_on` directly
+    |
+375 -     super::memory::ensure_on(
+375 +     namespaces::ensure_on(
+    |
+
+error[E0603]: function import `ensure_on` is private
+   --> src/adapters/persistence/participant.rs:461:20
+    |
+461 |     super::memory::ensure_on(
+    |                    ^^^^^^^^^ private function import
+    |
+note: the function import `ensure_on` is defined here...
+   --> src/adapters/persistence/memory/mod.rs:12:59
+    |
+ 12 | pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+    |                                                           ^^^^^^^^^
+note: ...and refers to the function `ensure_on` which is defined here
+   --> src/adapters/persistence/memory/namespaces.rs:53:1
+    |
+ 53 | / pub(super) async fn ensure_on(
+ 54 | |     db: &mut PgConnection,
+ 55 | |     company: Uuid,
+ 56 | |     owner: NamespaceOwner,
+...   |
+153 | |     Ok(NamespaceReadiness::NotReady)
+154 | | }
+    | |_^
+help: import `ensure_on` directly
+    |
+461 -     super::memory::ensure_on(
+461 +     namespaces::ensure_on(
+    |
+
+Some errors have detailed explanations: E0364, E0603.
+For more information about an error, try `rustc --explain E0364`.
+error: could not compile `open_bots` (lib) due to 5 previous errors
