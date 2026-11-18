@@ -22,8 +22,9 @@ impl PublicationDirectory for McpPublicationDirectory {
         actor: WorkflowActor,
         draft: &CompanyWorkflowDraft,
     ) -> AppResult<PublicationDependencies> {
-        let mut tx = begin_http(&self.persistence).await?;
-        authority::authorize_company(&mut tx, draft.company(), actor).await?;
+        let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
+        management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
+            .await?;
         let tools = capture_on(&mut tx, draft.company(), &self.selections).await?;
         tx.commit().await?;
         Ok(PublicationDependencies {

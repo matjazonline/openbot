@@ -479,7 +479,7 @@ async fn account_email_change_adopts_an_allowlisted_outsider_address() {
     let company_id = company_of(&persistence, &owner, "allow").await;
     join(&persistence, company_id, &member).await;
     let home = format!("{}@home.test", unique("home"));
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company_id,
         ChannelWrite {

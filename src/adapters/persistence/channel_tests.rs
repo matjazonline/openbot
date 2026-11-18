@@ -7,8 +7,14 @@ use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
 use crate::use_cases::user::UserPersistence;
 
 /// An edit made by a manager these tests do not otherwise need.
-fn test_update(company_id: Uuid, channel_id: Uuid, write: ChannelWrite) -> ChannelUpdate {
+fn test_update(
+    owner: Uuid,
+    company_id: Uuid,
+    channel_id: Uuid,
+    write: ChannelWrite,
+) -> ChannelUpdate {
     ChannelUpdate {
+        actor: crate::application::workflow::WorkflowActor::authenticated(owner).unwrap(),
         company_id,
         channel_id,
         write,
@@ -52,7 +58,7 @@ async fn postgres_channel_persistence_works() {
     // 1. Create Channel
     let emails = vec!["a@example.com".to_string(), "b@example.com".to_string()];
 
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company.id,
         ChannelWrite {
@@ -107,6 +113,7 @@ async fn postgres_channel_persistence_works() {
     let updated = ChannelPersistence::update(
         &persistence,
         test_update(
+            owner.id,
             company.id,
             channel.id,
             ChannelWrite {
@@ -158,7 +165,13 @@ async fn postgres_channel_persistence_works() {
     .await
     .unwrap();
     assert!(matches!(
-        ChannelPersistence::delete(&persistence, channel.id).await,
+        ChannelPersistence::delete(
+            &persistence,
+            crate::application::workflow::WorkflowActor::authenticated(owner.id).unwrap(),
+            company.id,
+            channel.id
+        )
+        .await,
         Err(AppError::Conflict(_))
     ));
     assert!(
@@ -174,9 +187,14 @@ async fn postgres_channel_persistence_works() {
         .unwrap();
 
     // 5. Delete an empty channel.
-    ChannelPersistence::delete(&persistence, channel.id)
-        .await
-        .unwrap();
+    ChannelPersistence::delete(
+        &persistence,
+        crate::application::workflow::WorkflowActor::authenticated(owner.id).unwrap(),
+        company.id,
+        channel.id,
+    )
+    .await
+    .unwrap();
     let list_after = ChannelPersistence::list_by_company_id(&persistence, company.id)
         .await
         .unwrap();
@@ -238,7 +256,7 @@ async fn alias_slugs_are_unique_within_a_company_and_free_across_companies() {
         ..ChannelWrite::default()
     };
 
-    let support = ChannelPersistence::create(
+    let support = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company.id,
         write("support", &["sales", "help"]),
@@ -260,14 +278,22 @@ async fn alias_slugs_are_unique_within_a_company_and_free_across_companies() {
     assert_eq!(by_alias.id, support.id);
 
     // A second channel may not claim a taken alias, nor collide with it via its own slug.
-    let alias_conflict =
-        ChannelPersistence::create(&persistence, company.id, write("billing", &["sales"])).await;
+    let alias_conflict = crate::adapters::persistence::test_support::create_channel(
+        &persistence,
+        company.id,
+        write("billing", &["sales"]),
+    )
+    .await;
     assert!(
         matches!(alias_conflict, Err(AppError::BadRequest(ref m)) if m.contains("sales")),
         "expected a named conflict, got {alias_conflict:?}"
     );
-    let slug_conflict =
-        ChannelPersistence::create(&persistence, company.id, write("help", &[])).await;
+    let slug_conflict = crate::adapters::persistence::test_support::create_channel(
+        &persistence,
+        company.id,
+        write("help", &[]),
+    )
+    .await;
     assert!(
         matches!(slug_conflict, Err(AppError::BadRequest(ref m)) if m.contains("help")),
         "expected a named conflict, got {slug_conflict:?}"
@@ -280,21 +306,34 @@ async fn alias_slugs_are_unique_within_a_company_and_free_across_companies() {
     assert_eq!(channels.len(), 1);
 
     // The namespace is per company, so another company may use the same names.
-    ChannelPersistence::create(&persistence, other_company.id, write("sales", &["support"]))
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::create_channel(
+        &persistence,
+        other_company.id,
+        write("sales", &["support"]),
+    )
+    .await
+    .unwrap();
 
     // An update replaces the alias set wholesale, freeing the names it drops.
     let updated = ChannelPersistence::update(
         &persistence,
-        test_update(company.id, support.id, write("support", &["contact"])),
+        test_update(
+            owner.id,
+            company.id,
+            support.id,
+            write("support", &["contact"]),
+        ),
     )
     .await
     .unwrap();
     assert_eq!(updated.alias_slugs, ["contact"]);
-    ChannelPersistence::create(&persistence, company.id, write("sales", &[]))
-        .await
-        .expect("a released alias is available again");
+    crate::adapters::persistence::test_support::create_channel(
+        &persistence,
+        company.id,
+        write("sales", &[]),
+    )
+    .await
+    .expect("a released alias is available again");
 
     let _ = CompanyPersistence::delete(&persistence, company.id).await;
     let _ = CompanyPersistence::delete(&persistence, other_company.id).await;
@@ -323,7 +362,7 @@ async fn an_enabled_channel_needs_no_agent() {
     )
     .await
     .unwrap();
-    let plain = ChannelPersistence::create(
+    let plain = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company.id,
         ChannelWrite {
@@ -348,7 +387,7 @@ async fn an_enabled_channel_needs_no_agent() {
     )
     .await
     .unwrap();
-    let assigned = ChannelPersistence::create(
+    let assigned = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company.id,
         ChannelWrite {
@@ -404,7 +443,7 @@ async fn a_channel_form_round_trips_its_email_allowlist_through_principal_grants
     )
     .await
     .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company.id,
         ChannelWrite {
@@ -474,6 +513,7 @@ async fn a_channel_form_round_trips_its_email_allowlist_through_principal_grants
     let updated = ChannelPersistence::update(
         &persistence,
         test_update(
+            owner.id,
             company.id,
             channel.id,
             ChannelWrite {
@@ -515,6 +555,7 @@ async fn a_channel_form_round_trips_its_email_allowlist_through_principal_grants
     let malformed = ChannelPersistence::update(
         &persistence,
         test_update(
+            owner.id,
             company.id,
             channel.id,
             ChannelWrite {

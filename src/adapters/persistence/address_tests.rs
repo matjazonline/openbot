@@ -84,7 +84,7 @@ impl Fixture {
     }
 
     async fn desk(&self, slug: &str, aliases: &[&str]) -> Result<Uuid, AppError> {
-        ChannelPersistence::create(
+        crate::adapters::persistence::test_support::create_channel(
             &self.persistence,
             self.company.id,
             desk_write(slug, aliases),
@@ -212,6 +212,7 @@ async fn address_namespace_a_slug_names_one_desk_or_person_per_company() {
     let rename = ChannelPersistence::update(
         &f.persistence,
         ChannelUpdate {
+            actor: crate::application::workflow::WorkflowActor::authenticated(f.owner).unwrap(),
             company_id: f.company.id,
             channel_id: front,
             write: desk_write(&f.owner_slug, &[]),
@@ -254,9 +255,13 @@ async fn address_namespace_a_slug_names_one_desk_or_person_per_company() {
 
     // Another company is another namespace: the same slugs are free there.
     let other = company(&f.persistence, f.owner).await;
-    ChannelPersistence::create(&f.persistence, other.id, desk_write("dana-own", &[]))
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::create_channel(
+        &f.persistence,
+        other.id,
+        desk_write("dana-own", &[]),
+    )
+    .await
+    .unwrap();
     // The owner owns both companies, so the owner has an address in each, each the same slug.
     let other_owner: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND user_id = $2")
@@ -372,10 +377,13 @@ async fn address_namespace_rejects_a_target_from_another_company() {
         return;
     };
     let other = company(&f.persistence, f.owner).await;
-    let foreign_desk =
-        ChannelPersistence::create(&f.persistence, other.id, desk_write("foreign", &[]))
-            .await
-            .unwrap();
+    let foreign_desk = crate::adapters::persistence::test_support::create_channel(
+        &f.persistence,
+        other.id,
+        desk_write("foreign", &[]),
+    )
+    .await
+    .unwrap();
     let foreign_principal: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND user_id = $2")
             .bind(other.id)

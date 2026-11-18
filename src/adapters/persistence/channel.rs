@@ -327,9 +327,29 @@ pub(crate) async fn insert_channel_row_on(
 
 #[async_trait]
 impl ChannelPersistence for PostgresPersistence {
-    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
+    async fn create(
+        &self,
+        actor: crate::application::workflow::WorkflowActor,
+        company_id: Uuid,
+        write: ChannelWrite,
+    ) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        let mut tx = super::workflow::management::begin(
+            self,
+            crate::domain::workflow::CompanyId::new(company_id),
+            actor,
+        )
+        .await?;
+        use crate::application::use_cases::administration::ManagementTarget;
+        super::workflow::management::authorize_target_on(
+            &mut tx,
+            crate::domain::workflow::CompanyId::new(company_id),
+            actor,
+            write
+                .department_id
+                .map_or(ManagementTarget::Root, ManagementTarget::Unit),
+        )
+        .await?;
         let participants = insert_channel_row_on(&mut tx, company_id, uuid, &write).await?;
 
         insert_desk_addresses(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
@@ -463,14 +483,34 @@ impl ChannelPersistence for PostgresPersistence {
             .ok_or_else(|| AppError::Internal("Updated channel was not found".into()))
     }
 
-    async fn delete(&self, id: Uuid) -> AppResult<()> {
-        let mut tx = self.pool.begin().await?;
+    async fn delete(
+        &self,
+        actor: crate::application::workflow::WorkflowActor,
+        company_id: Uuid,
+        id: Uuid,
+    ) -> AppResult<()> {
+        let mut tx = super::workflow::management::begin(
+            self,
+            crate::domain::workflow::CompanyId::new(company_id),
+            actor,
+        )
+        .await?;
+        super::workflow::management::authorize_association_on(
+            &mut tx,
+            crate::domain::workflow::CompanyId::new(company_id),
+            actor,
+            crate::application::workflow::RelatedAssociation::Channel(
+                crate::application::workflow::RelatedChannelId::new(id),
+            ),
+        )
+        .await?;
         let channel: Option<Uuid> =
-            sqlx::query_scalar("SELECT id FROM channels WHERE id=$1 FOR UPDATE")
+            sqlx::query_scalar("SELECT id FROM channels WHERE id=$1 AND company_id=$2 FOR UPDATE")
                 .bind(id)
+                .bind(company_id)
                 .fetch_optional(&mut *tx)
                 .await?;
-        let Some(_) = channel else { return Ok(()) };
+        channel.ok_or_else(crate::use_cases::channel::channel_not_found)?;
         let retained: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM threads WHERE channel_id=$1) \
              OR EXISTS(SELECT 1 FROM workflow_bindings WHERE channel_id=$1) \
@@ -486,8 +526,9 @@ impl ChannelPersistence for PostgresPersistence {
                     .into(),
             ));
         }
-        sqlx::query("DELETE FROM channels WHERE id = $1")
+        sqlx::query("DELETE FROM channels WHERE id=$1 AND company_id=$2")
             .bind(id)
+            .bind(company_id)
             .execute(&mut *tx)
             .await
             .map_err(|error| {

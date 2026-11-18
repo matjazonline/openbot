@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::local_agents::workflow::{LocalRunInputs, LocalRunProgress};
-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::actions::ActionService;
 use std::time::Duration;
 
@@ -134,7 +134,7 @@ async fn cloudroom_workflow_continuation_refuses_other_profile_and_other_origina
     p.save_profile(s.fixture.target.actor.user_id(), &other)
         .await
         .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         s.scope.company.as_uuid(),
         ChannelWrite {

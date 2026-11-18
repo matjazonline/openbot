@@ -33,6 +33,36 @@ struct MockAgentPersistence {
 
 #[async_trait]
 impl AgentPersistence for MockAgentPersistence {
+    async fn list_managed_agents(
+        &self,
+        _actor: WorkflowActor,
+        company: CompanyId,
+    ) -> AppResult<Vec<Agent>> {
+        self.list_by_company_id(company.as_uuid()).await
+    }
+
+    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
+        if self
+            .get_by_id(id)
+            .await?
+            .is_none_or(|agent| agent.company_id.is_some())
+        {
+            return Err(agent_not_found());
+        }
+        self.update(id, write).await
+    }
+
+    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()> {
+        if self
+            .get_by_id(id)
+            .await?
+            .is_none_or(|agent| agent.company_id.is_some())
+        {
+            return Err(agent_not_found());
+        }
+        self.delete(id).await
+    }
+
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let agent = Agent {
             open_to_public: write.open_to_public,
@@ -168,6 +198,20 @@ impl CompanyAgents for MockAgentPersistence {
 
 #[async_trait]
 impl crate::application::agent::AgentDraftPersistence for MockAgentPersistence {
+    async fn delete_company_agent(
+        &self,
+        scope: crate::application::agent::AgentPublicationScope,
+    ) -> AppResult<()> {
+        if self
+            .get_by_id(scope.agent.as_uuid())
+            .await?
+            .is_none_or(|agent| agent.company_id != Some(scope.company.as_uuid()))
+        {
+            return Err(agent_not_found());
+        }
+        self.delete(scope.agent.as_uuid()).await
+    }
+
     async fn save_company_agent(
         &self,
         request: crate::application::agent::SaveCompanyAgent,

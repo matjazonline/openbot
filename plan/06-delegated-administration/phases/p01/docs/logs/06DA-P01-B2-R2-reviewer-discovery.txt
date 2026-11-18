@@ -1,0 +1,8 @@
+B2R1: 4778; B2R2: 4782
+Removed:
+
+Added:
+adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_desk_crud_locks_the_actor_before_the_company
+adapters::persistence::department::tests::delegated_administration::schedules::account_locks::delegated_admin_competing_schedule_writes_lock_the_actor_before_the_company
+adapters::persistence::workflow::tests::binding_tests::delegated::delegated_admin_binding_activity_hides_current_and_stale_revisions_from_other_units
+adapters::persistence::workflow::tests::binding_tests::delegated::delegated_admin_competing_binding_activity_locks_the_actor_before_the_company

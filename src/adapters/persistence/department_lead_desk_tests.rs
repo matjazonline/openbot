@@ -2,9 +2,10 @@
 //! `department_desk_` for the desk a department is created with and how it follows its lead, and
 //! `department_lead_desk_competing_` for lead changes that race.
 use super::*;
-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::compiler::agent_reference_steps;
 use crate::application::workflow::templates::REPLY_AGENT_STEP;
+use crate::application::workflow::{RelatedAssociation, RelatedChannelId};
 
 /// These scenarios exercise an administrator who is also admitted to this private desk.
 async fn admit_member(f: &Departments, department: DepartmentId, user: Uuid) {
@@ -249,7 +250,7 @@ async fn department_lead_desk_taken_address_refuses_the_department() {
     let Some(f) = Departments::new().await else {
         return;
     };
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.company,
         ChannelWrite {
@@ -656,12 +657,20 @@ async fn department_lead_desk_refuses_lead_changes_it_cannot_follow() {
     .await
     .unwrap();
     restrict.commit().await.unwrap();
-    let refused = lead(&f, f.admin, department.id, f.agent_principal).await;
+    lead(&f, f.admin, department.id, f.agent_principal)
+        .await
+        .expect("a root manager configures a private department desk");
+    assert_eq!(bound(&f, binding).await.agent.as_deref(), Some("worker"));
     assert!(
-        matches!(&refused, Err(AppError::BadRequest(message)) if message.contains("cannot see the department desk")),
-        "{refused:?}"
+        crate::adapters::persistence::workflow::association::authorize_association(
+            &mut f.pool().acquire().await.unwrap(),
+            CompanyId::new(f.company),
+            WorkflowActor::authenticated(f.admin).unwrap(),
+            RelatedAssociation::Channel(RelatedChannelId::new(desk)),
+        )
+        .await
+        .is_err()
     );
-    assert_eq!(bound(&f, binding).await.agent.as_deref(), Some("closer"));
 }
 
 /// B1 D1 with D9: an agent created as a department's lead answers both its own desk and the

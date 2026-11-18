@@ -57,6 +57,24 @@ pub(in crate::adapters::persistence) async fn authorize_company_with_locks(
     actor: WorkflowActor,
     locks: super::row_locks::RowLocks,
 ) -> AppResult<crate::entities::access_level::LevelActor> {
+    let level = authorize_person_with_locks(db, company, actor, locks).await?;
+    super::super::administration::management_role_on(
+        db,
+        actor.user_id(),
+        company,
+        crate::application::use_cases::administration::ManagementTarget::Root,
+    )
+    .await?
+    .ok_or_else(missing)?;
+    Ok(level)
+}
+
+pub(in crate::adapters::persistence) async fn authorize_person_with_locks(
+    db: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<crate::entities::access_level::LevelActor> {
     use crate::adapters::persistence::participant::{membership_from_db, reader_level};
     use crate::entities::access_level::LevelActor;
     let owner: Uuid = sqlx::query_scalar(
@@ -77,15 +95,12 @@ pub(in crate::adapters::persistence) async fn authorize_company_with_locks(
          JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id \
          WHERE member.company_id=$1 AND member.root_user_id=$2 AND principal.kind='person' \
          FOR SHARE OF member,principal"))
-        .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(db).await?.ok_or_else(missing)?;
+        .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(&mut *db).await?.ok_or_else(missing)?;
     let membership = membership_from_db(Some(&facts.role))?;
     if membership.is_owner() != (owner == actor.user_id()) {
         return Err(invalid());
     }
     let access_level = reader_level(actor.user_id(), membership, Some(facts.access_level))?;
-    if !membership.manages_company_operations() {
-        return Err(missing());
-    }
     Ok(LevelActor {
         membership,
         access_level,

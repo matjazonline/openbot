@@ -1,0 +1,186 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+error[E0433]: cannot find type `WorkflowId` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_tests.rs:120:46
+    |
+120 |                 ManagementTarget::Definition(WorkflowId::new(workflow)),
+    |                                              ^^^^^^^^^^ use of undeclared type `WorkflowId`
+    |
+help: consider importing this struct through its public re-export
+    |
+  2 + use crate::workflow::WorkflowId;
+    |
+
+error[E0425]: cannot find type `WorkflowId` in this scope
+  --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:34:12
+   |
+34 |         w: WorkflowId,
+   |            ^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct through its public re-export
+   |
+ 1 + use crate::workflow::WorkflowId;
+   |
+
+error[E0425]: cannot find type `IdempotencyKey` in this scope
+  --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:41:13
+   |
+41 |         k: &IdempotencyKey,
+   |             ^^^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct through its public re-export
+   |
+ 1 + use crate::application::workflow::IdempotencyKey;
+   |
+
+error[E0425]: cannot find type `VersionId` in this scope
+  --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:48:12
+   |
+48 |         v: VersionId,
+   |            ^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct through its public re-export
+   |
+ 1 + use crate::workflow::VersionId;
+   |
+
+error[E0425]: cannot find type `PublishedBundle` in this scope
+  --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:49:49
+   |
+49 |     ) -> crate::app_error::AppResult<Option<Arc<PublishedBundle>>> {
+   |                                                 ^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+ 1 + use crate::application::workflow::publication::PublishedBundle;
+   |
+
+error[E0425]: cannot find type `PublishedBundle` in this scope
+  --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:59:42
+   |
+59 |     ) -> crate::app_error::AppResult<Arc<PublishedBundle>> {
+   |                                          ^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+ 1 + use crate::application::workflow::publication::PublishedBundle;
+   |
+
+error[E0433]: cannot find type `WorkflowId` in this scope
+  --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:94:19
+   |
+94 |         workflow: WorkflowId::new(workflow),
+   |                   ^^^^^^^^^^ use of undeclared type `WorkflowId`
+   |
+help: consider importing this struct through its public re-export
+   |
+ 1 + use crate::workflow::WorkflowId;
+   |
+
+error[E0433]: cannot find type `DraftRevision` in this scope
+  --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:99:28
+   |
+99 |             expected: Some(DraftRevision::new(1).unwrap()),
+   |                            ^^^^^^^^^^^^^ use of undeclared type `DraftRevision`
+   |
+help: consider importing this struct through its public re-export
+   |
+ 1 + use crate::workflow::DraftRevision;
+   |
+
+error[E0433]: cannot find type `DraftRevision` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:111:23
+    |
+111 |             expected: DraftRevision::new(1).unwrap(),
+    |                       ^^^^^^^^^^^^^ use of undeclared type `DraftRevision`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::DraftRevision;
+    |
+
+error[E0433]: cannot find type `VersionId` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:112:22
+    |
+112 |             version: VersionId::new(Uuid::new_v4()),
+    |                      ^^^^^^^^^ use of undeclared type `VersionId`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::VersionId;
+    |
+
+error[E0433]: cannot find type `IdempotencyKey` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:113:18
+    |
+113 |             key: IdempotencyKey::parse("prepared-stale").unwrap(),
+    |                  ^^^^^^^^^^^^^^ use of undeclared type `IdempotencyKey`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::application::workflow::IdempotencyKey;
+    |
+
+error[E0433]: cannot find type `WorkflowId` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:171:38
+    |
+171 |         .draft(company(m.f.company), WorkflowId::new(workflow))
+    |                                      ^^^^^^^^^^ use of undeclared type `WorkflowId`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::WorkflowId;
+    |
+
+error[E0433]: cannot find type `WorkflowId` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:184:20
+    |
+184 |     let workflow = WorkflowId::new(Uuid::new_v4());
+    |                    ^^^^^^^^^^ use of undeclared type `WorkflowId`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::WorkflowId;
+    |
+
+error[E0433]: cannot find type `CompanyWorkflowDraft` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:185:17
+    |
+185 |     let fresh = CompanyWorkflowDraft::saved(
+    |                 ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `CompanyWorkflowDraft`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::application::workflow::templates::CompanyWorkflowDraft;
+    |
+
+error[E0433]: cannot find type `DraftRevision` in this scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:188:9
+    |
+188 |         DraftRevision::new(1).unwrap(),
+    |         ^^^^^^^^^^^^^ use of undeclared type `DraftRevision`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::DraftRevision;
+    |
+
+error[E0599]: no method named `clone` found for struct `application::workflow::authorization::LifecycleAuthorizer<P, C, T>` in the current scope
+   --> src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs:84:23
+    |
+ 84 |         authorization.clone(),
+    |                       ^^^^^ method not found in `LifecycleAuthorizer<PostgresPersistence, PostgresPersistence, _>`
+    |
+   ::: src/application/workflow/authorization.rs:208:1
+    |
+208 | pub struct LifecycleAuthorizer<P, C, T> {
+    | --------------------------------------- method `clone` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `clone`, perhaps you need to implement it:
+            candidate #1: `Clone`
+    = note: the full name for the type has been written to '/Users/mac02/orca/workspaces/openbot/plan06/target/debug/deps/open_bots-6c54b484f2eac63a.long-type-3884564123629954453.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+Some errors have detailed explanations: E0425, E0433, E0599.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib test) due to 16 previous errors

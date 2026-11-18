@@ -12,6 +12,11 @@ async fn edit(
     ChannelPersistence::update(
         f.people.role.p(),
         ChannelUpdate {
+            actor: crate::adapters::persistence::test_support::company_owner_actor(
+                f.people.role.p(),
+                f.scope.company.as_uuid(),
+            )
+            .await,
             company_id: f.scope.company.as_uuid(),
             channel_id: f.people.role.channel,
             write: ChannelWrite {

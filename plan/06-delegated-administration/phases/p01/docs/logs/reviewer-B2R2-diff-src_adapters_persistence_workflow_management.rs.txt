@@ -1,0 +1,26 @@
+--- B2R1/src/adapters/persistence/workflow/management.rs
++++ B2R2/src/adapters/persistence/workflow/management.rs
+@@ -5,6 +5,23 @@
+     agent_capability::AgentId, department::DepartmentId, transport::PrincipalId,
+ };
+ use sqlx::PgConnection;
++
++/// Public management transactions acquire the actor account before company authority.
++/// Nested `_on` callers retain their already-established account/transaction prefix.
++pub(in crate::adapters::persistence) fn begin(
++    persistence: &PostgresPersistence,
++    company: CompanyId,
++    actor: WorkflowActor,
++) -> impl std::future::Future<Output = AppResult<Transaction<'_, Postgres>>> + Send {
++    super::super::company_invite::authority::start(
++        persistence.pool(),
++        super::super::company_invite::authority::TeamScope {
++            company_id: company.as_uuid(),
++            actor_id: actor.user_id(),
++        },
++        None,
++    )
++}
+ 
+ pub(in crate::adapters::persistence) async fn authorize_target_on(
+     db: &mut PgConnection,

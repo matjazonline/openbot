@@ -5,7 +5,6 @@ use crate::adapters::{
     storage::{BucketKind, FileStorage, test_support::FakeStorage},
     workflow_jev::{JevAssetReader, tests::server},
 };
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::jev::assets::tests as images;
 use crate::application::workflow::jev::*;
@@ -25,7 +24,7 @@ pub(super) struct Attachment {
 pub(super) async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {
     let p = &f.persistence;
     let company = f.target.company.as_uuid();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         company,
         ChannelWrite {

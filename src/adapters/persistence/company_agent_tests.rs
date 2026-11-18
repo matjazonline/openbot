@@ -155,7 +155,8 @@ fn production_calls() -> BTreeSet<(String, String, String)> {
     found
 }
 
-/// Production company-agent rows come only from `create_company_agent_on`: outside it, the two
+/// Production company-agent rows come only from `create_company_agent_on` and its identity phase:
+/// outside that constructor, the two
 /// insert primitives are called only where no company agent is created -- the library inserts in
 /// `persistence/agent.rs` (`company_id = None`) and the lazy principal of an existing agent in
 /// `thread/message.rs`. `AgentPersistence::create` is `#[cfg(test)]`, so it is not production.
@@ -164,12 +165,12 @@ fn agent_default_desk_company_agents_have_one_creation_path() {
     let expected: BTreeSet<(String, String, String)> = [
         (
             "src/adapters/persistence/company_agent.rs",
-            "create_company_agent_on",
+            "insert_company_agent_identity_on",
             "create_agent_principal_on",
         ),
         (
             "src/adapters/persistence/company_agent.rs",
-            "create_company_agent_on",
+            "insert_company_agent_identity_on",
             "insert_agent_on",
         ),
         (

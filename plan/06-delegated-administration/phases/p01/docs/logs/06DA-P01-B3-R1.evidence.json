@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B3-R1",
+  "artifact": "831c4502e070a2fa76966cc2ccdec073f50f34dea936055963fcfb1ab1566d6a",
+  "checks": [
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "git diff --check",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "owned Plan06 PostgreSQL18 / openbot_p06_b3_v2; schema metadata openbot_p06_b3_gate",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-sqlx-prepare.txt",
+          "sha256": "c7939c0d45183f4fb4f9856b3d27522e53154c8816b6e4769cc5a28bcf3a0147"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-offline.txt",
+          "sha256": "80a72ab0b6d57f57833fbff08eb4f1c216d4bb98fd0953be701bdd8ef1a25c8e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-clippy.txt",
+          "sha256": "37a57d6c0d52f817cb3e7c08a71a8914f5a5a6db2aa568bfdf277035c0a9f308"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-DEFINITIONS",
+        "B3-AGENTS",
+        "B3-CONCURRENCY",
+        "B3-BUILDER",
+        "B3-INHERITED"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- --nocapture delegated_ department_directory_ company_agent::tests local_agent_tests::e2e local_agent_tests::retention::peer",
+      "fixture": "owned Plan06 PostgreSQL18 / openbot_p06_b3_v2; schema metadata openbot_p06_b3_gate",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-corrections.txt",
+          "sha256": "f26dd6997de9ee1917cd27a23374f5515b5a7f0a0c20c0d5c01f0a1b72d9cae3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-source-modules.txt",
+          "sha256": "50442f1f7b1a1e8ef588087284de79168dd404663861155fa1733b8fc3976a03"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-after-tests.txt",
+          "sha256": "a231075ead46fd32657603284cc618c78541f61c2b69dd533f675989dc646569"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "trail build",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-trail-build-final.txt",
+          "sha256": "ff0704ae1be9242046141f7a35d9fbe4e28282ca4279cedb145b570bb5cbd79a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-CHECKPOINT"
+      ],
+      "command": "trail check",
+      "fixture": "worktree-local target",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-trail-check-final.txt",
+          "sha256": "54e624d86f8706097c6aff8a7c9ba4be73e3364ba61ae40090162b18ba0d548d"
+        }
+      ],
+      "reason": "Raw trail learning match is the previously confirmed lexical teardown false positive; independent recheck required."
+    },
+    {
+      "criteria": [
+        "B3-SCHEMA"
+      ],
+      "command": "DATABASE_URL=<owned fresh openbot_p06_b3_gate> cargo sqlx migrate run",
+      "fixture": "owned PostgreSQL18 / fresh openbot_p06_b3_gate",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-migration-final.txt",
+          "sha256": "e2896f71d2fc3e1aea10d9aa6e402d853a5357a39b7bd0ea7ad4904dec469a0b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-STACK"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline -- delegated_admin_agent_ delegated_admin_builder_",
+      "fixture": "owned PostgreSQL18 / openbot_p06_b3_v2; unchanged 2048 KiB stack",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-focused-stack.txt",
+          "sha256": "22deb7f3f19e4a0f385baf8b5466eb9fffbc04249b2bf47267762f5c7163426d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-DISCOVERY"
+      ],
+      "command": "Compare identical library test names in B2-R2-after-tests and B3-after-tests; account separately for unchanged other Cargo targets",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-discovery-delta.txt",
+          "sha256": "99dbd225c4ab7e0f9a84d0c6fd1269eca86201cb0492d58e4607b595efda3edb"
+        },
+        {
+          "path": "logs/B3-after-tests.txt",
+          "sha256": "a231075ead46fd32657603284cc618c78541f61c2b69dd533f675989dc646569"
+        },
+        {
+          "path": "logs/B2-R2-after-tests.txt",
+          "sha256": "111b4f93ce2dd5b843683de041240b26f7d731eded8ecae97fcc593f9c82c876"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-PEER-PREREQUISITES"
+      ],
+      "command": "npm ci --prefix integrations/cloudroom-plugin; (cwd integrations/cloudroom-plugin) node scripts/build.mjs --test",
+      "fixture": "local Node26.13.1/npm11.20.0; installed locked packages; built18 existing test entries",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-plugin-dependencies.txt",
+          "sha256": "89c9ddb33d3f966cb746cb4862dff5a710241214a6d7d436a5f0e8e858ac7ef5"
+        },
+        {
+          "path": "logs/B3-plugin-build-fixtures-corrected.txt",
+          "sha256": "34dd69f4857e0aa79afa62077b34e8bebcb940bb78861c0803103e6a304ec504"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-FAILURE-HISTORY"
+      ],
+      "command": "Historical initial definition-family run; exact original shell filter was not retained",
+      "fixture": "owned PostgreSQL18 / openbot_p06_b3_v2; earlier first definition run same final schema",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-definitions-focused-initial.txt",
+          "sha256": "0cd59defade7c12f54589aaf0949aceac8e9705636a1c749f4cd153d9ea931cf"
+        }
+      ],
+      "reason": "All failed assertions now exercised successfully by B3-corrections; retain historical failures. The805 unchanged broader positives remain reusable for unchanged paths/assertions."
+    },
+    {
+      "criteria": [
+        "B3-FAILURE-HISTORY"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib delegated_ -- --nocapture",
+      "fixture": "owned PostgreSQL18 / openbot_p06_b3_v2; earlier first definition run same final schema",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-delegated-corrected-v2.txt",
+          "sha256": "60dd8b1f6d0c34cba4c5caec0ad0ece5651706490846fdc5fe685c3be61f4fa0"
+        }
+      ],
+      "reason": "All failed assertions now exercised successfully by B3-corrections; retain historical failures. The805 unchanged broader positives remain reusable for unchanged paths/assertions."
+    },
+    {
+      "criteria": [
+        "B3-FAILURE-HISTORY"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib delegated_ -- --nocapture",
+      "fixture": "owned PostgreSQL18 / openbot_p06_b3_v2; earlier first definition run same final schema",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-delegated-final.txt",
+          "sha256": "6c7177b3ea970b6f809947385168291f99fd1f0c0697d68e145888c0dd7b6469"
+        }
+      ],
+      "reason": "All failed assertions now exercised successfully by B3-corrections; retain historical failures. The805 unchanged broader positives remain reusable for unchanged paths/assertions."
+    },
+    {
+      "criteria": [
+        "B3-FAILURE-HISTORY"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_ agent_ provisioning_ department_directory_ workflow_definition_ workflow_template_ workflows::tests:: company_test agent_tests onboarding::tests skill::tests",
+      "fixture": "owned PostgreSQL18 / openbot_p06_b3_v2; earlier first definition run same final schema",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-affected-interfaces.txt",
+          "sha256": "c3a50f19bf425acd2f2ea0e16a3ec3ec5f341c989038b15655f0e12dc362f11b"
+        }
+      ],
+      "reason": "All failed assertions now exercised successfully by B3-corrections; retain historical failures. The805 unchanged broader positives remain reusable for unchanged paths/assertions."
+    },
+    {
+      "criteria": [
+        "PLAN06-FINAL",
+        "IGNORED-FIXTURES"
+      ],
+      "command": "scripts/check.sh and complete Plan06/CI gate",
+      "fixture": "not started",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "User requires STOP at knowledge01B.6 / missing accepted05/ph03; complete source integration, UI/audit/docs and final gates remain pending. Eight ignored broader fixtures are unexercised; three also ignored by focused run."
+    }
+  ]
+}

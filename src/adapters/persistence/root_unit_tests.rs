@@ -232,7 +232,7 @@ async fn assert_admin_changes(
                 member_principal
             )
             .await,
-        Err(AppError::Forbidden(_))
+        Err(AppError::NotFound(_))
     ));
     assert!(matches!(
         departments
@@ -244,7 +244,7 @@ async fn assert_admin_changes(
                 member_principal
             )
             .await,
-        Err(AppError::Forbidden(_) | AppError::NotFound(_))
+        Err(AppError::NotFound(_))
     ));
     departments
         .assign_role(
@@ -267,7 +267,7 @@ async fn assert_admin_changes(
                 member_principal
             )
             .await,
-        Err(AppError::Forbidden(_))
+        Err(AppError::NotFound(_))
     ));
     departments
         .clear_role(

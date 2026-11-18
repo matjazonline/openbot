@@ -5,6 +5,9 @@ use crate::entities::mcp::{McpAuth, McpDiscoveredTool};
 use serde_json::json;
 use std::sync::Mutex;
 
+#[path = "delegated_binding_management_tests.rs"]
+mod delegated;
+
 #[derive(Clone)]
 struct Capture {
     persistence: PostgresPersistence,

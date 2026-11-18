@@ -91,7 +91,7 @@ async fn receiving_target(
             .id
         }
     };
-    let desk = ChannelPersistence::create(
+    let desk = crate::adapters::persistence::test_support::create_channel(
         p,
         f.people.role.company().as_uuid(),
         ChannelWrite {

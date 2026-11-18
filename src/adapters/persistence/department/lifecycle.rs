@@ -66,16 +66,6 @@ pub(crate) async fn create_department_with_id_on(
     .await
     .map_err(|error| slug_conflict(error, &write.slug))?;
     let department = Department::try_from(department)?;
-    // Boxed: an agent lead's desk descends into template compilation and publication.
-    Box::pin(provision_department_desk_on(
-        tx,
-        templates,
-        company,
-        actor,
-        &department,
-        lead,
-    ))
-    .await?;
     if let Some(lead) = lead {
         assign_department_role_on(
             tx,
@@ -88,6 +78,16 @@ pub(crate) async fn create_department_with_id_on(
         )
         .await?;
     }
+    // Boxed: an agent lead's desk descends into template compilation and publication.
+    Box::pin(provision_department_desk_on(
+        tx,
+        templates,
+        company,
+        actor,
+        &department,
+        lead,
+    ))
+    .await?;
     Ok(department)
 }
 
@@ -207,6 +207,15 @@ async fn guard_department_delete_on(
             current.name
         )));
     }
+    let owns_definitions: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_definitions WHERE company_id=$1 AND managing_department_id=$2)",
+    ).bind(company.as_uuid()).bind(department.as_uuid()).fetch_one(&mut **tx).await?;
+    if owns_definitions {
+        return Err(AppError::Conflict(format!(
+            "Department '{}' still owns workflow definitions and cannot be deleted.",
+            current.name,
+        )));
+    }
     let captured: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM workflow_run_role_bindings WHERE company_id=$1 AND department_id=$2)",
     ).bind(company.as_uuid()).bind(department.as_uuid()).fetch_one(&mut **tx).await?;
@@ -245,19 +254,7 @@ pub(crate) async fn delete_department_on(
         .bind(department.as_uuid())
         .execute(&mut **tx)
         .await
-        .map_err(|error| {
-            if error
-                .as_database_error()
-                .is_some_and(|database| database.is_foreign_key_violation())
-            {
-                AppError::Conflict(format!(
-                    "Department '{}' is still referenced and cannot be deleted.",
-                    current.name
-                ))
-            } else {
-                AppError::from(error)
-            }
-        })?;
+        .map_err(delete_error)?;
     super::super::workflow::role_binding::check_principals_on(tx, company, &placed).await?;
     // Its lead was a child lead of the parent's desks.
     if let Some(parent) = current.parent_id {
@@ -272,4 +269,15 @@ pub(crate) async fn delete_department_on(
     .execute(&mut **tx)
     .await?;
     Ok(())
+}
+
+pub(super) fn delete_error(error: sqlx::Error) -> AppError {
+    if error
+        .as_database_error()
+        .is_some_and(|database| database.is_foreign_key_violation())
+    {
+        AppError::Conflict("The department is still referenced and cannot be deleted.".into())
+    } else {
+        AppError::from(error)
+    }
 }

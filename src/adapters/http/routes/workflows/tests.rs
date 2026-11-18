@@ -9,7 +9,6 @@ use crate::adapters::persistence::{
     PostgresPersistence,
     test_support::{OwnDatabase, own_database},
 };
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::registry;
 use crate::infra::config::AppConfig;
@@ -390,3 +389,6 @@ mod run_filter_tests;
 mod tenancy_tests;
 #[path = "tool_tests.rs"]
 mod tool_tests;
+
+#[path = "delegated_definition_tests.rs"]
+mod delegated_definitions;

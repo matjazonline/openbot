@@ -2,7 +2,6 @@ use super::*;
 use crate::adapters::persistence::test_support::OwnDatabase;
 use crate::adapters::persistence::test_support::own_database;
 use crate::adapters::workflow_source::WorkflowSourceDecoder;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::services::harness::ClassificationRequest;
 use crate::application::services::harness::TextClassifier;
@@ -299,7 +298,7 @@ async fn onboarding_second_principal_workflow_error_rolls_back_every_effect() {
 #[tokio::test]
 async fn agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing() {
     let f = Fixture::new(false).await;
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         f.persistence.as_ref(),
         f.company,
         ChannelWrite {

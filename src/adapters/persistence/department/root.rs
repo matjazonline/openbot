@@ -1,12 +1,6 @@
 //! Root-only company authority on department management surfaces.
 use super::*;
 
-#[derive(sqlx::FromRow)]
-struct RootRoleAccess {
-    is_root: bool,
-    is_owner: bool,
-}
-
 pub(super) async fn root_role_authority_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
@@ -14,32 +8,38 @@ pub(super) async fn root_role_authority_on(
     department: DepartmentId,
     role: DepartmentRole,
 ) -> AppResult<()> {
+    use crate::application::use_cases::administration::{ManagementRole, ManagementTarget};
+    let current = lock_department_on(tx, company, department).await?;
+    if current.is_root {
+        if super::super::administration::management_role_on(
+            tx,
+            actor.user_id(),
+            company,
+            ManagementTarget::Root,
+        )
+        .await?
+            != Some(ManagementRole::Owner)
+        {
+            return Err(department_not_found());
+        }
+    } else {
+        require_department_management_on(tx, DepartmentScope { company, actor }, current.parent_id)
+            .await?;
+    }
     match role {
         DepartmentRole::Owner => {
             return Err(AppError::BadRequest(
                 "The owner role follows the company owner and cannot be edited here.".into(),
             ));
         }
-        DepartmentRole::Lead | DepartmentRole::Reviewer => return Ok(()),
-        DepartmentRole::Admin => {}
+        DepartmentRole::Admin if !current.is_root => {
+            return Err(AppError::BadRequest(
+                "The admin role belongs to the company root.".into(),
+            ));
+        }
+        _ => {}
     }
-    let access = sqlx::query_as::<_, RootRoleAccess>(
-        "SELECT department.is_root, company.user_id = $3 AS is_owner \
-         FROM companies AS company JOIN departments AS department ON department.company_id = company.id \
-         WHERE company.id = $1 AND department.id = $2",
-    )
-    .bind(company.as_uuid()).bind(department.as_uuid()).bind(actor.user_id())
-    .fetch_optional(&mut **tx).await?.ok_or_else(department_not_found)?;
-    if !access.is_root {
-        return Err(AppError::BadRequest(
-            "The admin role belongs to the company root.".into(),
-        ));
-    }
-    if !access.is_owner {
-        return Err(AppError::Forbidden(
-            "Only the company owner may change team administration.".into(),
-        ));
-    }
+
     Ok(())
 }
 

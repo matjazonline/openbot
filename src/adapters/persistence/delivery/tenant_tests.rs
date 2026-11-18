@@ -540,7 +540,7 @@ async fn channel_path_fk_delivery_cannot_cross_channels() {
     )
     .await;
     park(&persistence, fixture.delivery.id).await;
-    let other = ChannelPersistence::create(
+    let other = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         scope.company.id,
         ChannelWrite {

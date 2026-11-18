@@ -1,7 +1,7 @@
 //! Managing departments, their members and their roles (01-departments).
 //!
-//! Managing needs the authority managing channels needs: the company's owner or an admin. A plain
-//! member is refused exactly like a stranger, with `NotFound`, so a department id cannot be probed.
+//! Configuration follows the unit hierarchy. A refusal is `NotFound`, so department ids
+//! cannot be probed and management never confers conversation visibility.
 //! Persistence re-checks that authority under the company write lock.
 use std::sync::Arc;
 
@@ -28,7 +28,7 @@ use crate::{
     },
     use_cases::{
         channel::{SlugKind, validate_slug},
-        company::{CompanyPersistence, company_not_found, managed_company, readable_company},
+        company::{CompanyPersistence, readable_company},
     },
 };
 
@@ -160,18 +160,62 @@ impl DepartmentUseCases {
         }
     }
 
-    /// The caller manages this company, or it does not exist for them: a member's `Forbidden`
-    /// becomes the stranger's `NotFound`.
-    async fn managed(&self, user_id: Uuid, company_id: Uuid) -> AppResult<DepartmentScope> {
-        match managed_company(self.companies.as_ref(), user_id, company_id).await {
-            Ok(_) => {}
-            Err(AppError::Forbidden(_)) => return Err(company_not_found()),
-            Err(error) => return Err(error),
-        }
+    async fn managed(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit: Option<DepartmentId>,
+    ) -> AppResult<DepartmentScope> {
+        use super::administration::{ManagementTarget, require_management};
+        require_management(
+            self.departments.as_ref(),
+            user_id,
+            CompanyId::new(company_id),
+            unit.map_or(ManagementTarget::Root, ManagementTarget::Unit),
+        )
+        .await?;
         Ok(DepartmentScope {
             actor: WorkflowActor::authenticated(user_id)?,
             company: CompanyId::new(company_id),
         })
+    }
+
+    async fn managed_parent(
+        &self,
+        user: Uuid,
+        company: Uuid,
+        unit: DepartmentId,
+    ) -> AppResult<DepartmentScope> {
+        let department = self
+            .departments
+            .get(CompanyId::new(company), unit)
+            .await?
+            .ok_or_else(department_not_found)?;
+        self.managed(user, company, department.parent_id).await
+    }
+
+    async fn managed_roles(
+        &self,
+        user: Uuid,
+        company: Uuid,
+        unit: DepartmentId,
+    ) -> AppResult<DepartmentScope> {
+        use super::administration::{ManagementRole, ManagementTarget};
+        let department = self
+            .departments
+            .get(CompanyId::new(company), unit)
+            .await?
+            .ok_or_else(department_not_found)?;
+        if department.is_root
+            && self
+                .departments
+                .management_role(user, CompanyId::new(company), ManagementTarget::Root)
+                .await?
+                != Some(ManagementRole::Owner)
+        {
+            return Err(department_not_found());
+        }
+        self.managed(user, company, department.parent_id).await
     }
 
     #[instrument(skip_all)]
@@ -182,7 +226,7 @@ impl DepartmentUseCases {
         mut write: DepartmentWrite,
         lead: Option<PrincipalId>,
     ) -> AppResult<Department> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, write.parent_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
         info!(%company_id, "Creating department");
@@ -197,7 +241,10 @@ impl DepartmentUseCases {
         department: DepartmentId,
         mut edit: DepartmentEdit,
     ) -> AppResult<Department> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_parent(user_id, company_id, department).await?;
+        if let Some(parent) = edit.parent_id {
+            self.managed(user_id, company_id, parent).await?;
+        }
         edit.normalize()?;
         info!(%company_id, %department, "Updating department");
         self.departments.update(scope, department, edit).await
@@ -210,7 +257,7 @@ impl DepartmentUseCases {
         company_id: Uuid,
         department: DepartmentId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_parent(user_id, company_id, department).await?;
         info!(%company_id, %department, "Deleting department");
         self.departments.delete(scope, department).await
     }
@@ -224,7 +271,7 @@ impl DepartmentUseCases {
         role: DepartmentRole,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_roles(user_id, company_id, department).await?;
         info!(%company_id, %department, %role, %principal, "Assigning department role");
         self.departments
             .assign_role(scope, department, role, principal)
@@ -240,7 +287,7 @@ impl DepartmentUseCases {
         role: DepartmentRole,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_roles(user_id, company_id, department).await?;
         info!(%company_id, %department, %role, %principal, "Clearing department role");
         self.departments
             .clear_role(scope, department, role, principal)
@@ -255,7 +302,7 @@ impl DepartmentUseCases {
         department: DepartmentId,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, Some(department)).await?;
         info!(%company_id, %department, %principal, "Adding department member");
         self.departments
             .add_member(scope, department, principal)
@@ -270,7 +317,7 @@ impl DepartmentUseCases {
         department: DepartmentId,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, Some(department)).await?;
         info!(%company_id, %department, %principal, "Removing department member");
         self.departments
             .remove_member(scope, department, principal)
@@ -284,7 +331,7 @@ impl DepartmentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Department>> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, None).await?;
         self.departments.list_by_company(scope.company).await
     }
 
@@ -440,7 +487,7 @@ impl DepartmentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<(Vec<DepartmentPrincipal>, bool)> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, None).await?;
         let mut choices = self
             .departments
             .principals(scope.company, MAX_DEPARTMENT_PRINCIPAL_CHOICES + 1)

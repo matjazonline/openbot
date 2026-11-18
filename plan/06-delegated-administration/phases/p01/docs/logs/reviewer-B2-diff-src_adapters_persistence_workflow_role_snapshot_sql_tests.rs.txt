@@ -1,0 +1,18 @@
+--- B1/src/adapters/persistence/workflow/role_snapshot_sql_tests.rs
++++ B2/src/adapters/persistence/workflow/role_snapshot_sql_tests.rs
+@@ -222,6 +222,7 @@
+     ChannelPersistence::update(
+         f.p(),
+         ChannelUpdate {
++            actor: binding.target.actor,
+             company_id: f.company().as_uuid(),
+             channel_id: f.channel,
+             write: ChannelWrite {
+@@ -250,6 +251,7 @@
+         ChannelPersistence::update(
+             f.p(),
+             ChannelUpdate {
++                actor: binding.target.actor,
+                 company_id: f.company().as_uuid(),
+                 channel_id: desk,
+                 write: ChannelWrite {

@@ -41,6 +41,11 @@ async fn pending_target_edit(f: &QueuedRelay, blocker: i32) -> tokio::task::Join
         ChannelPersistence::update(
             &p,
             ChannelUpdate {
+                actor: crate::adapters::persistence::test_support::company_owner_actor(
+                    &p,
+                    old.company_id,
+                )
+                .await,
                 company_id: old.company_id,
                 channel_id: desk,
                 write: ChannelWrite {

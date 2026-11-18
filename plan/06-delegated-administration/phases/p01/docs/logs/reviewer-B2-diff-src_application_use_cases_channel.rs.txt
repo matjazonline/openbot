@@ -1,0 +1,156 @@
+--- B1/src/application/use_cases/channel.rs
++++ B2/src/application/use_cases/channel.rs
+@@ -194,6 +194,23 @@
+         Ok(())
+     }
+ 
++    async fn verify_unit_manager(
++        &self,
++        user_id: Uuid,
++        company_id: Uuid,
++        unit: Option<crate::entities::department::DepartmentId>,
++    ) -> AppResult<()> {
++        use crate::application::use_cases::administration::{ManagementTarget, require_management};
++        require_management(
++            self.participant_persistence.as_ref(),
++            user_id,
++            crate::domain::workflow::CompanyId::new(company_id),
++            unit.map_or(ManagementTarget::Root, ManagementTarget::Unit),
++        )
++        .await
++        .map(drop)
++    }
++
+     #[instrument(skip_all)]
+     pub async fn create_channel(
+         &self,
+@@ -202,7 +219,8 @@
+         mut write: ChannelWrite,
+         confirm_spam_disabled: bool,
+     ) -> AppResult<Channel> {
+-        self.verify_company_manager(user_id, company_id).await?;
++        self.verify_unit_manager(user_id, company_id, write.department_id)
++            .await?;
+         write.created_by = Some(CreationProvenance::user(user_id));
+ 
+         write.normalize()?;
+@@ -210,7 +228,13 @@
+ 
+         info!(%company_id, "Creating channel");
+ 
+-        self.channel_persistence.create(company_id, write).await
++        self.channel_persistence
++            .create(
++                crate::application::workflow::WorkflowActor::authenticated(user_id)?,
++                company_id,
++                write,
++            )
++            .await
+     }
+ 
+     fn check_spam_interlock(
+@@ -287,12 +311,15 @@
+         company_id: Uuid,
+         channel_id: Uuid,
+     ) -> AppResult<Option<Channel>> {
+-        self.verify_company_manager(user_id, company_id).await?;
+         let channel = self.channel_persistence.get_by_id(channel_id).await?;
+         if let Some(ref ch) = channel
+             && ch.company_id != company_id
+         {
+             return Ok(None);
++        }
++        if let Some(channel) = &channel {
++            self.verify_unit_manager(user_id, company_id, Some(channel.department_id))
++                .await?;
+         }
+         Ok(channel)
+     }
+@@ -310,8 +337,6 @@
+         mut write: ChannelWrite,
+         confirm_spam_disabled: bool,
+     ) -> AppResult<Channel> {
+-        self.verify_company_manager(user_id, company_id).await?;
+-
+         let channel = self
+             .channel_persistence
+             .get_by_id(channel_id)
+@@ -321,6 +346,14 @@
+         if channel.company_id != company_id {
+             return Err(channel_not_found());
+         }
++        self.verify_unit_manager(user_id, company_id, Some(channel.department_id))
++            .await?;
++        if let Some(unit) = write.department_id
++            && unit != channel.department_id
++        {
++            self.verify_unit_manager(user_id, company_id, Some(unit))
++                .await?;
++        }
+ 
+         write.normalize()?;
+         self.check_spam_interlock(&write, confirm_spam_disabled)?;
+@@ -329,6 +362,7 @@
+ 
+         self.channel_persistence
+             .update(ChannelUpdate {
++                actor: crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+                 company_id,
+                 channel_id,
+                 write,
+@@ -343,8 +377,6 @@
+         company_id: Uuid,
+         channel_id: Uuid,
+     ) -> AppResult<()> {
+-        self.verify_company_manager(user_id, company_id).await?;
+-
+         let channel = self
+             .channel_persistence
+             .get_by_id(channel_id)
+@@ -354,9 +386,17 @@
+         if channel.company_id != company_id {
+             return Err(channel_not_found());
+         }
++        self.verify_unit_manager(user_id, company_id, Some(channel.department_id))
++            .await?;
+ 
+         info!("Deleting channel {} for company {}", channel_id, company_id);
+-        self.channel_persistence.delete(channel_id).await
++        self.channel_persistence
++            .delete(
++                crate::application::workflow::WorkflowActor::authenticated(user_id)?,
++                company_id,
++                channel_id,
++            )
++            .await
+     }
+ 
+     #[instrument(skip_all)]
+@@ -598,7 +638,12 @@
+ 
+     #[async_trait]
+     impl ChannelPersistence for MockChannelPersistence {
+-        async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
++        async fn create(
++            &self,
++            _actor: crate::application::workflow::WorkflowActor,
++            company_id: Uuid,
++            write: ChannelWrite,
++        ) -> AppResult<Channel> {
+             let channel = channel_from_write(Uuid::new_v4(), company_id, write);
+             self.channels.lock().unwrap().push(channel.clone());
+             Ok(channel)
+@@ -685,7 +730,12 @@
+             Ok(existing.clone())
+         }
+ 
+-        async fn delete(&self, id: Uuid) -> AppResult<()> {
++        async fn delete(
++            &self,
++            _actor: crate::application::workflow::WorkflowActor,
++            _company_id: Uuid,
++            id: Uuid,
++        ) -> AppResult<()> {
+             self.channels.lock().unwrap().retain(|w| w.id != id);
+             Ok(())
+         }

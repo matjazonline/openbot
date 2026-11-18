@@ -1,0 +1,153 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: unused import: `managed_company`
+  --> src/application/use_cases/agent.rs:26:39
+   |
+26 |         company::{CompanyPersistence, managed_company},
+   |                                       ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0046]: not all trait items implemented, missing: `update_library`, `delete_library`
+   --> src/application/use_cases/agent_tests.rs:35:1
+    |
+ 35 | impl AgentPersistence for MockAgentPersistence {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `update_library`, `delete_library` in implementation
+    |
+   ::: src/application/use_cases/agent.rs:130:5
+    |
+130 |     async fn update_library(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
+    |     -------------------------------------------------------------------------------- `update_library` from trait
+131 |
+132 |     async fn delete_library(&self, id: Uuid) -> AppResult<()>;
+    |     ---------------------------------------------------------- `delete_library` from trait
+
+error[E0046]: not all trait items implemented, missing: `delete_company_agent`
+   --> src/application/use_cases/agent_tests.rs:170:1
+    |
+170 | impl crate::application::agent::AgentDraftPersistence for MockAgentPersistence {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `delete_company_agent` in implementation
+    |
+   ::: src/application/agent/authoring.rs:132:5
+    |
+132 |     async fn delete_company_agent(&self, scope: AgentPublicationScope) -> AppResult<()>;
+    |     ------------------------------------------------------------------------------------ `delete_company_agent` from trait
+
+error[E0034]: multiple applicable items in scope
+   --> src/adapters/persistence/skill_bundle_copy_concurrency_tests.rs:121:15
+    |
+121 |             p.update_library(request.source.id, write("coherent-copy", "b"))
+    |               ^^^^^^^^^^^^^^ multiple `update_library` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::agent::AgentPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/agent.rs:403:1
+    |
+403 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::use_cases::skill::SkillManagementPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/skill.rs:253:1
+    |
+253 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+121 -             p.update_library(request.source.id, write("coherent-copy", "b"))
+121 +             application::use_cases::agent::AgentPersistence::update_library(&p, request.source.id, write("coherent-copy", "b"))
+    |
+help: disambiguate the method for candidate #2
+    |
+121 -             p.update_library(request.source.id, write("coherent-copy", "b"))
+121 +             application::use_cases::skill::SkillManagementPersistence::update_library(&p, request.source.id, write("coherent-copy", "b"))
+    |
+
+error[E0034]: multiple applicable items in scope
+   --> src/adapters/persistence/skill_tests.rs:375:29
+    |
+375 |     let error = persistence.delete_library(skill.id).await.unwrap_err();
+    |                             ^^^^^^^^^^^^^^ multiple `delete_library` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::agent::AgentPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/agent.rs:403:1
+    |
+403 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::use_cases::skill::SkillManagementPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/skill.rs:253:1
+    |
+253 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+375 -     let error = persistence.delete_library(skill.id).await.unwrap_err();
+375 +     let error = application::use_cases::agent::AgentPersistence::delete_library(&persistence, skill.id).await.unwrap_err();
+    |
+help: disambiguate the method for candidate #2
+    |
+375 -     let error = persistence.delete_library(skill.id).await.unwrap_err();
+375 +     let error = application::use_cases::skill::SkillManagementPersistence::delete_library(&persistence, skill.id).await.unwrap_err();
+    |
+
+error[E0034]: multiple applicable items in scope
+   --> src/application/use_cases/company_test_support.rs:368:18
+    |
+368 |                 .company_access(actor, company.as_uuid())
+    |                  ^^^^^^^^^^^^^^ multiple `company_access` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::company::CompanyPersistence` for the type `MockCompanyPersistence`
+   --> src/application/use_cases/company_test_support.rs:134:1
+    |
+134 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::use_cases::participant::test_support::TeamFixture` for the type `MockCompanyPersistence`
+   --> src/application/use_cases/company_test_support.rs:318:1
+    |
+318 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+367 -             match self
+368 -                 .company_access(actor, company.as_uuid())
+367 +             match application::use_cases::company::CompanyPersistence::company_access(&self, actor, company.as_uuid())
+    |
+help: disambiguate the method for candidate #2
+    |
+367 -             match self
+368 -                 .company_access(actor, company.as_uuid())
+367 +             match application::use_cases::participant::test_support::TeamFixture::company_access(&self, actor, company.as_uuid())
+    |
+
+warning: method call on a diverging inference variable
+   --> src/application/use_cases/company_test_support.rs:370:18
+    |
+370 |                 .map(|access| access.membership)
+    |                  ^^^
+    |
+    = help: consider providing a type annotation
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #156047 <https://github.com/rust-lang/rust/issues/156047>
+    = note: `#[warn(method_call_on_diverging_infer_var)]` (part of `#[warn(future_incompatible)]`) on by default
+
+error[E0277]: `!` is not an iterator
+   --> src/application/use_cases/company_test_support.rs:370:18
+    |
+370 |                 .map(|access| access.membership)
+    |                  ^^^ `!` is not an iterator
+    |
+    = help: the trait `Iterator` is not implemented for `!`
+
+error[E0277]: `!` is not an iterator
+   --> src/application/use_cases/company_test_support.rs:367:19
+    |
+367 |               match self
+    |  ___________________^
+368 | |                 .company_access(actor, company.as_uuid())
+369 | |                 .await?
+370 | |                 .map(|access| access.membership)
+    | |________________________________________________^ `!` is not an iterator
+    |
+    = help: the trait `Iterator` is not implemented for `!`
+
+warning: `open_bots` (lib) generated 1 warning (run `cargo fix --lib -p open_bots` to apply 1 suggestion)
+Some errors have detailed explanations: E0034, E0046, E0277.
+For more information about an error, try `rustc --explain E0034`.
+warning: `open_bots` (lib test) generated 2 warnings (1 duplicate)
+error: could not compile `open_bots` (lib test) due to 7 previous errors; 3 warnings emitted

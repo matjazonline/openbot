@@ -1,0 +1,10 @@
+--- B1/src/adapters/persistence/workflow/agent_history_channel_release_tests.rs
++++ B2/src/adapters/persistence/workflow/agent_history_channel_release_tests.rs
+@@ -20,6 +20,7 @@
+     ChannelPersistence::update(
+         d.p(),
+         crate::application::ports::channel::ChannelUpdate {
++            actor: d.fixture.target.actor,
+             company_id: d.fixture.target.company.as_uuid(),
+             channel_id: d.channel,
+             write: ChannelWrite {

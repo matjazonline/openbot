@@ -5419,6 +5419,7 @@ CREATE TABLE public.workflow_definitions (
     company_id uuid NOT NULL,
     id uuid NOT NULL,
     owner_agent_id uuid,
+    managing_department_id uuid NOT NULL,
     revision bigint NOT NULL,
     title text NOT NULL,
     description text NOT NULL,
@@ -15688,6 +15689,39 @@ CREATE UNIQUE INDEX department_roles_one_lead ON public.department_roles USING b
     WHERE (role = 'lead'::text);
 CREATE INDEX department_roles_principal_idx ON public.department_roles USING btree (company_id, principal_id);
 
+-- Management is a person authority over configuration, never a conversation grant.
+-- NULL selects the company's root; a missing/foreign explicit unit never falls back.
+-- Root counts as level one, matching department_shape_problem's eight-level bound.
+CREATE FUNCTION public.unit_management_role(checked_user uuid, checked_company uuid, checked_unit uuid)
+RETURNS text LANGUAGE sql STABLE AS $$
+    WITH RECURSIVE ancestors(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1
+        FROM public.departments AS department
+        WHERE department.company_id = checked_company
+          AND (department.id = checked_unit OR (checked_unit IS NULL AND department.is_root))
+        UNION ALL
+        SELECT department.id, department.parent_id, ancestor.depth + 1
+        FROM ancestors AS ancestor
+        JOIN public.departments AS department
+          ON department.company_id = checked_company AND department.id = ancestor.parent_id
+        WHERE ancestor.depth < 8
+    )
+    SELECT CASE
+        WHEN NOT EXISTS (SELECT 1 FROM ancestors) THEN NULL
+        WHEN actor.role = 'owner' THEN 'owner'
+        WHEN actor.role = 'admin' THEN 'admin'
+        ELSE (
+            SELECT 'lead:' || ancestor.id::text
+            FROM ancestors AS ancestor
+            JOIN public.department_roles AS holder
+              ON holder.company_id = checked_company AND holder.department_id = ancestor.id
+             AND holder.principal_id = actor.principal_id AND holder.role = 'lead'
+            ORDER BY ancestor.depth LIMIT 1
+        )
+    END
+    FROM public.membership_of(checked_user, checked_company) AS actor
+$$;
+
 -- Every desk belongs to a department. Reassign or delete its desks before deleting a
 -- department. The tenant participates in the FK; ownership cannot cross a company boundary.
 ALTER TABLE ONLY public.channels
@@ -19925,3 +19959,116 @@ BEGIN
 END $$;
 CREATE TRIGGER attribution_outbox_immutable BEFORE UPDATE ON public.attribution_lifecycle_outbox
     FOR EACH ROW EXECUTE FUNCTION public.guard_attribution_outbox_payload();
+
+-- Definition ownership is fixed at creation; active bindings determine current management.
+ALTER TABLE ONLY public.workflow_definitions
+    ADD CONSTRAINT workflow_definitions_managing_department_fk
+        FOREIGN KEY (company_id, managing_department_id)
+        REFERENCES public.departments(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+CREATE FUNCTION public.initialize_workflow_managing_department() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.managing_department_id IS NULL THEN
+        SELECT id INTO NEW.managing_department_id FROM public.departments
+            WHERE company_id=NEW.company_id AND is_root;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_definition_managing_department_default BEFORE INSERT
+    ON public.workflow_definitions FOR EACH ROW
+    EXECUTE FUNCTION public.initialize_workflow_managing_department();
+
+CREATE FUNCTION public.keep_workflow_managing_department() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.managing_department_id IS DISTINCT FROM OLD.managing_department_id THEN
+        RAISE EXCEPTION 'A workflow definition keeps its creating department' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_definition_managing_department_immutable
+    BEFORE UPDATE OF managing_department_id ON public.workflow_definitions FOR EACH ROW
+    EXECUTE FUNCTION public.keep_workflow_managing_department();
+
+-- Canonical root membership is implicit; only an unambiguous non-root placement is selected.
+CREATE FUNCTION public.workflow_creating_department(checked_user uuid, checked_company uuid)
+    RETURNS uuid LANGUAGE sql STABLE AS $$
+    WITH placements AS (
+        SELECT placed.department_id FROM public.principals AS principal
+        JOIN (
+            SELECT company_id, department_id, principal_id FROM public.department_members
+            UNION SELECT company_id, department_id, principal_id FROM public.department_roles
+        ) AS placed ON placed.company_id=principal.company_id AND placed.principal_id=principal.id
+        JOIN public.departments AS department
+            ON department.company_id=placed.company_id AND department.id=placed.department_id
+        WHERE principal.company_id=checked_company AND principal.user_id=checked_user
+            AND principal.kind='person' AND NOT department.is_root
+        GROUP BY placed.department_id LIMIT 2
+    )
+    SELECT CASE WHEN (SELECT count(*) FROM placements)=1
+        THEN (SELECT department_id FROM placements LIMIT 1)
+        ELSE (SELECT id FROM public.departments WHERE company_id=checked_company AND is_root)
+    END
+$$;
+
+-- One agent-placement projection serves both target checks and scoped configuration lists.
+CREATE FUNCTION public.agent_management_role(
+    checked_user uuid, checked_company uuid, checked_agent uuid
+) RETURNS text LANGUAGE sql STABLE AS $$
+    WITH target AS (
+        SELECT id FROM public.principals
+        WHERE company_id=checked_company AND agent_id=checked_agent AND kind='agent'
+    ), placements AS (
+        SELECT member.department_id FROM public.department_members AS member
+        JOIN target ON target.id=member.principal_id WHERE member.company_id=checked_company
+        UNION SELECT holder.department_id FROM public.department_roles AS holder
+        JOIN target ON target.id=holder.principal_id WHERE holder.company_id=checked_company
+    ), units AS (
+        SELECT department_id FROM placements
+        UNION ALL SELECT NULL::uuid WHERE EXISTS(SELECT 1 FROM target)
+            AND NOT EXISTS(SELECT 1 FROM placements)
+    )
+    SELECT management.role FROM units CROSS JOIN LATERAL (
+        SELECT public.unit_management_role(checked_user,checked_company,units.department_id) AS role
+    ) AS management WHERE management.role IS NOT NULL ORDER BY management.role LIMIT 1
+$$;
+
+CREATE FUNCTION public.workflow_definition_management_role(
+    checked_user uuid, checked_company uuid, checked_workflow uuid
+) RETURNS text LANGUAGE sql STABLE AS $$
+    WITH definition AS MATERIALIZED (
+        SELECT managing_department_id FROM public.workflow_definitions
+        WHERE company_id=checked_company AND id=checked_workflow
+            AND NOT EXISTS (SELECT 1 FROM public.native_mcp_brokers AS broker
+                WHERE broker.company_id=checked_company AND broker.workflow_id=checked_workflow)
+    ), active AS MATERIALIZED (
+        SELECT binding.channel_id, binding.principal_id FROM public.workflow_bindings AS binding
+        JOIN public.workflow_binding_revisions AS configuration
+            ON configuration.company_id=binding.company_id AND configuration.binding_id=binding.id
+                AND configuration.revision=binding.configuration_revision
+        JOIN public.workflow_versions AS version
+            ON version.company_id=configuration.company_id AND version.id=configuration.version_id
+        WHERE binding.company_id=checked_company AND binding.active
+            AND version.workflow_id=checked_workflow AND EXISTS(SELECT 1 FROM definition)
+    ), units AS (
+        SELECT channel.department_id FROM active JOIN public.channels AS channel
+            ON channel.company_id=checked_company AND channel.id=active.channel_id
+        UNION
+        SELECT NULL::uuid FROM active LEFT JOIN public.principals AS principal
+            ON principal.company_id=checked_company AND principal.id=active.principal_id
+        WHERE active.channel_id IS NULL AND (active.principal_id IS NULL OR principal.kind<>'agent')
+        UNION
+        SELECT managing_department_id FROM definition WHERE NOT EXISTS(SELECT 1 FROM active)
+    )
+    , candidates AS (
+        SELECT public.unit_management_role(checked_user,checked_company,units.department_id) AS role
+        FROM units
+        UNION
+        SELECT public.agent_management_role(checked_user,checked_company,principal.agent_id)
+        FROM active JOIN public.principals AS principal
+            ON principal.company_id=checked_company AND principal.id=active.principal_id
+                AND principal.kind='agent'
+    )
+    SELECT role FROM candidates WHERE role IS NOT NULL ORDER BY role LIMIT 1
+$$;

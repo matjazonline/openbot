@@ -1,0 +1,19 @@
+--- B1/src/adapters/persistence/workflow/public_desk_private_agent_tests.rs
++++ B2/src/adapters/persistence/workflow/public_desk_private_agent_tests.rs
+@@ -58,7 +58,7 @@
+ }
+ 
+ async fn restricted_desk(d: &Deployment) -> Uuid {
+-    ChannelPersistence::create(
++    crate::adapters::persistence::test_support::create_channel(
+         d.p(),
+         d.fixture.target.company.as_uuid(),
+         ChannelWrite {
+@@ -148,6 +148,7 @@
+     ChannelPersistence::update(
+         d.p(),
+         crate::application::ports::channel::ChannelUpdate {
++            actor: d.fixture.target.actor,
+             company_id: d.fixture.target.company.as_uuid(),
+             channel_id: d.channel,
+             write: ChannelWrite {

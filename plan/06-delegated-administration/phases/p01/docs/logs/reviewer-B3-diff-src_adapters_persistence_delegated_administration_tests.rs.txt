@@ -1,0 +1,9 @@
+--- B2/src/adapters/persistence/delegated_administration_tests.rs
++++ B3/src/adapters/persistence/delegated_administration_tests.rs
+@@ -448,3 +448,6 @@
+ mod desks;
+ #[path = "delegated_schedule_management_tests.rs"]
+ mod schedules;
++
++#[path = "delegated_agent_management_tests.rs"]
++mod agents;

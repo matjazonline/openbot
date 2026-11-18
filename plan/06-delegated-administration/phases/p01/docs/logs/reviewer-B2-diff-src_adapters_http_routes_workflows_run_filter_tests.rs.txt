@@ -1,0 +1,11 @@
+--- B1/src/adapters/http/routes/workflows/run_filter_tests.rs
++++ B2/src/adapters/http/routes/workflows/run_filter_tests.rs
+@@ -411,7 +411,7 @@
+     source["steps"]["start"]["child_version_id"] = json!(child_version.to_string());
+     let (_, parent_version) = f.published(owner, company, source).await;
+ 
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         &f.persistence,
+         company,
+         ChannelWrite {

@@ -411,7 +411,7 @@ async fn run_top_level_lists_a_parent_once_and_rolls_up_its_child() {
     source["steps"]["start"]["child_version_id"] = json!(child_version.to_string());
     let (_, parent_version) = f.published(owner, company, source).await;
 
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         company,
         ChannelWrite {

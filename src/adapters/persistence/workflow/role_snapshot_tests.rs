@@ -83,7 +83,7 @@ impl RoleFixture {
             )
             .await
             .unwrap();
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &binding.fixture.persistence,
             binding.target.company.as_uuid(),
             ChannelWrite {

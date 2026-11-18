@@ -1,0 +1,211 @@
+--- B2/src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs
++++ B3/src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs
+@@ -0,0 +1,208 @@
++use super::*;
++use crate::adapters::workflow_source::WorkflowSourceDecoder;
++use crate::application::workflow::templates::{
++    CompanyWorkflowDraft, CopyTemplateRequest, PreparedTemplateCopy, TemplateCopyService,
++    WorkflowDraftCopies,
++};
++use crate::application::workflow::{IdempotencyKey, publication::PublishedBundle};
++use crate::application::workflow::{LifecycleAuthorizer, lifecycle::*};
++use crate::domain::workflow::{DraftRevision, VersionId};
++use std::sync::Mutex;
++
++#[derive(Clone)]
++struct Capture {
++    p: PostgresPersistence,
++    draft: Arc<Mutex<Option<PreparedDraft>>>,
++    published: Arc<Mutex<Option<PreparedPublication>>>,
++    copied: Arc<Mutex<Option<PreparedTemplateCopy>>>,
++}
++
++impl Capture {
++    fn new(p: &PostgresPersistence) -> Self {
++        Self {
++            p: p.clone(),
++            draft: Default::default(),
++            published: Default::default(),
++            copied: Default::default(),
++        }
++    }
++}
++
++// Captures only preparation; all decisive refusals below call the real PostgreSQL writer.
++#[async_trait::async_trait]
++impl WorkflowDefinitions for Capture {
++    async fn draft(
++        &self,
++        c: CompanyId,
++        w: WorkflowId,
++    ) -> crate::app_error::AppResult<Option<DraftState>> {
++        self.p.draft(c, w).await
++    }
++    async fn publication(
++        &self,
++        c: CompanyId,
++        k: &IdempotencyKey,
++    ) -> crate::app_error::AppResult<Option<PublishedCommand>> {
++        self.p.publication(c, k).await
++    }
++    async fn selectable_version(
++        &self,
++        c: CompanyId,
++        v: VersionId,
++    ) -> crate::app_error::AppResult<Option<Arc<PublishedBundle>>> {
++        self.p.selectable_version(c, v).await
++    }
++    async fn save_draft(&self, command: PreparedDraft) -> crate::app_error::AppResult<()> {
++        *self.draft.lock().unwrap() = Some(command);
++        Ok(())
++    }
++    async fn publish(
++        &self,
++        command: PreparedPublication,
++    ) -> crate::app_error::AppResult<Arc<PublishedBundle>> {
++        let bundle = command.command().bundle.clone();
++        *self.published.lock().unwrap() = Some(command);
++        Ok(bundle)
++    }
++}
++
++#[async_trait::async_trait]
++impl WorkflowDraftCopies for Capture {
++    async fn insert_copy(&self, command: PreparedTemplateCopy) -> crate::app_error::AppResult<()> {
++        *self.copied.lock().unwrap() = Some(command);
++        Ok(())
++    }
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_prepared_writers_recheck_current_binding_authority() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, version) = m.published().await;
++    let capture = Capture::new(&m.f.persistence);
++    let p = &m.f.persistence;
++    let authorization = || LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone());
++    let service = DefinitionService::new(
++        authorization(),
++        capture.clone(),
++        WorkflowSourceDecoder,
++        crate::adapters::persistence::workflow::step_builtins::StepBuiltinPublicationDirectory {
++            persistence: p.clone(),
++        },
++    );
++    let target = DefinitionTarget {
++        company: company(m.f.company),
++        actor: m.a_actor,
++        workflow: WorkflowId::new(workflow),
++    };
++    service
++        .save(SaveDraft {
++            target,
++            expected: Some(DraftRevision::new(1).unwrap()),
++            content: DraftContent {
++                title: "Prepared edit".into(),
++                description: String::new(),
++                source: example("data.map", workflow).to_string(),
++            },
++        })
++        .await
++        .unwrap();
++    service
++        .publish(PublishDraft {
++            target,
++            expected: DraftRevision::new(1).unwrap(),
++            version: VersionId::new(Uuid::new_v4()),
++            key: IdempotencyKey::parse("prepared-stale").unwrap(),
++        })
++        .await
++        .unwrap();
++    let template = m.f.engine.template_catalogue().entries().first().unwrap();
++    TemplateCopyService::new(authorization(), capture.clone(), WorkflowSourceDecoder)
++        .copy(
++            m.f.engine.template_catalogue(),
++            CopyTemplateRequest::new(
++                target.company,
++                target.actor,
++                template.id().clone(),
++                template.revision(),
++                target.workflow,
++            )
++            .unwrap(),
++        )
++        .await
++        .unwrap();
++    let draft = capture.draft.lock().unwrap().take().unwrap();
++    let publication = capture.published.lock().unwrap().take().unwrap();
++    let copy = capture.copied.lock().unwrap().take().unwrap();
++    let events = m.events(workflow).await;
++    m.active(m.b_actor, m.b, version, "prepared-boundary").await;
++    assert!(matches!(
++        WorkflowDefinitions::save_draft(p, draft).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        WorkflowDefinitions::publish(p, publication).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        WorkflowDraftCopies::insert_copy(p, copy).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert_eq!(m.events(workflow).await, events);
++    assert_eq!(
++        p.draft(target.company, target.workflow)
++            .await
++            .unwrap()
++            .unwrap()
++            .draft
++            .revision()
++            .get(),
++        1
++    );
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_capture_uses_existing_authority_before_creation_permission() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, _) = m.published().await;
++    let p = &m.f.persistence;
++    let draft = p
++        .draft(company(m.f.company), WorkflowId::new(workflow))
++        .await
++        .unwrap()
++        .unwrap()
++        .draft;
++    let directory =
++        crate::adapters::persistence::workflow::step_builtins::StepBuiltinPublicationDirectory {
++            persistence: p.clone(),
++        };
++    assert!(matches!(
++        directory.capture(m.b_actor, &draft).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    let workflow = WorkflowId::new(Uuid::new_v4());
++    let fresh = CompanyWorkflowDraft::saved(
++        company(m.f.company),
++        workflow,
++        DraftRevision::new(1).unwrap(),
++        DraftContent {
++            title: "New draft".into(),
++            description: String::new(),
++            source: example("data.map", workflow.as_uuid()).to_string(),
++        },
++        None,
++    );
++    assert!(
++        !directory
++            .capture(m.b_actor, &fresh)
++            .await
++            .unwrap()
++            .snapshots
++            .tools
++            .is_empty()
++    );
++}

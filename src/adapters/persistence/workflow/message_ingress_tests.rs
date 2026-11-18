@@ -150,7 +150,7 @@ impl Deployment {
         .await
         .unwrap();
         let agent = created.agent;
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &p,
             company,
             ChannelWrite {

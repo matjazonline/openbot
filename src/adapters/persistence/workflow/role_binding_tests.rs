@@ -44,7 +44,7 @@ fn write(department: Option<DepartmentId>) -> ChannelWrite {
 }
 
 async fn desk(f: &BindingFixture, department: Option<DepartmentId>) -> Uuid {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &f.fixture.persistence,
         f.target.company.as_uuid(),
         write(department),
@@ -120,6 +120,7 @@ async fn workflow_role_binding_preserves_required_owner_and_allows_reassignment(
         .unwrap();
     let p = &f.fixture.persistence;
     let update = ChannelUpdate {
+        actor: f.target.actor,
         company_id: f.target.company.as_uuid(),
         channel_id: desk,
         write: write(None),
@@ -201,6 +202,7 @@ async fn workflow_role_binding_competing_activation_and_reassignment_keep_requir
         .await
         .unwrap();
     let update = ChannelUpdate {
+        actor: f.target.actor,
         company_id: f.target.company.as_uuid(),
         channel_id: desk,
         write: write(Some(root)),

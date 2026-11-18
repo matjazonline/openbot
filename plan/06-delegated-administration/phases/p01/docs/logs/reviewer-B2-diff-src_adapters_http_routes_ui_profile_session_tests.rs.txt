@@ -1,0 +1,20 @@
+--- B1/src/adapters/http/routes/ui_profile_session_tests.rs
++++ B2/src/adapters/http/routes/ui_profile_session_tests.rs
+@@ -314,7 +314,7 @@
+ #[tokio::test]
+ async fn address_profile_renames_only_the_callers_own_address() {
+     use crate::{
+-        application::ports::channel::{ChannelPersistence, ChannelWrite},
++        application::ports::channel::ChannelWrite,
+         use_cases::company::{CompanyPersistence, CompanyWrite},
+     };
+     let Some(f) = Fixture::new(AccountKind::Password, Confirmation::Immediate).await else {
+@@ -332,7 +332,7 @@
+     )
+     .await
+     .unwrap();
+-    ChannelPersistence::create(
++    crate::adapters::persistence::test_support::create_channel(
+         &persistence,
+         company.id,
+         ChannelWrite {

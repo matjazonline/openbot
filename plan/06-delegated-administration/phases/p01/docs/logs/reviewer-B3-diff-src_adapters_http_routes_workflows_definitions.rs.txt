@@ -1,0 +1,58 @@
+--- B2/src/adapters/http/routes/workflows/definitions.rs
++++ B3/src/adapters/http/routes/workflows/definitions.rs
+@@ -63,7 +63,15 @@
+     Path((company_id, workflow)): Path<(Uuid, Uuid)>,
+ ) -> WorkflowResult<Json<Value>> {
+     let company = company(company_id);
+-    authorize(&engine, company, actor(&user)?, RelatedAssociation::Company).await?;
++    engine
++        .authorization()
++        .authorize(
++            company,
++            actor(&user)?,
++            RelatedAssociation::Company,
++            WorkflowOperation::ManageDefinition(WorkflowId::new(workflow)),
++        )
++        .await?;
+     let detail = engine
+         .reads()
+         .definition(company, WorkflowId::new(workflow))
+@@ -371,13 +379,15 @@
+     user: AuthenticatedUser,
+     Path(company_id): Path<Uuid>,
+ ) -> WorkflowResult<Json<Value>> {
+-    authorize(
+-        &engine,
+-        company(company_id),
+-        actor(&user)?,
+-        RelatedAssociation::Company,
+-    )
+-    .await?;
++    engine
++        .authorization()
++        .authorize(
++            company(company_id),
++            actor(&user)?,
++            RelatedAssociation::Company,
++            WorkflowOperation::ListManaged,
++        )
++        .await?;
+     Ok(ok(json!(
+         engine
+             .template_catalogue()
+@@ -445,6 +455,15 @@
+         Err(crate::application::workflow::templates::TemplateError::Application(
+             AppError::Conflict(message),
+         )) => {
++            engine
++                .authorization()
++                .authorize(
++                    company,
++                    actor,
++                    RelatedAssociation::Company,
++                    WorkflowOperation::ManageDefinition(workflow),
++                )
++                .await?;
+             let existing = engine.reads().definition(company, workflow).await?;
+             match existing {
+                 Some(detail)

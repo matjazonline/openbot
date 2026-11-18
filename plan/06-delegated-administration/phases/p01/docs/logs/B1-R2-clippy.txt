@@ -1,0 +1,5 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 51.99s

@@ -1,0 +1,95 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 42s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 61 tests
+test adapters::http::pages::tests::the_column_marks_a_delegated_thread_without_being_told ... ok
+test adapters::http::pages::tests::every_delegated_action_has_a_branch_in_the_bundle ... ok
+test adapters::http::routes::channel::authorization_tests::delegated::delegated_admin_desk_json_routes_allow_the_unit_lead_and_hide_siblings_and_foreign_ids ... ok
+test adapters::http::routes::channel::authorization_tests::delegated::delegated_admin_schedule_json_routes_scope_configuration_to_the_desk_unit ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_sibling_foreign_missing_and_agent_writes_hide_revision_conflicts ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_old_binding_revisions_confer_no_authority ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::manages_unit_definition_uses_any_active_binding_and_recorded_unit_only_when_unbound ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_prepared_writers_recheck_current_binding_authority ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_capture_uses_existing_authority_before_creation_permission ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_unbound_crud_uses_the_recorded_creating_unit ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds ... ok
+
+thread 'adapters::http::routes::agent::api_tests::delegated::delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets' (30741676) panicked at src/adapters/http/routes/delegated_agent_api_tests.rs:75:64:
+called `Result::unwrap()` on an `Err` value: BadRequest("Invalid agent: missing field `native_permissions`")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::routes::agent::api_tests::delegated::delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets ... FAILED
+test adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_ownership_is_immutable_tenant_scoped_and_root_defaulted ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_binding_deactivation_precedes_definition_publication ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_binding_deactivation ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_role_removal ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_follows_active_bindings_without_adopting_ownership ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_role_removal_precedes_definition_publication ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_requires_current_target_authority ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_parent_member_and_role_boundaries ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_persistence_refuses_every_sibling_write ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_existing_create_collisions_require_current_management ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::construction::delegated_admin_agent_creation_rolls_back_early_membership_and_publications_on_final_grant_failure ... ok
+
+thread 'adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view' (30742869) panicked at src/adapters/persistence/delegated_agent_management_tests.rs:188:10:
+called `Result::unwrap()` on an `Err` value: Conflict("This agent has retained capability grant records and cannot be deleted.")
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_desk_crud_follows_the_managed_subtree_without_conversation_view ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view ... FAILED
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_desk_persistence_checks_current_destination_and_foreign_ownership ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::manages_unit_collection_entry_never_grants_an_individual_target ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_library_copy_uses_managed_placement_and_root_when_unplaced ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::boundaries::delegated_admin_unit_lead_cannot_inspect_root_owned_resources ... ok
+
+thread 'adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate' (30742971) panicked at src/adapters/persistence/delegated_agent_management_tests.rs:278:10:
+called `Result::unwrap()` on an `Err` value: Internal("The app domain is not configured")
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate ... FAILED
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_persistence_refuses_sibling_foreign_agent_and_library_bypasses ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::boundaries::delegated_admin_direct_nested_writers_hide_siblings_and_foreign_targets ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_agent_placements_use_any_managed_unit_and_no_unit_uses_root ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_agent_lead_transitions_configure_without_conversation_access ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_reaches_the_eighth_level_and_rejects_a_ninth ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_current_person_hierarchy_and_tenant_matrix ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_deletion_precedes_role_removal ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_configuration_and_lists_follow_managed_units_without_view ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_hides_foreign_ids_in_the_local_scope ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_refuses_sibling_and_foreign_writers ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_draft_write_precedes_role_removal ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_deletion ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_draft_write ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_desk_crud_locks_the_actor_before_the_company ... ok
+2026-11-17T18:04:24.471134Z  WARN open_bots::adapters::persistence::channel_edit: A channel edit was refused and rolled back company_id=043eac59-b545-4c8a-9321-1eb4a2e75d67 channel_id=2a89549b-78f3-47cd-b01f-dcabefc34e9d outcome="not_found" duration_ms=0
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_desk_edit_holds_authority_until_commit ... ok
+2026-11-17T18:04:24.998077Z  WARN open_bots::adapters::persistence::channel_edit: A channel edit was refused and rolled back company_id=c5edcc18-90c4-433b-bd4a-104ead2579ff channel_id=b15f28fc-c8e6-4bb3-94ac-aaac32e93299 outcome="not_found" duration_ms=3
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_role_removal_precedes_a_desk_edit ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_competing_lead_removal_precedes_a_locked_management_write ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::account_locks::delegated_admin_competing_schedule_writes_lock_the_actor_before_the_company ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_competing_role_removal_precedes_schedule_configuration ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_run_inspection_and_initiation_require_current_human_view ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::delegated_schedule::delegated_admin_schedule_claim_requires_human_view_before_both_admission_boundaries ... ok
+test adapters::persistence::workflow::tests::binding_tests::delegated::delegated_admin_binding_activity_hides_current_and_stale_revisions_from_other_units ... ok
+test adapters::persistence::workflow::tests::binding_tests::delegated::delegated_admin_binding_service_configures_activates_and_pauses_captured_messaging ... ok
+test adapters::persistence::workflow::tests::binding_tests::delegated::delegated_admin_competing_binding_activity_locks_the_actor_before_the_company ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_current_model_source ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_initial_preparation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_current_model_authority_fences_grant_removal ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_model_source_never_borrows_owned_reply_proof_for_other_runs ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::requester_locks::delegated_provisioning_locks_requester_before_company ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_reply_missing_agent_grant_never_enters_the_provider ... ok
+
+failures:
+
+failures:
+    adapters::http::routes::agent::api_tests::delegated::delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets
+    adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view
+    adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate
+
+test result: FAILED. 58 passed; 3 failed; 0 ignored; 0 measured; 4746 filtered out; finished in 29.99s
+
+error: test failed, to rerun pass `--lib`

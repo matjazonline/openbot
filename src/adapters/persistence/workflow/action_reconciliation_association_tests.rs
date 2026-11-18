@@ -2,7 +2,6 @@
 use super::proof_tests::all_tables;
 use super::*;
 use crate::adapters::persistence::workflow::tests::admission_tests::admission_history_tests::Conversation;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::{
     RelatedChannelId, RelatedThreadId, WorkflowAuthorization, WorkflowOperation,
@@ -127,7 +126,7 @@ async fn foreign_associations(f: &AdmissionFixture) -> ForeignAssociations {
     )
     .await
     .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         f.persistence(),
         foreign.id,
         ChannelWrite {

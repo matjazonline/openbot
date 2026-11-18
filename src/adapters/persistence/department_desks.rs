@@ -303,6 +303,7 @@ pub(crate) async fn sync_desk_grants_on(
 }
 
 /// Reassignment is the only ownership mutation; a stored owner can never be cleared.
+#[cfg(test)]
 pub(crate) async fn set_desk_ownership_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,

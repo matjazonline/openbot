@@ -89,7 +89,13 @@ async fn run_binding_fk_channel_with_runs_is_still_refused() {
     let binding = s.binding(MessageTrigger::Any, None).await;
     s.intent(TO).await;
     assert_eq!(s.drain(&s.admissions(admission(s.p()))).await, 1);
-    let refused = ChannelPersistence::delete(s.p(), s.channel).await;
+    let refused = ChannelPersistence::delete(
+        s.p(),
+        s.owner(),
+        s.fixture.target.company.as_uuid(),
+        s.channel,
+    )
+    .await;
     assert!(matches!(refused, Err(AppError::Conflict(_))), "{refused:?}");
     assert_eq!(s.runs(binding).await.len(), 1);
 }

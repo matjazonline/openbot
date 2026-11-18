@@ -6,6 +6,11 @@ use crate::{
     use_cases::{company::CompanyPersistence, user::UserPersistence},
 };
 
+struct RootRefusals {
+    roles: StatusCode,
+    membership: StatusCode,
+}
+
 struct RootRoutes {
     f: Fixture,
     departments: Arc<DepartmentUseCases>,
@@ -52,7 +57,7 @@ impl RootRoutes {
         })
     }
 
-    async fn refuse(&self, user: &User, company: Uuid, expected: StatusCode) {
+    async fn refuse(&self, user: &User, company: Uuid, expected: RootRefusals) {
         denied(
             assign_role_json(
                 State(self.departments.clone()),
@@ -60,7 +65,7 @@ impl RootRoutes {
                 Path((company, self.root, "admin".into(), self.principal)),
             )
             .await,
-            expected,
+            expected.roles,
             &self.f.foreign.name,
         )
         .await;
@@ -71,7 +76,7 @@ impl RootRoutes {
                 Path((company, self.root, "admin".into(), self.principal)),
             )
             .await,
-            expected,
+            expected.roles,
             &self.f.foreign.name,
         )
         .await;
@@ -82,7 +87,7 @@ impl RootRoutes {
                 Path((company, self.root, self.principal)),
             )
             .await,
-            expected,
+            expected.membership,
             &self.f.foreign.name,
         )
         .await;
@@ -211,7 +216,16 @@ async fn root_membership_department_routes_preserve_owner_only_team_mutations() 
         (&f.stranger, f.company.id, StatusCode::NOT_FOUND),
         (&f.owner, f.foreign.id, StatusCode::NOT_FOUND),
     ] {
-        routes.refuse(user, company, expected).await;
+        routes
+            .refuse(
+                user,
+                company,
+                RootRefusals {
+                    roles: StatusCode::NOT_FOUND,
+                    membership: expected,
+                },
+            )
+            .await;
     }
     routes.owner_role_round_trip().await;
     routes.preserve_owner_and_scope().await;

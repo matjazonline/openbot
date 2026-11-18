@@ -3,7 +3,9 @@
 use std::str::FromStr;
 
 use super::*;
-use crate::adapters::persistence::company_agent::{CompanyAgentCreation, create_company_agent_on};
+use crate::adapters::persistence::company_agent::{
+    AgentCreationPlacement, CompanyAgentCreation, create_company_agent_on,
+};
 use crate::adapters::persistence::department::place_in_department_on;
 use crate::entities::department::{DepartmentId, DepartmentRole};
 use crate::use_cases::agent::AgentPlacement;
@@ -90,7 +92,10 @@ async fn builder_on(
         CompanyAgentCreation {
             id: key.id("agent"),
             write,
-            placement: None,
+            placement: placement.map_or(
+                AgentCreationPlacement::Unplaced,
+                AgentCreationPlacement::Deferred,
+            ),
         },
     ))
     .await?;
@@ -147,17 +152,19 @@ async fn placement_on(
     let department = match spec.department.as_deref() {
         Some(slug) => {
             let id: Option<Uuid> = sqlx::query_scalar(
-                "SELECT id FROM departments WHERE company_id = $1 AND slug = $2",
+                "SELECT id FROM departments WHERE company_id=$1 AND slug=$2 \
+                 AND unit_management_role($3,$1,id) IS NOT NULL",
             )
             .bind(company.as_uuid())
             .bind(slug.trim().to_lowercase())
+            .bind(requester.user_id())
             .fetch_optional(&mut **tx)
             .await?;
             match id {
                 Some(id) => Some(DepartmentId::new(id)),
                 None => {
                     return Ok(Err(ProvisioningRefusal::Invalid(format!(
-                        "No department named '{}' exists in this company",
+                        "No available department named '{}' exists in this company",
                         slug.trim()
                     ))));
                 }

@@ -44,7 +44,7 @@ impl action_dispatch::SqlActionAuthority for MessageActionAuthority {
         }
         let kind =
             MessageKind::parse(request.contract.contract.name.as_str()).ok_or_else(missing)?;
-        let current = current_message_on(tx, request.scope.company, authority.actor, kind).await?;
+        let current = current_message_on(tx, request.scope, authority.actor, kind).await?;
         let run = run_route_on(tx, request.scope).await?;
         association::authorize_association(
             tx,
@@ -70,11 +70,13 @@ impl action_dispatch::SqlActionAuthority for MessageActionAuthority {
 /// Each caller must establish its own invocation grant before using this resource authority.
 pub(super) async fn current_message_on(
     db: &mut PgConnection,
-    company: CompanyId,
+    scope: ActionScope,
     actor: WorkflowActor,
     kind: MessageKind,
 ) -> AppResult<action_dispatch::LockedActionAuthority> {
-    authority::authorize_company(db, company, actor).await?;
+    let company = scope.company;
+    management::authorize_run_with_locks(db, company, scope.run, actor, row_locks::RowLocks::Wait)
+        .await?;
     Ok(action_dispatch::LockedActionAuthority {
         resource: messaging_status(company)?,
         policy: CurrentActionPolicy {

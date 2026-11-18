@@ -1,0 +1,6 @@
+                    datname                     |  pid  |        state        | wait_event_type | pg_blocking_pids |                                    query                                     
+------------------------------------------------+-------+---------------------+-----------------+------------------+------------------------------------------------------------------------------
+ open_bots_own_6edf44ed1ea1423c8c412f40b0fb34ca | 18527 | idle in transaction | Client          | {}               | DELETE FROM channel_principal_grants WHERE channel_id=$1 AND principal_id=$2
+ open_bots_own_6edf44ed1ea1423c8c412f40b0fb34ca | 18528 | active              | Lock            | {18527}          | SELECT department_id FROM channels WHERE company_id=$1 AND id=$2 FOR SHARE
+(2 rows)
+

@@ -108,7 +108,7 @@ async fn department_directory_lists_departments_roles_and_desks() {
     .await
     .unwrap()
     .id;
-    let plain = ChannelPersistence::create(
+    let plain = crate::adapters::persistence::test_support::create_channel(
         f.persistence(),
         company(&f).as_uuid(),
         ChannelWrite {
@@ -175,9 +175,14 @@ async fn department_directory_lists_departments_roles_and_desks() {
 
     let _ = scout;
 
-    ChannelPersistence::delete(f.persistence(), plain)
-        .await
-        .unwrap();
+    ChannelPersistence::delete(
+        f.persistence(),
+        f.binding.target.actor,
+        company(&f).as_uuid(),
+        plain,
+    )
+    .await
+    .unwrap();
     let desks = || async {
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM channels WHERE company_id = $1")
             .bind(company(&f).as_uuid())

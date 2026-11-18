@@ -1,0 +1,3 @@
+plan/06-delegated-administration/COORDINATION.md matches plan/06-delegated-administration/phases/p01/docs/logs/06DA-P01-B2-R2-coordination.md: True
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md matches plan/06-delegated-administration/phases/p01/docs/logs/06DA-P01-B2-R2-producer-coordination.md: True
+D3/r3 SHA256: 5d05aa1b9fd9c70a83a6691e59e2e76b666732f975c9fcf0f25b008dd043b52c

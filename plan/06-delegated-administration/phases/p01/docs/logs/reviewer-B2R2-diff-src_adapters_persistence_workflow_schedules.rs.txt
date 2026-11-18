@@ -1,0 +1,47 @@
+--- B2R1/src/adapters/persistence/workflow/schedules.rs
++++ B2R2/src/adapters/persistence/workflow/schedules.rs
+@@ -340,7 +340,7 @@
+         channel_id: Uuid,
+         write: ScheduleWrite,
+     ) -> AppResult<ChannelSchedule> {
+-        let mut tx = self.pool.begin().await?;
++        let mut tx = super::management::begin(self, company, actor).await?;
+         authorize_channel(&mut tx, company, actor, channel_id).await?;
+         let binding_channel = check_binding(&mut tx, company, write.binding_id, channel_id).await?;
+         let schedule = sqlx::query_as::<_, ScheduleRow>(&format!(
+@@ -374,7 +374,7 @@
+         channel_id: Uuid,
+         write: ScheduleWrite,
+     ) -> AppResult<ChannelSchedule> {
+-        let mut tx = self.pool.begin().await?;
++        let mut tx = super::management::begin(self, company, actor).await?;
+         let existing = managed(&mut tx, company, actor, id).await?;
+         if existing.channel_id != channel_id {
+             return Err(AppError::BadRequest(
+@@ -412,7 +412,7 @@
+     }
+ 
+     async fn delete(&self, actor: WorkflowActor, company: CompanyId, id: Uuid) -> AppResult<()> {
+-        let mut tx = self.pool.begin().await?;
++        let mut tx = super::management::begin(self, company, actor).await?;
+         managed(&mut tx, company, actor, id).await?;
+         sqlx::query("DELETE FROM channel_schedules WHERE company_id = $1 AND id = $2")
+             .bind(company.as_uuid())
+@@ -430,7 +430,7 @@
+         id: Uuid,
+         enabled: bool,
+     ) -> AppResult<()> {
+-        let mut tx = self.pool.begin().await?;
++        let mut tx = super::management::begin(self, company, actor).await?;
+         managed(&mut tx, company, actor, id).await?;
+         sqlx::query(
+             "UPDATE channel_schedules SET enabled = $3, updated_at = CURRENT_TIMESTAMP \
+@@ -452,7 +452,7 @@
+         id: Uuid,
+         command_key: &str,
+     ) -> AppResult<Uuid> {
+-        let mut tx = self.pool.begin().await?;
++        let mut tx = super::management::begin(self, company, actor).await?;
+         let schedule = managed(&mut tx, company, actor, id).await?;
+         association::authorize_association(
+             &mut tx,

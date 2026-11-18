@@ -145,7 +145,7 @@ async fn department_context_roster_lists_the_desks_around_the_department() {
     assert!(!member.lead);
     assert_eq!(member.roster, lead.roster);
     // Default-created shared desks receive their root department context.
-    let unowned = crate::application::ports::channel::ChannelPersistence::create(
+    let unowned = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.company,
         crate::application::ports::channel::ChannelWrite {

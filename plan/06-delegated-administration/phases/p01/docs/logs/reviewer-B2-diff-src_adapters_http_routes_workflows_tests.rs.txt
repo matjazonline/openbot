@@ -1,0 +1,10 @@
+--- B1/src/adapters/http/routes/workflows/tests.rs
++++ B2/src/adapters/http/routes/workflows/tests.rs
+@@ -9,7 +9,6 @@
+     PostgresPersistence,
+     test_support::{OwnDatabase, own_database},
+ };
+-use crate::application::ports::channel::ChannelPersistence;
+ use crate::application::ports::channel::ChannelWrite;
+ use crate::application::workflow::registry;
+ use crate::infra::config::AppConfig;

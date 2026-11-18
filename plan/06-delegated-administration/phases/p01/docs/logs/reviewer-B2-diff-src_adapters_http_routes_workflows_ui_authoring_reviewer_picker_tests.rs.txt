@@ -1,0 +1,28 @@
+--- B1/src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs
++++ B2/src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs
+@@ -1,6 +1,6 @@
+ use super::super::reviewer_picker::{ReviewerForm, apply, picker};
+ use super::*;
+-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
++use crate::application::ports::channel::ChannelWrite;
+ use crate::application::ports::department::DepartmentWrite;
+ use crate::application::workflow::registry;
+ use crate::domain::workflow::CompanyId;
+@@ -59,7 +59,7 @@
+         )
+         .await
+         .unwrap();
+-    let desk = ChannelPersistence::create(
++    let desk = crate::adapters::persistence::test_support::create_channel(
+         &f.persistence,
+         f.company,
+         ChannelWrite {
+@@ -165,7 +165,7 @@
+         .await,
+         Err(AppError::NotFound(_))
+     ));
+-    let foreign_desk = ChannelPersistence::create(
++    let foreign_desk = crate::adapters::persistence::test_support::create_channel(
+         &f.persistence,
+         f.other,
+         ChannelWrite {

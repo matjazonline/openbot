@@ -51,7 +51,7 @@ where
                 request.company,
                 request.actor,
                 RelatedAssociation::Company,
-                WorkflowOperation::CopyTemplate,
+                WorkflowOperation::CopyTemplate(request.workflow),
             )
             .await?;
         let template = catalogue.selected(&request.template, request.revision)?;

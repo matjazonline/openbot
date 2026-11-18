@@ -1,0 +1,31 @@
+--- B2R1/src/adapters/persistence/channel_edit.rs
++++ B2R2/src/adapters/persistence/channel_edit.rs
+@@ -2,7 +2,7 @@
+ //!
+ //! One transaction, in this order, so a failure anywhere leaves the channel exactly as it was:
+ //!
+-//! 1. the company and applicable desk ownership locks, serializing current reviewer refresh;
++//! 1. the actor account, then company and applicable desk ownership locks;
+ //! 2. the channel's gate, exclusively ([`crate::adapters::persistence::channel_gate`]), so no
+ //!    inbound commit admits a message against settings this edit is replacing;
+ //! 3. the channel row, re-checked against the tenant;
+@@ -17,6 +17,7 @@
+ 
+ use sqlx::{PgPool, Postgres, Transaction};
+ use tracing::warn;
++use uuid::Uuid;
+ 
+ use super::{
+     channel::write_channel_settings_on,
+@@ -108,6 +109,11 @@
+ ) -> AppResult<()> {
+     bound_statements_on(tx, budget).await?;
+     let company = CompanyId::new(request.company_id);
++    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
++        .bind(request.actor.user_id())
++        .fetch_optional(&mut **tx)
++        .await?
++        .ok_or_else(channel_not_found)?;
+     super::workflow::authority::authorize_person_with_locks(
+         tx,
+         company,

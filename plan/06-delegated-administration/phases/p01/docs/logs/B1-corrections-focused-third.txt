@@ -1,0 +1,34 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 39s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 20 tests
+test adapters::http::routes::department::tests::root::root_membership_department_routes_preserve_owner_only_team_mutations ... ok
+test adapters::http::routes::department::tests::department_routes_hide_foreign_companies_and_refuse_members_and_strangers ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_reaches_the_eighth_level_and_rejects_a_ninth ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_persistence_refuses_every_sibling_write ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_agent_placements_use_any_managed_unit_and_no_unit_uses_root ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_parent_member_and_role_boundaries ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_current_person_hierarchy_and_tenant_matrix ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_agent_lead_transitions_configure_without_conversation_access ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_refuses_lead_changes_it_cannot_follow ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_competing_lead_removal_precedes_a_locked_management_write ... ok
+test adapters::persistence::workflow::tests::binding_association_tests::workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_roles_and_equivalent_department_mutations_keep_owner_authority ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_private_foreign_and_member_requests_reveal_no_settings ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_separates_management_from_current_run_as_visibility ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_current_model_source ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_initial_preparation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_current_model_authority_fences_grant_removal ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_model_source_never_borrows_owned_reply_proof_for_other_runs ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_reply_missing_agent_grant_never_enters_the_provider ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 4742 filtered out; finished in 12.76s
+

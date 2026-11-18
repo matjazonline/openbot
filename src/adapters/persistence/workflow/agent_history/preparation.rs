@@ -206,10 +206,17 @@ pub(super) async fn locked_on(
         principal_id: facts.principal_id,
         thread_id: facts.thread_id,
     })?;
-    association::authorize_association(tx, action.company, actor, association).await?;
     let selection =
         agent_manifest::execution_selection_on(tx, action, actor, &facts.bundle).await?;
     agent_authority::check_execution_on(tx, action, selection.agent(), selection.mode()).await?;
+    super::super::agent_preparation::authorize_model_source_on(
+        tx,
+        action,
+        actor,
+        association,
+        selection.agent().agent_id,
+    )
+    .await?;
     // Global account/company/association/agent authority precedes the native local fence.
     if !checkpoints::lock_owner(tx, fence, bound).await? {
         return Err(ownership_lost());

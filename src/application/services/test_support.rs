@@ -234,7 +234,12 @@ impl ChannelDirectoryStub {
 
 #[async_trait::async_trait]
 impl ChannelPersistence for ChannelDirectoryStub {
-    async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
+    async fn create(
+        &self,
+        _actor: crate::application::workflow::WorkflowActor,
+        _company_id: Uuid,
+        _write: ChannelWrite,
+    ) -> AppResult<Channel> {
         unimplemented!()
     }
 
@@ -304,7 +309,12 @@ impl ChannelPersistence for ChannelDirectoryStub {
         unimplemented!()
     }
 
-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
+    async fn delete(
+        &self,
+        _actor: crate::application::workflow::WorkflowActor,
+        _company_id: Uuid,
+        _id: Uuid,
+    ) -> AppResult<()> {
         unimplemented!()
     }
 }

@@ -1100,7 +1100,12 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
+        async fn create(
+            &self,
+            _actor: crate::application::workflow::WorkflowActor,
+            _company_id: Uuid,
+            _write: ChannelWrite,
+        ) -> AppResult<Channel> {
             unimplemented!()
         }
         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
@@ -1161,7 +1166,12 @@ mod tests {
         ) -> AppResult<crate::entities::channel::Channel> {
             unimplemented!()
         }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+        async fn delete(
+            &self,
+            _actor: crate::application::workflow::WorkflowActor,
+            _company_id: Uuid,
+            _id: Uuid,
+        ) -> AppResult<()> {
             unimplemented!()
         }
     }
@@ -1754,7 +1764,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         )
         .await
         .unwrap();
-        ChannelPersistence::create(
+        crate::adapters::persistence::test_support::create_channel(
             persistence.as_ref(),
             company.id,
             ChannelWrite {
@@ -1840,7 +1850,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         )
         .await
         .unwrap();
-        ChannelPersistence::create(
+        crate::adapters::persistence::test_support::create_channel(
             persistence.as_ref(),
             company.id,
             ChannelWrite {

@@ -1,0 +1,19 @@
+--- B1/src/adapters/persistence/thread/test_support.rs
++++ B2/src/adapters/persistence/thread/test_support.rs
+@@ -6,7 +6,6 @@
+ 
+ use super::*;
+ use crate::adapters::persistence::test_support::{OwnDatabase, own_database, test_pool};
+-use crate::application::ports::channel::ChannelPersistence;
+ use crate::application::ports::channel::ChannelWrite;
+ use crate::application::ports::participant::IdentityObservation;
+ use crate::application::ports::thread::MessageAuthorWrite;
+@@ -253,7 +252,7 @@
+         slug: &str,
+         suffix: &str,
+     ) -> AppResult<crate::entities::channel::Channel> {
+-        ChannelPersistence::create(
++        crate::adapters::persistence::test_support::create_channel(
+             self,
+             company_id,
+             ChannelWrite {

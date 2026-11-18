@@ -1,0 +1,14 @@
+--- B1/src/adapters/persistence/workflow/run_schema_tests.rs
++++ B2/src/adapters/persistence/workflow/run_schema_tests.rs
+@@ -255,10 +255,9 @@
+ }
+ impl HistoryFixture {
+     async fn new(f: &BindingFixture) -> Self {
+-        use crate::application::ports::channel::ChannelPersistence;
+         use crate::application::ports::channel::ChannelWrite;
+         let company = f.target.company.as_uuid();
+-        let channel = ChannelPersistence::create(
++        let channel = crate::adapters::persistence::test_support::create_channel(
+             &f.fixture.persistence,
+             company,
+             ChannelWrite {

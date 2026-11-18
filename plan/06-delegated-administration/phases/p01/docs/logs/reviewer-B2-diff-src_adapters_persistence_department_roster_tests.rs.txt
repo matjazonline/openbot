@@ -1,0 +1,11 @@
+--- B1/src/adapters/persistence/department_roster_tests.rs
++++ B2/src/adapters/persistence/department_roster_tests.rs
+@@ -145,7 +145,7 @@
+     assert!(!member.lead);
+     assert_eq!(member.roster, lead.roster);
+     // Default-created shared desks receive their root department context.
+-    let unowned = crate::application::ports::channel::ChannelPersistence::create(
++    let unowned = crate::adapters::persistence::test_support::create_channel(
+         &f.persistence,
+         f.company,
+         crate::application::ports::channel::ChannelWrite {

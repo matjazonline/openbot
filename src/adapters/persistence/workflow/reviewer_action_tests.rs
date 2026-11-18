@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::department::DepartmentWrite;
 use crate::entities::department::DepartmentRole;
 use crate::entities::transport::PrincipalId;
@@ -150,7 +150,7 @@ async fn role_department(fixture: &Fixture) -> RoleDepartment {
             .await
             .unwrap();
     }
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &fixture.persistence,
         fixture.target.company.as_uuid(),
         ChannelWrite {

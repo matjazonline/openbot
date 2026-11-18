@@ -66,7 +66,6 @@ use super::super::ui::stream_tests::{Frames, test_config};
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::entities::run_counts::RunCountRow;
 use crate::entities::run_counts::RunCountSnapshot;
@@ -117,7 +116,7 @@ impl CountsFixture {
         let mut channels = Vec::new();
         for index in 0..2 {
             channels.push(
-                ChannelPersistence::create(
+                crate::adapters::persistence::test_support::create_channel(
                     persistence.as_ref(),
                     company.id,
                     ChannelWrite {

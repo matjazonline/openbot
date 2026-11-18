@@ -30,7 +30,7 @@ async fn security_email_identity_workflow_channel_and_thread_need_current_addres
     .await
     .as_uuid();
 
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         company.as_uuid(),
         ChannelWrite {
@@ -157,7 +157,7 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
     .await
     .as_uuid();
 
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         f.target.company.as_uuid(),
         ChannelWrite {
@@ -242,7 +242,7 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
 async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association() {
     let f = BindingFixture::new(serde_json::json!([])).await;
     let p = &f.fixture.persistence;
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         f.target.company.as_uuid(),
         ChannelWrite {
@@ -253,7 +253,7 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
     )
     .await
     .unwrap();
-    let second = ChannelPersistence::create(
+    let second = crate::adapters::persistence::test_support::create_channel(
         p,
         f.target.company.as_uuid(),
         ChannelWrite {
@@ -330,19 +330,33 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
     sqlx::query("INSERT INTO channel_principal_grants (company_id, channel_id, principal_id, capability, provenance) VALUES ($1, $2, $3, 'view', 'configured_allowlist')")
         .bind(f.target.company.as_uuid()).bind(channel.id).bind(principal).execute(p.pool()).await.unwrap();
     let activation = f.activity(configured.revision).await;
-    // Direct grant writers need not take the company lock; the exact grant row is locked.
     let mut revocation = p.pool().begin().await.unwrap();
-    sqlx::query("DELETE FROM channel_principal_grants WHERE channel_id = $1 AND principal_id = $2")
+    sqlx::query("DELETE FROM channel_principal_grants WHERE channel_id=$1 AND principal_id=$2")
         .bind(channel.id)
         .bind(principal)
         .execute(&mut *revocation)
         .await
         .unwrap();
+    // The grant writer still holds the desk row; configuration serializes with it,
+    // then succeeds without borrowing the revoked human View permission.
     let (result, ()) = tokio::join!(p.save_binding(activation), async {
         crate::adapters::persistence::test_support::wait_until_backends_are_blocked(p.pool(), 1)
             .await;
         revocation.commit().await.unwrap();
     });
-    assert!(matches!(result, Err(AppError::NotFound(_))));
-    assert_eq!(f.state().await.revision, configured.revision);
+    result.unwrap();
+    assert_eq!(
+        f.state().await.revision.get(),
+        configured.revision.get() + 1
+    );
+    assert!(
+        super::super::association::authorize_association(
+            &mut p.pool().acquire().await.unwrap(),
+            f.target.company,
+            f.target.actor,
+            configured.association,
+        )
+        .await
+        .is_err()
+    );
 }

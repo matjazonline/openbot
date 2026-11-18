@@ -1,6 +1,5 @@
 //! Isolated job fixtures use the fully migrated nullable workflow schema.
 use super::*;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 
 #[path = "job_association_tests.rs"]
@@ -19,7 +18,7 @@ struct JobFixture {
 impl JobFixture {
     async fn new() -> Self {
         let binding = configured_binding().await;
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &binding.fixture.persistence,
             binding.target.company.as_uuid(),
             ChannelWrite {
@@ -156,7 +155,7 @@ async fn workflow_job_schema_rejects_foreign_execution_and_missing_owner() {
     )
     .await
     .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         company.id,
         ChannelWrite {

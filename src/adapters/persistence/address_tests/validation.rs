@@ -11,7 +11,7 @@ async fn direct_thread_private_address_and_unknown_address_have_identical_sugges
         .await
         .unwrap()
         .unwrap();
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.company.id,
         ChannelWrite {
@@ -105,7 +105,7 @@ async fn address_resolution_directory_lists_only_currently_writable_people_and_a
     let (other, name) = account(&f.persistence, "directory_private").await;
     let private = f.join(other, &name).await;
     let agent = production_agent(&f, false).await;
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.company.id,
         ChannelWrite {

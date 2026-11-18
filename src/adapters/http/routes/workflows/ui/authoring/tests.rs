@@ -165,9 +165,8 @@ impl Fixture {
     /// A channel of the company; `restricted` makes it one an admin who is not on its allowlist
     /// cannot see (the owner still can).
     async fn channel(&self, name: &str, slug: &str, restricted: bool) -> Uuid {
-        use crate::application::ports::channel::ChannelPersistence;
         use crate::application::ports::channel::ChannelWrite;
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &self.persistence,
             self.company,
             ChannelWrite {

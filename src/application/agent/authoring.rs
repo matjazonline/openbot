@@ -129,4 +129,5 @@ pub struct SaveCompanyAgent {
 pub trait AgentDraftPersistence: Send + Sync {
     /// Locks current authority and draft, compares the expected revision and commits all fields together.
     async fn save_company_agent(&self, request: SaveCompanyAgent) -> AppResult<Agent>;
+    async fn delete_company_agent(&self, scope: AgentPublicationScope) -> AppResult<()>;
 }

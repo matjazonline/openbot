@@ -300,7 +300,7 @@ async fn workflow_listings_hide_channels_an_admin_cannot_see() {
     let (_, version) = f
         .published(owner, company, example("data.map", Uuid::new_v4()))
         .await;
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         company,
         ChannelWrite {

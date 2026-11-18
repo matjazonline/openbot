@@ -58,7 +58,7 @@ impl Scale {
         let desk_started = Instant::now();
         let mut created = Vec::new();
         for index in 0..desks {
-            let desk = ChannelPersistence::create(
+            let desk = crate::adapters::persistence::test_support::create_channel(
                 &persistence,
                 company,
                 desk_write(&format!("scale-{index}"), None),
@@ -362,7 +362,11 @@ async fn access_mode_grants_competing_root_join_and_default_desk_creation_keep_e
     let (joined, created, ()) = tokio::join!(
         f.persistence
             .accept_pending_invite(candidate.invite, candidate.user, &candidate.email),
-        ChannelPersistence::create(&f.persistence, f.company, desk_write("raced", None)),
+        crate::adapters::persistence::test_support::create_channel(
+            &f.persistence,
+            f.company,
+            desk_write("raced", None)
+        ),
         async {
             crate::adapters::persistence::test_support::wait_until_backends_are_blocked(
                 f.persistence.pool(),

@@ -1,0 +1,18 @@
+before=4749 after=4762
+removed:
+adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_rechecks_current_run_as_private_channel_visibility
+added:
+adapters::persistence::department::tests::delegated_administration::delegated_admin_department_parent_member_and_role_boundaries
+adapters::persistence::department::tests::delegated_administration::delegated_admin_department_persistence_refuses_every_sibling_write
+adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_agent_lead_transitions_configure_without_conversation_access
+adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_competing_lead_removal_precedes_a_locked_management_write
+adapters::persistence::department::tests::delegated_administration::manages_unit_agent_placements_use_any_managed_unit_and_no_unit_uses_root
+adapters::persistence::department::tests::delegated_administration::manages_unit_current_person_hierarchy_and_tenant_matrix
+adapters::persistence::department::tests::delegated_administration::manages_unit_reaches_the_eighth_level_and_rejects_a_ninth
+adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view
+adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_reply_missing_agent_grant_never_enters_the_provider
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_current_model_source
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_initial_preparation
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_current_model_authority_fences_grant_removal
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_model_source_never_borrows_owned_reply_proof_for_other_runs
+adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_separates_management_from_current_run_as_visibility

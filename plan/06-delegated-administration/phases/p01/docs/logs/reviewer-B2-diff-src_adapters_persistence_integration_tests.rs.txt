@@ -1,0 +1,35 @@
+--- B1/src/adapters/persistence/integration/tests.rs
++++ B2/src/adapters/persistence/integration/tests.rs
+@@ -73,7 +73,7 @@
+ 
+ /// A channel with no agent, so the enabled-channel trigger stays out of the way.
+ async fn channel(persistence: &PostgresPersistence, company_id: Uuid, slug: &str) -> Channel {
+-    ChannelPersistence::create(
++    crate::adapters::persistence::test_support::create_channel(
+         persistence,
+         company_id,
+         ChannelWrite {
+@@ -786,6 +786,11 @@
+             ChannelPersistence::update(
+                 persistence.as_ref(),
+                 crate::application::ports::channel::ChannelUpdate {
++                    actor: crate::adapters::persistence::test_support::company_owner_actor(
++                        persistence.as_ref(),
++                        company_id,
++                    )
++                    .await,
+                     company_id,
+                     channel_id,
+                     write: ChannelWrite {
+@@ -836,6 +841,11 @@
+     ChannelPersistence::update(
+         &persistence,
+         crate::application::ports::channel::ChannelUpdate {
++            actor: crate::adapters::persistence::test_support::company_owner_actor(
++                &persistence,
++                acme.id,
++            )
++            .await,
+             company_id: acme.id,
+             channel_id: support.id,
+             write: ChannelWrite {

@@ -1,0 +1,98 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view' (29734178) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:313:13:
+the engine never reached: the delegated department's native reply is published and delivered
+pool size 5 idle 5
+{
+  "events": null,
+  "intents": [
+    {
+      "attempts": 1,
+      "available_at": "2026-11-17T12:35:45.128399+00:00",
+      "id": "292d4d99-3bb6-40b2-9e5a-c2c6f7070db6",
+      "lease": null,
+      "now": "2026-11-17T12:36:15.163899+00:00",
+      "outcome": "admitted",
+      "reply_settled": false,
+      "state": "done",
+      "updated_at": "2026-11-17T12:35:45.264333+00:00",
+      "worker": null
+    }
+  ],
+  "jobs": [
+    {
+      "id": "966006b0-5e0c-447c-9d33-f7c0ab78ac59",
+      "lock_expires_at": null,
+      "run_at": "2026-11-17T12:35:45.168342+00:00",
+      "status": "completed"
+    },
+    {
+      "id": "2f0e7d64-60dd-4b3c-8f8d-f4f3c2eb79de",
+      "lock_expires_at": null,
+      "run_at": "2026-11-17T12:35:45.37372+00:00",
+      "status": "failed"
+    }
+  ],
+  "runs": [
+    {
+      "id": "dd7b468f-e738-4583-8ce7-3383d406823a",
+      "state": "failed",
+      "waiting": null
+    }
+  ],
+  "sessions": [
+    {
+      "blocked_by": [],
+      "pid": 71347,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 71346,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 71339,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 71345,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 71344,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    }
+  ],
+  "waits": null
+}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4756 filtered out; finished in 31.72s
+

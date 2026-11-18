@@ -71,6 +71,7 @@ async fn workflow_escalation_binding_roundtrip_update_and_required_owner() {
         .await
         .unwrap();
     let update = ChannelUpdate {
+        actor: f.target.actor,
         company_id: f.target.company.as_uuid(),
         channel_id: channel,
         write: write(None),

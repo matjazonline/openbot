@@ -1,0 +1,11 @@
+--- B2/src/application/workflow/templates.rs
++++ B3/src/application/workflow/templates.rs
+@@ -51,7 +51,7 @@
+                 request.company,
+                 request.actor,
+                 RelatedAssociation::Company,
+-                WorkflowOperation::CopyTemplate,
++                WorkflowOperation::CopyTemplate(request.workflow),
+             )
+             .await?;
+         let template = catalogue.selected(&request.template, request.revision)?;

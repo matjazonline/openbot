@@ -10,7 +10,6 @@ use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
 use crate::app_error::AppResult;
 use crate::application::attention::AttentionUseCases;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::thread::ThreadPersistence;
 use crate::entities::company::Company;
@@ -248,7 +247,7 @@ async fn create_company(p: &PostgresPersistence, owner: &User) -> Company {
 }
 
 async fn create_channel(p: &PostgresPersistence, company: Uuid) -> Uuid {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         p,
         company,
         ChannelWrite {

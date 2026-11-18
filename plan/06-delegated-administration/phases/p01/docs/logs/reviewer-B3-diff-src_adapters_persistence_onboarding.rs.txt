@@ -1,0 +1,11 @@
+--- B2/src/adapters/persistence/onboarding.rs
++++ B3/src/adapters/persistence/onboarding.rs
+@@ -229,7 +229,7 @@
+             CompanyAgentCreation {
+                 id: prepared.id,
+                 write: prepared.write,
+-                placement: None,
++                placement: super::company_agent::AgentCreationPlacement::Unplaced,
+             },
+         ))
+         .await?;

@@ -1,0 +1,12 @@
+--- B2R1/src/application/workflow/lifecycle/bindings.rs
++++ B2R2/src/application/workflow/lifecycle/bindings.rs
+@@ -120,8 +120,8 @@
+             .binding(request.target.company, request.target.binding)
+             .await?
+             .ok_or_else(missing)?;
++        self.authorize(request.target, state.association).await?;
+         check_state(&state, request.target, request.expected)?;
+-        self.authorize(request.target, state.association).await?;
+         Ok(state)
+     }
+ 

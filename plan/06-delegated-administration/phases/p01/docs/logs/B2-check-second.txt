@@ -1,0 +1,91 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:224:9
+    |
+224 |         ChannelUpdate {
+    |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:252:13
+    |
+252 |             ChannelUpdate {
+    |             ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_binding_tests.rs:122:18
+    |
+122 |     let update = ChannelUpdate {
+    |                  ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_binding_tests.rs:203:18
+    |
+203 |     let update = ChannelUpdate {
+    |                  ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/workflow/escalation_binding_tests.rs:73:18
+   |
+73 |     let update = ChannelUpdate {
+   |                  ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/address_tests.rs:214:9
+    |
+214 |         ChannelUpdate {
+    |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/address_tests/notifications.rs:328:9
+    |
+328 |         ChannelUpdate {
+    |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/application/use_cases/thread/address_resolution_tests.rs:22:20
+   |
+22 |         self.desks.create(company_id, write).await
+   |                    ^^^^^^ ---------- argument #1 of type `application::workflow::authorization::WorkflowActor` is missing
+   |
+note: method defined here
+  --> src/application/ports/channel.rs:50:14
+   |
+50 |     async fn create(
+   |              ^^^^^^
+51 |         &self,
+52 |         actor: crate::application::workflow::WorkflowActor,
+   |         -----
+help: provide the argument
+   |
+22 |         self.desks.create(/* WorkflowActor */, company_id, write).await
+   |                           ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 1 argument was supplied
+  --> src/application/use_cases/thread/address_resolution_tests.rs:85:20
+   |
+85 |         self.desks.delete(id).await
+   |                    ^^^^^^----
+   |                          ||
+   |                          |argument #1 of type `application::workflow::authorization::WorkflowActor` is missing
+   |                          argument #3 of type `uuid::Uuid` is missing
+   |
+note: method defined here
+  --> src/application/ports/channel.rs:92:14
+   |
+92 |     async fn delete(
+   |              ^^^^^^
+93 |         &self,
+94 |         actor: crate::application::workflow::WorkflowActor,
+   |         -----
+95 |         company_id: Uuid,
+96 |         id: Uuid,
+   |         --
+help: provide the arguments
+   |
+85 -         self.desks.delete(id).await
+85 +         self.desks.delete(/* WorkflowActor */, id, /* Uuid */).await
+   |
+
+Some errors have detailed explanations: E0061, E0063.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 9 previous errors

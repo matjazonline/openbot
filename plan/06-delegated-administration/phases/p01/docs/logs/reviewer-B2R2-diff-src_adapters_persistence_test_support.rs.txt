@@ -1,0 +1,12 @@
+--- B2R1/src/adapters/persistence/test_support.rs
++++ B2R2/src/adapters/persistence/test_support.rs
+@@ -45,7 +45,8 @@
+ #[path = "managed_desk_test_support.rs"]
+ mod managed_desk;
+ pub(crate) use managed_desk::{
+-    company_owner_actor, create_channel, delegated_unit, wait_until_blocked_by,
++    assert_actor_before_company, company_owner_actor, create_channel, delegated_unit,
++    wait_until_blocked_by,
+ };
+ 
+ use sqlx::postgres::PgPoolOptions;

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::app_error::AppError;
 
 pub(crate) mod account_identity;
+pub(crate) mod administration;
 pub mod agent;
 mod agent_authoring;
 mod agent_binding_selection;

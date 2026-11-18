@@ -1,0 +1,17 @@
+--- B2/src/adapters/persistence/agent_publication/mod.rs
++++ B3/src/adapters/persistence/agent_publication/mod.rs
+@@ -56,7 +56,13 @@
+         .fetch_optional(&mut **tx)
+         .await?
+         .ok_or_else(missing)?;
+-    super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await?;
++    super::workflow::management::authorize_target_on(
++        tx,
++        scope.company,
++        scope.actor,
++        crate::application::use_cases::administration::ManagementTarget::AnyUnit,
++    )
++    .await?;
+     Ok(())
+ }
+ 

@@ -1,0 +1,9 @@
+--- B2R1/src/adapters/persistence/delegated_schedule_management_tests.rs
++++ B2R2/src/adapters/persistence/delegated_schedule_management_tests.rs
+@@ -448,3 +448,6 @@
+         Some(f.schedule.clone())
+     );
+ }
++
++#[path = "delegated_schedule_account_lock_tests.rs"]
++mod account_locks;

@@ -229,7 +229,7 @@ impl Session {
             CompanyAgentCreation {
                 id: prepared.id,
                 write: prepared.write,
-                placement: None,
+                placement: super::company_agent::AgentCreationPlacement::Unplaced,
             },
         ))
         .await?;

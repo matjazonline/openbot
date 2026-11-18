@@ -1,0 +1,26 @@
+--- B1/src/adapters/persistence/administration.rs
++++ B2/src/adapters/persistence/administration.rs
+@@ -33,6 +33,23 @@
+     target: ManagementTarget,
+ ) -> AppResult<Option<ManagementRole>> {
+     let role = match target {
++        ManagementTarget::AnyUnit => {
++            sqlx::query_scalar(
++                "WITH candidate AS ( \
++                   SELECT id FROM departments WHERE company_id=$2 AND is_root \
++                   UNION SELECT holder.department_id FROM department_roles AS holder \
++                   JOIN principals AS principal ON principal.company_id=holder.company_id \
++                     AND principal.id=holder.principal_id \
++                   WHERE holder.company_id=$2 AND holder.role='lead' AND principal.user_id=$1 \
++                 ), roles AS MATERIALIZED ( \
++                   SELECT unit_management_role($1,$2,candidate.id) AS role FROM candidate \
++                 ) SELECT role FROM roles WHERE role IS NOT NULL ORDER BY role LIMIT 1",
++            )
++            .bind(actor)
++            .bind(company.as_uuid())
++            .fetch_optional(db)
++            .await?
++        }
+         ManagementTarget::Root | ManagementTarget::Unit(_) => {
+             let unit = match target {
+                 ManagementTarget::Unit(unit) => Some(unit.as_uuid()),

@@ -1,0 +1,355 @@
+--- B1/src/adapters/persistence/delegated_desk_tests.rs
++++ B2/src/adapters/persistence/delegated_desk_tests.rs
+@@ -0,0 +1,352 @@
++//! Scoped desk writes through the use case and its independently checked adapter.
++use super::*;
++use crate::application::ports::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
++use crate::application::use_cases::agent::SpamScanning;
++use crate::application::use_cases::channel::ChannelUseCases;
++use crate::application::workflow::{
++    LifecycleAuthorizer, RelatedAssociation, WorkflowAuthorization, WorkflowOperation,
++};
++
++pub(super) fn cases(d: &Delegated) -> ChannelUseCases {
++    let p = Arc::new(d.f.persistence.clone());
++    ChannelUseCases::new(p.clone(), p.clone(), p, SpamScanning::Available)
++}
++
++fn write(unit: DepartmentId, name: &str) -> ChannelWrite {
++    ChannelWrite {
++        name: name.into(),
++        slug: name.to_lowercase(),
++        department_id: Some(unit),
++        enabled: true,
++        ..Default::default()
++    }
++}
++
++fn edit(d: &Delegated, actor: Uuid, desk: Uuid, unit: DepartmentId) -> ChannelUpdate {
++    ChannelUpdate {
++        actor: d.scope(actor).actor,
++        company_id: d.f.company,
++        channel_id: desk,
++        write: write(unit, "Edited"),
++    }
++}
++
++async fn state(d: &Delegated, desk: Uuid) -> (String, Uuid, i64) {
++    sqlx::query_as(
++        "SELECT name,department_id,settings_revision FROM channels WHERE company_id=$1 AND id=$2",
++    )
++    .bind(d.f.company)
++    .bind(desk)
++    .fetch_one(d.f.pool())
++    .await
++    .unwrap()
++}
++
++#[tokio::test]
++async fn delegated_admin_desk_crud_follows_the_managed_subtree_without_conversation_view() {
++    let Some(pool) = test_pool().await else {
++        return;
++    };
++    let d = Delegated::on(pool).await;
++    let remote = d.remote().await;
++    let uc = cases(&d);
++    let desk = uc
++        .create_channel(
++            d.f.member,
++            d.f.company,
++            write(remote.id, "Remoteintake"),
++            false,
++        )
++        .await
++        .unwrap();
++    assert_eq!(desk.department_id, remote.id);
++    assert_eq!(
++        uc.get_company_channel(d.f.member, d.f.company, desk.id)
++            .await
++            .unwrap()
++            .unwrap()
++            .id,
++        desk.id
++    );
++    let viewer = crate::entities::user::Viewer {
++        user_id: d.f.member,
++        email: sqlx::query_scalar::<_, String>("SELECT email FROM users WHERE id=$1")
++            .bind(d.f.member)
++            .fetch_one(d.f.pool())
++            .await
++            .unwrap()
++            .into(),
++        email_verified_at: None,
++    };
++    assert!(
++        uc.get_readable_channel(&viewer, d.f.company, desk.id)
++            .await
++            .unwrap()
++            .is_none()
++    );
++    let changed = uc
++        .update_channel(
++            d.f.member,
++            d.f.company,
++            desk.id,
++            write(d.child.id, "Moved"),
++            false,
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        (changed.name.as_str(), changed.department_id),
++        ("Moved", d.child.id)
++    );
++    let before = state(&d, desk.id).await;
++    hidden(
++        uc.update_channel(
++            d.f.member,
++            d.f.company,
++            desk.id,
++            write(d.sibling.id, "Stolen"),
++            false,
++        )
++        .await,
++    );
++    assert_eq!(state(&d, desk.id).await, before);
++    hidden(
++        uc.delete_channel(d.sibling_lead, d.f.company, desk.id)
++            .await,
++    );
++    uc.delete_channel(d.f.member, d.f.company, desk.id)
++        .await
++        .unwrap();
++    assert!(
++        ChannelPersistence::get_by_id(&d.f.persistence, desk.id)
++            .await
++            .unwrap()
++            .is_none()
++    );
++}
++
++#[tokio::test]
++async fn delegated_admin_desk_persistence_checks_current_destination_and_foreign_ownership() {
++    let Some(pool) = test_pool().await else {
++        return;
++    };
++    let d = Delegated::on(pool).await;
++    let remote = d.remote().await;
++    let p = &d.f.persistence;
++    let lead = d.scope(d.f.member).actor;
++    let sibling = d.scope(d.sibling_lead).actor;
++    let desk = ChannelPersistence::create(p, lead, d.f.company, write(remote.id, "Managed"))
++        .await
++        .unwrap();
++    let before = state(&d, desk.id).await;
++    let before_count: i64 = sqlx::query_scalar("SELECT count(*) FROM channels WHERE company_id=$1")
++        .bind(d.f.company)
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    hidden(ChannelPersistence::create(p, sibling, d.f.company, write(remote.id, "Refused")).await);
++    hidden(ChannelPersistence::update(p, edit(&d, d.sibling_lead, desk.id, remote.id)).await);
++    hidden(ChannelPersistence::update(p, edit(&d, d.f.member, desk.id, d.sibling.id)).await);
++    let sibling_desk = d.f.desk_of(d.sibling.id).await;
++    hidden(ChannelPersistence::update(p, edit(&d, d.f.member, sibling_desk, remote.id)).await);
++    hidden(ChannelPersistence::delete(p, sibling, d.f.company, desk.id).await);
++    let foreign = crate::adapters::persistence::test_support::create_channel(
++        p,
++        d.f.foreign_company,
++        ChannelWrite {
++            name: "Foreign".into(),
++            slug: "foreign-target".into(),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    hidden(ChannelPersistence::update(p, edit(&d, d.f.member, foreign.id, remote.id)).await);
++    hidden(ChannelPersistence::delete(p, lead, d.f.company, foreign.id).await);
++    hidden(
++        ChannelPersistence::create(
++            p,
++            lead,
++            d.f.company,
++            write(foreign.department_id, "Foreignowner"),
++        )
++        .await,
++    );
++    assert_eq!(state(&d, desk.id).await, before);
++    let after_count: i64 = sqlx::query_scalar("SELECT count(*) FROM channels WHERE company_id=$1")
++        .bind(d.f.company)
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(
++        after_count, before_count,
++        "refused creates leave no desk or partial row"
++    );
++    assert_eq!(
++        ChannelPersistence::get_by_id(p, sibling_desk)
++            .await
++            .unwrap()
++            .unwrap()
++            .department_id,
++        d.sibling.id
++    );
++    assert_eq!(
++        ChannelPersistence::get_by_id(p, foreign.id)
++            .await
++            .unwrap()
++            .unwrap()
++            .company_id,
++        d.f.foreign_company
++    );
++    ChannelPersistence::delete(p, lead, d.f.company, desk.id)
++        .await
++        .unwrap();
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_role_removal_precedes_a_desk_edit() {
++    let Some(database) = own_database().await else {
++        return;
++    };
++    let d = Arc::new(Delegated::on(database.pool.clone()).await);
++    let remote = d.remote().await;
++    let desk = d.f.desk_of(remote.id).await;
++    let before = state(&d, desk).await;
++    let mut removal = begin_department_write(&d.f.persistence, d.scope(d.f.owner))
++        .await
++        .unwrap();
++    clear_department_role_on(
++        &mut removal,
++        &d.f.departments.templates,
++        d.company(),
++        d.scope(d.f.owner).actor,
++        d.unit.id,
++        DepartmentRole::Lead,
++        d.f.member_principal,
++    )
++    .await
++    .unwrap();
++    let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *removal)
++        .await
++        .unwrap();
++    let writer = tokio::spawn({
++        let d = d.clone();
++        async move {
++            ChannelPersistence::update(&d.f.persistence, edit(&d, d.f.member, desk, remote.id))
++                .await
++        }
++    });
++    crate::adapters::persistence::test_support::wait_until_blocked_by(d.f.pool(), blocker).await;
++    removal.commit().await.unwrap();
++    hidden(writer.await.unwrap());
++    assert_eq!(state(&d, desk).await, before);
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_desk_edit_holds_authority_until_commit() {
++    use crate::adapters::persistence::channel_edit::{EditBudget, update_channel_on};
++    let Some(database) = own_database().await else {
++        return;
++    };
++    let d = Arc::new(Delegated::on(database.pool.clone()).await);
++    let remote = d.remote().await;
++    let desk = d.f.desk_of(remote.id).await;
++    let request = edit(&d, d.f.member, desk, remote.id);
++    let mut editing = d.f.pool().begin().await.unwrap();
++    update_channel_on(&mut editing, &request, EditBudget::DEFAULT)
++        .await
++        .unwrap();
++    let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *editing)
++        .await
++        .unwrap();
++    let remover = tokio::spawn({
++        let d = d.clone();
++        async move {
++            d.f.use_cases
++                .clear_role(
++                    d.f.owner,
++                    d.f.company,
++                    d.unit.id,
++                    DepartmentRole::Lead,
++                    d.f.member_principal,
++                )
++                .await
++        }
++    });
++    crate::adapters::persistence::test_support::wait_until_blocked_by(d.f.pool(), blocker).await;
++    editing.commit().await.unwrap();
++    remover.await.unwrap().unwrap();
++    assert_eq!(state(&d, desk).await.0, "Edited");
++    hidden(ChannelPersistence::update(&d.f.persistence, request).await);
++}
++
++#[tokio::test]
++async fn manages_unit_collection_entry_never_grants_an_individual_target() {
++    let Some(pool) = test_pool().await else {
++        return;
++    };
++    let d = Delegated::on(pool).await;
++    let p = &d.f.persistence;
++    assert!(
++        p.management_role(d.f.member, d.company(), ManagementTarget::AnyUnit)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    assert_eq!(
++        p.management_role(d.f.member, d.company(), ManagementTarget::Root)
++            .await
++            .unwrap(),
++        None
++    );
++    assert_eq!(
++        p.management_role(d.f.stranger, d.company(), ManagementTarget::AnyUnit)
++            .await
++            .unwrap(),
++        None
++    );
++    let (plain, _) = teammate(d.f.pool(), d.f.company, "member").await;
++    assert_eq!(
++        p.management_role(plain, d.company(), ManagementTarget::AnyUnit)
++            .await
++            .unwrap(),
++        None
++    );
++    let foreign_owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id=$1")
++        .bind(d.f.foreign_company)
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(
++        p.management_role(foreign_owner, d.company(), ManagementTarget::AnyUnit)
++            .await
++            .unwrap(),
++        None
++    );
++    let agent: Uuid = sqlx::query_scalar("SELECT agent_id FROM principals WHERE id=$1")
++        .bind(d.f.agent_principal.as_uuid())
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(
++        p.management_role(agent, d.company(), ManagementTarget::AnyUnit)
++            .await
++            .unwrap(),
++        None
++    );
++    let auth = LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone());
++    assert!(matches!(
++        auth.authorize(
++            d.company(),
++            d.scope(d.f.member).actor,
++            RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(
++                d.f.desk_of(d.unit.id).await
++            )),
++            WorkflowOperation::ListManaged
++        )
++        .await,
++        Err(AppError::NotFound(_))
++    ));
++}

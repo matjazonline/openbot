@@ -134,6 +134,7 @@ async fn configure_actor(d: &Deployment, binding: BindingTarget, admin: Uuid) {
     ChannelPersistence::update(
         d.p(),
         crate::application::ports::channel::ChannelUpdate {
+            actor: d.fixture.target.actor,
             company_id: d.fixture.target.company.as_uuid(),
             channel_id: d.channel,
             write: ChannelWrite {

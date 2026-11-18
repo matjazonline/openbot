@@ -72,7 +72,7 @@ impl Escalating {
             )
             .await
             .unwrap();
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &f.persistence,
             f.company,
             ChannelWrite {

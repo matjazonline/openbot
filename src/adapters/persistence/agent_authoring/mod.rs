@@ -25,6 +25,18 @@ async fn bounded<T>(operation: impl std::future::Future<Output = AppResult<T>>) 
 
 #[async_trait::async_trait]
 impl AgentDraftPersistence for PostgresPersistence {
+    async fn delete_company_agent(&self, scope: AgentPublicationScope) -> AppResult<()> {
+        bounded(async {
+            let mut tx = super::agent_publication::begin_authorized(self, scope).await?;
+            let locks = super::agent::lock_agent_delete_on(&mut tx, scope.agent.as_uuid())
+                .await?
+                .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+            super::agent::finish_agent_delete_on(&mut tx, locks).await?;
+            tx.commit().await.map_err(super::agent::agent_delete_error)
+        })
+        .await
+    }
+
     async fn save_company_agent(
         &self,
         mut request: SaveCompanyAgent,

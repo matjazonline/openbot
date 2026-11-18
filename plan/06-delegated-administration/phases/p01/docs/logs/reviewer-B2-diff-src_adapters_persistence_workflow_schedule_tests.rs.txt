@@ -1,0 +1,121 @@
+--- B1/src/adapters/persistence/workflow/schedule_tests.rs
++++ B2/src/adapters/persistence/workflow/schedule_tests.rs
+@@ -1,12 +1,14 @@
+ //! p08 D1.9 against PostgreSQL: schedules on bindings. Who may manage a schedule, which binding
+ //! may drive it, how a captured occurrence becomes exactly one run under competing materializers
+ //! and failures, and what the schema refuses outright.
++#[path = "schedule_configuration_authority_tests.rs"]
++mod configuration_authority;
++
+ use super::*;
+ use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
+ use crate::adapters::persistence::workflow::schedule_test_support::{
+     bind, publish, schedule_use_cases, source,
+ };
+-use crate::application::ports::channel::ChannelPersistence;
+ use crate::application::ports::channel::ChannelWrite;
+ use crate::application::use_cases::schedule::{SchedulePersistence, ScheduleUseCases};
+ use crate::application::workflow::manual::{self, StartRun};
+@@ -261,7 +263,7 @@
+ }
+ 
+ async fn channel(fixture: &Fixture, slug: &str) -> Uuid {
+-    ChannelPersistence::create(
++    crate::adapters::persistence::test_support::create_channel(
+         &fixture.persistence,
+         fixture.target.company.as_uuid(),
+         ChannelWrite {
+@@ -596,93 +598,6 @@
+     assert!(reclaimed.is_none(), "backoff keeps it unclaimable");
+ }
+ 
+-/// D1.9 authority: owner or admin who can see the schedule's channel, for every operation.
+-#[tokio::test]
+-async fn schedule_management_requires_an_owner_or_admin_who_sees_the_channel() {
+-    let s = Schedules::new().await;
+-    let schedule = s.schedule("Hourly").await;
+-    let plain = member(&s.fixture, "member").await;
+-    let admin = member(&s.fixture, "admin").await;
+-    let refused =
+-        |result: AppResult<()>| assert!(matches!(result, Err(AppError::NotFound(_))), "{result:?}");
+-    let all = async |user: Uuid| -> Vec<AppResult<()>> {
+-        let uc = &s.use_cases;
+-        vec![
+-            uc.create_schedule(user, s.company(), s.channel, s.write("New", s.binding))
+-                .await
+-                .map(drop),
+-            uc.update_schedule(
+-                user,
+-                s.company(),
+-                schedule.id,
+-                s.channel,
+-                s.write("Edited", s.binding),
+-            )
+-            .await
+-            .map(drop),
+-            uc.toggle_schedule(user, s.company(), schedule.id, false)
+-                .await,
+-            uc.trigger_schedule_now(user, s.company(), schedule.id, "k")
+-                .await
+-                .map(drop),
+-            uc.list_schedule_runs(user, s.company(), schedule.id, 0, 10)
+-                .await
+-                .map(drop),
+-            uc.list_channel_schedules(user, s.company(), s.channel)
+-                .await
+-                .map(drop),
+-            uc.delete_schedule(user, s.company(), schedule.id).await,
+-        ]
+-    };
+-    for result in all(plain).await {
+-        refused(result);
+-    }
+-    assert_eq!(
+-        s.use_cases
+-            .get_schedule(plain, s.company(), schedule.id)
+-            .await
+-            .unwrap(),
+-        None
+-    );
+-    // An admin who cannot see an allowlisted channel cannot manage its schedules either.
+-    allowlist(s.pool(), s.channel).await;
+-    for result in all(admin).await {
+-        refused(result);
+-    }
+-    assert!(
+-        s.use_cases
+-            .list_company_schedules(admin, s.company())
+-            .await
+-            .unwrap()
+-            .is_empty()
+-    );
+-    assert_eq!(s.occurrences(schedule.id).await.len(), 0);
+-    // Persistence rechecks under the company lock: a write that skipped the preflight is refused
+-    // just the same.
+-    let actor = WorkflowActor::authenticated(admin).unwrap();
+-    assert!(matches!(
+-        s.p()
+-            .set_enabled(actor, s.fixture.target.company, schedule.id, false)
+-            .await,
+-        Err(AppError::NotFound(_))
+-    ));
+-    assert!(matches!(
+-        s.p()
+-            .capture_now(actor, s.fixture.target.company, schedule.id, "k")
+-            .await,
+-        Err(AppError::NotFound(_))
+-    ));
+-    // The owner sees every channel.
+-    assert_eq!(
+-        s.use_cases
+-            .list_company_schedules(s.owner(), s.company())
+-            .await
+-            .unwrap()
+-            .len(),
+-        1
+-    );
+-}
+-
+ /// D1.9 compatibility: the binding must be the company's or the channel's, accept the schedule
+ /// input, and run as someone who sees the channel.
+ #[tokio::test]

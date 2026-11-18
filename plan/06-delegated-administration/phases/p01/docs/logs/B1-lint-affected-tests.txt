@@ -1,0 +1,19 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 26s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 4 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::integrity::channel_reply_binding_separates_management_from_current_run_as_visibility ... ok
+test adapters::persistence::workflow::tests::binding_association_tests::workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_agent_lead_transitions_configure_without_conversation_access ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_refuses_lead_changes_it_cannot_follow ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4758 filtered out; finished in 1.98s
+

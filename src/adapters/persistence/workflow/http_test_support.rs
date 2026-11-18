@@ -73,9 +73,8 @@ pub(super) async fn setup_scoped(origin: &str, entrance: Entrance, scope: HttpTe
     let association = match scope {
         HttpTestScope::Company => RelatedAssociation::Company,
         HttpTestScope::PrivateChannel => {
-            use crate::application::ports::channel::ChannelPersistence;
             use crate::application::ports::channel::ChannelWrite;
-            let channel = ChannelPersistence::create(
+            let channel = crate::adapters::persistence::test_support::create_channel(
                 &fixture.persistence,
                 fixture.target.company.as_uuid(),
                 ChannelWrite {

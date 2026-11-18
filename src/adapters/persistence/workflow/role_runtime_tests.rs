@@ -98,7 +98,7 @@ async fn desk(d: &Deployment, slug: &str, agent: &RoleAgent) -> RoleDesk {
         )
         .await
         .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         d.p(),
         d.fixture.target.company.as_uuid(),
         ChannelWrite {

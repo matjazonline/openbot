@@ -140,6 +140,7 @@ async fn configure(d: &Deployment, audience: Audience) {
     ChannelPersistence::update(
         d.p(),
         ChannelUpdate {
+            actor: d.fixture.target.actor,
             company_id: d.fixture.target.company.as_uuid(),
             channel_id: d.channel,
             write: ChannelWrite {

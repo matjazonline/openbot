@@ -3,12 +3,11 @@ use super::*;
 #[path = "decision_business_member_tests.rs"]
 mod business_member_tests;
 use crate::adapters::persistence::test_support::wait_until_a_backend_is_blocked;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 
 async fn channel_fixture() -> (DecisionFixture, Uuid) {
     let mut f = Box::pin(DecisionFixture::new(1, None)).await;
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         f.persistence(),
         f.scope.company.as_uuid(),
         ChannelWrite {

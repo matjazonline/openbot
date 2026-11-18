@@ -9,6 +9,9 @@ use crate::application::workflow::provisioning::*;
 #[path = "provisioning_requester_lock_tests.rs"]
 mod requester_locks;
 
+#[path = "delegated_builder_runtime_tests.rs"]
+mod delegated_builder;
+
 #[path = "channel_reply_native_runtime_tests.rs"]
 mod channel_reply_native_runtime_tests;
 

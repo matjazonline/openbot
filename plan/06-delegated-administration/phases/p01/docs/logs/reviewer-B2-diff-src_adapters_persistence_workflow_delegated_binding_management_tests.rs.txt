@@ -1,0 +1,150 @@
+--- B1/src/adapters/persistence/workflow/delegated_binding_management_tests.rs
++++ B2/src/adapters/persistence/workflow/delegated_binding_management_tests.rs
+@@ -0,0 +1,147 @@
++//! The ordinary public binding service reuses captured messaging, without root catalog access.
++use super::*;
++use crate::adapters::persistence::test_support::{delegated_unit, insert_root_member};
++use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
++use crate::application::workflow::{LifecycleAuthorizer, WorkflowAuthorization, WorkflowOperation};
++use crate::entities::company_member::CompanyAccessRole;
++use crate::use_cases::user::UserPersistence;
++
++async fn lead(f: &Fixture) -> WorkflowActor {
++    let suffix = Uuid::new_v4().simple().to_string();
++    let person = f
++        .persistence
++        .create_user(&suffix, &format!("{suffix}@example.test"), "hash")
++        .await
++        .unwrap();
++    insert_root_member(
++        f.persistence.pool(),
++        f.target.company,
++        person.id,
++        CompanyAccessRole::Member,
++        crate::entities::access_level::AccessLevel::PUBLIC,
++    )
++    .await;
++    WorkflowActor::authenticated(person.id).unwrap()
++}
++
++async fn message_version(f: &Fixture, desk: Uuid) -> VersionId {
++    let mut body: serde_json::Value =
++        serde_json::from_str(&registry::example("message.send").unwrap().source).unwrap();
++    body["workflow_id"] = json!(f.target.workflow.to_string());
++    body["steps"]["start"]["with"] = json!({
++        "content":{"literal":{"subject":"Unit status","body":"Scoped work"}},
++        "destinations":{"literal":[{"kind":"channel","id":desk.to_string()}]}
++    });
++    let p = &f.persistence;
++    let service = DefinitionService::new(
++        LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone()),
++        p.clone(),
++        WorkflowSourceDecoder,
++        super::super::super::step_builtins::StepBuiltinPublicationDirectory {
++            persistence: p.clone(),
++        },
++    );
++    let mut draft = f.save(None);
++    draft.content.source = body.to_string();
++    service.save(draft).await.unwrap();
++    let publish = f.publish();
++    service.publish(publish.clone()).await.unwrap();
++    publish.version
++}
++
++#[tokio::test]
++async fn delegated_admin_binding_service_configures_activates_and_pauses_captured_messaging() {
++    let f = Fixture::new().await;
++    let p = &f.persistence;
++    let actor = lead(&f).await;
++    let unit = delegated_unit(p, f.target.company, f.target.actor, actor).await;
++    let desk = ChannelPersistence::create(
++        p,
++        actor,
++        f.target.company.as_uuid(),
++        ChannelWrite {
++            name: "Delegated binding".into(),
++            slug: "delegated-binding".into(),
++            department_id: Some(unit),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    let version = message_version(&f, desk.id).await;
++    let association = RelatedAssociation::Channel(RelatedChannelId::new(desk.id));
++    let authorizer = LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone());
++    assert!(matches!(
++        authorizer
++            .authorize(
++                f.target.company,
++                actor,
++                association,
++                WorkflowOperation::Inspect
++            )
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        p.inspect(
++            f.target.company,
++            actor,
++            RuntimeResourceId::new(f.target.company.as_uuid())
++        )
++        .await,
++        Err(AppError::NotFound(_))
++    ));
++    let service = BindingService::new(authorizer, p.clone(), p.clone(), p.clone());
++    let target = BindingTarget {
++        company: f.target.company,
++        actor,
++        binding: WorkflowBindingId::new(Uuid::new_v4()),
++    };
++    let state = service
++        .configure(ConfigureBinding {
++            target,
++            expected: None,
++            association,
++            version,
++            params: json!({}),
++            resources: Default::default(),
++            run_as: None,
++            message_trigger: None,
++            escalation: None,
++        })
++        .await
++        .unwrap();
++    assert!(
++        state
++            .configuration
++            .bundle()
++            .snapshots()
++            .tools
++            .iter()
++            .any(|tool| tool.kind() == crate::application::workflow::publication::ToolKind::Message)
++    );
++    let active = service
++        .activate(SetBindingActivity {
++            target,
++            expected: state.revision,
++        })
++        .await
++        .unwrap();
++    assert!(active.active);
++    let paused = service
++        .deactivate(SetBindingActivity {
++            target,
++            expected: active.revision,
++        })
++        .await
++        .unwrap();
++    assert!(!paused.active);
++    assert_eq!(
++        p.binding(target.company, target.binding)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++        paused.revision
++    );
++}

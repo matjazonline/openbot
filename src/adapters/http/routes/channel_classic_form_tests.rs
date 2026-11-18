@@ -195,7 +195,7 @@ async fn create(f: &Fixture, data: &BTreeMap<String, String>) -> String {
 }
 
 async fn public_desk(f: &Fixture, department: DepartmentId) -> Channel {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         f.persistence.as_ref(),
         f.company.id,
         ChannelWrite {

@@ -1,5 +1,4 @@
 use super::*;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::domain::entities::message::CanonicalMessageId;
 
@@ -18,7 +17,7 @@ impl Conversation {
     pub(super) async fn new(f: &AdmissionFixture) -> Self {
         let p = f.persistence();
         let company = f.binding.target.company.as_uuid();
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             p,
             company,
             ChannelWrite {

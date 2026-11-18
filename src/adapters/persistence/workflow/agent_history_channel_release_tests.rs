@@ -20,6 +20,7 @@ async fn team_member(d: &Deployment) -> String {
     ChannelPersistence::update(
         d.p(),
         crate::application::ports::channel::ChannelUpdate {
+            actor: d.fixture.target.actor,
             company_id: d.fixture.target.company.as_uuid(),
             channel_id: d.channel,
             write: ChannelWrite {

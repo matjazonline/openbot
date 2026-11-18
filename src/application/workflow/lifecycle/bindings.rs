@@ -115,15 +115,13 @@ impl<A: WorkflowAuthorization, P: BindingLifecycle, V: WorkflowDefinitions, R: R
     }
 
     async fn load(&self, request: SetBindingActivity) -> LifecycleResult<BindingState> {
-        self.authorize(request.target, RelatedAssociation::Company)
-            .await?;
         let state = self
             .persistence
             .binding(request.target.company, request.target.binding)
             .await?
             .ok_or_else(missing)?;
-        check_state(&state, request.target, request.expected)?;
         self.authorize(request.target, state.association).await?;
+        check_state(&state, request.target, request.expected)?;
         Ok(state)
     }
 

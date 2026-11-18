@@ -2,7 +2,7 @@
 //!
 //! One transaction, in this order, so a failure anywhere leaves the channel exactly as it was:
 //!
-//! 1. the company and applicable desk ownership locks, serializing current reviewer refresh;
+//! 1. the actor account, then company and applicable desk ownership locks;
 //! 2. the channel's gate, exclusively ([`crate::adapters::persistence::channel_gate`]), so no
 //!    inbound commit admits a message against settings this edit is replacing;
 //! 3. the channel row, re-checked against the tenant;
@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 
 use sqlx::{PgPool, Postgres, Transaction};
 use tracing::warn;
+use uuid::Uuid;
 
 use super::{
     channel::write_channel_settings_on,
@@ -108,6 +109,34 @@ pub(crate) async fn update_channel_on(
 ) -> AppResult<()> {
     bound_statements_on(tx, budget).await?;
     let company = CompanyId::new(request.company_id);
+    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+        .bind(request.actor.user_id())
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or_else(channel_not_found)?;
+    super::workflow::authority::authorize_person_with_locks(
+        tx,
+        company,
+        request.actor,
+        super::workflow::row_locks::RowLocks::Wait,
+    )
+    .await?;
+    // Company serialization stabilizes ownership. Do not lock the desk row before
+    // its gate: an ingress holding a read gate may still need to update that row.
+    let current = super::department_desks::desk_ownership_on(tx, company, request.channel_id)
+        .await?
+        .ok_or_else(channel_not_found)?;
+    let destination = request.write.department_id.filter(|unit| *unit != current);
+    for unit in std::iter::once(current).chain(destination) {
+        super::administration::management_role_on(
+            tx,
+            request.actor.user_id(),
+            company,
+            crate::application::use_cases::administration::ManagementTarget::Unit(unit),
+        )
+        .await?
+        .ok_or_else(channel_not_found)?;
+    }
     let department = prelock_ownership_on(
         tx,
         company,

@@ -1,5 +1,4 @@
 //! Workflow publication captures only durable agent identities and their source uses.
-use super::http::begin_http;
 use super::*;
 use crate::application::agent::AgentKey;
 use crate::application::workflow::lifecycle::{PublicationDependencies, PublicationDirectory};
@@ -26,8 +25,9 @@ impl<D: PublicationDirectory> PublicationDirectory for AgentPublicationDirectory
         let Some(selection) = agent_selection(draft)? else {
             return Ok(captured);
         };
-        let mut tx = begin_http(&self.persistence).await?;
-        authority::authorize_company(&mut tx, draft.company(), actor).await?;
+        let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
+        management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
+            .await?;
         capture_agents_on(&mut tx, draft.company(), &selection, &mut captured).await?;
         tx.commit().await?;
         Ok(captured)

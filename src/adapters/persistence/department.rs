@@ -23,14 +23,12 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::adapters::persistence::PostgresPersistence;
-use crate::adapters::persistence::agent_publication::{begin_bounded, lock_company_on};
 use crate::adapters::persistence::department_desks::sync_department_grants_on;
 use crate::adapters::persistence::workflow::provisioning::{
     ProvisioningDeployment, department_desk_key, follow_department_lead_on,
     provision_department_desk_on,
 };
 use crate::app_error::{AppError, AppResult};
-use crate::application::agent::AgentCompanyScope;
 use crate::application::ports::department::{
     DepartmentEdit, DepartmentPersistence, DepartmentScope, DepartmentWrite,
 };
@@ -47,12 +45,40 @@ use crate::entities::value_objects::DepartmentSlug;
 use crate::use_cases::company::company_not_found;
 use crate::use_cases::department::department_not_found;
 
+mod placement;
+pub(crate) use placement::{place_in_department_on, prepare_new_agent_placement_on};
 mod lifecycle;
 mod root;
 pub(crate) use lifecycle::{
     create_department_on, create_department_with_id_on, delete_department_on, update_department_on,
 };
 use root::root_role_authority_on;
+
+async fn require_department_management_on(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: DepartmentScope,
+    unit: Option<DepartmentId>,
+) -> AppResult<()> {
+    use crate::application::use_cases::administration::ManagementTarget;
+    super::administration::management_role_on(
+        tx,
+        scope.actor.user_id(),
+        scope.company,
+        unit.map_or(ManagementTarget::Root, ManagementTarget::Unit),
+    )
+    .await?
+    .ok_or_else(department_not_found)?;
+    Ok(())
+}
+
+async fn require_parent_management_on(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: DepartmentScope,
+    unit: DepartmentId,
+) -> AppResult<()> {
+    let current = lock_department_on(tx, scope.company, unit).await?;
+    require_department_management_on(tx, scope, current.parent_id).await
+}
 
 /// A principal named as the department pages show it: an agent by its current name and handle, a
 /// person by their account's username and email (not `display_label`, which a rename leaves).
@@ -147,17 +173,13 @@ async fn begin_department_write(
     persistence: &PostgresPersistence,
     scope: DepartmentScope,
 ) -> AppResult<Transaction<'_, Postgres>> {
-    let mut tx = begin_bounded(persistence).await?;
-    let company = AgentCompanyScope {
-        company: scope.company,
-        actor: scope.actor,
+    use super::company_invite::authority::{self as company_level_authority, TeamScope};
+    let team = TeamScope {
+        actor_id: scope.actor.user_id(),
+        company_id: scope.company.as_uuid(),
     };
-    lock_company_on(&mut tx, company)
-        .await
-        .map_err(|error| match error {
-            AppError::NotFound(_) => company_not_found(),
-            other => other,
-        })?;
+    let mut tx = company_level_authority::start(persistence.pool(), team, None).await?;
+    company_level_authority::lock_team(&mut tx, team, None).await?;
     Ok(tx)
 }
 
@@ -330,39 +352,6 @@ pub(crate) async fn assign_department_role_on(
         Some(principal),
     )
     .await?;
-    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
-}
-
-/// Make `principal` a member of the department and, with `role`, its holder of that role, as
-/// company-agent creation places a new agent (plan 01-departments 03C item 0). One write: the
-/// rows, then a single grant sync over everything they reach, so the department's desk gates
-/// are taken once, in order, with its neighbours' (01DEP-P03-B1-F1). The caller holds the company
-/// write lock.
-pub(crate) async fn place_in_department_on(
-    tx: &mut Transaction<'_, Postgres>,
-    templates: &ProvisioningDeployment,
-    company: CompanyId,
-    actor: WorkflowActor,
-    department: DepartmentId,
-    principal: PrincipalId,
-    role: Option<DepartmentRole>,
-) -> AppResult<()> {
-    if let Some(role) = role {
-        root_role_authority_on(tx, company, actor, department, role).await?;
-    }
-    write_placement_on(tx, company, department, principal, true, role).await?;
-    if let Some(role) = role {
-        follow_lead_on(
-            tx,
-            templates,
-            company,
-            actor,
-            department,
-            role,
-            Some(principal),
-        )
-        .await?;
-    }
     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
 }
 
@@ -597,7 +586,7 @@ pub(crate) async fn departments_of_company(
 /// re-pointed with (01DEP-P03-D7).
 #[derive(Clone)]
 pub struct PostgresDepartments {
-    persistence: PostgresPersistence,
+    pub(super) persistence: PostgresPersistence,
     templates: ProvisioningDeployment,
 }
 impl PostgresDepartments {
@@ -618,6 +607,7 @@ impl DepartmentPersistence for PostgresDepartments {
         lead: Option<PrincipalId>,
     ) -> AppResult<Department> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
+        require_department_management_on(&mut tx, scope, write.parent_id).await?;
         let department = create_department_on(
             &mut tx,
             &self.templates,
@@ -638,6 +628,10 @@ impl DepartmentPersistence for PostgresDepartments {
         edit: DepartmentEdit,
     ) -> AppResult<Department> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
+        require_parent_management_on(&mut tx, scope, department).await?;
+        if let Some(parent) = edit.parent_id {
+            require_department_management_on(&mut tx, scope, parent).await?;
+        }
         let department = update_department_on(&mut tx, scope.company, department, &edit).await?;
         tx.commit().await?;
         Ok(department)
@@ -645,8 +639,9 @@ impl DepartmentPersistence for PostgresDepartments {
 
     async fn delete(&self, scope: DepartmentScope, department: DepartmentId) -> AppResult<()> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
+        require_parent_management_on(&mut tx, scope, department).await?;
         delete_department_on(&mut tx, scope.company, department).await?;
-        tx.commit().await?;
+        tx.commit().await.map_err(lifecycle::delete_error)?;
         Ok(())
     }
 
@@ -701,6 +696,7 @@ impl DepartmentPersistence for PostgresDepartments {
         principal: PrincipalId,
     ) -> AppResult<()> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
+        require_department_management_on(&mut tx, scope, Some(department)).await?;
         add_department_member_on(&mut tx, scope.company, department, principal).await?;
         tx.commit().await?;
         Ok(())
@@ -722,6 +718,7 @@ impl DepartmentPersistence for PostgresDepartments {
             return root::remove_root_member(&self.persistence, scope, department, principal).await;
         }
         let mut tx = begin_department_write(&self.persistence, scope).await?;
+        require_department_management_on(&mut tx, scope, Some(department)).await?;
         remove_department_member_on(&mut tx, scope.company, department, principal).await?;
         tx.commit().await?;
         Ok(())

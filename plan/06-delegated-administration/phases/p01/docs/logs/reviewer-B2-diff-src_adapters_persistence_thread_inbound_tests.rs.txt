@@ -1,0 +1,46 @@
+--- B1/src/adapters/persistence/thread/inbound_tests.rs
++++ B2/src/adapters/persistence/thread/inbound_tests.rs
+@@ -612,6 +612,11 @@
+         .unwrap()
+         .unwrap();
+     ChannelUpdate {
++        actor: crate::adapters::persistence::test_support::company_owner_actor(
++            &fixture.persistence,
++            fixture.company_id,
++        )
++        .await,
+         company_id: fixture.company_id,
+         channel_id: fixture.channel_id,
+         write: ChannelWrite {
+@@ -703,6 +708,10 @@
+     )
+     .await
+     .unwrap();
++    let admission_backend: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *admission)
++        .await
++        .unwrap();
+ 
+     let edit = tokio::spawn({
+         let pool = fixture.pool.clone();
+@@ -715,9 +724,19 @@
+         };
+         async move { update_channel_within(&pool, update, patient).await }
+     });
+-    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
++    crate::adapters::persistence::test_support::wait_until_blocked_by(
++        &fixture.pool,
++        admission_backend,
++    )
++    .await;
+     assert!(!edit.is_finished(), "the edit must wait for the commit");
+     assert_eq!(channel_settings(&fixture).await, (true, revision));
++    // An edit waiting for the gate must not already own a conflicting desk-row lock.
++    sqlx::query("SELECT id FROM channels WHERE id=$1 FOR UPDATE NOWAIT")
++        .bind(fixture.channel_id)
++        .execute(&mut *admission)
++        .await
++        .unwrap();
+ 
+     // The rest of the commit, under the gate it already holds.
+     super::inbound::commit_on(&mut admission, &routed)

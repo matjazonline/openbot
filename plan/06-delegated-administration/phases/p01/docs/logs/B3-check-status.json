@@ -1,0 +1,128 @@
+[
+  {
+    "name": "B3-format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "code": 0,
+    "fixture": "worktree-local target"
+  },
+  {
+    "name": "B3-whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "code": 0,
+    "fixture": "worktree-local target"
+  },
+  {
+    "name": "B3-sqlx-prepare",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "code": 0,
+    "fixture": "owned Plan06 PostgreSQL18 / openbot_p06_b3_v2; schema metadata openbot_p06_b3_gate"
+  },
+  {
+    "name": "B3-offline",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "code": 0,
+    "fixture": "worktree-local target"
+  },
+  {
+    "name": "B3-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "code": 0,
+    "fixture": "worktree-local target"
+  },
+  {
+    "name": "B3-corrections",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "--",
+      "--nocapture",
+      "delegated_",
+      "department_directory_",
+      "company_agent::tests",
+      "local_agent_tests::e2e",
+      "local_agent_tests::retention::peer"
+    ],
+    "code": 0,
+    "fixture": "owned Plan06 PostgreSQL18 / openbot_p06_b3_v2; schema metadata openbot_p06_b3_gate"
+  },
+  {
+    "name": "B3-source-modules",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "source_modules"
+    ],
+    "code": 0,
+    "fixture": "worktree-local target"
+  },
+  {
+    "name": "B3-after-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "--list"
+    ],
+    "code": 0,
+    "fixture": "worktree-local target"
+  },
+  {
+    "name": "B3-trail-build-final",
+    "command": [
+      "trail",
+      "build"
+    ],
+    "code": 0,
+    "fixture": "worktree-local target"
+  },
+  {
+    "name": "B3-trail-check-final",
+    "command": [
+      "trail",
+      "check"
+    ],
+    "code": 1,
+    "fixture": "worktree-local target"
+  }
+]

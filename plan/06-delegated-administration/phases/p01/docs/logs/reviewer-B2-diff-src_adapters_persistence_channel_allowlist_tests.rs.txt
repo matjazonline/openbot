@@ -1,0 +1,44 @@
+--- B1/src/adapters/persistence/channel_allowlist_tests.rs
++++ B2/src/adapters/persistence/channel_allowlist_tests.rs
+@@ -6,8 +6,14 @@
+ use crate::use_cases::participant::IdentityDirectory;
+ use crate::use_cases::user::UserPersistence;
+ 
+-fn allowlist_edit(company_id: Uuid, channel_id: Uuid, emails: &[&str]) -> ChannelUpdate {
++fn allowlist_edit(
++    owner: Uuid,
++    company_id: Uuid,
++    channel_id: Uuid,
++    emails: &[&str],
++) -> ChannelUpdate {
+     ChannelUpdate {
++        actor: crate::application::workflow::WorkflowActor::authenticated(owner).unwrap(),
+         company_id,
+         channel_id,
+         write: ChannelWrite {
+@@ -61,7 +67,7 @@
+     .await
+     .unwrap()
+     .id;
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         &persistence,
+         company_id,
+         ChannelWrite {
+@@ -109,6 +115,7 @@
+     ChannelPersistence::update(
+         &persistence,
+         allowlist_edit(
++            owner.id,
+             company_id,
+             channel.id,
+             &["sam@partner.test", "dana@partner.test"],
+@@ -133,7 +140,7 @@
+ 
+     let edited = ChannelPersistence::update(
+         &persistence,
+-        allowlist_edit(company_id, channel.id, &["sam@partner.test"]),
++        allowlist_edit(owner.id, company_id, channel.id, &["sam@partner.test"]),
+     )
+     .await
+     .unwrap();

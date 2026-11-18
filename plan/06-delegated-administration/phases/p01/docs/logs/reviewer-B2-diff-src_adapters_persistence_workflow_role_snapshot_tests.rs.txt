@@ -1,0 +1,11 @@
+--- B1/src/adapters/persistence/workflow/role_snapshot_tests.rs
++++ B2/src/adapters/persistence/workflow/role_snapshot_tests.rs
+@@ -83,7 +83,7 @@
+             )
+             .await
+             .unwrap();
+-        let channel = ChannelPersistence::create(
++        let channel = crate::adapters::persistence::test_support::create_channel(
+             &binding.fixture.persistence,
+             binding.target.company.as_uuid(),
+             ChannelWrite {

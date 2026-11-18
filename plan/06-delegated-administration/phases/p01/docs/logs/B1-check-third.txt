@@ -1,0 +1,26 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+error[E0599]: no method named `ok_or_else` found for struct `domain::entities::department::DepartmentId` in the current scope
+   --> src/application/workflow/authorization.rs:233:66
+    |
+233 |                     ManagementTarget::Unit(channel.department_id.ok_or_else(not_found)?),
+    |                                                                  ^^^^^^^^^^ method not found in `domain::entities::department::DepartmentId`
+    |
+   ::: src/domain/entities/transport/mod.rs:185:9
+    |
+185 |         pub struct $name(Uuid);
+    |         ----------------------- method `ok_or_else` not found for this struct
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+  --> src/adapters/persistence/workflow/delegated_administration_runtime_tests.rs:98:49
+   |
+98 |     let desk = ingress.thread.as_ref().unwrap().channel_id.unwrap();
+   |                                                 ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+Some errors have detailed explanations: E0599, E0609.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

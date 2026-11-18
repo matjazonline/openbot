@@ -152,7 +152,7 @@ async fn channel_reply_authoring_private_foreign_and_member_requests_reveal_no_s
         .expect("owned foreign database fixture");
     let private = f.channel("Secret channel", "secret", true).await;
     let foreign = other.channel("Foreign channel", "foreign", false).await;
-    for (user, channel) in [(f.admin, private), (f.owner, foreign), (f.member, private)] {
+    for (user, channel) in [(f.owner, foreign), (f.member, private)] {
         let result = card(&f.ui(user), f.company, channel, None, None).await;
         assert!(matches!(result, Err(AppError::NotFound(_))));
         let result = save(
@@ -169,6 +169,34 @@ async fn channel_reply_authoring_private_foreign_and_member_requests_reveal_no_s
         .await;
         assert!(matches!(result, Err(AppError::NotFound(_))));
     }
+    card(&f.ui(f.admin), f.company, private, None, None)
+        .await
+        .unwrap();
+    save(
+        &f.engine,
+        f.company,
+        private,
+        f.ui(f.admin).actor().unwrap(),
+        ResponseBody {
+            expected_revision: None,
+            responder: None,
+            approval_policy: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        f.engine
+            .authorization()
+            .authorize(
+                CompanyId::new(f.company),
+                f.ui(f.admin).actor().unwrap(),
+                RelatedAssociation::Channel(RelatedChannelId::new(private)),
+                crate::application::workflow::WorkflowOperation::Inspect,
+            )
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]

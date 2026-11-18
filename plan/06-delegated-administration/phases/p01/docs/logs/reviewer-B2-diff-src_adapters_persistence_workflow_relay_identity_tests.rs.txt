@@ -1,0 +1,11 @@
+--- B1/src/adapters/persistence/workflow/relay_identity_tests.rs
++++ B2/src/adapters/persistence/workflow/relay_identity_tests.rs
+@@ -91,7 +91,7 @@
+             .id
+         }
+     };
+-    let desk = ChannelPersistence::create(
++    let desk = crate::adapters::persistence::test_support::create_channel(
+         p,
+         f.people.role.company().as_uuid(),
+         ChannelWrite {

@@ -1,0 +1,169 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+error[E0433]: cannot find type `AgentPersistence` in this scope
+  --> src/adapters/http/routes/delegated_agent_api_tests.rs:54:18
+   |
+54 |     let stored = AgentPersistence::get_by_id(f.persistence.as_ref(), agent)
+   |                  ^^^^^^^^^^^^^^^^ use of undeclared type `AgentPersistence`
+   |
+help: a trait with a similar name exists
+   |
+54 -     let stored = AgentPersistence::get_by_id(f.persistence.as_ref(), agent)
+54 +     let stored = UserPersistence::get_by_id(f.persistence.as_ref(), agent)
+   |
+help: consider importing this trait
+   |
+ 1 + use crate::use_cases::agent::AgentPersistence;
+   |
+
+error[E0433]: cannot find type `AgentPersistence` in this scope
+   --> src/adapters/http/routes/delegated_agent_api_tests.rs:142:9
+    |
+142 |         AgentPersistence::get_by_id(f.persistence.as_ref(), agent)
+    |         ^^^^^^^^^^^^^^^^ use of undeclared type `AgentPersistence`
+    |
+help: a trait with a similar name exists
+    |
+142 -         AgentPersistence::get_by_id(f.persistence.as_ref(), agent)
+142 +         UserPersistence::get_by_id(f.persistence.as_ref(), agent)
+    |
+help: consider importing this trait
+    |
+  1 + use crate::use_cases::agent::AgentPersistence;
+    |
+
+warning: method call on a diverging inference variable
+  --> src/adapters/http/routes/delegated_agent_api_tests.rs:56:10
+   |
+56 |         .unwrap();
+   |          ^^^^^^
+   |
+   = help: consider providing a type annotation
+   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = note: for more information, see issue #156047 <https://github.com/rust-lang/rust/issues/156047>
+   = note: `#[warn(method_call_on_diverging_infer_var)]` (part of `#[warn(future_incompatible)]`) on by default
+
+error[E0599]: no method named `unwrap` found for type `_` in the current scope
+  --> src/adapters/http/routes/delegated_agent_api_tests.rs:56:10
+   |
+54 |       let stored = AgentPersistence::get_by_id(f.persistence.as_ref(), agent)
+   |  __________________-
+55 | |         .await?
+56 | |         .unwrap();
+   | |_________-^^^^^^
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `KeyWrap` which provides `unwrap` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use aws_lc_rs::key_wrap::KeyWrap;
+   |
+help: there is a method `unwrap_err` with a similar name
+   |
+56 |         .unwrap_err();
+   |                ++++
+
+error[E0308]: mismatched types
+   --> src/adapters/http/routes/delegated_agent_api_tests.rs:98:19
+    |
+ 98 |             State(departments.clone()),
+    |             ----- ^^^^^^^^^^^^^^^^^^^ expected `Arc<SkillUseCases>`, found `Arc<DepartmentUseCases>`
+    |             |
+    |             arguments to this struct are incorrect
+    |
+    = note: expected struct `Arc<application::use_cases::skill::SkillUseCases>`
+               found struct `Arc<application::use_cases::department::DepartmentUseCases>`
+help: the type constructed contains `std::sync::Arc<application::use_cases::department::DepartmentUseCases>` due to the type of the argument passed
+   --> src/adapters/http/routes/delegated_agent_api_tests.rs:98:13
+    |
+ 98 |             State(departments.clone()),
+    |             ^^^^^^-------------------^
+    |                   |
+    |                   this argument influences the type of `State`
+note: tuple struct defined here
+   --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.8.4/src/extract/state.rs:296:12
+    |
+296 | pub struct State<S>(pub S);
+    |            ^^^^^
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> src/adapters/http/routes/delegated_agent_api_tests.rs:96:9
+    |
+ 96 |         get_agent_json(
+    |         ^^^^^^^^^^^^^^
+...
+ 99 |             AuthenticatedUser { id: bob },
+    |             ----------------------------- argument #3 of type `axum::extract::State<std::sync::Arc<application::use_cases::department::DepartmentUseCases>>` is missing
+    |
+note: function defined here
+   --> src/adapters/http/routes/agent.rs:669:10
+    |
+669 | async fn get_agent_json(
+    |          ^^^^^^^^^^^^^^
+...
+672 |     State(departments): DepartmentUseCasesState,
+    |     -------------------------------------------
+help: provide the argument
+    |
+ 96 ~         get_agent_json(
+ 97 +             State(f.agents.clone()),
+ 98 +             State(departments.clone()),
+ 99 +             /* State<Arc<DepartmentUseCases>> */,
+100 +             AuthenticatedUser { id: bob },
+101 +             Path((f.company, agent)),
+102 +         )
+    |
+
+error[E0308]: mismatched types
+   --> src/adapters/http/routes/delegated_agent_api_tests.rs:109:19
+    |
+109 |             State(departments),
+    |             ----- ^^^^^^^^^^^ expected `Arc<SkillUseCases>`, found `Arc<DepartmentUseCases>`
+    |             |
+    |             arguments to this struct are incorrect
+    |
+    = note: expected struct `Arc<application::use_cases::skill::SkillUseCases>`
+               found struct `Arc<application::use_cases::department::DepartmentUseCases>`
+help: the type constructed contains `std::sync::Arc<application::use_cases::department::DepartmentUseCases>` due to the type of the argument passed
+   --> src/adapters/http/routes/delegated_agent_api_tests.rs:109:13
+    |
+109 |             State(departments),
+    |             ^^^^^^-----------^
+    |                   |
+    |                   this argument influences the type of `State`
+note: tuple struct defined here
+   --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.8.4/src/extract/state.rs:296:12
+    |
+296 | pub struct State<S>(pub S);
+    |            ^^^^^
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> src/adapters/http/routes/delegated_agent_api_tests.rs:107:9
+    |
+107 |         get_agent_json(
+    |         ^^^^^^^^^^^^^^
+...
+110 |             AuthenticatedUser { id: alice },
+    |             ------------------------------- argument #3 of type `axum::extract::State<std::sync::Arc<application::use_cases::department::DepartmentUseCases>>` is missing
+    |
+note: function defined here
+   --> src/adapters/http/routes/agent.rs:669:10
+    |
+669 | async fn get_agent_json(
+    |          ^^^^^^^^^^^^^^
+...
+672 |     State(departments): DepartmentUseCasesState,
+    |     -------------------------------------------
+help: provide the argument
+    |
+107 ~         get_agent_json(
+108 +             State(f.agents.clone()),
+109 +             State(departments),
+110 +             /* State<Arc<DepartmentUseCases>> */,
+111 +             AuthenticatedUser { id: alice },
+112 +             Path((foreign.company, agent)),
+113 +         )
+    |
+
+Some errors have detailed explanations: E0061, E0308, E0433, E0599.
+For more information about an error, try `rustc --explain E0061`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 7 previous errors; 2 warnings emitted

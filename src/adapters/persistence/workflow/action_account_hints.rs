@@ -399,7 +399,15 @@ async fn prelock_with_native(
         }
     }
     let actor = hints.actor()?;
-    match authority::authorize_company_with_locks(db, scope.company, actor, locks).await {
+    match super::super::management::authorize_run_with_locks(
+        db,
+        scope.company,
+        scope.run,
+        actor,
+        locks,
+    )
+    .await
+    {
         Ok(_) => {
             if actor_hints_on(db, scope, reviewer).await?.as_ref() != Some(&hints) {
                 return Err(missing());

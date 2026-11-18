@@ -1,0 +1,37 @@
+--- B2/src/adapters/http/routes/agent_api_tests.rs
++++ B3/src/adapters/http/routes/agent_api_tests.rs
+@@ -27,7 +27,10 @@
+ }
+ impl Fixture {
+     async fn new() -> Option<Self> {
+-        let persistence = Arc::new(PostgresPersistence::new(test_pool().await?));
++        Some(Self::on(test_pool().await?).await)
++    }
++    async fn on(pool: sqlx::PgPool) -> Self {
++        let persistence = Arc::new(PostgresPersistence::new(pool));
+         let suffix = Uuid::new_v4().simple().to_string();
+         let user = persistence
+             .create_user(&suffix, &format!("{suffix}@example.test"), "hash")
+@@ -76,13 +79,13 @@
+                 crate::adapters::persistence::test_support::company_agents(persistence.as_ref()),
+             ),
+         );
+-        Some(Self {
++        Self {
+             persistence,
+             agents,
+             skills,
+             user,
+             company,
+-        })
++        }
+     }
+     async fn create(&self, mut body: Value) -> Value {
+         body["native_permissions"] = json!("full");
+@@ -393,3 +396,6 @@
+     assert_eq!(agents, 1);
+     f.cleanup().await;
+ }
++
++#[path = "delegated_agent_api_tests.rs"]
++mod delegated;

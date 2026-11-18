@@ -1,0 +1,11 @@
+--- B1/src/adapters/http/routes/channel_classic_form_tests.rs
++++ B2/src/adapters/http/routes/channel_classic_form_tests.rs
+@@ -195,7 +195,7 @@
+ }
+ 
+ async fn public_desk(f: &Fixture, department: DepartmentId) -> Channel {
+-    ChannelPersistence::create(
++    crate::adapters::persistence::test_support::create_channel(
+         f.persistence.as_ref(),
+         f.company.id,
+         ChannelWrite {

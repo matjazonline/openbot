@@ -136,7 +136,15 @@ pub(super) async fn prepare_on(
         return Ok(Preparation::Stale);
     }
     let actor = actors.actor()?;
-    match authority::authorize_company(db, scope.company, actor).await {
+    match management::authorize_run_with_locks(
+        db,
+        scope.company,
+        scope.run,
+        actor,
+        row_locks::RowLocks::Wait,
+    )
+    .await
+    {
         Ok(_) => {}
         Err(AppError::NotFound(_)) => {
             return Ok(Preparation::Current(ModelAuthority {

@@ -326,6 +326,7 @@ async fn direct_thread_notification_competing_mixed_redelivery_emits_only_each_p
     ChannelPersistence::update(
         &f.persistence,
         ChannelUpdate {
+            actor: crate::application::workflow::WorkflowActor::authenticated(f.owner).unwrap(),
             company_id: f.company.id,
             channel_id: desk,
             write: ChannelWrite {

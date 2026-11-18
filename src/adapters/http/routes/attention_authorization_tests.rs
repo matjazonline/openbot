@@ -179,7 +179,7 @@ async fn department_views_attention_reads_only_the_departments_desks() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    let owned = crate::application::ports::channel::ChannelPersistence::create(
+    let owned = crate::adapters::persistence::test_support::create_channel(
         f.persistence.as_ref(),
         f.company.id,
         crate::application::ports::channel::ChannelWrite {

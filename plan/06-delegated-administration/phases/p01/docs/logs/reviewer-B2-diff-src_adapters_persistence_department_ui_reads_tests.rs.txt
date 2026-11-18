@@ -1,0 +1,11 @@
+--- B1/src/adapters/persistence/department_ui_reads_tests.rs
++++ B2/src/adapters/persistence/department_ui_reads_tests.rs
+@@ -91,7 +91,7 @@
+     assert_eq!((desks[0].id, desks[0].slug.as_str()), (desk, "sales"));
+     assert!(desks[0].own, "the department's own desk is marked");
+     // A second desk the department owns is listed after its own, unmarked.
+-    let extra = crate::application::ports::channel::ChannelPersistence::create(
++    let extra = crate::adapters::persistence::test_support::create_channel(
+         &f.persistence,
+         f.company,
+         crate::application::ports::channel::ChannelWrite {

@@ -81,6 +81,7 @@ mod knowledge_release;
 mod lease;
 mod lease_claim;
 pub mod local_agents;
+pub(in crate::adapters::persistence) mod management;
 pub mod mcp;
 mod member_dependents;
 mod memory_steps;

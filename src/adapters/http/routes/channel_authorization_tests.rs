@@ -3,6 +3,9 @@ use super::simulation::{OpenSimulatedThreadContext, open_simulated_thread_logic}
 use super::*;
 use axum::http::StatusCode;
 
+#[path = "delegated_channel_authorization_tests.rs"]
+mod delegated;
+
 #[tokio::test]
 async fn channel_management_and_simulation_hide_foreign_companies_and_refuse_members() {
     let Some(f) = Fixture::new().await else {
@@ -58,12 +61,11 @@ async fn channel_management_and_simulation_hide_foreign_companies_and_refuse_mem
 #[tokio::test]
 async fn simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids()
 {
-    use crate::application::ports::channel::ChannelPersistence;
     use crate::application::ports::thread::ThreadPersistence;
     let Some(f) = Fixture::new().await else {
         return;
     };
-    let other_channel = ChannelPersistence::create(
+    let other_channel = crate::adapters::persistence::test_support::create_channel(
         f.persistence.as_ref(),
         f.company.id,
         ChannelWrite {

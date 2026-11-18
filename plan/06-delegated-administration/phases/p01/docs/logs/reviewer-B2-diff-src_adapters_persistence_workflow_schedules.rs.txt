@@ -1,0 +1,48 @@
+--- B1/src/adapters/persistence/workflow/schedules.rs
++++ B2/src/adapters/persistence/workflow/schedules.rs
+@@ -158,8 +158,9 @@
+     actor: WorkflowActor,
+     channel: Uuid,
+ ) -> AppResult<()> {
+-    authority::authorize_company(tx, company, actor).await?;
+-    association::authorize_association(tx, company, actor, channel_association(channel)).await
++    super::management::authorize_association_on(tx, company, actor, channel_association(channel))
++        .await
++        .map(drop)
+ }
+ 
+ /// The schedule `id`, locked, for an actor who may manage it.
+@@ -169,7 +170,8 @@
+     actor: WorkflowActor,
+     id: Uuid,
+ ) -> AppResult<ChannelSchedule> {
+-    authority::authorize_company(tx, company, actor).await?;
++    authority::authorize_person_with_locks(tx, company, actor, super::row_locks::RowLocks::Wait)
++        .await?;
+     // A schedule's channel is immutable, so it is safe to authorize before locking the row.
+     let channel: Uuid = sqlx::query_scalar(
+         "SELECT channel_id FROM channel_schedules WHERE company_id = $1 AND id = $2",
+@@ -179,7 +181,8 @@
+     .fetch_optional(&mut **tx)
+     .await?
+     .ok_or_else(missing)?;
+-    association::authorize_association(tx, company, actor, channel_association(channel)).await?;
++    super::management::authorize_association_on(tx, company, actor, channel_association(channel))
++        .await?;
+     sqlx::query_as::<_, ScheduleRow>(&format!(
+         "SELECT {COLUMNS} FROM channel_schedules WHERE company_id = $1 AND id = $2 FOR UPDATE"
+     ))
+@@ -451,6 +454,13 @@
+     ) -> AppResult<Uuid> {
+         let mut tx = self.pool.begin().await?;
+         let schedule = managed(&mut tx, company, actor, id).await?;
++        association::authorize_association(
++            &mut tx,
++            company,
++            actor,
++            channel_association(schedule.channel_id),
++        )
++        .await?;
+         let captured = sqlx::query(
+             "INSERT INTO schedule_runs (id, schedule_id, scheduled_for, \
+                company_id, channel_id, binding_id, command_key) \

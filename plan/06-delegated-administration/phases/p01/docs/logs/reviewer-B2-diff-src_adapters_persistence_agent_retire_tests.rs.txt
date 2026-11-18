@@ -1,0 +1,19 @@
+--- B1/src/adapters/persistence/agent_retire_tests.rs
++++ B2/src/adapters/persistence/agent_retire_tests.rs
+@@ -7,7 +7,6 @@
+ use crate::adapters::persistence::test_support::{
+     own_database, test_pool, wait_until_a_backend_is_blocked,
+ };
+-use crate::application::ports::channel::ChannelPersistence;
+ use crate::application::ports::channel::ChannelWrite;
+ use crate::application::ports::participant::IdentityObservation;
+ use crate::entities::participant::{IdentityClaimMetadata, IdentityProvenance};
+@@ -46,7 +45,7 @@
+     .await
+     .unwrap()
+     .id;
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         persistence,
+         company_id,
+         ChannelWrite {

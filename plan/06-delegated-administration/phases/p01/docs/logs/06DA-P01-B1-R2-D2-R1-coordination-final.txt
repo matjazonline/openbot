@@ -1,0 +1,2 @@
+plan/06-delegated-administration/COORDINATION.md equals plan/06-delegated-administration/phases/p01/docs/logs/coordination-r2.md: True
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md equals plan/06-delegated-administration/phases/p01/docs/logs/06DA-P01-B1-R2-producer-coordination.md: True

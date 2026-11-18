@@ -1,0 +1,199 @@
+--- B1/src/application/use_cases/schedule.rs
++++ B2/src/application/use_cases/schedule.rs
+@@ -152,12 +152,13 @@
+         &self.persistence
+     }
+ 
+-    /// Owner or admin of the company who can see `channel` (or any channel, for `None`).
++    /// Configuration, inspection and initiation retain their own association requirements.
+     async fn authorize(
+         &self,
+         user_id: Uuid,
+         company_id: Uuid,
+         channel: Option<Uuid>,
++        operation: WorkflowOperation,
+     ) -> AppResult<(WorkflowActor, CompanyId)> {
+         let actor = WorkflowActor::authenticated(user_id)?;
+         let company = CompanyId::new(company_id);
+@@ -165,12 +166,7 @@
+             RelatedAssociation::Channel(RelatedChannelId::new(channel))
+         });
+         self.authorization
+-            .authorize(
+-                company,
+-                actor,
+-                association,
+-                WorkflowOperation::ManageSchedule,
+-            )
++            .authorize(company, actor, association, operation)
+             .await?;
+         Ok((actor, company))
+     }
+@@ -183,12 +179,13 @@
+         user_id: Uuid,
+         scope: impl Into<ScheduleScope>,
+         id: Uuid,
++        operation: WorkflowOperation,
+     ) -> AppResult<(WorkflowActor, CompanyId, ChannelSchedule)> {
+         let ScheduleScope {
+             company_id,
+             channel_id,
+         } = scope.into();
+-        let (_, company) = self.authorize(user_id, company_id, None).await?;
++        let company = CompanyId::new(company_id);
+         let schedule = self
+             .persistence
+             .get(company, id)
+@@ -196,7 +193,7 @@
+             .filter(|schedule| channel_id.is_none_or(|channel| channel == schedule.channel_id))
+             .ok_or_else(not_found)?;
+         let (actor, company) = self
+-            .authorize(user_id, company_id, Some(schedule.channel_id))
++            .authorize(user_id, company_id, Some(schedule.channel_id), operation)
+             .await?;
+         Ok((actor, company, schedule))
+     }
+@@ -235,7 +232,14 @@
+         company_id: Uuid,
+         channel_id: Option<Uuid>,
+     ) -> AppResult<Vec<ScheduleBindingChoice>> {
+-        let (_, company) = self.authorize(user_id, company_id, channel_id).await?;
++        let operation = if channel_id.is_some() {
++            WorkflowOperation::ManageSchedule
++        } else {
++            WorkflowOperation::ListManaged
++        };
++        let (_, company) = self
++            .authorize(user_id, company_id, channel_id, operation)
++            .await?;
+         let choices = self
+             .persistence
+             .binding_choices(company, channel_id)
+@@ -263,7 +267,15 @@
+             if visible.contains_key(&channel) {
+                 continue;
+             }
+-            let seen = match self.authorize(user_id, company_id, Some(channel)).await {
++            let seen = match self
++                .authorize(
++                    user_id,
++                    company_id,
++                    Some(channel),
++                    WorkflowOperation::ManageSchedule,
++                )
++                .await
++            {
+                 Ok(_) => true,
+                 Err(AppError::NotFound(_)) => false,
+                 Err(error) => return Err(error),
+@@ -281,7 +293,12 @@
+         write: ScheduleWrite,
+     ) -> AppResult<ChannelSchedule> {
+         let (actor, company) = self
+-            .authorize(user_id, company_id, Some(channel_id))
++            .authorize(
++                user_id,
++                company_id,
++                Some(channel_id),
++                WorkflowOperation::ManageSchedule,
++            )
+             .await?;
+         Self::validate_write(&write)?;
+         info!(%channel_id, %company_id, schedule_type = %write.schedule_type, "Creating schedule");
+@@ -297,7 +314,10 @@
+         scope: impl Into<ScheduleScope> + std::fmt::Debug,
+         id: Uuid,
+     ) -> AppResult<Option<ChannelSchedule>> {
+-        match self.managed_schedule(user_id, scope, id).await {
++        match self
++            .managed_schedule(user_id, scope, id, WorkflowOperation::ManageSchedule)
++            .await
++        {
+             Ok((_, _, schedule)) => Ok(Some(schedule)),
+             Err(AppError::NotFound(_)) => Ok(None),
+             Err(err) => Err(err),
+@@ -312,19 +332,26 @@
+         channel_id: Uuid,
+     ) -> AppResult<Vec<ChannelSchedule>> {
+         let (_, company) = self
+-            .authorize(user_id, company_id, Some(channel_id))
++            .authorize(
++                user_id,
++                company_id,
++                Some(channel_id),
++                WorkflowOperation::ManageSchedule,
++            )
+             .await?;
+         self.persistence.list_by_channel(company, channel_id).await
+     }
+ 
+-    /// Every schedule on a channel this caller can see.
++    /// Every schedule on a desk this caller manages; this exposes configuration only.
+     #[instrument(skip_all)]
+     pub async fn list_company_schedules(
+         &self,
+         user_id: Uuid,
+         company_id: Uuid,
+     ) -> AppResult<Vec<ChannelSchedule>> {
+-        let (_, company) = self.authorize(user_id, company_id, None).await?;
++        let (_, company) = self
++            .authorize(user_id, company_id, None, WorkflowOperation::ListManaged)
++            .await?;
+         let schedules = self.persistence.list_by_company(company).await?;
+         let channels = schedules.iter().map(|schedule| schedule.channel_id);
+         let visible = self.visible_channels(user_id, company_id, channels).await?;
+@@ -343,7 +370,9 @@
+         channel_id: Uuid,
+         write: ScheduleWrite,
+     ) -> AppResult<ChannelSchedule> {
+-        let (actor, company, existing) = self.managed_schedule(user_id, company_id, id).await?;
++        let (actor, company, existing) = self
++            .managed_schedule(user_id, company_id, id, WorkflowOperation::ManageSchedule)
++            .await?;
+         if existing.channel_id != channel_id {
+             return Err(AppError::BadRequest(
+                 "A schedule cannot change its channel".into(),
+@@ -363,7 +392,9 @@
+         scope: impl Into<ScheduleScope> + std::fmt::Debug,
+         id: Uuid,
+     ) -> AppResult<()> {
+-        let (actor, company, _) = self.managed_schedule(user_id, scope, id).await?;
++        let (actor, company, _) = self
++            .managed_schedule(user_id, scope, id, WorkflowOperation::ManageSchedule)
++            .await?;
+         info!("Deleting schedule {} for company {}", id, company.as_uuid());
+         self.persistence.delete(actor, company, id).await
+     }
+@@ -376,7 +407,9 @@
+         id: Uuid,
+         enabled: bool,
+     ) -> AppResult<()> {
+-        let (actor, company, _) = self.managed_schedule(user_id, scope, id).await?;
++        let (actor, company, _) = self
++            .managed_schedule(user_id, scope, id, WorkflowOperation::ManageSchedule)
++            .await?;
+         self.persistence
+             .set_enabled(actor, company, id, enabled)
+             .await
+@@ -391,7 +424,9 @@
+         offset: i64,
+         limit: i64,
+     ) -> AppResult<Vec<ScheduleRun>> {
+-        let (_, company, _) = self.managed_schedule(user_id, scope, schedule_id).await?;
++        let (_, company, _) = self
++            .managed_schedule(user_id, scope, schedule_id, WorkflowOperation::Inspect)
++            .await?;
+         self.persistence
+             .list_runs(company, schedule_id, offset, limit)
+             .await
+@@ -413,7 +448,9 @@
+                 "A run-now request needs a command key of at most 200 bytes.".into(),
+             ));
+         }
+-        let (actor, company, schedule) = self.managed_schedule(user_id, scope, id).await?;
++        let (actor, company, schedule) = self
++            .managed_schedule(user_id, scope, id, WorkflowOperation::Admit)
++            .await?;
+         info!(schedule_id = %schedule.id, "Manually triggering schedule");
+         let occurrence = self
+             .persistence

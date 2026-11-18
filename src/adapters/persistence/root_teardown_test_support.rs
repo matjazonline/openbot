@@ -134,7 +134,7 @@ fn document() -> PreparedKnowledgeDocument {
 
 pub(crate) async fn tree_and_document(p: &PostgresPersistence, company: CompanyId, owner: Uuid) {
     let leaf = tree(p, company, owner).await;
-    let desk = ChannelPersistence::create(
+    let desk = crate::adapters::persistence::test_support::create_channel(
         p,
         company.as_uuid(),
         ChannelWrite {

@@ -1791,7 +1791,6 @@ async fn reconnect_batch_links_do_not_depend_on_the_newest_history_window() {
 
 #[tokio::test]
 async fn link_visibility_loads_only_requested_source_channels() {
-    use crate::application::ports::channel::ChannelPersistence;
     use crate::application::ports::channel::ChannelWrite;
     use crate::application::thread_activity::ThreadActivityReader;
     let s = Intents::new().await;
@@ -1801,7 +1800,7 @@ async fn link_visibility_loads_only_requested_source_channels() {
     let run = s.runs(binding).await[0];
     let company = s.fixture.target.company.as_uuid();
     for index in 0..64 {
-        ChannelPersistence::create(
+        crate::adapters::persistence::test_support::create_channel(
             s.p(),
             company,
             ChannelWrite {

@@ -90,7 +90,15 @@ async fn authorize_on(
         .fetch_optional(&mut **tx)
         .await?
         .ok_or_else(missing)?;
-    authority::authorize_company(tx, target.company, target.actor).await?;
+    super::management::authorize_target_on(
+        tx,
+        target.company,
+        target.actor,
+        crate::application::use_cases::administration::ManagementTarget::Definition(
+            target.workflow,
+        ),
+    )
+    .await?;
     Ok(())
 }
 impl SampleCapture {

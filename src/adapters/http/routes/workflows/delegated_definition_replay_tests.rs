@@ -1,0 +1,150 @@
+use super::*;
+
+impl ManagedDefinitions {
+    async fn copy(&self, actor: WorkflowActor, key: &str) -> (StatusCode, Value) {
+        let template = self
+            .f
+            .engine
+            .template_catalogue()
+            .entries()
+            .first()
+            .unwrap();
+        answer(
+            definitions::copy_template(
+                self.f.state(),
+                by(actor.user_id()),
+                Path((self.f.company, template.id().as_str().to_owned())),
+                body(json!({"revision":template.revision().get(),"command_key":key})),
+            )
+            .await,
+        )
+        .await
+    }
+
+    pub(super) async fn revoke_a(&self) {
+        let principal: Uuid =
+            sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+                .bind(self.f.company)
+                .bind(self.a_actor.user_id())
+                .fetch_one(self.f.persistence.pool())
+                .await
+                .unwrap();
+        crate::adapters::persistence::test_support::department_use_cases(&self.f.persistence)
+            .clear_role(
+                self.f.owner,
+                self.f.company,
+                self.a,
+                crate::entities::department::DepartmentRole::Lead,
+                PrincipalId::new(principal),
+            )
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn delegated_admin_definition_copy_replay_requires_current_target_authority() {
+    let Some(m) = ManagedDefinitions::new().await else {
+        return;
+    };
+    let key = "delegated-copy";
+    let (status, copied) = m.copy(m.a_actor, key).await;
+    assert_eq!(status, StatusCode::CREATED, "{copied}");
+    let workflow = uuid(&copied["workflow_id"]);
+    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
+    let events = m.events(workflow).await;
+    let (status, replay) = m.copy(m.a_actor, key).await;
+    assert_eq!(status, StatusCode::OK, "{replay}");
+    assert_eq!(replay, copied);
+    assert_eq!(m.events(workflow).await, events);
+    let (status, sibling) = m.copy(m.b_actor, key).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{sibling}");
+    assert!(sibling.get("revision").is_none());
+    m.revoke_a().await;
+    let (status, revoked) = m.copy(m.a_actor, key).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{revoked}");
+    assert!(revoked.get("revision").is_none());
+    let (status, owner) = m
+        .copy(WorkflowActor::authenticated(m.f.owner).unwrap(), key)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{owner}");
+    assert_eq!(owner, copied);
+    assert_eq!(m.events(workflow).await, events);
+    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
+}
+
+#[tokio::test]
+async fn delegated_admin_definition_existing_create_collisions_require_current_management() {
+    let Some(m) = ManagedDefinitions::new().await else {
+        return;
+    };
+    let (workflow, version) = m.published().await;
+    let events = m.events(workflow).await;
+    let source = example("data.map", workflow);
+    assert_eq!(
+        m.f.save(m.a_actor.user_id(), m.f.company, workflow, None, &source)
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    m.active(m.b_actor, m.b, version, "creation-collision")
+        .await;
+    let (status, refused) =
+        m.f.save(m.a_actor.user_id(), m.f.company, workflow, None, &source)
+            .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{refused}");
+    assert_eq!(
+        m.f.save(m.b_actor.user_id(), m.f.company, workflow, None, &source)
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(m.events(workflow).await, events);
+    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
+}
+
+#[tokio::test]
+async fn delegated_admin_definition_copy_replay_follows_active_bindings_without_adopting_ownership()
+{
+    let Some(m) = ManagedDefinitions::new().await else {
+        return;
+    };
+    let key = "bound-copy";
+    let (status, copied) = m.copy(m.a_actor, key).await;
+    assert_eq!(status, StatusCode::CREATED, "{copied}");
+    let workflow = uuid(&copied["workflow_id"]);
+    assert_eq!(
+        m.f.save(
+            m.a_actor.user_id(),
+            m.f.company,
+            workflow,
+            Some(1),
+            &example("data.map", workflow)
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let (status, published) =
+        m.f.publish(
+            m.a_actor.user_id(),
+            m.f.company,
+            workflow,
+            2,
+            "copy-version",
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{published}");
+    m.active(m.b_actor, m.b, uuid(&published["version_id"]), "bound-copy")
+        .await;
+    let events = m.events(workflow).await;
+    let (status, refused) = m.copy(m.a_actor, key).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{refused}");
+    assert!(refused.get("revision").is_none());
+    let (status, replay) = m.copy(m.b_actor, key).await;
+    assert_eq!(status, StatusCode::OK, "{replay}");
+    assert_eq!(replay["workflow_id"], copied["workflow_id"]);
+    assert_eq!(replay["revision"], 2);
+    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
+    assert_eq!(m.events(workflow).await, events);
+}

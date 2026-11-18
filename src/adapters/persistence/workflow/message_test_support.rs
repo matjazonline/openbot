@@ -3,7 +3,6 @@
 //! its claimed execution.
 use super::*;
 use crate::adapters::{protocols::email::EmailRenderer, workflow_message::MessageRuntime};
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::transport::{DeliveryComposer, TransportRenderers};
 use crate::application::workflow::{
@@ -61,7 +60,7 @@ pub(in crate::adapters::persistence::workflow::tests) async fn new_channel(
     fixture: &Fixture,
     slug: &str,
 ) -> Uuid {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &fixture.persistence,
         fixture.target.company.as_uuid(),
         ChannelWrite {

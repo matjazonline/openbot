@@ -1,0 +1,81 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 51.47s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 1 test
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card' (30327821) panicked at src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs:342:5:
+<section id="workflow-pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 pt-4 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="min-w-0 truncate text-xl font-bold">Support</h2>
+                    <a class="btn btn-ghost btn-xs ml-auto" href="/ui/workflow-runs?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;view=board&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158">Runs board</a>
+                </div>
+                <p class="mt-1 text-xs opacity-60">Draft revision 1 · 1 published version</p>
+                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views"><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=editor"
+                hx-get="/ui/workflows/e6ae7790-2cef-4c65-85fd-a3c88928c158?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;tab=editor"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=editor">Editor</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=sample"
+                hx-get="/ui/workflows/e6ae7790-2cef-4c65-85fd-a3c88928c158?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;tab=sample"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=sample">Sample</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=versions"
+                hx-get="/ui/workflows/e6ae7790-2cef-4c65-85fd-a3c88928c158?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;tab=versions"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=versions">Versions and usage</a><a role="tab" class="tab tab-active" aria-selected="true"
+                href="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=bindings"
+                hx-get="/ui/workflows/e6ae7790-2cef-4c65-85fd-a3c88928c158?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;tab=bindings"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=f515dd85-9b91-4982-b63e-1d9305370452&amp;workflow_id=e6ae7790-2cef-4c65-85fd-a3c88928c158&amp;tab=bindings">Bindings</a></nav>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6"><div role="status" class="alert alert-success mb-4 text-sm">Saved binding b5e9c5ec at state revision 1; it is paused until you activate it.</div><div class="space-y-6">
+            <section class="space-y-2"><h3 class="font-semibold">Bindings</h3><ul class="divide-y divide-base-300"></ul><p class="text-xs opacity-70">2 more of the listed bindings are on desks you cannot see.</p></section>
+            <section id="binding-form" class="space-y-3 rounded-box border border-base-300 p-4">
+            <h3 class="font-semibold">New binding</h3>
+            
+            <form hx-post="/ui/workflows/e6ae7790-2cef-4c65-85fd-a3c88928c158/bindings?company_id=f515dd85-9b91-4982-b63e-1d9305370452" hx-target="#workflow-pane" hx-swap="outerHTML"
+                hx-disabled-elt="find button[type='submit']" class="space-y-4">
+                <input type="hidden" name="form_key" value="8b3cb30c-022c-47e5-9f52-544fa3a3000a">
+                <div class="grid gap-3 sm:grid-cols-2"><label class="form-control w-full"><div class="label"><span class="text-xs">Association</span></div><select class="select w-full" name="association"><option value="company" selected>Company-wide (manual starts and schedules)</option><option value="channel:1db2e7e9-83e6-4fd3-b12b-aceb821d9cd6">Desk Open desk</option></select><div class="label"><span class="text-xs">A desk binding can answer that desk&#39;s messages; thread bindings are made through the API.</span></div></label><label class="form-control w-full"><div class="label"><span class="text-xs">Published version</span></div><select class="select w-full" name="version_id"
+                hx-get="/ui/workflows/e6ae7790-2cef-4c65-85fd-a3c88928c158/bindings/form?company_id=f515dd85-9b91-4982-b63e-1d9305370452" hx-include="closest form"
+                hx-target="#binding-form" hx-swap="outerHTML" hx-trigger="change"><option value="673162c1-3a1b-8083-84b8-6937d41cb919" selected>version 673162c1 (newest, draft revision 1)</option></select><div class="label"><span class="text-xs">Changing it reloads the parameters and resources this version declares.</span></div></label></div>
+                <fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend>
+                    <input type="hidden" name="params_mode" value="fields">
+                    <div class="grid gap-3 sm:grid-cols-2"><label class="form-control w-full"><div class="label"><span class="text-xs">limit</span></div><input class="input w-full" type="number" step="1" name="param:limit" value=""></label><label class="form-control w-full"><div class="label"><span class="text-xs">reviewer (required)</span></div><input class="input w-full" name="param:reviewer" value="" list="binding-people" maxlength="64" required><div class="label"><span class="text-xs">Who reviews</span></div></label><label class="form-control w-full"><div class="label"><span class="text-xs">tone</span></div><select class="select w-full" name="param:tone"><option value="" selected>(not set)</option><option value="warm">warm</option><option value="brief">brief</option></select></label></div>
+                    <datalist id="binding-people"><option value="5279b27b-d31a-4795-8a68-386d28605fae">01d6a0e6bf5b4797a019e8da098644f1 (owner)</option><option value="06cd5c97-148e-486c-bd23-69373fe3b3d0">4c81e784b0a3421ebd3e8e27922e2118 (admin)</option><option value="d5f7470e-3ffc-451d-9459-d55c186c0f55">b87e3f6224684207a68c95d6c82777ed (member)</option></datalist>
+                    <p class="text-xs opacity-60">A text parameter suggests the company's people by id; an empty optional field is left out.</p>
+                </fieldset>
+                
+                <div class="grid gap-3 sm:grid-cols-2"><label class="form-control w-full"><div class="label"><span class="text-xs">Message trigger</span></div><select class="select w-full" name="message_trigger"><option value="" selected>No message trigger: messages never start it</option><option value="direct">Addressed in To, or mentioned</option><option value="any">Addressed in To or Cc, or mentioned</option><option value="mentioned">Mentioned by name, alias, address or handle</option><option value="mentioned_or_reply">Mentioned, or a direct reply to a message a run published</option></select><div class="label"><span class="text-xs">Desk bindings only; a company-wide binding takes none.</span></div></label><label class="form-control w-full"><div class="label"><span class="text-xs">Runs as</span></div><p class="py-2 text-sm">Runs as you; only the company owner may name somebody else.</p></label></div>
+                <label class="form-control w-full"><div class="label"><span class="text-xs">Escalation</span></div><select class="select w-full" name="escalation"><option value="" selected>Disabled</option><option value="lead:1">Lead, one hop</option><option value="lead:2">Lead, then parent lead</option><option value="reviewer:1">Reviewers, one hop</option><option value="reviewer:2">Reviewers, then parent lead</option><option value="owner:1">Owner, one hop</option><option value="owner:2">Owner, then parent lead</option><option value="admin:1">Admins, one hop</option><option value="admin:2">Admins, then parent lead</option></select><div class="label"><span class="text-xs">Available on a department-owned desk.</span></div></label>
+                
+                <div class="flex items-center gap-3 border-t border-base-300 pt-3">
+                    <button type="submit" class="btn btn-primary btn-sm">Save binding</button>
+                    <p class="text-xs opacity-70">A saved binding stays paused until you activate it; activation checks readiness again.</p>
+                </div>
+            </form>
+        </section>
+        </div></div>
+        </section>
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card ... FAILED
+
+failures:
+
+failures:
+    adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4777 filtered out; finished in 1.95s
+
+error: test failed, to rerun pass `--lib`

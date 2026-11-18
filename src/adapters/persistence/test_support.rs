@@ -42,6 +42,13 @@
 mod channel_access;
 pub use channel_access::{empty_channel_department, restrict_channel_to_configured_grants};
 
+#[path = "managed_desk_test_support.rs"]
+mod managed_desk;
+pub(crate) use managed_desk::{
+    WriteBarrier, assert_actor_before_company, company_owner_actor, competing_writes,
+    create_channel, delegated_unit, wait_until_blocked_by,
+};
+
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, PgConnection, PgPool};
 use tokio::sync::{Mutex, OnceCell};

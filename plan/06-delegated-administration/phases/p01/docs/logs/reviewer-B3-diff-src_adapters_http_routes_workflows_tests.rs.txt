@@ -1,0 +1,9 @@
+--- B2/src/adapters/http/routes/workflows/tests.rs
++++ B3/src/adapters/http/routes/workflows/tests.rs
+@@ -389,3 +389,6 @@
+ mod tenancy_tests;
+ #[path = "tool_tests.rs"]
+ mod tool_tests;
++
++#[path = "delegated_definition_tests.rs"]
++mod delegated_definitions;

@@ -1,0 +1,12 @@
+--- B2/src/adapters/persistence/workflow/provisioning_runtime_tests.rs
++++ B3/src/adapters/persistence/workflow/provisioning_runtime_tests.rs
+@@ -8,6 +8,9 @@
+ 
+ #[path = "provisioning_requester_lock_tests.rs"]
+ mod requester_locks;
++
++#[path = "delegated_builder_runtime_tests.rs"]
++mod delegated_builder;
+ 
+ #[path = "channel_reply_native_runtime_tests.rs"]
+ mod channel_reply_native_runtime_tests;

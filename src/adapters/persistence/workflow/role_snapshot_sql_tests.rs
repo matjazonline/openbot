@@ -222,6 +222,7 @@ async fn workflow_role_admission_retained_department_refuses_delete_with_a_histo
     ChannelPersistence::update(
         f.p(),
         ChannelUpdate {
+            actor: binding.target.actor,
             company_id: f.company().as_uuid(),
             channel_id: f.channel,
             write: ChannelWrite {
@@ -250,6 +251,7 @@ async fn workflow_role_admission_retained_department_refuses_delete_with_a_histo
         ChannelPersistence::update(
             f.p(),
             ChannelUpdate {
+                actor: binding.target.actor,
                 company_id: f.company().as_uuid(),
                 channel_id: desk,
                 write: ChannelWrite {

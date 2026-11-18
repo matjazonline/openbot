@@ -1,0 +1,4353 @@
+--- B2/.trail/learnings/2026-11-17-bound-procedures-follow-any-active-binding-mac02.md
++++ B3/.trail/learnings/2026-11-17-bound-procedures-follow-any-active-binding-mac02.md
+@@ -0,0 +1,50 @@
++---
++title: Bound procedures follow any active binding unit manager
++author: Mac02
++date: 2026-11-17
++branch: plan06
++id: l-cfa5b983
++scope: repo
++status: active
++src: agent
++touches:
++  - migrations/20260817000000_init_schema.sql
++  - src/adapters/http/routes/agent_api_tests.rs
++  - src/adapters/http/routes/attention_authorization_tests.rs
++  - src/adapters/http/routes/authorization_test_support.rs
++  - src/adapters/http/routes/channel_authorization_tests.rs
++  - src/adapters/http/routes/channel_classic_form_tests.rs
++  - src/adapters/http/routes/department_tests.rs
++  - src/adapters/http/routes/root_department_route_tests.rs
++  - src/adapters/http/routes/schedule_channel_tests.rs
++  - src/adapters/http/routes/ui_local_agents_tests.rs
++---
++
++## Decided
++
++The user resolved the Plan06 README/01B.4 conflict: a procedure with active bindings
++is managed by managers of ANY unit with a current active binding. The recorded
++creating department governs only when no active binding exists. Publishing does
++not require authority over every existing binding; creating/moving a binding still
++requires authority over its actual target unit.
++
++Creation commands retain the destination workflow identity. If that same-company
++definition already exists, its current management authority applies before any
++collision or replay result. Only actual absence uses the creating unit.
++
++## Tried and ruled out
++
++Always using the recorded department contradicts the user's chosen binding rule.
++Identity-free creation authority exposes another unit's existing definition via
++conflicts or repeated template-copy keys; independent D3 review found that gap.
++
++## Watch out
++
++Use the current binding configuration/version, excluding inactive and historical
++revisions. Recheck current target authority on template-copy conflict replay, even
++when the original creator still manages its former department. Keep configuration
++management separate from conversation View and current authenticated provenance.
++
++In the code: plan/06-delegated-administration/README.md decision3;
++src/adapters/persistence/administration.rs and workflow/definitions.rs;
++src/adapters/http/routes/workflows/definitions.rs; p01 D3/r4 review records.
+--- B2/migrations/20260817000000_init_schema.sql
++++ B3/migrations/20260817000000_init_schema.sql
+@@ -5419,6 +5419,7 @@
+     company_id uuid NOT NULL,
+     id uuid NOT NULL,
+     owner_agent_id uuid,
++    managing_department_id uuid NOT NULL,
+     revision bigint NOT NULL,
+     title text NOT NULL,
+     description text NOT NULL,
+@@ -19958,3 +19959,116 @@
+ END $$;
+ CREATE TRIGGER attribution_outbox_immutable BEFORE UPDATE ON public.attribution_lifecycle_outbox
+     FOR EACH ROW EXECUTE FUNCTION public.guard_attribution_outbox_payload();
++
++-- Definition ownership is fixed at creation; active bindings determine current management.
++ALTER TABLE ONLY public.workflow_definitions
++    ADD CONSTRAINT workflow_definitions_managing_department_fk
++        FOREIGN KEY (company_id, managing_department_id)
++        REFERENCES public.departments(company_id, id) DEFERRABLE INITIALLY DEFERRED;
++
++CREATE FUNCTION public.initialize_workflow_managing_department() RETURNS trigger
++    LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.managing_department_id IS NULL THEN
++        SELECT id INTO NEW.managing_department_id FROM public.departments
++            WHERE company_id=NEW.company_id AND is_root;
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_definition_managing_department_default BEFORE INSERT
++    ON public.workflow_definitions FOR EACH ROW
++    EXECUTE FUNCTION public.initialize_workflow_managing_department();
++
++CREATE FUNCTION public.keep_workflow_managing_department() RETURNS trigger
++    LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.managing_department_id IS DISTINCT FROM OLD.managing_department_id THEN
++        RAISE EXCEPTION 'A workflow definition keeps its creating department' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_definition_managing_department_immutable
++    BEFORE UPDATE OF managing_department_id ON public.workflow_definitions FOR EACH ROW
++    EXECUTE FUNCTION public.keep_workflow_managing_department();
++
++-- Canonical root membership is implicit; only an unambiguous non-root placement is selected.
++CREATE FUNCTION public.workflow_creating_department(checked_user uuid, checked_company uuid)
++    RETURNS uuid LANGUAGE sql STABLE AS $$
++    WITH placements AS (
++        SELECT placed.department_id FROM public.principals AS principal
++        JOIN (
++            SELECT company_id, department_id, principal_id FROM public.department_members
++            UNION SELECT company_id, department_id, principal_id FROM public.department_roles
++        ) AS placed ON placed.company_id=principal.company_id AND placed.principal_id=principal.id
++        JOIN public.departments AS department
++            ON department.company_id=placed.company_id AND department.id=placed.department_id
++        WHERE principal.company_id=checked_company AND principal.user_id=checked_user
++            AND principal.kind='person' AND NOT department.is_root
++        GROUP BY placed.department_id LIMIT 2
++    )
++    SELECT CASE WHEN (SELECT count(*) FROM placements)=1
++        THEN (SELECT department_id FROM placements LIMIT 1)
++        ELSE (SELECT id FROM public.departments WHERE company_id=checked_company AND is_root)
++    END
++$$;
++
++-- One agent-placement projection serves both target checks and scoped configuration lists.
++CREATE FUNCTION public.agent_management_role(
++    checked_user uuid, checked_company uuid, checked_agent uuid
++) RETURNS text LANGUAGE sql STABLE AS $$
++    WITH target AS (
++        SELECT id FROM public.principals
++        WHERE company_id=checked_company AND agent_id=checked_agent AND kind='agent'
++    ), placements AS (
++        SELECT member.department_id FROM public.department_members AS member
++        JOIN target ON target.id=member.principal_id WHERE member.company_id=checked_company
++        UNION SELECT holder.department_id FROM public.department_roles AS holder
++        JOIN target ON target.id=holder.principal_id WHERE holder.company_id=checked_company
++    ), units AS (
++        SELECT department_id FROM placements
++        UNION ALL SELECT NULL::uuid WHERE EXISTS(SELECT 1 FROM target)
++            AND NOT EXISTS(SELECT 1 FROM placements)
++    )
++    SELECT management.role FROM units CROSS JOIN LATERAL (
++        SELECT public.unit_management_role(checked_user,checked_company,units.department_id) AS role
++    ) AS management WHERE management.role IS NOT NULL ORDER BY management.role LIMIT 1
++$$;
++
++CREATE FUNCTION public.workflow_definition_management_role(
++    checked_user uuid, checked_company uuid, checked_workflow uuid
++) RETURNS text LANGUAGE sql STABLE AS $$
++    WITH definition AS MATERIALIZED (
++        SELECT managing_department_id FROM public.workflow_definitions
++        WHERE company_id=checked_company AND id=checked_workflow
++            AND NOT EXISTS (SELECT 1 FROM public.native_mcp_brokers AS broker
++                WHERE broker.company_id=checked_company AND broker.workflow_id=checked_workflow)
++    ), active AS MATERIALIZED (
++        SELECT binding.channel_id, binding.principal_id FROM public.workflow_bindings AS binding
++        JOIN public.workflow_binding_revisions AS configuration
++            ON configuration.company_id=binding.company_id AND configuration.binding_id=binding.id
++                AND configuration.revision=binding.configuration_revision
++        JOIN public.workflow_versions AS version
++            ON version.company_id=configuration.company_id AND version.id=configuration.version_id
++        WHERE binding.company_id=checked_company AND binding.active
++            AND version.workflow_id=checked_workflow AND EXISTS(SELECT 1 FROM definition)
++    ), units AS (
++        SELECT channel.department_id FROM active JOIN public.channels AS channel
++            ON channel.company_id=checked_company AND channel.id=active.channel_id
++        UNION
++        SELECT NULL::uuid FROM active LEFT JOIN public.principals AS principal
++            ON principal.company_id=checked_company AND principal.id=active.principal_id
++        WHERE active.channel_id IS NULL AND (active.principal_id IS NULL OR principal.kind<>'agent')
++        UNION
++        SELECT managing_department_id FROM definition WHERE NOT EXISTS(SELECT 1 FROM active)
++    )
++    , candidates AS (
++        SELECT public.unit_management_role(checked_user,checked_company,units.department_id) AS role
++        FROM units
++        UNION
++        SELECT public.agent_management_role(checked_user,checked_company,principal.agent_id)
++        FROM active JOIN public.principals AS principal
++            ON principal.company_id=checked_company AND principal.id=active.principal_id
++                AND principal.kind='agent'
++    )
++    SELECT role FROM candidates WHERE role IS NOT NULL ORDER BY role LIMIT 1
++$$;
+--- B2/src/adapters/http/routes/agent_api_tests.rs
++++ B3/src/adapters/http/routes/agent_api_tests.rs
+@@ -27,7 +27,10 @@
+ }
+ impl Fixture {
+     async fn new() -> Option<Self> {
+-        let persistence = Arc::new(PostgresPersistence::new(test_pool().await?));
++        Some(Self::on(test_pool().await?).await)
++    }
++    async fn on(pool: sqlx::PgPool) -> Self {
++        let persistence = Arc::new(PostgresPersistence::new(pool));
+         let suffix = Uuid::new_v4().simple().to_string();
+         let user = persistence
+             .create_user(&suffix, &format!("{suffix}@example.test"), "hash")
+@@ -76,13 +79,13 @@
+                 crate::adapters::persistence::test_support::company_agents(persistence.as_ref()),
+             ),
+         );
+-        Some(Self {
++        Self {
+             persistence,
+             agents,
+             skills,
+             user,
+             company,
+-        })
++        }
+     }
+     async fn create(&self, mut body: Value) -> Value {
+         body["native_permissions"] = json!("full");
+@@ -393,3 +396,6 @@
+     assert_eq!(agents, 1);
+     f.cleanup().await;
+ }
++
++#[path = "delegated_agent_api_tests.rs"]
++mod delegated;
+--- B2/src/adapters/http/routes/delegated_agent_api_tests.rs
++++ B3/src/adapters/http/routes/delegated_agent_api_tests.rs
+@@ -0,0 +1,150 @@
++use super::*;
++use crate::application::ports::department::DepartmentWrite;
++use crate::domain::workflow::CompanyId;
++use crate::entities::{
++    company_member::CompanyAccessRole, department::DepartmentId, transport::PrincipalId,
++};
++use crate::use_cases::agent::AgentPersistence;
++
++async fn lead(f: &Fixture, slug: &str) -> (Uuid, DepartmentId) {
++    let suffix = Uuid::new_v4().simple().to_string();
++    let user = f
++        .persistence
++        .create_user(&suffix, &format!("{suffix}@example.test"), "hash")
++        .await
++        .unwrap();
++    crate::adapters::persistence::test_support::insert_root_member(
++        f.persistence.pool(),
++        CompanyId::new(f.company),
++        user.id,
++        CompanyAccessRole::Member,
++        crate::entities::access_level::AccessLevel::PUBLIC,
++    )
++    .await;
++    let principal: Uuid =
++        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
++            .bind(f.company)
++            .bind(user.id)
++            .fetch_one(f.persistence.pool())
++            .await
++            .unwrap();
++    let unit = crate::adapters::persistence::test_support::department_use_cases(&f.persistence)
++        .create_department(
++            f.user,
++            f.company,
++            DepartmentWrite {
++                name: slug.into(),
++                slug: slug.into(),
++                ..Default::default()
++            },
++            Some(PrincipalId::new(principal)),
++        )
++        .await
++        .unwrap();
++    (user.id, unit.id)
++}
++
++async fn created(f: &Fixture, actor: Uuid, unit: DepartmentId, slug: &str) -> AppResult<Value> {
++    Ok(response_json(create_agent_json(
++        State(f.agents.clone()),State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
++        AuthenticatedUser {id:actor},Path(f.company),Json(json!({"name":slug,"slug":slug,"system_prompt":"Help the team.","native_permissions":"full","department_id":unit.as_uuid()})),
++    ).await?).await)
++}
++
++async fn edit(f: &Fixture, actor: Uuid, agent: Uuid) -> AppResult<Value> {
++    let stored = AgentPersistence::get_by_id(f.persistence.as_ref(), agent)
++        .await?
++        .unwrap();
++    Ok(response_json(update_agent_json(
++        State(f.agents.clone()),State(f.skills.clone()),State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
++        AuthenticatedUser {id:actor},Path((f.company,agent)),Json(serde_json::from_value(json!({"expected_revision":stored.draft_revision,"agent":{
++            "name":"Edited by unit manager","slug":stored.slug,"provider":stored.provider,"model":stored.model,"system_prompt":"Scoped change.","native_permissions":"full"
++        }})).unwrap()),
++    ).await?).await)
++}
++
++#[tokio::test]
++async fn delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets()
++ {
++    let Some(database) = crate::adapters::persistence::test_support::own_database().await else {
++        return;
++    };
++    let f = Fixture::on(database.pool.clone()).await;
++    let (alice, unit) = lead(&f, "research").await;
++    let (bob, sibling) = lead(&f, "sales").await;
++    let own = created(&f, alice, unit, "delegated-json").await.unwrap();
++    let agent = Uuid::parse_str(own["agent"]["id"].as_str().unwrap()).unwrap();
++    assert_eq!(own["departments"][0]["id"], unit.as_uuid().to_string());
++    assert!(matches!(
++        created(&f, bob, unit, "sibling-json").await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        created(&f, alice, sibling, "outside-json").await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert_eq!(
++        edit(&f, alice, agent).await.unwrap()["agent"]["name"],
++        "Edited by unit manager"
++    );
++    assert!(matches!(
++        edit(&f, bob, agent).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    let departments =
++        crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
++    assert!(matches!(
++        get_agent_json(
++            State(f.agents.clone()),
++            State(f.skills.clone()),
++            State(departments.clone()),
++            AuthenticatedUser { id: bob },
++            Path((f.company, agent))
++        )
++        .await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    let foreign = Fixture::on(database.pool.clone()).await;
++    assert!(matches!(
++        get_agent_json(
++            State(f.agents.clone()),
++            State(f.skills.clone()),
++            State(departments),
++            AuthenticatedUser { id: alice },
++            Path((foreign.company, agent))
++        )
++        .await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        delete_agent_json(
++            State(f.agents.clone()),
++            AuthenticatedUser { id: bob },
++            Path((f.company, agent))
++        )
++        .await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        delete_agent_json(
++            State(f.agents.clone()),
++            AuthenticatedUser { id: alice },
++            Path((foreign.company, agent))
++        )
++        .await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    delete_agent_json(
++        State(f.agents.clone()),
++        AuthenticatedUser { id: alice },
++        Path((f.company, agent)),
++    )
++    .await
++    .unwrap();
++    assert!(
++        AgentPersistence::get_by_id(f.persistence.as_ref(), agent)
++            .await
++            .unwrap()
++            .is_none()
++    );
++}
+--- B2/src/adapters/http/routes/workflows/definitions.rs
++++ B3/src/adapters/http/routes/workflows/definitions.rs
+@@ -63,7 +63,15 @@
+     Path((company_id, workflow)): Path<(Uuid, Uuid)>,
+ ) -> WorkflowResult<Json<Value>> {
+     let company = company(company_id);
+-    authorize(&engine, company, actor(&user)?, RelatedAssociation::Company).await?;
++    engine
++        .authorization()
++        .authorize(
++            company,
++            actor(&user)?,
++            RelatedAssociation::Company,
++            WorkflowOperation::ManageDefinition(WorkflowId::new(workflow)),
++        )
++        .await?;
+     let detail = engine
+         .reads()
+         .definition(company, WorkflowId::new(workflow))
+@@ -371,13 +379,15 @@
+     user: AuthenticatedUser,
+     Path(company_id): Path<Uuid>,
+ ) -> WorkflowResult<Json<Value>> {
+-    authorize(
+-        &engine,
+-        company(company_id),
+-        actor(&user)?,
+-        RelatedAssociation::Company,
+-    )
+-    .await?;
++    engine
++        .authorization()
++        .authorize(
++            company(company_id),
++            actor(&user)?,
++            RelatedAssociation::Company,
++            WorkflowOperation::ListManaged,
++        )
++        .await?;
+     Ok(ok(json!(
+         engine
+             .template_catalogue()
+@@ -445,6 +455,15 @@
+         Err(crate::application::workflow::templates::TemplateError::Application(
+             AppError::Conflict(message),
+         )) => {
++            engine
++                .authorization()
++                .authorize(
++                    company,
++                    actor,
++                    RelatedAssociation::Company,
++                    WorkflowOperation::ManageDefinition(workflow),
++                )
++                .await?;
+             let existing = engine.reads().definition(company, workflow).await?;
+             match existing {
+                 Some(detail)
+--- B2/src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs
++++ B3/src/adapters/http/routes/workflows/delegated_definition_boundary_tests.rs
+@@ -0,0 +1,208 @@
++use super::*;
++use crate::adapters::workflow_source::WorkflowSourceDecoder;
++use crate::application::workflow::templates::{
++    CompanyWorkflowDraft, CopyTemplateRequest, PreparedTemplateCopy, TemplateCopyService,
++    WorkflowDraftCopies,
++};
++use crate::application::workflow::{IdempotencyKey, publication::PublishedBundle};
++use crate::application::workflow::{LifecycleAuthorizer, lifecycle::*};
++use crate::domain::workflow::{DraftRevision, VersionId};
++use std::sync::Mutex;
++
++#[derive(Clone)]
++struct Capture {
++    p: PostgresPersistence,
++    draft: Arc<Mutex<Option<PreparedDraft>>>,
++    published: Arc<Mutex<Option<PreparedPublication>>>,
++    copied: Arc<Mutex<Option<PreparedTemplateCopy>>>,
++}
++
++impl Capture {
++    fn new(p: &PostgresPersistence) -> Self {
++        Self {
++            p: p.clone(),
++            draft: Default::default(),
++            published: Default::default(),
++            copied: Default::default(),
++        }
++    }
++}
++
++// Captures only preparation; all decisive refusals below call the real PostgreSQL writer.
++#[async_trait::async_trait]
++impl WorkflowDefinitions for Capture {
++    async fn draft(
++        &self,
++        c: CompanyId,
++        w: WorkflowId,
++    ) -> crate::app_error::AppResult<Option<DraftState>> {
++        self.p.draft(c, w).await
++    }
++    async fn publication(
++        &self,
++        c: CompanyId,
++        k: &IdempotencyKey,
++    ) -> crate::app_error::AppResult<Option<PublishedCommand>> {
++        self.p.publication(c, k).await
++    }
++    async fn selectable_version(
++        &self,
++        c: CompanyId,
++        v: VersionId,
++    ) -> crate::app_error::AppResult<Option<Arc<PublishedBundle>>> {
++        self.p.selectable_version(c, v).await
++    }
++    async fn save_draft(&self, command: PreparedDraft) -> crate::app_error::AppResult<()> {
++        *self.draft.lock().unwrap() = Some(command);
++        Ok(())
++    }
++    async fn publish(
++        &self,
++        command: PreparedPublication,
++    ) -> crate::app_error::AppResult<Arc<PublishedBundle>> {
++        let bundle = command.command().bundle.clone();
++        *self.published.lock().unwrap() = Some(command);
++        Ok(bundle)
++    }
++}
++
++#[async_trait::async_trait]
++impl WorkflowDraftCopies for Capture {
++    async fn insert_copy(&self, command: PreparedTemplateCopy) -> crate::app_error::AppResult<()> {
++        *self.copied.lock().unwrap() = Some(command);
++        Ok(())
++    }
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_prepared_writers_recheck_current_binding_authority() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, version) = m.published().await;
++    let capture = Capture::new(&m.f.persistence);
++    let p = &m.f.persistence;
++    let authorization = || LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone());
++    let service = DefinitionService::new(
++        authorization(),
++        capture.clone(),
++        WorkflowSourceDecoder,
++        crate::adapters::persistence::workflow::step_builtins::StepBuiltinPublicationDirectory {
++            persistence: p.clone(),
++        },
++    );
++    let target = DefinitionTarget {
++        company: company(m.f.company),
++        actor: m.a_actor,
++        workflow: WorkflowId::new(workflow),
++    };
++    service
++        .save(SaveDraft {
++            target,
++            expected: Some(DraftRevision::new(1).unwrap()),
++            content: DraftContent {
++                title: "Prepared edit".into(),
++                description: String::new(),
++                source: example("data.map", workflow).to_string(),
++            },
++        })
++        .await
++        .unwrap();
++    service
++        .publish(PublishDraft {
++            target,
++            expected: DraftRevision::new(1).unwrap(),
++            version: VersionId::new(Uuid::new_v4()),
++            key: IdempotencyKey::parse("prepared-stale").unwrap(),
++        })
++        .await
++        .unwrap();
++    let template = m.f.engine.template_catalogue().entries().first().unwrap();
++    TemplateCopyService::new(authorization(), capture.clone(), WorkflowSourceDecoder)
++        .copy(
++            m.f.engine.template_catalogue(),
++            CopyTemplateRequest::new(
++                target.company,
++                target.actor,
++                template.id().clone(),
++                template.revision(),
++                target.workflow,
++            )
++            .unwrap(),
++        )
++        .await
++        .unwrap();
++    let draft = capture.draft.lock().unwrap().take().unwrap();
++    let publication = capture.published.lock().unwrap().take().unwrap();
++    let copy = capture.copied.lock().unwrap().take().unwrap();
++    let events = m.events(workflow).await;
++    m.active(m.b_actor, m.b, version, "prepared-boundary").await;
++    assert!(matches!(
++        WorkflowDefinitions::save_draft(p, draft).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        WorkflowDefinitions::publish(p, publication).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        WorkflowDraftCopies::insert_copy(p, copy).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    assert_eq!(m.events(workflow).await, events);
++    assert_eq!(
++        p.draft(target.company, target.workflow)
++            .await
++            .unwrap()
++            .unwrap()
++            .draft
++            .revision()
++            .get(),
++        1
++    );
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_capture_uses_existing_authority_before_creation_permission() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, _) = m.published().await;
++    let p = &m.f.persistence;
++    let draft = p
++        .draft(company(m.f.company), WorkflowId::new(workflow))
++        .await
++        .unwrap()
++        .unwrap()
++        .draft;
++    let directory =
++        crate::adapters::persistence::workflow::step_builtins::StepBuiltinPublicationDirectory {
++            persistence: p.clone(),
++        };
++    assert!(matches!(
++        directory.capture(m.b_actor, &draft).await,
++        Err(crate::app_error::AppError::NotFound(_))
++    ));
++    let workflow = WorkflowId::new(Uuid::new_v4());
++    let fresh = CompanyWorkflowDraft::saved(
++        company(m.f.company),
++        workflow,
++        DraftRevision::new(1).unwrap(),
++        DraftContent {
++            title: "New draft".into(),
++            description: String::new(),
++            source: example("data.map", workflow.as_uuid()).to_string(),
++        },
++        None,
++    );
++    assert!(
++        !directory
++            .capture(m.b_actor, &fresh)
++            .await
++            .unwrap()
++            .snapshots
++            .tools
++            .is_empty()
++    );
++}
+--- B2/src/adapters/http/routes/workflows/delegated_definition_integrity_tests.rs
++++ B3/src/adapters/http/routes/workflows/delegated_definition_integrity_tests.rs
+@@ -0,0 +1,133 @@
++use super::*;
++
++#[tokio::test]
++async fn delegated_admin_definition_ownership_is_immutable_tenant_scoped_and_root_defaulted() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, _) = m.published().await;
++    let p = &m.f.persistence;
++    let mut tx = p.pool().begin().await.unwrap();
++    let error = sqlx::query(
++        "UPDATE workflow_definitions SET managing_department_id=$3 WHERE company_id=$1 AND id=$2",
++    )
++    .bind(m.f.company)
++    .bind(workflow)
++    .bind(m.b.as_uuid())
++    .execute(&mut *tx)
++    .await
++    .unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().code().as_deref(),
++        Some("23514")
++    );
++    tx.rollback().await.unwrap();
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++    let foreign: Uuid =
++        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
++            .bind(m.f.other)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    let mut tx = p.pool().begin().await.unwrap();
++    sqlx::query("INSERT INTO workflow_definitions(company_id,id,managing_department_id,revision,title,description,source) VALUES($1,$2,$3,1,'Invalid','',$4)")
++        .bind(m.f.company).bind(Uuid::new_v4()).bind(foreign).bind(example("data.map", Uuid::new_v4()).to_string())
++        .execute(&mut *tx).await.unwrap();
++    let error = tx.commit().await.unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().constraint(),
++        Some("workflow_definitions_managing_department_fk")
++    );
++    let root: Uuid =
++        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
++            .bind(m.f.company)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    let native = Uuid::new_v4();
++    let stored: Uuid = sqlx::query_scalar("INSERT INTO workflow_definitions(company_id,id,revision,title,description,source) VALUES($1,$2,1,'Trusted native','',$3) RETURNING managing_department_id")
++        .bind(m.f.company).bind(native).bind(example("data.map", native).to_string()).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(stored, root);
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds()
++ {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let p = &m.f.persistence;
++    sqlx::query("INSERT INTO department_members(company_id,department_id,principal_id) SELECT $1,unit.id,principal.id FROM departments AS unit CROSS JOIN principals AS principal WHERE unit.company_id=$1 AND unit.id=ANY($2) AND principal.company_id=$1 AND principal.user_id=$3")
++        .bind(m.f.company).bind(vec![m.a.as_uuid(),m.b.as_uuid()]).bind(m.f.owner).execute(p.pool()).await.unwrap();
++    let workflow = Uuid::new_v4();
++    let (status, saved) =
++        m.f.save(
++            m.f.owner,
++            m.f.company,
++            workflow,
++            None,
++            &example("data.map", workflow),
++        )
++        .await;
++    assert_eq!(status, StatusCode::OK, "{saved}");
++    let root: Uuid =
++        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
++            .bind(m.f.company)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(m.creating_unit(workflow).await, root);
++    let (owned, _) = m.published().await;
++    let desks: Vec<Uuid> =
++        sqlx::query_scalar("SELECT id FROM channels WHERE company_id=$1 AND department_id=$2")
++            .bind(m.f.company)
++            .bind(m.a.as_uuid())
++            .fetch_all(p.pool())
++            .await
++            .unwrap();
++    for desk in desks {
++        ChannelPersistence::delete(
++            p,
++            WorkflowActor::authenticated(m.f.owner).unwrap(),
++            m.f.company,
++            desk,
++        )
++        .await
++        .unwrap();
++    }
++    let mut tx = p.pool().begin().await.unwrap();
++    sqlx::query("DELETE FROM departments WHERE company_id=$1 AND id=$2")
++        .bind(m.f.company)
++        .bind(m.a.as_uuid())
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    let error = tx.commit().await.unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().constraint(),
++        Some("workflow_definitions_managing_department_fk")
++    );
++    let refused = crate::adapters::persistence::test_support::department_use_cases(p)
++        .delete_department(m.f.owner, m.f.company, m.a)
++        .await;
++    assert!(matches!(
++        refused,
++        Err(crate::app_error::AppError::Conflict(_))
++    ));
++    assert_eq!(m.creating_unit(owned).await, m.a.as_uuid());
++    CompanyPersistence::delete_for_user(p, m.f.owner, m.f.company)
++        .await
++        .unwrap();
++    assert!(
++        CompanyPersistence::get_by_id(p, m.f.company)
++            .await
++            .unwrap()
++            .is_none()
++    );
++    assert!(
++        CompanyPersistence::get_by_id(p, m.f.other)
++            .await
++            .unwrap()
++            .is_some()
++    );
++}
+--- B2/src/adapters/http/routes/workflows/delegated_definition_race_tests.rs
++++ B3/src/adapters/http/routes/workflows/delegated_definition_race_tests.rs
+@@ -0,0 +1,136 @@
++use super::*;
++
++use crate::adapters::persistence::test_support::{
++    WriteBarrier as BarrierTable, competing_writes as contend,
++};
++
++async fn edited(m: &ManagedDefinitions, workflow: Uuid) {
++    let (status, body) =
++        m.f.save(
++            m.a_actor.user_id(),
++            m.f.company,
++            workflow,
++            Some(1),
++            &example("data.map", workflow),
++        )
++        .await;
++    assert_eq!(status, StatusCode::OK, "{body}");
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_role_removal_precedes_definition_publication() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, _) = m.published().await;
++    edited(&m, workflow).await;
++    let events = m.events(workflow).await;
++    let result = contend(
++        m.f.persistence.pool(),
++        BarrierTable::DeskGrants,
++        m.revoke_a(),
++        m.f.publish(
++            m.a_actor.user_id(),
++            m.f.company,
++            workflow,
++            2,
++            "revocation-first",
++        ),
++    )
++    .await;
++    assert_eq!(
++        result.second.0,
++        StatusCode::NOT_FOUND,
++        "{}",
++        result.second.1
++    );
++    assert_eq!(m.events(workflow).await, events);
++    assert!(!m.manages(m.a_actor, workflow).await);
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_definition_publication_precedes_role_removal() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, _) = m.published().await;
++    edited(&m, workflow).await;
++    let events = m.events(workflow).await;
++    let result = contend(
++        m.f.persistence.pool(),
++        BarrierTable::DefinitionEvents,
++        m.f.publish(
++            m.a_actor.user_id(),
++            m.f.company,
++            workflow,
++            2,
++            "publication-first",
++        ),
++        m.revoke_a(),
++    )
++    .await;
++    assert_eq!(result.first.0, StatusCode::OK, "{}", result.first.1);
++    assert_eq!(m.events(workflow).await, events + 1);
++    assert!(!m.manages(m.a_actor, workflow).await);
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_binding_deactivation_precedes_definition_publication() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, version) = m.published().await;
++    edited(&m, workflow).await;
++    let binding = m
++        .active(m.b_actor, m.b, version, "deactivation-first")
++        .await;
++    let events = m.events(workflow).await;
++    let result = contend(
++        m.f.persistence.pool(),
++        BarrierTable::BindingEvents,
++        m.pause(m.b_actor, &binding),
++        m.f.publish(
++            m.b_actor.user_id(),
++            m.f.company,
++            workflow,
++            2,
++            "deactivation-first",
++        ),
++    )
++    .await;
++    assert_eq!(
++        result.second.0,
++        StatusCode::NOT_FOUND,
++        "{}",
++        result.second.1
++    );
++    assert_eq!(m.events(workflow).await, events);
++    assert!(m.manages(m.a_actor, workflow).await && !m.manages(m.b_actor, workflow).await);
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_definition_publication_precedes_binding_deactivation() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, version) = m.published().await;
++    edited(&m, workflow).await;
++    let binding = m.active(m.b_actor, m.b, version, "publication-first").await;
++    let events = m.events(workflow).await;
++    let result = contend(
++        m.f.persistence.pool(),
++        BarrierTable::DefinitionEvents,
++        m.f.publish(
++            m.b_actor.user_id(),
++            m.f.company,
++            workflow,
++            2,
++            "publication-first",
++        ),
++        m.pause(m.b_actor, &binding),
++    )
++    .await;
++    assert_eq!(result.first.0, StatusCode::OK, "{}", result.first.1);
++    assert_eq!(m.events(workflow).await, events + 1);
++    assert!(m.manages(m.a_actor, workflow).await && !m.manages(m.b_actor, workflow).await);
++}
+--- B2/src/adapters/http/routes/workflows/delegated_definition_replay_tests.rs
++++ B3/src/adapters/http/routes/workflows/delegated_definition_replay_tests.rs
+@@ -0,0 +1,150 @@
++use super::*;
++
++impl ManagedDefinitions {
++    async fn copy(&self, actor: WorkflowActor, key: &str) -> (StatusCode, Value) {
++        let template = self
++            .f
++            .engine
++            .template_catalogue()
++            .entries()
++            .first()
++            .unwrap();
++        answer(
++            definitions::copy_template(
++                self.f.state(),
++                by(actor.user_id()),
++                Path((self.f.company, template.id().as_str().to_owned())),
++                body(json!({"revision":template.revision().get(),"command_key":key})),
++            )
++            .await,
++        )
++        .await
++    }
++
++    pub(super) async fn revoke_a(&self) {
++        let principal: Uuid =
++            sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
++                .bind(self.f.company)
++                .bind(self.a_actor.user_id())
++                .fetch_one(self.f.persistence.pool())
++                .await
++                .unwrap();
++        crate::adapters::persistence::test_support::department_use_cases(&self.f.persistence)
++            .clear_role(
++                self.f.owner,
++                self.f.company,
++                self.a,
++                crate::entities::department::DepartmentRole::Lead,
++                PrincipalId::new(principal),
++            )
++            .await
++            .unwrap();
++    }
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_copy_replay_requires_current_target_authority() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let key = "delegated-copy";
++    let (status, copied) = m.copy(m.a_actor, key).await;
++    assert_eq!(status, StatusCode::CREATED, "{copied}");
++    let workflow = uuid(&copied["workflow_id"]);
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++    let events = m.events(workflow).await;
++    let (status, replay) = m.copy(m.a_actor, key).await;
++    assert_eq!(status, StatusCode::OK, "{replay}");
++    assert_eq!(replay, copied);
++    assert_eq!(m.events(workflow).await, events);
++    let (status, sibling) = m.copy(m.b_actor, key).await;
++    assert_eq!(status, StatusCode::NOT_FOUND, "{sibling}");
++    assert!(sibling.get("revision").is_none());
++    m.revoke_a().await;
++    let (status, revoked) = m.copy(m.a_actor, key).await;
++    assert_eq!(status, StatusCode::NOT_FOUND, "{revoked}");
++    assert!(revoked.get("revision").is_none());
++    let (status, owner) = m
++        .copy(WorkflowActor::authenticated(m.f.owner).unwrap(), key)
++        .await;
++    assert_eq!(status, StatusCode::OK, "{owner}");
++    assert_eq!(owner, copied);
++    assert_eq!(m.events(workflow).await, events);
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_existing_create_collisions_require_current_management() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, version) = m.published().await;
++    let events = m.events(workflow).await;
++    let source = example("data.map", workflow);
++    assert_eq!(
++        m.f.save(m.a_actor.user_id(), m.f.company, workflow, None, &source)
++            .await
++            .0,
++        StatusCode::CONFLICT
++    );
++    m.active(m.b_actor, m.b, version, "creation-collision")
++        .await;
++    let (status, refused) =
++        m.f.save(m.a_actor.user_id(), m.f.company, workflow, None, &source)
++            .await;
++    assert_eq!(status, StatusCode::NOT_FOUND, "{refused}");
++    assert_eq!(
++        m.f.save(m.b_actor.user_id(), m.f.company, workflow, None, &source)
++            .await
++            .0,
++        StatusCode::CONFLICT
++    );
++    assert_eq!(m.events(workflow).await, events);
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_copy_replay_follows_active_bindings_without_adopting_ownership()
++{
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let key = "bound-copy";
++    let (status, copied) = m.copy(m.a_actor, key).await;
++    assert_eq!(status, StatusCode::CREATED, "{copied}");
++    let workflow = uuid(&copied["workflow_id"]);
++    assert_eq!(
++        m.f.save(
++            m.a_actor.user_id(),
++            m.f.company,
++            workflow,
++            Some(1),
++            &example("data.map", workflow)
++        )
++        .await
++        .0,
++        StatusCode::OK
++    );
++    let (status, published) =
++        m.f.publish(
++            m.a_actor.user_id(),
++            m.f.company,
++            workflow,
++            2,
++            "copy-version",
++        )
++        .await;
++    assert_eq!(status, StatusCode::OK, "{published}");
++    m.active(m.b_actor, m.b, uuid(&published["version_id"]), "bound-copy")
++        .await;
++    let events = m.events(workflow).await;
++    let (status, refused) = m.copy(m.a_actor, key).await;
++    assert_eq!(status, StatusCode::NOT_FOUND, "{refused}");
++    assert!(refused.get("revision").is_none());
++    let (status, replay) = m.copy(m.b_actor, key).await;
++    assert_eq!(status, StatusCode::OK, "{replay}");
++    assert_eq!(replay["workflow_id"], copied["workflow_id"]);
++    assert_eq!(replay["revision"], 2);
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++    assert_eq!(m.events(workflow).await, events);
++}
+--- B2/src/adapters/http/routes/workflows/delegated_definition_tests.rs
++++ B3/src/adapters/http/routes/workflows/delegated_definition_tests.rs
+@@ -0,0 +1,401 @@
++//! Definition management uses current active bindings, with immutable creating-unit fallback.
++use super::*;
++use crate::application::ports::channel::ChannelPersistence;
++use crate::application::ports::department::DepartmentWrite;
++use crate::application::use_cases::administration::{AdministrationPersistence, ManagementTarget};
++use crate::domain::workflow::WorkflowId;
++use crate::entities::{department::DepartmentId, transport::PrincipalId};
++
++struct ManagedDefinitions {
++    f: Fixture,
++    a: DepartmentId,
++    b: DepartmentId,
++    a_actor: WorkflowActor,
++    b_actor: WorkflowActor,
++}
++
++struct ActiveBinding {
++    id: Uuid,
++    revision: u64,
++    desk: Uuid,
++}
++
++impl ManagedDefinitions {
++    async fn new() -> Option<Self> {
++        let f = Fixture::new().await?;
++        let a_actor = WorkflowActor::authenticated(f.member).unwrap();
++        let b_actor =
++            WorkflowActor::authenticated(teammate(&f.persistence, f.company, "member").await)
++                .unwrap();
++        let a = unit(&f, a_actor, "research", None).await;
++        let b = unit(&f, b_actor, "sales", None).await;
++        Some(Self {
++            f,
++            a,
++            b,
++            a_actor,
++            b_actor,
++        })
++    }
++
++    async fn published(&self) -> (Uuid, Uuid) {
++        self.f
++            .published(
++                self.a_actor.user_id(),
++                self.f.company,
++                example("data.map", Uuid::new_v4()),
++            )
++            .await
++    }
++
++    async fn active(
++        &self,
++        actor: WorkflowActor,
++        unit: DepartmentId,
++        version: Uuid,
++        slug: &str,
++    ) -> ActiveBinding {
++        let desk = ChannelPersistence::create(
++            &self.f.persistence,
++            WorkflowActor::authenticated(self.f.owner).unwrap(),
++            self.f.company,
++            ChannelWrite {
++                name: slug.into(),
++                slug: slug.into(),
++                department_id: Some(unit),
++                ..Default::default()
++            },
++        )
++        .await
++        .unwrap();
++        let id = Uuid::new_v4();
++        let (status, state) = self
++            .f
++            .configure_on(
++                actor.user_id(),
++                self.f.company,
++                id,
++                None,
++                version,
++                json!({"kind":"channel","channel_id":desk.id}),
++            )
++            .await;
++        assert_eq!(status, StatusCode::OK, "{state}");
++        let (status, state) = self
++            .f
++            .activate(
++                actor.user_id(),
++                self.f.company,
++                id,
++                state["state_revision"].as_u64().unwrap(),
++            )
++            .await;
++        assert_eq!(status, StatusCode::OK, "{state}");
++        ActiveBinding {
++            id,
++            revision: state["state_revision"].as_u64().unwrap(),
++            desk: desk.id,
++        }
++    }
++
++    async fn pause(&self, actor: WorkflowActor, binding: &ActiveBinding) {
++        let (status, body) = answer(
++            bindings::deactivate(
++                self.f.state(),
++                by(actor.user_id()),
++                Path((self.f.company, binding.id)),
++                body(json!({"expected_state_revision":binding.revision})),
++            )
++            .await,
++        )
++        .await;
++        assert_eq!(status, StatusCode::OK, "{body}");
++    }
++
++    async fn manages(&self, actor: WorkflowActor, workflow: Uuid) -> bool {
++        self.f
++            .persistence
++            .management_role(
++                actor.user_id(),
++                company(self.f.company),
++                ManagementTarget::Definition(WorkflowId::new(workflow)),
++            )
++            .await
++            .unwrap()
++            .is_some()
++    }
++
++    async fn creating_unit(&self, workflow: Uuid) -> Uuid {
++        sqlx::query_scalar(
++            "SELECT managing_department_id FROM workflow_definitions WHERE company_id=$1 AND id=$2",
++        )
++        .bind(self.f.company)
++        .bind(workflow)
++        .fetch_one(self.f.persistence.pool())
++        .await
++        .unwrap()
++    }
++
++    async fn events(&self, workflow: Uuid) -> i64 {
++        sqlx::query_scalar("SELECT count(*) FROM workflow_definition_events WHERE company_id=$1 AND workflow_id=$2")
++            .bind(self.f.company).bind(workflow).fetch_one(self.f.persistence.pool()).await.unwrap()
++    }
++}
++
++async fn unit(
++    f: &Fixture,
++    lead: WorkflowActor,
++    slug: &str,
++    parent: Option<DepartmentId>,
++) -> DepartmentId {
++    let principal: Uuid = sqlx::query_scalar(
++        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
++    )
++    .bind(f.company)
++    .bind(lead.user_id())
++    .fetch_one(f.persistence.pool())
++    .await
++    .unwrap();
++    crate::adapters::persistence::test_support::department_use_cases(&f.persistence)
++        .create_department(
++            f.owner,
++            f.company,
++            DepartmentWrite {
++                name: slug.into(),
++                slug: slug.into(),
++                parent_id: parent,
++                ..Default::default()
++            },
++            Some(PrincipalId::new(principal)),
++        )
++        .await
++        .unwrap()
++        .id
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_unbound_crud_uses_the_recorded_creating_unit() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, _) = m.published().await;
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++    let source = example("data.map", workflow);
++    assert_eq!(
++        m.f.save(m.b_actor.user_id(), m.f.company, workflow, Some(1), &source)
++            .await
++            .0,
++        StatusCode::NOT_FOUND
++    );
++    let (status, saved) =
++        m.f.save(m.a_actor.user_id(), m.f.company, workflow, Some(1), &source)
++            .await;
++    assert_eq!(status, StatusCode::OK, "{saved}");
++    assert_eq!(saved["revision"], 2);
++    let (status, published) =
++        m.f.publish(m.a_actor.user_id(), m.f.company, workflow, 2, "second")
++            .await;
++    assert_eq!(status, StatusCode::OK, "{published}");
++    let (status, read) = answer(
++        definitions::read(
++            m.f.state(),
++            by(m.a_actor.user_id()),
++            Path((m.f.company, workflow)),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(status, StatusCode::OK, "{read}");
++    assert!(read["source"].as_str().unwrap().contains("data.map"));
++    assert_eq!(
++        answer(
++            definitions::read(
++                m.f.state(),
++                by(m.b_actor.user_id()),
++                Path((m.f.company, workflow))
++            )
++            .await
++        )
++        .await
++        .0,
++        StatusCode::NOT_FOUND
++    );
++    assert_eq!(
++        answer(
++            definitions::archive(
++                m.f.state(),
++                by(m.b_actor.user_id()),
++                Path((m.f.company, workflow)),
++                body(json!({"expected_revision":2}))
++            )
++            .await
++        )
++        .await
++        .0,
++        StatusCode::NOT_FOUND
++    );
++    assert_eq!(
++        answer(
++            definitions::archive(
++                m.f.state(),
++                by(m.a_actor.user_id()),
++                Path((m.f.company, workflow)),
++                body(json!({"expected_revision":2}))
++            )
++            .await
++        )
++        .await
++        .0,
++        StatusCode::NO_CONTENT
++    );
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++}
++
++#[tokio::test]
++async fn manages_unit_definition_uses_any_active_binding_and_recorded_unit_only_when_unbound() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, version) = m.published().await;
++    let b = m.active(m.b_actor, m.b, version, "b-binding").await;
++    assert!(!m.manages(m.a_actor, workflow).await);
++    assert!(m.manages(m.b_actor, workflow).await);
++    let source = example("data.map", workflow);
++    assert_eq!(
++        m.f.save(m.a_actor.user_id(), m.f.company, workflow, Some(1), &source)
++            .await
++            .0,
++        StatusCode::NOT_FOUND
++    );
++    assert_eq!(
++        m.f.save(m.b_actor.user_id(), m.f.company, workflow, Some(1), &source)
++            .await
++            .0,
++        StatusCode::OK
++    );
++    assert_eq!(
++        m.f.publish(
++            m.b_actor.user_id(),
++            m.f.company,
++            workflow,
++            2,
++            "bound-manager"
++        )
++        .await
++        .0,
++        StatusCode::OK
++    );
++    let a = m.active(m.a_actor, m.a, version, "a-binding").await;
++    assert!(m.manages(m.a_actor, workflow).await && m.manages(m.b_actor, workflow).await);
++    m.pause(m.b_actor, &b).await;
++    assert!(!m.manages(m.b_actor, workflow).await);
++    m.pause(m.a_actor, &a).await;
++    assert!(m.manages(m.a_actor, workflow).await && !m.manages(m.b_actor, workflow).await);
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_old_binding_revisions_confer_no_authority() {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, version) = m.published().await;
++    let active = m.active(m.b_actor, m.b, version, "moved-version").await;
++    let (_, other_version) =
++        m.f.published(m.f.owner, m.f.company, example("data.map", Uuid::new_v4()))
++            .await;
++    let (status, result) =
++        m.f.configure_on(
++            m.b_actor.user_id(),
++            m.f.company,
++            active.id,
++            Some(active.revision),
++            other_version,
++            json!({"kind":"channel","channel_id":active.desk}),
++        )
++        .await;
++    assert_eq!(status, StatusCode::OK, "{result}");
++    assert!(!m.manages(m.b_actor, workflow).await);
++    assert!(m.manages(m.a_actor, workflow).await);
++    assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
++}
++
++#[tokio::test]
++async fn delegated_admin_definition_sibling_foreign_missing_and_agent_writes_hide_revision_conflicts()
++ {
++    let Some(m) = ManagedDefinitions::new().await else {
++        return;
++    };
++    let (workflow, _) = m.published().await;
++    let source = example("data.map", workflow);
++    for expected in [None, Some(1), Some(100)] {
++        assert_eq!(
++            m.f.save(
++                m.b_actor.user_id(),
++                m.f.company,
++                workflow,
++                expected,
++                &source
++            )
++            .await
++            .0,
++            StatusCode::NOT_FOUND
++        );
++        assert_eq!(
++            m.f.save(m.a_actor.user_id(), m.f.other, workflow, expected, &source)
++                .await
++                .0,
++            StatusCode::NOT_FOUND
++        );
++    }
++    assert_eq!(
++        m.f.save(
++            m.a_actor.user_id(),
++            m.f.company,
++            Uuid::new_v4(),
++            Some(1),
++            &source
++        )
++        .await
++        .0,
++        StatusCode::NOT_FOUND
++    );
++    assert_eq!(
++        m.f.save(
++            m.a_actor.user_id(),
++            m.f.company,
++            workflow,
++            Some(100),
++            &source
++        )
++        .await
++        .0,
++        StatusCode::CONFLICT
++    );
++    let agent = AgentPersistence::create(
++        &m.f.persistence,
++        m.f.company,
++        AgentWrite {
++            name: "Not a person".into(),
++            slug: "not-a-person".into(),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    assert_eq!(
++        m.f.save(agent.id, m.f.company, workflow, Some(1), &source)
++            .await
++            .0,
++        StatusCode::NOT_FOUND
++    );
++}
++
++#[path = "delegated_definition_boundary_tests.rs"]
++mod boundaries;
++#[path = "delegated_definition_integrity_tests.rs"]
++mod integrity;
++#[path = "delegated_definition_race_tests.rs"]
++mod races;
++#[path = "delegated_definition_replay_tests.rs"]
++mod replays;
+--- B2/src/adapters/http/routes/workflows/tests.rs
++++ B3/src/adapters/http/routes/workflows/tests.rs
+@@ -389,3 +389,6 @@
+ mod tenancy_tests;
+ #[path = "tool_tests.rs"]
+ mod tool_tests;
++
++#[path = "delegated_definition_tests.rs"]
++mod delegated_definitions;
+--- B2/src/adapters/persistence/administration.rs
++++ B3/src/adapters/persistence/administration.rs
+@@ -26,6 +26,20 @@
+     .transpose()
+ }
+ 
++pub(in crate::adapters::persistence) async fn creating_department_on(
++    db: &mut PgConnection,
++    actor: Uuid,
++    company: CompanyId,
++) -> AppResult<DepartmentId> {
++    sqlx::query_scalar::<_, Option<Uuid>>("SELECT workflow_creating_department($1,$2)")
++        .bind(actor)
++        .bind(company.as_uuid())
++        .fetch_one(db)
++        .await?
++        .map(DepartmentId::new)
++        .ok_or_else(|| AppError::NotFound("Creating department not found".into()))
++}
++
+ pub(in crate::adapters::persistence) async fn management_role_on(
+     db: &mut PgConnection,
+     actor: Uuid,
+@@ -33,6 +47,26 @@
+     target: ManagementTarget,
+ ) -> AppResult<Option<ManagementRole>> {
+     let role = match target {
++        ManagementTarget::DefinitionCreation(workflow) => {
++            sqlx::query_scalar(
++                "SELECT CASE WHEN EXISTS(SELECT 1 FROM workflow_definitions WHERE company_id=$2 AND id=$3) \
++                 THEN workflow_definition_management_role($1,$2,$3) \
++                 ELSE unit_management_role($1,$2,workflow_creating_department($1,$2)) END",
++            )
++                .bind(actor)
++                .bind(company.as_uuid())
++                .bind(workflow.as_uuid())
++                .fetch_one(db)
++                .await?
++        }
++        ManagementTarget::Definition(workflow) => {
++            sqlx::query_scalar("SELECT workflow_definition_management_role($1,$2,$3)")
++                .bind(actor)
++                .bind(company.as_uuid())
++                .bind(workflow.as_uuid())
++                .fetch_one(db)
++                .await?
++        }
+         ManagementTarget::AnyUnit => {
+             sqlx::query_scalar(
+                 "WITH candidate AS ( \
+@@ -63,29 +97,12 @@
+                 .await?
+         }
+         ManagementTarget::Agent(agent) => {
+-            sqlx::query_scalar(
+-                "WITH target AS ( \
+-                   SELECT id FROM principals WHERE company_id=$2 AND agent_id=$3 AND kind='agent' \
+-                 ), placements AS ( \
+-                   SELECT member.department_id FROM department_members AS member \
+-                   JOIN target ON target.id=member.principal_id WHERE member.company_id=$2 \
+-                   UNION \
+-                   SELECT holder.department_id FROM department_roles AS holder \
+-                   JOIN target ON target.id=holder.principal_id WHERE holder.company_id=$2 \
+-                 ), units AS ( \
+-                   SELECT department_id FROM placements \
+-                   UNION ALL SELECT NULL::uuid WHERE EXISTS(SELECT 1 FROM target) \
+-                     AND NOT EXISTS(SELECT 1 FROM placements) \
+-                 ) \
+-                 SELECT management.role FROM units \
+-                 CROSS JOIN LATERAL (SELECT unit_management_role($1,$2,units.department_id) AS role) AS management \
+-                 WHERE management.role IS NOT NULL ORDER BY management.role LIMIT 1",
+-            )
+-            .bind(actor)
+-            .bind(company.as_uuid())
+-            .bind(agent.as_uuid())
+-            .fetch_optional(db)
+-            .await?
++            sqlx::query_scalar("SELECT agent_management_role($1,$2,$3)")
++                .bind(actor)
++                .bind(company.as_uuid())
++                .bind(agent.as_uuid())
++                .fetch_one(db)
++                .await?
+         }
+     };
+     decode(role)
+--- B2/src/adapters/persistence/agent.rs
++++ B3/src/adapters/persistence/agent.rs
+@@ -271,6 +271,7 @@
+ }
+ 
+ /// Save an agent's settings and capabilities in one transaction.
++#[cfg(test)]
+ pub(crate) async fn update_agent(
+     persistence: &PostgresPersistence,
+     id: Uuid,
+@@ -469,6 +470,35 @@
+         db_list.into_iter().map(TryInto::try_into).collect()
+     }
+ 
++    async fn list_managed_agents(
++        &self,
++        actor: crate::application::workflow::WorkflowActor,
++        company: crate::domain::workflow::CompanyId,
++    ) -> AppResult<Vec<Agent>> {
++        let mut tx = super::workflow::management::begin(self, company, actor).await?;
++        super::workflow::management::authorize_target_on(
++            &mut tx,
++            company,
++            actor,
++            crate::application::use_cases::administration::ManagementTarget::AnyUnit,
++        )
++        .await?;
++        let rows: Vec<AgentDb> = sqlx::query_as(&format!(
++            "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.company_id=$1 \
++             AND agent_management_role($2,$1,agent.id) IS NOT NULL ORDER BY agent.name,agent.id"
++        ))
++        .bind(company.as_uuid())
++        .bind(actor.user_id())
++        .fetch_all(&mut *tx)
++        .await?;
++        let agents = rows
++            .into_iter()
++            .map(Agent::try_from)
++            .collect::<AppResult<Vec<_>>>()?;
++        tx.commit().await?;
++        Ok(agents)
++    }
++
+     async fn list_library(&self) -> AppResult<Vec<Agent>> {
+         let rows = sqlx::query_as::<_, AgentDb>(&format!(
+             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.company_id IS NULL \
+@@ -480,6 +510,39 @@
+         rows.into_iter().map(TryInto::try_into).collect()
+     }
+ 
++    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
++        let mut tx = self.pool.begin().await?;
++        sqlx::query_scalar::<_, Uuid>(
++            "SELECT id FROM agents WHERE id=$1 AND company_id IS NULL FOR UPDATE",
++        )
++        .bind(id)
++        .fetch_optional(&mut *tx)
++        .await?
++        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
++        let db = update_agent_on(&mut tx, None, id, &write).await?;
++        tx.commit()
++            .await
++            .map_err(super::agent_capability::relationship_error)?;
++        db.try_into()
++    }
++
++    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()> {
++        let mut tx = self.pool.begin().await?;
++        sqlx::query_scalar::<_, Uuid>(
++            "SELECT id FROM agents WHERE id=$1 AND company_id IS NULL FOR UPDATE",
++        )
++        .bind(id)
++        .fetch_optional(&mut *tx)
++        .await?
++        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
++        let locks = lock_agent_delete_on(&mut tx, id)
++            .await?
++            .ok_or_else(crate::use_cases::agent::agent_not_found)?;
++        finish_agent_delete_on(&mut tx, locks).await?;
++        tx.commit().await.map_err(agent_delete_error)
++    }
++
++    #[cfg(test)]
+     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
+         update_agent(self, id, write).await
+     }
+@@ -487,6 +550,7 @@
+     /// Retire the agent: its principal becomes an outsider and keeps everything it wrote and took
+     /// part in, then the agent row goes. The database refuses a delete that would take history
+     /// with it, so this is the only way an agent that has spoken can be deleted.
++    #[cfg(test)]
+     async fn delete(&self, id: Uuid) -> AppResult<()> {
+         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+         let Some(locks) = lock_agent_delete_on(&mut transaction, id).await? else {
+@@ -636,7 +700,7 @@
+ }
+ 
+ /// Name what still holds an agent instead of reporting every refusal as one cause.
+-fn agent_delete_error(error: sqlx::Error) -> AppError {
++pub(super) fn agent_delete_error(error: sqlx::Error) -> AppError {
+     let constraint = error
+         .as_database_error()
+         .and_then(|database| database.constraint())
+--- B2/src/adapters/persistence/agent_authoring/directory.rs
++++ B3/src/adapters/persistence/agent_authoring/directory.rs
+@@ -65,8 +65,8 @@
+     let entry = sqlx::query_as::<_, DirectoryRow>(
+         "SELECT agent.id,agent.slug::text AS key,agent.name,active.revision_id AS active_revision FROM agents AS agent \
+          LEFT JOIN agent_active_revisions AS active ON active.company_id=agent.company_id AND active.agent_id=agent.id \
+-         WHERE agent.company_id=$1 AND agent.slug=$2",
+-    ).bind(scope.company.as_uuid()).bind(key.as_str()).fetch_optional(&mut *db).await?
++         WHERE agent.company_id=$1 AND agent.slug=$2 AND agent_management_role($3,$1,agent.id) IS NOT NULL",
++    ).bind(scope.company.as_uuid()).bind(key.as_str()).bind(scope.actor.user_id()).fetch_optional(&mut *db).await?
+         .map(DirectoryRow::entry).transpose()?;
+     let mut entries: Vec<AgentDirectoryEntry> = entry.into_iter().collect();
+     placed(db, scope, domain, &mut entries).await?;
+@@ -83,6 +83,10 @@
+         "SELECT agent.id,agent.slug::text AS key,agent.name,active.revision_id AS active_revision FROM agents AS agent LEFT JOIN agent_active_revisions AS active ON active.company_id=agent.company_id AND active.agent_id=agent.id WHERE agent.company_id=",
+     );
+     query.push_bind(scope.company.as_uuid());
++    query
++        .push(" AND agent_management_role(")
++        .push_bind(scope.actor.user_id())
++        .push(",agent.company_id,agent.id) IS NOT NULL");
+     if let Some(after) = after {
+         query
+             .push(" AND agent.slug>")
+--- B2/src/adapters/persistence/agent_authoring/mod.rs
++++ B3/src/adapters/persistence/agent_authoring/mod.rs
+@@ -25,6 +25,18 @@
+ 
+ #[async_trait::async_trait]
+ impl AgentDraftPersistence for PostgresPersistence {
++    async fn delete_company_agent(&self, scope: AgentPublicationScope) -> AppResult<()> {
++        bounded(async {
++            let mut tx = super::agent_publication::begin_authorized(self, scope).await?;
++            let locks = super::agent::lock_agent_delete_on(&mut tx, scope.agent.as_uuid())
++                .await?
++                .ok_or_else(crate::use_cases::agent::agent_not_found)?;
++            super::agent::finish_agent_delete_on(&mut tx, locks).await?;
++            tx.commit().await.map_err(super::agent::agent_delete_error)
++        })
++        .await
++    }
++
+     async fn save_company_agent(
+         &self,
+         mut request: SaveCompanyAgent,
+--- B2/src/adapters/persistence/agent_publication/mod.rs
++++ B3/src/adapters/persistence/agent_publication/mod.rs
+@@ -56,7 +56,13 @@
+         .fetch_optional(&mut **tx)
+         .await?
+         .ok_or_else(missing)?;
+-    super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await?;
++    super::workflow::management::authorize_target_on(
++        tx,
++        scope.company,
++        scope.actor,
++        crate::application::use_cases::administration::ManagementTarget::AnyUnit,
++    )
++    .await?;
+     Ok(())
+ }
+ 
+--- B2/src/adapters/persistence/company_agent.rs
++++ B3/src/adapters/persistence/company_agent.rs
+@@ -33,14 +33,28 @@
+     use_cases::agent::{AgentPlacement, AgentWrite, CompanyAgents, CreatedAgent, model_allowed},
+ };
+ 
+-/// What [`create_company_agent_on`] creates: the agent under `id` from `write`, placed in
+-/// `placement` when one is named. A caller with writes of its own after the creation passes no
+-/// placement and places the agent last itself (`place_in_department_on`), so the department's
+-/// desk gates stay the last locks it takes.
++/// Membership is established before publication; callers doing more construction finalize
++/// deferred placement last so department desk gates remain the last locks they take.
++#[derive(Clone, Copy)]
++pub(crate) enum AgentCreationPlacement {
++    Unplaced,
++    Complete(AgentPlacement),
++    Deferred(AgentPlacement),
++}
++
++impl AgentCreationPlacement {
++    fn requested(self) -> Option<AgentPlacement> {
++        match self {
++            Self::Unplaced => None,
++            Self::Complete(placement) | Self::Deferred(placement) => Some(placement),
++        }
++    }
++}
++
+ pub(crate) struct CompanyAgentCreation {
+     pub id: Uuid,
+     pub write: AgentWrite,
+-    pub placement: Option<AgentPlacement>,
++    pub placement: AgentCreationPlacement,
+ }
+ 
+ pub(crate) struct CreatedCompanyAgent {
+@@ -59,25 +73,20 @@
+     actor: WorkflowActor,
+     creation: CompanyAgentCreation,
+ ) -> AppResult<CreatedCompanyAgent> {
++    let mut creation = creation;
++    // Publication capture dominates this phase; keep it off the constructor's future frame.
++    let principal = Box::pin(insert_company_agent_identity_on(
++        tx,
++        company,
++        actor,
++        &mut creation,
++    ))
++    .await?;
+     let CompanyAgentCreation {
+         id,
+-        mut write,
++        write,
+         placement,
+     } = creation;
+-    resolve_model_on(tx, company, &mut write).await?;
+-    insert_agent_on(tx, id, Some(company.as_uuid()), &write).await?;
+-    let principal = create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
+-    super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, &write).await?;
+-    register_agent_address_on(tx, company, principal, &write.slug).await?;
+-    publish_initial_on(
+-        tx,
+-        AgentPublicationScope {
+-            company,
+-            actor,
+-            agent: AgentId::new(id),
+-        },
+-    )
+-    .await?;
+     // Boxed: template compilation and publication otherwise dominate the creator's future.
+     let workflow = Box::pin(provision_agent_workflow_on(
+         tx,
+@@ -92,7 +101,7 @@
+     ))
+     .await?
+     .map_err(refusal_error)?;
+-    if let Some(placement) = placement {
++    if let AgentCreationPlacement::Complete(placement) = placement {
+         place_in_department_on(
+             tx,
+             templates,
+@@ -108,6 +117,48 @@
+         principal,
+         workflow,
+     })
++}
++
++async fn insert_company_agent_identity_on(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    actor: WorkflowActor,
++    creation: &mut CompanyAgentCreation,
++) -> AppResult<crate::entities::transport::PrincipalId> {
++    let id = creation.id;
++    let placement = creation.placement;
++    let write = &mut creation.write;
++    super::workflow::management::authorize_target_on(
++        tx,
++        company,
++        actor,
++        crate::use_cases::agent::placement_target(placement.requested()),
++    )
++    .await?;
++    resolve_model_on(tx, company, write).await?;
++    insert_agent_on(tx, id, Some(company.as_uuid()), write).await?;
++    let principal = create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
++    if let Some(placement) = placement.requested() {
++        super::department::prepare_new_agent_placement_on(
++            tx,
++            crate::application::ports::department::DepartmentScope { company, actor },
++            principal,
++            placement,
++        )
++        .await?;
++    }
++    super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, write).await?;
++    register_agent_address_on(tx, company, principal, &write.slug).await?;
++    publish_initial_on(
++        tx,
++        AgentPublicationScope {
++            company,
++            actor,
++            agent: AgentId::new(id),
++        },
++    )
++    .await?;
++    Ok(principal)
+ }
+ 
+ async fn register_agent_address_on(
+@@ -229,6 +280,13 @@
+     ) -> AppResult<CreatedAgent> {
+         let mut tx = begin_bounded(&self.persistence).await?;
+         lock_company_on(&mut tx, AgentCompanyScope { company, actor }).await?;
++        super::workflow::management::authorize_target_on(
++            &mut tx,
++            company,
++            actor,
++            crate::use_cases::agent::placement_target(placement),
++        )
++        .await?;
+         if let Some(library_agent_id) = library_agent_id {
+             prepare_library_agent_on(&mut tx, company.as_uuid(), library_agent_id, &mut write)
+                 .await?;
+@@ -242,7 +300,10 @@
+             CompanyAgentCreation {
+                 id,
+                 write,
+-                placement,
++                placement: placement.map_or(
++                    AgentCreationPlacement::Unplaced,
++                    AgentCreationPlacement::Complete,
++                ),
+             },
+         ))
+         .await?;
+--- B2/src/adapters/persistence/company_agent_tests.rs
++++ B3/src/adapters/persistence/company_agent_tests.rs
+@@ -155,7 +155,8 @@
+     found
+ }
+ 
+-/// Production company-agent rows come only from `create_company_agent_on`: outside it, the two
++/// Production company-agent rows come only from `create_company_agent_on` and its identity phase:
++/// outside that constructor, the two
+ /// insert primitives are called only where no company agent is created -- the library inserts in
+ /// `persistence/agent.rs` (`company_id = None`) and the lazy principal of an existing agent in
+ /// `thread/message.rs`. `AgentPersistence::create` is `#[cfg(test)]`, so it is not production.
+@@ -164,12 +165,12 @@
+     let expected: BTreeSet<(String, String, String)> = [
+         (
+             "src/adapters/persistence/company_agent.rs",
+-            "create_company_agent_on",
++            "insert_company_agent_identity_on",
+             "create_agent_principal_on",
+         ),
+         (
+             "src/adapters/persistence/company_agent.rs",
+-            "create_company_agent_on",
++            "insert_company_agent_identity_on",
+             "insert_agent_on",
+         ),
+         (
+--- B2/src/adapters/persistence/delegated_administration_tests.rs
++++ B3/src/adapters/persistence/delegated_administration_tests.rs
+@@ -448,3 +448,6 @@
+ mod desks;
+ #[path = "delegated_schedule_management_tests.rs"]
+ mod schedules;
++
++#[path = "delegated_agent_management_tests.rs"]
++mod agents;
+--- B2/src/adapters/persistence/delegated_agent_construction_tests.rs
++++ B3/src/adapters/persistence/delegated_agent_construction_tests.rs
+@@ -0,0 +1,83 @@
++use super::*;
++
++#[derive(Debug, PartialEq, sqlx::FromRow)]
++pub(super) struct Counts {
++    pub(super) agents: i64,
++    pub(super) principals: i64,
++    pub(super) revisions: i64,
++    pub(super) workflows: i64,
++    pub(super) bindings: i64,
++    pub(super) members: i64,
++    pub(super) grants: i64,
++}
++
++pub(super) async fn counts(m: &ManagedAgents) -> Counts {
++    sqlx::query_as(
++        "SELECT (SELECT count(*) FROM agents WHERE company_id=$1) AS agents, \
++        (SELECT count(*) FROM principals WHERE company_id=$1) AS principals, \
++        (SELECT count(*) FROM agent_revisions WHERE company_id=$1) AS revisions, \
++        (SELECT count(*) FROM workflow_definitions WHERE company_id=$1) AS workflows, \
++        (SELECT count(*) FROM workflow_bindings WHERE company_id=$1) AS bindings, \
++        (SELECT count(*) FROM department_members WHERE company_id=$1) AS members, \
++        (SELECT count(*) FROM channel_principal_grants WHERE company_id=$1) AS grants",
++    )
++    .bind(m.d.f.company)
++    .fetch_one(m.p().pool())
++    .await
++    .unwrap()
++}
++
++#[tokio::test]
++async fn delegated_admin_agent_creation_rolls_back_early_membership_and_publications_on_final_grant_failure()
++ {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let before = counts(&m).await;
++    sqlx::raw_sql(r#"
++        CREATE FUNCTION fail_delegated_agent_grant() RETURNS trigger LANGUAGE plpgsql AS $$
++        DECLARE selected uuid;
++        BEGIN
++            SELECT agent.id INTO selected FROM agents AS agent JOIN principals AS principal
++                ON principal.company_id=agent.company_id AND principal.agent_id=agent.id
++                WHERE agent.company_id=NEW.company_id AND agent.slug='rollback-target'
++                    AND principal.id=NEW.principal_id;
++            IF selected IS NOT NULL THEN
++                IF NOT EXISTS(SELECT 1 FROM agent_revisions WHERE company_id=NEW.company_id AND agent_id=selected)
++                    OR NOT EXISTS(SELECT 1 FROM workflow_definitions WHERE company_id=NEW.company_id AND owner_agent_id=selected) THEN
++                    RAISE EXCEPTION 'fixture grant arrived before publication and native construction';
++                END IF;
++                RAISE EXCEPTION 'fixture final grant failure';
++            END IF;
++            RETURN NEW;
++        END $$;
++        CREATE TRIGGER fail_delegated_agent_grant BEFORE INSERT ON channel_principal_grants
++            FOR EACH ROW EXECUTE FUNCTION fail_delegated_agent_grant();
++    "#).execute(m.p().pool()).await.unwrap();
++    let error = m
++        .service
++        .create(
++            m.actor(),
++            m.d.company(),
++            write("rollback-target"),
++            Some(AgentPlacement {
++                department: m.d.unit.id,
++                role: None,
++            }),
++        )
++        .await
++        .unwrap_err();
++    assert!(
++        format!("{error:?}").contains("fixture final grant failure"),
++        "{error:?}"
++    );
++    assert_eq!(counts(&m).await, before);
++    assert!(
++        m.p()
++            .list_by_company_id(m.d.f.company)
++            .await
++            .unwrap()
++            .iter()
++            .all(|agent| agent.slug.as_str() != "rollback-target")
++    );
++}
+--- B2/src/adapters/persistence/delegated_agent_management_tests.rs
++++ B3/src/adapters/persistence/delegated_agent_management_tests.rs
+@@ -0,0 +1,471 @@
++//! Real agent authoring and construction under delegated unit ownership.
++use super::*;
++use crate::adapters::persistence::company_agent::CompanyAgentService;
++use crate::application::agent::*;
++use crate::entities::agent_capability::{AgentBuiltinTool, AgentId, AgentToolAlias};
++use crate::use_cases::agent::{
++    AgentPersistence, AgentPlacement, AgentUseCases, AgentWrite, CompanyAgents, CreatedAgent,
++    SpamScanning,
++};
++use crate::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence};
++use crate::use_cases::skill::{AgentCapabilityReader, SkillManagementPersistence, SkillWrite};
++
++struct ManagedAgents {
++    _database: crate::adapters::persistence::test_support::OwnDatabase,
++    d: Delegated,
++    cases: AgentUseCases,
++    service: Arc<CompanyAgentService>,
++}
++
++fn write(slug: &str) -> AgentWrite {
++    AgentWrite {
++        name: slug.into(),
++        slug: slug.into(),
++        provider: Some("openai".into()),
++        model: Some("gpt-4o-mini".into()),
++        system_prompt: Some("Answer carefully.".into()),
++        ..Default::default()
++    }
++}
++
++impl ManagedAgents {
++    async fn new() -> Option<Self> {
++        let database = own_database().await?;
++        let mut d = Delegated::on(database.pool.clone()).await;
++        d.f.persistence = d.f.persistence.with_app_domain("agents.test");
++        let p = Arc::new(d.f.persistence.clone());
++        CompanyPersistence::replace_model_connections_for_user(
++            p.as_ref(),
++            d.f.owner,
++            d.f.company,
++            vec![CompanyModelConnectionWrite {
++                provider: "openai".into(),
++                api_key: Some("fixture-key".into()),
++                models: vec!["gpt-4o-mini".into()],
++                is_default: true,
++            }],
++        )
++        .await
++        .unwrap();
++        let service = Arc::new(CompanyAgentService::new(
++            p.as_ref().clone(),
++            provisioning_templates(),
++        ));
++        let cases = AgentUseCases::new(p.clone(), p.clone(), p, SpamScanning::Available)
++            .with_company_agents(service.clone());
++        Some(Self {
++            _database: database,
++            d,
++            cases,
++            service,
++        })
++    }
++
++    fn p(&self) -> &PostgresPersistence {
++        &self.d.f.persistence
++    }
++    fn actor(&self) -> WorkflowActor {
++        self.d.scope(self.d.f.member).actor
++    }
++    fn scope(&self, actor: WorkflowActor, agent: Uuid) -> AgentPublicationScope {
++        AgentPublicationScope {
++            company: self.d.company(),
++            actor,
++            agent: AgentId::new(agent),
++        }
++    }
++    async fn create(&self, slug: &str, unit: DepartmentId) -> CreatedAgent {
++        self.cases
++            .create_agent(
++                self.actor().user_id(),
++                self.d.f.company,
++                write(slug),
++                Some(AgentPlacement {
++                    department: unit,
++                    role: None,
++                }),
++            )
++            .await
++            .unwrap()
++    }
++    async fn changes(&self, actor: WorkflowActor, agent: Uuid) -> SaveCompanyAgent {
++        let state = self
++            .p()
++            .load_capabilities(self.d.f.company, agent)
++            .await
++            .unwrap()
++            .unwrap();
++        SaveCompanyAgent {
++            scope: self.scope(actor, agent),
++            expected_revision: state.agent.draft_revision,
++            tools: None,
++            write: AgentWrite {
++                name: state.agent.name,
++                slug: state.agent.slug,
++                provider: state.agent.provider,
++                model: state.agent.model,
++                system_prompt: Some("Updated within the unit.".into()),
++                skill_ids: state.skills.into_iter().map(|skill| skill.id).collect(),
++                ..Default::default()
++            },
++        }
++    }
++}
++
++#[tokio::test]
++async fn delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let remote = m.d.remote().await;
++    let desk = m.d.f.desk_of(remote.id).await;
++    assert_no_desk_view(&m, desk).await;
++    let created = m.create("delegated-author", remote.id).await;
++    let initial = m
++        .p()
++        .active_agent_revision(m.scope(m.actor(), created.agent.id))
++        .await
++        .unwrap()
++        .unwrap();
++    let skill = SkillManagementPersistence::create_company(
++        m.p(),
++        m.d.f.company,
++        SkillWrite {
++            slug: "accuracy".into(),
++            name: "Accuracy".into(),
++            description: "Check the answer".into(),
++            instructions: "Use exact, supported answers.".into(),
++            files: None,
++            required_tools: None,
++            created_by: None,
++        },
++    )
++    .await
++    .unwrap();
++    let mut command = m.changes(m.actor(), created.agent.id).await;
++    command.write.skill_ids = vec![skill.id];
++    let updated = m
++        .cases
++        .update_agent(
++            m.actor().user_id(),
++            m.d.f.company,
++            CompanyAgentUpdate {
++                agent: command.scope.agent,
++                expected_revision: command.expected_revision,
++                write: command.write,
++                tools: Some(vec![AgentToolAssignment {
++                    binding: None,
++                    alias: AgentToolAlias::parse("unit.send").unwrap(),
++                    choice: AgentToolChoice::Builtin {
++                        tool: AgentBuiltinTool::MessageSend,
++                    },
++                }]),
++            },
++        )
++        .await
++        .unwrap();
++    let published = m
++        .p()
++        .publish_agent(PublishAgent {
++            scope: m.scope(m.actor(), created.agent.id),
++            expected_draft_revision: updated.draft_revision,
++            expected_active_revision: Some(initial.id),
++            key: AgentPublicationKey::parse("unit-publish").unwrap(),
++        })
++        .await
++        .unwrap();
++    assert_eq!(published.definition.skills[0].skill.skill_id, skill.id);
++    assert_eq!(published.definition.tools.len(), 1);
++    m.p()
++        .revoke_agent_grant(
++            m.scope(m.actor(), created.agent.id),
++            AgentGrantIdentity::Binding(published.definition.tools[0].binding.id),
++        )
++        .await
++        .unwrap();
++    assert!(
++        matches!(
++            m.cases
++                .delete_agent(m.actor().user_id(), m.d.f.company, created.agent.id)
++                .await,
++            Err(AppError::Conflict(_))
++        ),
++        "retained capability history still prevents deletion"
++    );
++    let deletable = m.create("deletable-unit-agent", remote.id).await;
++    m.cases
++        .delete_agent(m.actor().user_id(), m.d.f.company, deletable.agent.id)
++        .await
++        .unwrap();
++    assert!(
++        AgentPersistence::get_by_id(m.p(), deletable.agent.id)
++            .await
++            .unwrap()
++            .is_none()
++    );
++}
++
++#[tokio::test]
++async fn delegated_admin_agent_library_copy_uses_managed_placement_and_root_when_unplaced() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let library = AgentPersistence::create_library(m.p(), write("portable"))
++        .await
++        .unwrap();
++    let copied = m
++        .cases
++        .create_agent_from_library(
++            m.actor().user_id(),
++            m.d.f.company,
++            library.id,
++            Some(AgentPlacement {
++                department: m.d.unit.id,
++                role: None,
++            }),
++        )
++        .await
++        .unwrap();
++    assert!(
++        m.p()
++            .active_agent_revision(m.scope(m.actor(), copied.agent.id))
++            .await
++            .unwrap()
++            .is_some()
++    );
++    hidden(
++        m.service
++            .copy_from_library(
++                m.actor(),
++                m.d.company(),
++                library.id,
++                write("sibling-copy"),
++                Some(AgentPlacement {
++                    department: m.d.sibling.id,
++                    role: None,
++                }),
++            )
++            .await,
++    );
++    assert_root_boundaries(&m, library.id).await;
++}
++
++#[tokio::test]
++async fn delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let own = m.create("owned", m.d.unit.id).await;
++    let other = m
++        .service
++        .create(
++            m.d.scope(m.d.f.owner).actor,
++            m.d.company(),
++            write("sibling"),
++            Some(AgentPlacement {
++                department: m.d.sibling.id,
++                role: None,
++            }),
++        )
++        .await
++        .unwrap();
++    let list = m
++        .cases
++        .list_company_agents(m.actor().user_id(), m.d.f.company)
++        .await
++        .unwrap();
++    assert!(list.iter().any(|agent| agent.id == own.agent.id));
++    assert!(!list.iter().any(|agent| agent.id == other.agent.id));
++    let directory = m
++        .p()
++        .agent_directory(
++            AgentCompanyScope {
++                company: m.d.company(),
++                actor: m.actor(),
++            },
++            None,
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        directory
++            .items
++            .iter()
++            .map(|entry| entry.id.as_uuid())
++            .collect::<Vec<_>>(),
++        vec![own.agent.id]
++    );
++    assert!(
++        m.p()
++            .agent_directory_entry(
++                AgentCompanyScope {
++                    company: m.d.company(),
++                    actor: m.actor()
++                },
++                AgentKey::parse("sibling").unwrap()
++            )
++            .await
++            .unwrap()
++            .is_none()
++    );
++    share_with_unit(&m, other.principal_id).await;
++    assert!(
++        m.p()
++            .preview_agent(m.scope(m.actor(), other.agent.id))
++            .await
++            .map(drop)
++            .is_ok()
++    );
++    assert!(
++        m.p()
++            .preview_agent(m.scope(m.d.scope(m.d.sibling_lead).actor, other.agent.id))
++            .await
++            .map(drop)
++            .is_ok()
++    );
++    assert!(
++        m.cases
++            .list_company_agents(m.actor().user_id(), m.d.f.company)
++            .await
++            .unwrap()
++            .iter()
++            .any(|agent| agent.id == other.agent.id)
++    );
++}
++
++#[tokio::test]
++async fn delegated_admin_agent_persistence_refuses_sibling_foreign_agent_and_library_bypasses() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let own = m.create("owned", m.d.unit.id).await;
++    let sibling = m.d.scope(m.d.sibling_lead).actor;
++    let command = m.changes(sibling, own.agent.id).await;
++    hidden(m.p().save_company_agent(command).await);
++    hidden(
++        m.p()
++            .delete_company_agent(m.scope(sibling, own.agent.id))
++            .await,
++    );
++    hidden(
++        m.p()
++            .preview_agent(m.scope(sibling, own.agent.id))
++            .await
++            .map(drop),
++    );
++    hidden(
++        m.p()
++            .delete_company_agent(AgentPublicationScope {
++                company: CompanyId::new(m.d.f.foreign_company),
++                ..m.scope(m.actor(), own.agent.id)
++            })
++            .await,
++    );
++    hidden(
++        m.p()
++            .delete_company_agent(m.scope(
++                WorkflowActor::authenticated(own.agent.id).unwrap(),
++                own.agent.id,
++            ))
++            .await,
++    );
++    hidden(
++        AgentPersistence::update_library_agent(m.p(), own.agent.id, write("library-bypass")).await,
++    );
++    hidden(AgentPersistence::delete_library_agent(m.p(), own.agent.id).await);
++    hidden(
++        m.service
++            .create(
++                m.actor(),
++                CompanyId::new(m.d.f.foreign_company),
++                write("foreign"),
++                Some(AgentPlacement {
++                    department: m.d.unit.id,
++                    role: None,
++                }),
++            )
++            .await,
++    );
++    assert!(
++        AgentPersistence::get_by_id(m.p(), own.agent.id)
++            .await
++            .unwrap()
++            .is_some()
++    );
++}
++
++#[path = "delegated_agent_construction_tests.rs"]
++mod construction;
++#[path = "delegated_agent_race_tests.rs"]
++mod races;
++
++async fn assert_no_desk_view(m: &ManagedAgents, desk: Uuid) {
++    let authorizer = crate::application::workflow::LifecycleAuthorizer::new(
++        m.p().clone(),
++        m.p().clone(),
++        m.p().clone(),
++    );
++    assert!(matches!(
++        crate::application::workflow::WorkflowAuthorization::authorize(
++            &authorizer,
++            m.d.company(),
++            m.actor(),
++            crate::application::workflow::RelatedAssociation::Channel(
++                crate::application::workflow::RelatedChannelId::new(desk)
++            ),
++            crate::application::workflow::WorkflowOperation::Inspect
++        )
++        .await,
++        Err(AppError::NotFound(_))
++    ));
++}
++
++async fn assert_root_boundaries(m: &ManagedAgents, library: Uuid) {
++    hidden(
++        m.service
++            .create(m.actor(), m.d.company(), write("unplaced"), None)
++            .await,
++    );
++    hidden(
++        m.cases
++            .create_agent_from_library(m.actor().user_id(), m.d.f.company, library, None)
++            .await,
++    );
++    hidden(
++        m.service
++            .create(
++                m.actor(),
++                m.d.company(),
++                write("own-unit-lead"),
++                Some(AgentPlacement {
++                    department: m.d.unit.id,
++                    role: Some(DepartmentRole::Lead),
++                }),
++            )
++            .await,
++    );
++    let unplaced = m
++        .service
++        .create(
++            m.d.scope(m.d.f.owner).actor,
++            m.d.company(),
++            write("root-agent"),
++            None,
++        )
++        .await
++        .unwrap();
++    hidden(
++        m.p()
++            .preview_agent(m.scope(m.actor(), unplaced.agent.id))
++            .await
++            .map(drop),
++    );
++}
++
++async fn share_with_unit(m: &ManagedAgents, principal: PrincipalId) {
++    m.d.f
++        .use_cases
++        .add_member(m.d.f.owner, m.d.f.company, m.d.unit.id, principal)
++        .await
++        .unwrap();
++}
+--- B2/src/adapters/persistence/delegated_agent_race_tests.rs
++++ B3/src/adapters/persistence/delegated_agent_race_tests.rs
+@@ -0,0 +1,217 @@
++use super::*;
++use crate::adapters::persistence::test_support::{WriteBarrier, competing_writes};
++
++impl ManagedAgents {
++    async fn revoke(&self) {
++        self.d
++            .f
++            .use_cases
++            .clear_role(
++                self.d.f.owner,
++                self.d.f.company,
++                self.d.unit.id,
++                DepartmentRole::Lead,
++                self.d.f.member_principal,
++            )
++            .await
++            .unwrap();
++    }
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_role_removal_precedes_agent_draft_write() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let agent = m.create("draft-race", m.d.unit.id).await;
++    let request = m.changes(m.actor(), agent.agent.id).await;
++    let before = request.expected_revision;
++    let result = competing_writes(
++        m.p().pool(),
++        WriteBarrier::DeskGrants,
++        m.revoke(),
++        m.p().save_company_agent(request),
++    )
++    .await;
++    hidden(result.second);
++    let stored = AgentPersistence::get_by_id(m.p(), agent.agent.id)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(stored.draft_revision, before);
++    assert_eq!(stored.system_prompt, Some("Answer carefully.".into()));
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_agent_draft_write_precedes_role_removal() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let agent = m.create("draft-first", m.d.unit.id).await;
++    let request = m.changes(m.actor(), agent.agent.id).await;
++    let before = request.expected_revision;
++    let result = competing_writes(
++        m.p().pool(),
++        WriteBarrier::Agents,
++        m.p().save_company_agent(request),
++        m.revoke(),
++    )
++    .await;
++    assert_eq!(result.first.unwrap().draft_revision.get(), before.get() + 1);
++    let stored = AgentPersistence::get_by_id(m.p(), agent.agent.id)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(
++        stored.system_prompt,
++        Some("Updated within the unit.".into())
++    );
++    hidden(
++        m.p()
++            .preview_agent(m.scope(m.actor(), agent.agent.id))
++            .await
++            .map(drop),
++    );
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_role_removal_precedes_agent_deletion() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let agent = m.create("delete-race", m.d.unit.id).await;
++    let result = competing_writes(
++        m.p().pool(),
++        WriteBarrier::DeskGrants,
++        m.revoke(),
++        m.p()
++            .delete_company_agent(m.scope(m.actor(), agent.agent.id)),
++    )
++    .await;
++    hidden(result.second);
++    assert!(
++        AgentPersistence::get_by_id(m.p(), agent.agent.id)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    let kind: String =
++        sqlx::query_scalar("SELECT kind FROM principals WHERE company_id=$1 AND id=$2")
++            .bind(m.d.f.company)
++            .bind(agent.principal_id.as_uuid())
++            .fetch_one(m.p().pool())
++            .await
++            .unwrap();
++    assert_eq!(kind, "agent");
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_agent_deletion_precedes_role_removal() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let agent = m.create("delete-first", m.d.unit.id).await;
++    let result = competing_writes(
++        m.p().pool(),
++        WriteBarrier::Agents,
++        m.p()
++            .delete_company_agent(m.scope(m.actor(), agent.agent.id)),
++        m.revoke(),
++    )
++    .await;
++    result.first.unwrap();
++    assert!(
++        AgentPersistence::get_by_id(m.p(), agent.agent.id)
++            .await
++            .unwrap()
++            .is_none()
++    );
++    let kind: String =
++        sqlx::query_scalar("SELECT kind FROM principals WHERE company_id=$1 AND id=$2")
++            .bind(m.d.f.company)
++            .bind(agent.principal_id.as_uuid())
++            .fetch_one(m.p().pool())
++            .await
++            .unwrap();
++    assert_eq!(kind, "external");
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_agent_construction_finishes_before_role_removal() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let result = competing_writes(
++        m.p().pool(),
++        WriteBarrier::DeskGrants,
++        m.service.create(
++            m.actor(),
++            m.d.company(),
++            write("construction-first"),
++            Some(AgentPlacement {
++                department: m.d.unit.id,
++                role: None,
++            }),
++        ),
++        m.revoke(),
++    )
++    .await;
++    let created = result.first.unwrap();
++    assert!(
++        AgentPersistence::get_by_id(m.p(), created.agent.id)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    let complete: bool = sqlx::query_scalar(
++        "SELECT EXISTS(SELECT 1 FROM principals AS principal JOIN department_members AS member \
++         ON member.company_id=principal.company_id AND member.principal_id=principal.id \
++         JOIN agent_revisions AS revision ON revision.company_id=principal.company_id AND revision.agent_id=principal.agent_id \
++         JOIN workflow_definitions AS definition ON definition.company_id=principal.company_id AND definition.owner_agent_id=principal.agent_id \
++         JOIN workflow_bindings AS binding ON binding.company_id=principal.company_id AND binding.principal_id=principal.id AND binding.active \
++         JOIN channel_principal_grants AS grant_row ON grant_row.company_id=principal.company_id AND grant_row.principal_id=principal.id \
++         WHERE principal.company_id=$1 AND principal.agent_id=$2 AND member.department_id=$3)",
++    ).bind(m.d.f.company).bind(created.agent.id).bind(m.d.unit.id.as_uuid())
++        .fetch_one(m.p().pool()).await.unwrap();
++    assert!(
++        complete,
++        "membership, publication, native binding and desk grants committed together"
++    );
++    hidden(
++        m.p()
++            .preview_agent(m.scope(m.actor(), created.agent.id))
++            .await
++            .map(drop),
++    );
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_role_removal_precedes_agent_construction() {
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let before = construction::counts(&m).await;
++    let result = competing_writes(
++        m.p().pool(),
++        WriteBarrier::DeskGrants,
++        m.revoke(),
++        m.service.create(
++            m.actor(),
++            m.d.company(),
++            write("construction-refused"),
++            Some(AgentPlacement {
++                department: m.d.unit.id,
++                role: None,
++            }),
++        ),
++    )
++    .await;
++    hidden(result.second);
++    let after = construction::counts(&m).await;
++    assert_eq!(after.agents, before.agents);
++    assert_eq!(after.principals, before.principals);
++    assert_eq!(after.revisions, before.revisions);
++    assert_eq!(after.workflows, before.workflows);
++    assert_eq!(after.bindings, before.bindings);
++    assert_eq!(after.members, before.members);
++}
+--- B2/src/adapters/persistence/department.rs
++++ B3/src/adapters/persistence/department.rs
+@@ -45,6 +45,8 @@
+ use crate::use_cases::company::company_not_found;
+ use crate::use_cases::department::department_not_found;
+ 
++mod placement;
++pub(crate) use placement::{place_in_department_on, prepare_new_agent_placement_on};
+ mod lifecycle;
+ mod root;
+ pub(crate) use lifecycle::{
+@@ -350,39 +352,6 @@
+         Some(principal),
+     )
+     .await?;
+-    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
+-}
+-
+-/// Make `principal` a member of the department and, with `role`, its holder of that role, as
+-/// company-agent creation places a new agent (plan 01-departments 03C item 0). One write: the
+-/// rows, then a single grant sync over everything they reach, so the department's desk gates
+-/// are taken once, in order, with its neighbours' (01DEP-P03-B1-F1). The caller holds the company
+-/// write lock.
+-pub(crate) async fn place_in_department_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    templates: &ProvisioningDeployment,
+-    company: CompanyId,
+-    actor: WorkflowActor,
+-    department: DepartmentId,
+-    principal: PrincipalId,
+-    role: Option<DepartmentRole>,
+-) -> AppResult<()> {
+-    if let Some(role) = role {
+-        root_role_authority_on(tx, company, actor, department, role).await?;
+-    }
+-    write_placement_on(tx, company, department, principal, true, role).await?;
+-    if let Some(role) = role {
+-        follow_lead_on(
+-            tx,
+-            templates,
+-            company,
+-            actor,
+-            department,
+-            role,
+-            Some(principal),
+-        )
+-        .await?;
+-    }
+     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
+ }
+ 
+@@ -672,7 +641,7 @@
+         let mut tx = begin_department_write(&self.persistence, scope).await?;
+         require_parent_management_on(&mut tx, scope, department).await?;
+         delete_department_on(&mut tx, scope.company, department).await?;
+-        tx.commit().await?;
++        tx.commit().await.map_err(lifecycle::delete_error)?;
+         Ok(())
+     }
+ 
+--- B2/src/adapters/persistence/department/lifecycle.rs
++++ B3/src/adapters/persistence/department/lifecycle.rs
+@@ -207,6 +207,15 @@
+             current.name
+         )));
+     }
++    let owns_definitions: bool = sqlx::query_scalar(
++        "SELECT EXISTS(SELECT 1 FROM workflow_definitions WHERE company_id=$1 AND managing_department_id=$2)",
++    ).bind(company.as_uuid()).bind(department.as_uuid()).fetch_one(&mut **tx).await?;
++    if owns_definitions {
++        return Err(AppError::Conflict(format!(
++            "Department '{}' still owns workflow definitions and cannot be deleted.",
++            current.name,
++        )));
++    }
+     let captured: bool = sqlx::query_scalar(
+         "SELECT EXISTS (SELECT 1 FROM workflow_run_role_bindings WHERE company_id=$1 AND department_id=$2)",
+     ).bind(company.as_uuid()).bind(department.as_uuid()).fetch_one(&mut **tx).await?;
+@@ -245,19 +254,7 @@
+         .bind(department.as_uuid())
+         .execute(&mut **tx)
+         .await
+-        .map_err(|error| {
+-            if error
+-                .as_database_error()
+-                .is_some_and(|database| database.is_foreign_key_violation())
+-            {
+-                AppError::Conflict(format!(
+-                    "Department '{}' is still referenced and cannot be deleted.",
+-                    current.name
+-                ))
+-            } else {
+-                AppError::from(error)
+-            }
+-        })?;
++        .map_err(delete_error)?;
+     super::super::workflow::role_binding::check_principals_on(tx, company, &placed).await?;
+     // Its lead was a child lead of the parent's desks.
+     if let Some(parent) = current.parent_id {
+@@ -273,3 +270,14 @@
+     .await?;
+     Ok(())
+ }
++
++pub(super) fn delete_error(error: sqlx::Error) -> AppError {
++    if error
++        .as_database_error()
++        .is_some_and(|database| database.is_foreign_key_violation())
++    {
++        AppError::Conflict("The department is still referenced and cannot be deleted.".into())
++    } else {
++        AppError::from(error)
++    }
++}
+--- B2/src/adapters/persistence/department/placement.rs
++++ B3/src/adapters/persistence/department/placement.rs
+@@ -0,0 +1,56 @@
++//! Agent placement construction and final grant/role synchronization.
++use super::*;
++
++/// Make `principal` a member of the department and, with `role`, its holder of that role, as
++/// company-agent creation places a new agent (plan 01-departments 03C item 0). One write: the
++/// rows, then a single grant sync over everything they reach, so the department's desk gates
++/// are taken once, in order, with its neighbours' (01DEP-P03-B1-F1). The caller holds the company
++/// write lock.
++pub(crate) async fn place_in_department_on(
++    tx: &mut Transaction<'_, Postgres>,
++    templates: &ProvisioningDeployment,
++    company: CompanyId,
++    actor: WorkflowActor,
++    department: DepartmentId,
++    principal: PrincipalId,
++    role: Option<DepartmentRole>,
++) -> AppResult<()> {
++    if let Some(role) = role {
++        root_role_authority_on(tx, company, actor, department, role).await?;
++    }
++    write_placement_on(tx, company, department, principal, true, role).await?;
++    if let Some(role) = role {
++        follow_lead_on(
++            tx,
++            templates,
++            company,
++            actor,
++            department,
++            role,
++            Some(principal),
++        )
++        .await?;
++    }
++    Box::pin(crate::adapters::persistence::workflow::follow_reviewers::refresh_on(tx, company))
++        .await
++}
++
++/// A new agent's actual owning membership must precede its first publication. Grant gates
++/// and role/reviewer effects are finalized once construction is complete, in this transaction.
++pub(crate) async fn prepare_new_agent_placement_on(
++    tx: &mut Transaction<'_, Postgres>,
++    scope: DepartmentScope,
++    principal: PrincipalId,
++    placement: crate::use_cases::agent::AgentPlacement,
++) -> AppResult<()> {
++    require_department_management_on(tx, scope, Some(placement.department)).await?;
++    if let Some(role) = placement.role {
++        root_role_authority_on(tx, scope.company, scope.actor, placement.department, role).await?;
++    }
++    lock_department_on(tx, scope.company, placement.department).await?;
++    check_principal_on(tx, scope.company, principal).await?;
++    department_member_insert(scope.company, placement.department, principal)
++        .execute(&mut **tx)
++        .await?;
++    Ok(())
++}
+--- B2/src/adapters/persistence/managed_desk_test_support.rs
++++ B3/src/adapters/persistence/managed_desk_test_support.rs
+@@ -31,15 +31,68 @@
+     .await
+ }
+ 
+-pub(crate) async fn wait_until_blocked_by(pool: &PgPool, blocker: i32) {
++/// The exact waiting backend, for checking the next edge of a competing write chain.
++pub(crate) async fn wait_until_blocked_by(pool: &PgPool, blocker: i32) -> i32 {
+     tokio::time::timeout(std::time::Duration::from_secs(3), async {
+         loop {
+-            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND $1=ANY(pg_blocking_pids(pid)))")
+-                .bind(blocker).fetch_one(pool).await.unwrap();
+-            if blocked { break; }
++            let blocked: Option<i32> = sqlx::query_scalar("SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND $1=ANY(pg_blocking_pids(pid)) ORDER BY pid LIMIT 1")
++                .bind(blocker).fetch_optional(pool).await.unwrap();
++            if let Some(pid) = blocked { return pid; }
+             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+         }
+-    }).await.expect("the actual competing caller waits on this exact writer");
++    }).await.expect("the actual competing caller waits on this exact writer")
++}
++
++pub(crate) enum WriteBarrier {
++    DefinitionEvents,
++    BindingEvents,
++    DeskGrants,
++    Agents,
++}
++impl WriteBarrier {
++    fn sql(&self) -> &'static str {
++        match self {
++            Self::DefinitionEvents => "LOCK TABLE workflow_definition_events IN SHARE MODE",
++            Self::BindingEvents => "LOCK TABLE workflow_binding_events IN SHARE MODE",
++            Self::DeskGrants => "LOCK TABLE channel_principal_grants IN SHARE MODE",
++            Self::Agents => "LOCK TABLE agents IN SHARE MODE",
++        }
++    }
++}
++
++pub(crate) struct CompetingWrites<A, B> {
++    pub first: A,
++    pub second: B,
++}
++
++/// Both futures are real public writers. Hold the first after its company lock, observe the
++/// second waiting on that exact backend, then release the first to commit in the proved order.
++pub(crate) async fn competing_writes<A, B>(
++    pool: &PgPool,
++    table: WriteBarrier,
++    first: impl std::future::Future<Output = A>,
++    second: impl std::future::Future<Output = B>,
++) -> CompetingWrites<A, B> {
++    let mut barrier = pool.begin().await.unwrap();
++    sqlx::query(table.sql())
++        .execute(&mut *barrier)
++        .await
++        .unwrap();
++    let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *barrier)
++        .await
++        .unwrap();
++    let second = async {
++        wait_until_blocked_by(pool, blocker).await;
++        second.await
++    };
++    let release = async {
++        let writer = wait_until_blocked_by(pool, blocker).await;
++        wait_until_blocked_by(pool, writer).await;
++        barrier.commit().await.unwrap();
++    };
++    let (first, second, ()) = tokio::join!(first, second, release);
++    CompetingWrites { first, second }
+ }
+ 
+ /// A real writer must wait for its actor while leaving the company available.
+--- B2/src/adapters/persistence/onboarding.rs
++++ B3/src/adapters/persistence/onboarding.rs
+@@ -229,7 +229,7 @@
+             CompanyAgentCreation {
+                 id: prepared.id,
+                 write: prepared.write,
+-                placement: None,
++                placement: super::company_agent::AgentCreationPlacement::Unplaced,
+             },
+         ))
+         .await?;
+--- B2/src/adapters/persistence/test_support.rs
++++ B3/src/adapters/persistence/test_support.rs
+@@ -45,8 +45,8 @@
+ #[path = "managed_desk_test_support.rs"]
+ mod managed_desk;
+ pub(crate) use managed_desk::{
+-    assert_actor_before_company, company_owner_actor, create_channel, delegated_unit,
+-    wait_until_blocked_by,
++    WriteBarrier, assert_actor_before_company, company_owner_actor, competing_writes,
++    create_channel, delegated_unit, wait_until_blocked_by,
+ };
+ 
+ use sqlx::postgres::PgPoolOptions;
+--- B2/src/adapters/persistence/workflow/agent_publication.rs
++++ B3/src/adapters/persistence/workflow/agent_publication.rs
+@@ -1,5 +1,4 @@
+ //! Workflow publication captures only durable agent identities and their source uses.
+-use super::http::begin_http;
+ use super::*;
+ use crate::application::agent::AgentKey;
+ use crate::application::workflow::lifecycle::{PublicationDependencies, PublicationDirectory};
+@@ -26,8 +25,9 @@
+         let Some(selection) = agent_selection(draft)? else {
+             return Ok(captured);
+         };
+-        let mut tx = begin_http(&self.persistence).await?;
+-        authority::authorize_company(&mut tx, draft.company(), actor).await?;
++        let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
++        management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
++            .await?;
+         capture_agents_on(&mut tx, draft.company(), &selection, &mut captured).await?;
+         tx.commit().await?;
+         Ok(captured)
+--- B2/src/adapters/persistence/workflow/child_publication.rs
++++ B3/src/adapters/persistence/workflow/child_publication.rs
+@@ -1,4 +1,3 @@
+-use super::http::begin_http;
+ use super::*;
+ use crate::application::workflow::lifecycle::{PublicationDependencies, PublicationDirectory};
+ use std::collections::BTreeSet;
+@@ -22,8 +21,9 @@
+         draft: &CompanyWorkflowDraft,
+     ) -> AppResult<PublicationDependencies> {
+         let captured = self.inner.capture(actor, draft).await?;
+-        let mut tx = begin_http(&self.persistence).await?;
+-        authority::authorize_company(&mut tx, draft.company(), actor).await?;
++        let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
++        management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
++            .await?;
+         let captured = capture_on(&mut tx, draft, captured).await?;
+         tx.commit().await?;
+         Ok(captured)
+--- B2/src/adapters/persistence/workflow/definitions.rs
++++ B3/src/adapters/persistence/workflow/definitions.rs
+@@ -1,4 +1,6 @@
+ use super::{authority::*, rows::*, *};
++use crate::application::use_cases::administration::ManagementTarget;
++use crate::entities::department::DepartmentId;
+ 
+ pub(super) async fn read_draft(
+     db: &mut PgConnection,
+@@ -60,11 +62,12 @@
+     tx: &mut Transaction<'_, Postgres>,
+     draft: &CompanyWorkflowDraft,
+     owner_agent: Option<Uuid>,
++    managing_department: Option<DepartmentId>,
+ ) -> AppResult<()> {
+     sqlx::query(
+         "INSERT INTO workflow_definitions \
+-        (company_id, id, revision, title, description, source, template_origin, owner_agent_id) \
+-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
++        (company_id, id, revision, title, description, source, template_origin, owner_agent_id, managing_department_id) \
++        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+     )
+     .bind(draft.company().as_uuid())
+     .bind(draft.workflow().as_uuid())
+@@ -74,6 +77,7 @@
+     .bind(draft.source())
+     .bind(origin_json(draft)?)
+     .bind(owner_agent)
++    .bind(managing_department.map(DepartmentId::as_uuid))
+     .execute(&mut **tx)
+     .await
+     .map_err(write_error)?;
+@@ -83,10 +87,22 @@
+ #[async_trait]
+ impl WorkflowDraftCopies for PostgresPersistence {
+     async fn insert_copy(&self, copy: PreparedTemplateCopy) -> AppResult<()> {
+-        let mut tx = self.pool.begin().await?;
+         let draft = copy.draft();
+-        authorize_company(&mut tx, draft.company(), copy.actor()).await?;
+-        insert_draft(&mut tx, draft, None).await?;
++        let mut tx = management::begin(self, draft.company(), copy.actor()).await?;
++        management::authorize_target_on(
++            &mut tx,
++            draft.company(),
++            copy.actor(),
++            ManagementTarget::DefinitionCreation(draft.workflow()),
++        )
++        .await?;
++        let department = super::super::administration::creating_department_on(
++            &mut tx,
++            copy.actor().user_id(),
++            draft.company(),
++        )
++        .await?;
++        insert_draft(&mut tx, draft, None, Some(department)).await?;
+         event(&mut tx, draft, copy.actor(), "copied", None).await?;
+         tx.commit().await?;
+         Ok(())
+@@ -130,15 +146,34 @@
+             .transpose()
+     }
+     async fn save_draft(&self, command: PreparedDraft) -> AppResult<()> {
+-        let mut tx = self.pool.begin().await?;
+         let state = command.state();
+-        authorize_company(&mut tx, state.draft.company(), command.actor()).await?;
++        let company = state.draft.company();
++        let mut tx = management::begin(self, company, command.actor()).await?;
++        let target = if command.expected().is_none() {
++            ManagementTarget::DefinitionCreation(state.draft.workflow())
++        } else {
++            ManagementTarget::Definition(state.draft.workflow())
++        };
++        management::authorize_target_on(&mut tx, company, command.actor(), target).await?;
++        let creating_department = if command.expected().is_none() {
++            Some(
++                super::super::administration::creating_department_on(
++                    &mut tx,
++                    command.actor().user_id(),
++                    company,
++                )
++                .await?,
++            )
++        } else {
++            None
++        };
+         save_draft_on(
+             &mut tx,
+             &state.draft,
+             command.actor(),
+             command.expected(),
+             state.archived,
++            creating_department,
+         )
+         .await?;
+         tx.commit().await?;
+@@ -146,8 +181,14 @@
+     }
+     async fn publish(&self, prepared: PreparedPublication) -> AppResult<Arc<PublishedBundle>> {
+         let request = &prepared.command().request;
+-        let mut tx = self.pool.begin().await?;
+-        authorize_company(&mut tx, request.target.company, request.target.actor).await?;
++        let mut tx = management::begin(self, request.target.company, request.target.actor).await?;
++        management::authorize_target_on(
++            &mut tx,
++            request.target.company,
++            request.target.actor,
++            ManagementTarget::Definition(request.target.workflow),
++        )
++        .await?;
+         let bundle = publish_on(&mut tx, &prepared).await?;
+         tx.commit().await?;
+         Ok(bundle)
+@@ -208,9 +249,10 @@
+     actor: WorkflowActor,
+     expected: Option<DraftRevision>,
+     archived: bool,
++    managing_department: Option<DepartmentId>,
+ ) -> AppResult<()> {
+     match expected {
+-        None => insert_draft(tx, draft, None).await?,
++        None => insert_draft(tx, draft, None, managing_department).await?,
+         Some(expected) => {
+             let count = sqlx::query(
+                 "UPDATE workflow_definitions SET revision = $3, title = $4, \
+@@ -254,7 +296,7 @@
+     kind: &str,
+     owner_agent: Option<Uuid>,
+ ) -> AppResult<()> {
+-    insert_draft(tx, draft, owner_agent).await?;
++    insert_draft(tx, draft, owner_agent, None).await?;
+     event(tx, draft, actor, kind, None).await
+ }
+ 
+--- B2/src/adapters/persistence/workflow/delegated_builder_runtime_tests.rs
++++ B3/src/adapters/persistence/workflow/delegated_builder_runtime_tests.rs
+@@ -0,0 +1,159 @@
++//! The real Builder acts for the signed-in requester, including a unit lead.
++use super::*;
++use crate::adapters::persistence::department::PostgresDepartments;
++use crate::application::ports::department::{
++    DepartmentPersistence, DepartmentScope, DepartmentWrite,
++};
++use crate::entities::department::{DepartmentId, DepartmentRole};
++use crate::entities::transport::PrincipalId;
++
++async fn unit(d: &Deployment, slug: &str, lead: Option<Uuid>) -> DepartmentId {
++    let departments = PostgresDepartments::new(
++        d.p().clone(),
++        crate::adapters::persistence::test_support::provisioning_templates(),
++    );
++    let scope = DepartmentScope {
++        actor: d.fixture.target.actor,
++        company: d.fixture.target.company,
++    };
++    let department = departments
++        .create(
++            scope,
++            DepartmentWrite {
++                name: slug.into(),
++                slug: slug.into(),
++                ..Default::default()
++            },
++            None,
++        )
++        .await
++        .unwrap();
++    if let Some(user) = lead {
++        let principal: Uuid = sqlx::query_scalar(
++            "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
++        )
++        .bind(scope.company.as_uuid())
++        .bind(user)
++        .fetch_one(d.p().pool())
++        .await
++        .unwrap();
++        departments
++            .assign_role(
++                scope,
++                department.id,
++                DepartmentRole::Lead,
++                PrincipalId::new(principal),
++            )
++            .await
++            .unwrap();
++    }
++    department.id
++}
++
++#[tokio::test]
++async fn delegated_admin_builder_uses_actual_lead_requester_for_creation_listing_and_root_desk_refusal()
++ {
++    let mut managed = spec("unit-helper");
++    managed["department"] = json!("sales");
++    let mut sibling = spec("sibling-helper");
++    sibling["department"] = json!("sibling-unit");
++    let d = Deployment::new(vec![
++        LlmTurn::tool_call(CREATE_AGENT, managed),
++        LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
++        LlmTurn::tool_call(CREATE_AGENT, sibling),
++        LlmTurn::tool_call(
++            CREATE_DESK_FOR_AGENT,
++            desk_spec("unit-helper", "root-desk", ReplyMode::Autonomous),
++        ),
++        LlmTurn::text(r#"{"body":"Created the unit helper; other requests refused."}"#),
++        LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
++        LlmTurn::text(r#"{"body":"Sign in to manage agents."}"#),
++    ])
++    .await;
++    let builder = builder(&d).await;
++    let (lead, email) = person(&d, "member").await;
++    let sales = unit(&d, "sales", Some(lead)).await;
++    unit(&d, "sibling-unit", None).await;
++    write(
++        &d,
++        &email,
++        "builder",
++        "Create and list my helper.",
++        IngressOrigin::TrustedApplication,
++    )
++    .await;
++    d.run_until("the unit lead's Builder request replied", async || {
++        replied(&d, builder).await == 1
++    })
++    .await;
++    assert_managed_results(&d, builder, lead, sales).await;
++    // The same verified person's email is not authenticated administration provenance.
++    write(
++        &d,
++        &email,
++        "builder",
++        "List my agents by email.",
++        IngressOrigin::ExternalTransport,
++    )
++    .await;
++    d.run_until("the email refusal replied", async || {
++        replied(&d, builder).await == 2
++    })
++    .await;
++    let results = receipts(&d, builder).await;
++    assert_eq!(results.len(), 5);
++    assert_eq!(
++        results[4]["error"]["code"], PROVISIONING_FORBIDDEN,
++        "{results:?}"
++    );
++    assert!(results[4].get("agents").is_none());
++    assert_eq!(d.llm.finish().await.unwrap(), 7);
++}
++
++async fn assert_managed_results(d: &Deployment, builder: Uuid, lead: Uuid, sales: DepartmentId) {
++    let results = receipts(d, builder).await;
++    assert_eq!(results.len(), 4, "{results:?}");
++    assert_eq!(results[0]["agent"]["slug"], "unit-helper", "{results:?}");
++    let listed: Vec<&str> = results[1]["agents"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .map(|agent| agent["slug"].as_str().unwrap())
++        .collect();
++    assert_eq!(
++        listed,
++        ["unit-helper"],
++        "root and sibling agents are outside the requester's authority"
++    );
++    assert_eq!(
++        results[2]["error"]["code"], PROVISIONING_INVALID,
++        "{results:?}"
++    );
++    assert_eq!(
++        results[3]["error"]["code"], PROVISIONING_FORBIDDEN,
++        "{results:?}"
++    );
++    let binding = Uuid::parse_str(results[0]["binding_id"].as_str().unwrap()).unwrap();
++    let configured: (Uuid, Uuid) = sqlx::query_as(
++        "SELECT actor_id, run_as_user_id FROM workflow_binding_revisions WHERE company_id=$1 AND binding_id=$2",
++    ).bind(d.fixture.target.company.as_uuid()).bind(binding).fetch_one(d.p().pool()).await.unwrap();
++    assert_eq!(configured, (lead, lead));
++    let placed: Uuid = sqlx::query_scalar(
++        "SELECT member.department_id FROM department_members AS member JOIN principals AS principal \
++         ON principal.company_id=member.company_id AND principal.id=member.principal_id \
++         WHERE principal.company_id=$1 AND principal.agent_id=$2 AND member.department_id=$3",
++    ).bind(d.fixture.target.company.as_uuid())
++        .bind(Uuid::parse_str(results[0]["agent"]["id"].as_str().unwrap()).unwrap())
++        .bind(sales.as_uuid()).fetch_one(d.p().pool()).await.unwrap();
++    assert_eq!(placed, sales.as_uuid());
++    assert_eq!(
++        d.count("SELECT count(*) FROM agents WHERE company_id=$1 AND slug='sibling-helper'")
++            .await,
++        0
++    );
++    assert_eq!(
++        d.count("SELECT count(*) FROM addresses WHERE company_id=$1 AND target_kind='desk' AND slug='root-desk'")
++            .await,
++        0
++    );
++}
+--- B2/src/adapters/persistence/workflow/http_publication.rs
++++ B3/src/adapters/persistence/workflow/http_publication.rs
+@@ -22,8 +22,9 @@
+         actor: WorkflowActor,
+         draft: &CompanyWorkflowDraft,
+     ) -> AppResult<PublicationDependencies> {
+-        let mut tx = begin_http(&self.persistence).await?;
+-        authority::authorize_company(&mut tx, draft.company(), actor).await?;
++        let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
++        management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
++            .await?;
+         let tools = capture_on(&mut tx, draft.company(), &self.selections).await?;
+         tx.commit().await?;
+         Ok(PublicationDependencies {
+--- B2/src/adapters/persistence/workflow/management.rs
++++ B3/src/adapters/persistence/workflow/management.rs
+@@ -36,6 +36,22 @@
+         .await?
+         .ok_or_else(missing)?;
+     Ok(level)
++}
++
++/// Captures can prepare a new draft; existing definitions always use their stored/bound owner.
++pub(in crate::adapters::persistence) fn authorize_publication_on(
++    db: &mut PgConnection,
++    company: CompanyId,
++    actor: WorkflowActor,
++    workflow: WorkflowId,
++) -> impl std::future::Future<Output = AppResult<crate::entities::access_level::LevelActor>> + Send + '_
++{
++    authorize_target_on(
++        db,
++        company,
++        actor,
++        ManagementTarget::DefinitionCreation(workflow),
++    )
+ }
+ 
+ pub(in crate::adapters::persistence) fn authorize_association_on(
+--- B2/src/adapters/persistence/workflow/mcp_publication.rs
++++ B3/src/adapters/persistence/workflow/mcp_publication.rs
+@@ -22,8 +22,9 @@
+         actor: WorkflowActor,
+         draft: &CompanyWorkflowDraft,
+     ) -> AppResult<PublicationDependencies> {
+-        let mut tx = begin_http(&self.persistence).await?;
+-        authority::authorize_company(&mut tx, draft.company(), actor).await?;
++        let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
++        management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
++            .await?;
+         let tools = capture_on(&mut tx, draft.company(), &self.selections).await?;
+         tx.commit().await?;
+         Ok(PublicationDependencies {
+--- B2/src/adapters/persistence/workflow/provisioning.rs
++++ B3/src/adapters/persistence/workflow/provisioning.rs
+@@ -12,6 +12,8 @@
+ mod builder;
+ #[path = "provisioning_department.rs"]
+ mod department;
++#[path = "provisioning_directory.rs"]
++mod directory;
+ use builder::create_agent_on;
+ pub(crate) use department::{
+     department_desk_key, follow_department_lead_on, provision_department_desk_on,
+@@ -42,9 +44,8 @@
+ use sha2::{Digest, Sha256};
+ use std::collections::BTreeSet;
+ 
+-/// Current authority for the built-in provisioning target: the run actor must still be the
+-/// company owner or an admin, and the snapshot is exactly the trusted built-in. There is never
+-/// an approval (P08-Q5).
++/// A current person manager may enter the exact trusted provisioning built-in. Effects
++/// separately authorize the genuine requester against their actual per-kind target.
+ pub struct ProvisioningActionAuthority;
+ #[async_trait]
+ impl SqlActionAuthority for ProvisioningActionAuthority {
+@@ -57,7 +58,13 @@
+         if provisioning_target(&request.target)? != request.scope.company.as_uuid() {
+             return Err(missing());
+         }
+-        super::authority::authorize_company(tx, request.scope.company, authority.actor).await?;
++        super::management::authorize_target_on(
++            tx,
++            request.scope.company,
++            authority.actor,
++            crate::application::use_cases::administration::ManagementTarget::AnyUnit,
++        )
++        .await?;
+         let kind =
+             ProvisioningKind::parse(request.contract.contract.name.as_str()).ok_or_else(missing)?;
+         Ok(LockedActionAuthority {
+@@ -215,7 +222,8 @@
+         }
+         match kind {
+             ProvisioningKind::ListAgents => {
+-                list_on(tx, &self.templates, company, &request.arguments).await
++                directory::list_on(tx, &self.templates, company, requester, &request.arguments)
++                    .await
+             }
+             ProvisioningKind::CreateAgent => {
+                 let spec = CreateAgent::parse(&request.arguments)?;
+@@ -237,6 +245,20 @@
+                 )
+             }
+             ProvisioningKind::CreateDeskForAgent => {
++                match super::management::authorize_target_on(
++                    tx,
++                    company,
++                    requester,
++                    crate::application::use_cases::administration::ManagementTarget::Root,
++                )
++                .await
++                {
++                    Ok(_) => {}
++                    Err(AppError::NotFound(_)) => {
++                        return Ok(ProvisioningRefusal::Forbidden.tool_error());
++                    }
++                    Err(error) => return Err(error),
++                }
+                 let spec = CreateDeskForAgent::parse(&request.arguments)?;
+                 let provisioning = Provisioning {
+                     company,
+@@ -266,7 +288,14 @@
+     company: CompanyId,
+     requester: WorkflowActor,
+ ) -> AppResult<Provisioned<()>> {
+-    match super::authority::authorize_company(tx, company, requester).await {
++    match super::management::authorize_target_on(
++        tx,
++        company,
++        requester,
++        crate::application::use_cases::administration::ManagementTarget::AnyUnit,
++    )
++    .await
++    {
+         Ok(_) => Ok(Ok(())),
+         Err(AppError::NotFound(_)) => Ok(Err(ProvisioningRefusal::Forbidden)),
+         Err(error) => Err(error),
+@@ -372,119 +401,6 @@
+     }
+ }
+ 
+-/// One listed agent: id, slug, name, description, provider and model.
+-type ListedAgent = (
+-    Uuid,
+-    String,
+-    String,
+-    Option<String>,
+-    Option<String>,
+-    Option<String>,
+-);
+-
+-/// The company's agents by slug -- with their departments and desks, only one department's
+-/// members and role holders when `department` names it (01DEP-P03-D10) -- and its keyed models.
+-async fn list_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    templates: &ProvisioningDeployment,
+-    company: CompanyId,
+-    arguments: &Value,
+-) -> AppResult<Value> {
+-    use crate::adapters::persistence::department_roster::{
+-        CompanyAddresses, agent_addresses_on, agent_departments_on,
+-    };
+-    let department = match arguments.get("department").and_then(Value::as_str) {
+-        None => None,
+-        Some(slug) => {
+-            let id: Option<Uuid> = sqlx::query_scalar(
+-                "SELECT id FROM departments WHERE company_id = $1 AND slug = $2",
+-            )
+-            .bind(company.as_uuid())
+-            .bind(slug)
+-            .fetch_optional(&mut **tx)
+-            .await?;
+-            match id {
+-                Some(id) => Some(id),
+-                None => {
+-                    return Ok(ProvisioningRefusal::Invalid(format!(
+-                        "No department has the slug '{slug}'"
+-                    ))
+-                    .tool_error());
+-                }
+-            }
+-        }
+-    };
+-    let mut budget = MAX_LISTING_BYTES;
+-    let mut truncated = false;
+-    let mut fits = |entry: &Value| {
+-        let size = entry.to_string().len() + 1;
+-        let fit = size <= budget;
+-        if fit {
+-            budget -= size;
+-        }
+-        fit
+-    };
+-    let mut models = Vec::new();
+-    for (provider, model) in ready_models_on(tx, company).await? {
+-        let entry = json!({"provider": provider, "model": model});
+-        if models.len() == MAX_LISTED_MODELS || !fits(&entry) {
+-            truncated = true;
+-            break;
+-        }
+-        models.push(entry);
+-    }
+-    let rows: Vec<ListedAgent> = sqlx::query_as(
+-        "SELECT agent.id, agent.slug::text, agent.name, agent.description, agent.provider, \
+-           agent.model FROM agents AS agent \
+-         WHERE agent.company_id = $1 AND ($2::uuid IS NULL OR EXISTS ( \
+-           SELECT 1 FROM principals AS principal WHERE principal.company_id = agent.company_id \
+-             AND principal.agent_id = agent.id AND ( \
+-               EXISTS (SELECT 1 FROM department_members AS member \
+-                 WHERE member.company_id = principal.company_id AND member.department_id = $2 \
+-                   AND member.principal_id = principal.id) \
+-               OR EXISTS (SELECT 1 FROM department_roles AS role \
+-                 WHERE role.company_id = principal.company_id AND role.department_id = $2 \
+-                   AND role.principal_id = principal.id)))) \
+-         ORDER BY agent.slug LIMIT $3",
+-    )
+-    .bind(company.as_uuid())
+-    .bind(department)
+-    .bind(MAX_LISTED_AGENTS as i64 + 1)
+-    .fetch_all(&mut **tx)
+-    .await?;
+-    truncated |= rows.len() > MAX_LISTED_AGENTS;
+-    let rows: Vec<ListedAgent> = rows.into_iter().take(MAX_LISTED_AGENTS).collect();
+-    let ids: Vec<Uuid> = rows.iter().map(|row| row.0).collect();
+-    let mut departments = agent_departments_on(tx, company, &ids).await?;
+-    let mut addresses = CompanyAddresses::new(company, Some(&templates.app_domain));
+-    let mut desks = agent_addresses_on(tx, &mut addresses, &ids).await?;
+-    let name = |name: &str| name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>();
+-    let mut agents = Vec::new();
+-    for (id, slug, agent_name, description, provider, model) in rows {
+-        let (placed, more) = departments.remove(&id).unwrap_or_default();
+-        truncated |= more;
+-        let entry = json!({
+-            "slug": slug,
+-            "name": name(&agent_name),
+-            "description": description
+-                .map(|text| text.chars().take(MAX_LISTED_DESCRIPTION_CHARS).collect::<String>()),
+-            "provider": provider, "model": model,
+-            "departments": placed.iter().map(|department| json!({
+-                "slug": department.slug,
+-                "name": name(&department.name),
+-                "roles": department.roles.iter().map(|role| role.as_str()).collect::<Vec<_>>(),
+-            })).collect::<Vec<_>>(),
+-            "address": desks.remove(&id).map(|address| json!({"principal_id": address.principal_id, "address": address.address})),
+-        });
+-        if !fits(&entry) {
+-            truncated = true;
+-            break;
+-        }
+-        agents.push(entry);
+-    }
+-    Ok(json!({"agents": agents, "models": models, "truncated": truncated}))
+-}
+-
+ /// Every enabled model of a connection that has a key, default connection first, each in the
+ /// order the connection stores them.
+ pub(crate) async fn ready_models_on(
+--- B2/src/adapters/persistence/workflow/provisioning_builder.rs
++++ B3/src/adapters/persistence/workflow/provisioning_builder.rs
+@@ -3,7 +3,9 @@
+ use std::str::FromStr;
+ 
+ use super::*;
+-use crate::adapters::persistence::company_agent::{CompanyAgentCreation, create_company_agent_on};
++use crate::adapters::persistence::company_agent::{
++    AgentCreationPlacement, CompanyAgentCreation, create_company_agent_on,
++};
+ use crate::adapters::persistence::department::place_in_department_on;
+ use crate::entities::department::{DepartmentId, DepartmentRole};
+ use crate::use_cases::agent::AgentPlacement;
+@@ -90,7 +92,10 @@
+         CompanyAgentCreation {
+             id: key.id("agent"),
+             write,
+-            placement: None,
++            placement: placement.map_or(
++                AgentCreationPlacement::Unplaced,
++                AgentCreationPlacement::Deferred,
++            ),
+         },
+     ))
+     .await?;
+@@ -147,17 +152,19 @@
+     let department = match spec.department.as_deref() {
+         Some(slug) => {
+             let id: Option<Uuid> = sqlx::query_scalar(
+-                "SELECT id FROM departments WHERE company_id = $1 AND slug = $2",
++                "SELECT id FROM departments WHERE company_id=$1 AND slug=$2 \
++                 AND unit_management_role($3,$1,id) IS NOT NULL",
+             )
+             .bind(company.as_uuid())
+             .bind(slug.trim().to_lowercase())
++            .bind(requester.user_id())
+             .fetch_optional(&mut **tx)
+             .await?;
+             match id {
+                 Some(id) => Some(DepartmentId::new(id)),
+                 None => {
+                     return Ok(Err(ProvisioningRefusal::Invalid(format!(
+-                        "No department named '{}' exists in this company",
++                        "No available department named '{}' exists in this company",
+                         slug.trim()
+                     ))));
+                 }
+--- B2/src/adapters/persistence/workflow/provisioning_department.rs
++++ B3/src/adapters/persistence/workflow/provisioning_department.rs
+@@ -389,7 +389,8 @@
+         },
+         previous.origin().cloned(),
+     );
+-    super::definitions::save_draft_on(tx, &draft, actor, Some(previous.revision()), false).await?;
++    super::definitions::save_draft_on(tx, &draft, actor, Some(previous.revision()), false, None)
++        .await?;
+     let version = VersionId::new(Uuid::new_v4());
+     let bundle = match compiled(tx, templates, &decoder, &draft, version).await? {
+         Ok(bundle) => Arc::new(bundle),
+--- B2/src/adapters/persistence/workflow/provisioning_directory.rs
++++ B3/src/adapters/persistence/workflow/provisioning_directory.rs
+@@ -0,0 +1,146 @@
++//! Bounded Agent Builder directory, scoped to the actual requester.
++use super::*;
++
++/// One listed agent: id, slug, name, description, provider and model.
++#[derive(sqlx::FromRow)]
++struct ListedAgent {
++    id: Uuid,
++    slug: String,
++    name: String,
++    description: Option<String>,
++    provider: Option<String>,
++    model: Option<String>,
++}
++
++/// The company's agents by slug -- with their departments and desks, only one department's
++/// members and role holders when `department` names it (01DEP-P03-D10) -- and its keyed models.
++pub(super) async fn list_on(
++    tx: &mut Transaction<'_, Postgres>,
++    templates: &ProvisioningDeployment,
++    company: CompanyId,
++    requester: WorkflowActor,
++    arguments: &Value,
++) -> AppResult<Value> {
++    use crate::adapters::persistence::department_roster::{
++        CompanyAddresses, agent_addresses_on, agent_departments_on,
++    };
++    let department = match department_on(tx, company, requester, arguments).await? {
++        Ok(department) => department,
++        Err(refusal) => return Ok(refusal.tool_error()),
++    };
++    let mut budget = MAX_LISTING_BYTES;
++    let mut truncated = false;
++    let mut fits = |entry: &Value| {
++        let size = entry.to_string().len() + 1;
++        let fit = size <= budget;
++        if fit {
++            budget -= size;
++        }
++        fit
++    };
++    let mut models = Vec::new();
++    for (provider, model) in ready_models_on(tx, company).await? {
++        let entry = json!({"provider": provider, "model": model});
++        if models.len() == MAX_LISTED_MODELS || !fits(&entry) {
++            truncated = true;
++            break;
++        }
++        models.push(entry);
++    }
++    let rows = rows_on(tx, company, requester, department).await?;
++    truncated |= rows.len() > MAX_LISTED_AGENTS;
++    let rows: Vec<ListedAgent> = rows.into_iter().take(MAX_LISTED_AGENTS).collect();
++    let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
++    let mut departments = agent_departments_on(tx, company, &ids).await?;
++    let mut addresses = CompanyAddresses::new(company, Some(&templates.app_domain));
++    let mut desks = agent_addresses_on(tx, &mut addresses, &ids).await?;
++    let name = |name: &str| name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>();
++    let mut agents = Vec::new();
++    for ListedAgent {
++        id,
++        slug,
++        name: agent_name,
++        description,
++        provider,
++        model,
++    } in rows
++    {
++        let (placed, more) = departments.remove(&id).unwrap_or_default();
++        truncated |= more;
++        let entry = json!({
++            "slug": slug,
++            "name": name(&agent_name),
++            "description": description
++                .map(|text| text.chars().take(MAX_LISTED_DESCRIPTION_CHARS).collect::<String>()),
++            "provider": provider, "model": model,
++            "departments": placed.iter().map(|department| json!({
++                "slug": department.slug,
++                "name": name(&department.name),
++                "roles": department.roles.iter().map(|role| role.as_str()).collect::<Vec<_>>(),
++            })).collect::<Vec<_>>(),
++            "address": desks.remove(&id).map(|address| json!({"principal_id": address.principal_id, "address": address.address})),
++        });
++        if !fits(&entry) {
++            truncated = true;
++            break;
++        }
++        agents.push(entry);
++    }
++    Ok(json!({"agents": agents, "models": models, "truncated": truncated}))
++}
++
++async fn department_on(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    requester: WorkflowActor,
++    arguments: &Value,
++) -> AppResult<Provisioned<Option<Uuid>>> {
++    let Some(slug) = arguments.get("department").and_then(Value::as_str) else {
++        return Ok(Ok(None));
++    };
++    let id: Option<Uuid> = sqlx::query_scalar(
++        "SELECT id FROM departments WHERE company_id=$1 AND slug=$2 \
++         AND unit_management_role($3,$1,id) IS NOT NULL",
++    )
++    .bind(company.as_uuid())
++    .bind(slug)
++    .bind(requester.user_id())
++    .fetch_optional(&mut **tx)
++    .await?;
++    Ok(match id {
++        Some(id) => Ok(Some(id)),
++        None => Err(ProvisioningRefusal::Invalid(format!(
++            "No department has the slug '{slug}'"
++        ))),
++    })
++}
++
++async fn rows_on(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    requester: WorkflowActor,
++    department: Option<Uuid>,
++) -> AppResult<Vec<ListedAgent>> {
++    let rows: Vec<ListedAgent> = sqlx::query_as(
++        "SELECT agent.id, agent.slug::text AS slug, agent.name, agent.description, agent.provider, \
++           agent.model FROM agents AS agent \
++         WHERE agent.company_id = $1 AND agent_management_role($4,$1,agent.id) IS NOT NULL \
++           AND ($2::uuid IS NULL OR EXISTS ( \
++           SELECT 1 FROM principals AS principal WHERE principal.company_id = agent.company_id \
++             AND principal.agent_id = agent.id AND ( \
++               EXISTS (SELECT 1 FROM department_members AS member \
++                 WHERE member.company_id = principal.company_id AND member.department_id = $2 \
++                   AND member.principal_id = principal.id) \
++               OR EXISTS (SELECT 1 FROM department_roles AS role \
++                 WHERE role.company_id = principal.company_id AND role.department_id = $2 \
++                   AND role.principal_id = principal.id)))) \
++         ORDER BY agent.slug LIMIT $3",
++    )
++    .bind(company.as_uuid())
++    .bind(department)
++    .bind(MAX_LISTED_AGENTS as i64 + 1)
++    .bind(requester.user_id())
++    .fetch_all(&mut **tx)
++    .await?;
++    Ok(rows)
++}
+--- B2/src/adapters/persistence/workflow/provisioning_runtime_tests.rs
++++ B3/src/adapters/persistence/workflow/provisioning_runtime_tests.rs
+@@ -8,6 +8,9 @@
+ 
+ #[path = "provisioning_requester_lock_tests.rs"]
+ mod requester_locks;
++
++#[path = "delegated_builder_runtime_tests.rs"]
++mod delegated_builder;
+ 
+ #[path = "channel_reply_native_runtime_tests.rs"]
+ mod channel_reply_native_runtime_tests;
+--- B2/src/adapters/persistence/workflow/sample_capture.rs
++++ B3/src/adapters/persistence/workflow/sample_capture.rs
+@@ -90,7 +90,15 @@
+         .fetch_optional(&mut **tx)
+         .await?
+         .ok_or_else(missing)?;
+-    authority::authorize_company(tx, target.company, target.actor).await?;
++    super::management::authorize_target_on(
++        tx,
++        target.company,
++        target.actor,
++        crate::application::use_cases::administration::ManagementTarget::Definition(
++            target.workflow,
++        ),
++    )
++    .await?;
+     Ok(())
+ }
+ impl SampleCapture {
+--- B2/src/adapters/persistence/workflow/step_builtins.rs
++++ B3/src/adapters/persistence/workflow/step_builtins.rs
+@@ -14,8 +14,9 @@
+         draft: &CompanyWorkflowDraft,
+     ) -> AppResult<PublicationDependencies> {
+         tokio::time::timeout(std::time::Duration::from_secs(2), async {
+-            let mut tx = self.persistence.pool().begin().await?;
+-            super::authority::authorize_company(&mut tx, draft.company(), actor).await?;
++            let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
++            management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
++                .await?;
+             tx.commit().await?;
+             dependencies(draft.company())
+         })
+--- B2/src/application/agent/authoring.rs
++++ B3/src/application/agent/authoring.rs
+@@ -129,4 +129,5 @@
+ pub trait AgentDraftPersistence: Send + Sync {
+     /// Locks current authority and draft, compares the expected revision and commits all fields together.
+     async fn save_company_agent(&self, request: SaveCompanyAgent) -> AppResult<Agent>;
++    async fn delete_company_agent(&self, scope: AgentPublicationScope) -> AppResult<()>;
+ }
+--- B2/src/application/use_cases/administration.rs
++++ B3/src/application/use_cases/administration.rs
+@@ -4,7 +4,7 @@
+ 
+ use crate::{
+     app_error::{AppError, AppResult},
+-    domain::workflow::CompanyId,
++    domain::workflow::{CompanyId, WorkflowId},
+     entities::agent_capability::AgentId,
+     entities::department::DepartmentId,
+ };
+@@ -16,6 +16,8 @@
+     Root,
+     Unit(DepartmentId),
+     Agent(AgentId),
++    DefinitionCreation(WorkflowId),
++    Definition(WorkflowId),
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+--- B2/src/application/use_cases/agent.rs
++++ B3/src/application/use_cases/agent.rs
+@@ -6,11 +6,14 @@
+ 
+ use crate::{
+     app_error::{AppError, AppResult},
+-    application::workflow::WorkflowActor,
++    application::{
++        use_cases::administration::{ManagementRole, ManagementTarget, require_management},
++        workflow::WorkflowActor,
++    },
+     domain::workflow::CompanyId,
+     entities::{
+         agent::{Agent, MAX_AGENT_SKILLS},
+-        company::Company,
++        agent_capability::AgentId,
+         creation::CreationProvenance,
+         department::{DepartmentId, DepartmentRole},
+         user::{Caller, Viewer},
+@@ -20,12 +23,12 @@
+     use_cases::{
+         caller::require_operator,
+         channel::{SlugKind, validate_slug},
+-        company::{CompanyPersistence, managed_company},
++        company::CompanyPersistence,
+     },
+ };
+ 
+ /// An agent belonging to another company is reported exactly like a missing one, so an id probe
+-/// cannot tell a foreign agent from a nonexistent one. See [`managed_company`].
++/// cannot tell a foreign agent from a nonexistent one. See [`crate::use_cases::company::managed_company`].
+ pub fn agent_not_found() -> AppError {
+     AppError::NotFound("Agent not found in this company.".into())
+ }
+@@ -122,10 +125,23 @@
+ 
+     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
+ 
++    async fn list_managed_agents(
++        &self,
++        actor: WorkflowActor,
++        company: CompanyId,
++    ) -> AppResult<Vec<Agent>>;
++
+     async fn list_library(&self) -> AppResult<Vec<Agent>>;
+ 
++    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
++
++    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()>;
++
++    /// Bare fixture mutation. Production company changes use scoped draft commands.
++    #[cfg(test)]
+     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
+ 
++    #[cfg(test)]
+     async fn delete(&self, id: Uuid) -> AppResult<()>;
+ }
+ 
+@@ -135,6 +151,12 @@
+ pub struct AgentPlacement {
+     pub department: DepartmentId,
+     pub role: Option<DepartmentRole>,
++}
++
++pub(crate) fn placement_target(placement: Option<AgentPlacement>) -> ManagementTarget {
++    placement.map_or(ManagementTarget::Root, |placement| {
++        ManagementTarget::Unit(placement.department)
++    })
+ }
+ 
+ /// A company agent and its directly addressable principal.
+@@ -306,9 +328,26 @@
+         })
+     }
+ 
+-    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+-        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+-        Ok(())
++    fn verify_manager(
++        &self,
++        user_id: Uuid,
++        company_id: Uuid,
++        target: ManagementTarget,
++    ) -> impl std::future::Future<Output = AppResult<ManagementRole>> + Send + '_ {
++        require_management(
++            self.company_persistence.as_ref(),
++            user_id,
++            CompanyId::new(company_id),
++            target,
++        )
++    }
++
++    fn verify_company_manager(
++        &self,
++        user_id: Uuid,
++        company_id: Uuid,
++    ) -> impl std::future::Future<Output = AppResult<ManagementRole>> + Send + '_ {
++        self.verify_manager(user_id, company_id, ManagementTarget::Root)
+     }
+ 
+     async fn validate_model_selection(
+@@ -347,8 +386,8 @@
+         write: AgentWrite,
+         placement: Option<AgentPlacement>,
+     ) -> AppResult<CreatedAgent> {
+-        let (_, write) = self
+-            .prepared_agent_write(user_id, company_id, write)
++        let write = self
++            .prepared_agent_write(user_id, company_id, write, placement_target(placement))
+             .await?;
+         info!(%company_id, "Creating agent");
+         self.company_agents()?
+@@ -371,10 +410,8 @@
+         company_id: Uuid,
+         write: AgentWrite,
+     ) -> AppResult<AgentWrite> {
+-        let (_, write) = self
+-            .prepared_agent_write(user_id, company_id, write)
+-            .await?;
+-        Ok(write)
++        self.prepared_agent_write(user_id, company_id, write, ManagementTarget::AnyUnit)
++            .await
+     }
+ 
+     /// The company a new agent belongs to, and the write itself normalized and checked.
+@@ -386,15 +423,15 @@
+         user_id: Uuid,
+         company_id: Uuid,
+         mut write: AgentWrite,
+-    ) -> AppResult<(Company, AgentWrite)> {
+-        let company =
+-            managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
++        target: ManagementTarget,
++    ) -> AppResult<AgentWrite> {
++        self.verify_manager(user_id, company_id, target).await?;
+         write.created_by = Some(CreationProvenance::user(user_id));
+         write.normalize()?;
+         self.spam_scanning
+             .check_public_ingress(write.open_to_public, write.confirm_spam_disabled)?;
+         self.validate_model_selection(company_id, &write).await?;
+-        Ok((company, write))
++        Ok(write)
+     }
+ 
+     /// Create one company agent from a global library definition, with its default desk like
+@@ -410,7 +447,8 @@
+         library_agent_id: Uuid,
+         placement: Option<AgentPlacement>,
+     ) -> AppResult<ProvisionedAgent> {
+-        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
++        self.verify_manager(user_id, company_id, placement_target(placement))
++            .await?;
+         let definition = self
+             .get_library_agent(library_agent_id)
+             .await?
+@@ -451,8 +489,14 @@
+         user_id: Uuid,
+         company_id: Uuid,
+     ) -> AppResult<Vec<Agent>> {
+-        self.verify_company_manager(user_id, company_id).await?;
+-        self.agent_persistence.list_by_company_id(company_id).await
++        self.verify_manager(user_id, company_id, ManagementTarget::AnyUnit)
++            .await?;
++        self.agent_persistence
++            .list_managed_agents(
++                WorkflowActor::authenticated(user_id)?,
++                CompanyId::new(company_id),
++            )
++            .await
+     }
+ 
+     pub async fn list_library_agents(&self) -> AppResult<Vec<Agent>> {
+@@ -515,7 +559,9 @@
+             .await?
+             .ok_or_else(agent_not_found)?;
+         write.normalize()?;
+-        self.agent_persistence.update(agent_id, write).await
++        self.agent_persistence
++            .update_library_agent(agent_id, write)
++            .await
+     }
+ 
+     /// Operator only.
+@@ -524,7 +570,7 @@
+         self.get_library_agent(agent_id)
+             .await?
+             .ok_or_else(agent_not_found)?;
+-        self.agent_persistence.delete(agent_id).await
++        self.agent_persistence.delete_library_agent(agent_id).await
+     }
+ 
+     #[instrument(skip_all)]
+@@ -534,13 +580,21 @@
+         company_id: Uuid,
+         agent_id: Uuid,
+     ) -> AppResult<Option<Agent>> {
+-        self.verify_company_manager(user_id, company_id).await?;
+         let agent = self.agent_persistence.get_by_id(agent_id).await?;
+         if let Some(ref ag) = agent
+             && ag.company_id != Some(company_id)
+         {
+             return Ok(None);
+         }
++        if agent.is_none() {
++            return Ok(None);
++        }
++        self.verify_manager(
++            user_id,
++            company_id,
++            ManagementTarget::Agent(AgentId::new(agent_id)),
++        )
++        .await?;
+         Ok(agent)
+     }
+ 
+@@ -587,7 +641,8 @@
+             tools,
+         } = request;
+         let agent_id = agent.as_uuid();
+-        self.verify_company_manager(user_id, company_id).await?;
++        self.verify_manager(user_id, company_id, ManagementTarget::Agent(agent))
++            .await?;
+ 
+         let stored = self
+             .agent_persistence
+@@ -627,7 +682,12 @@
+         company_id: Uuid,
+         agent_id: Uuid,
+     ) -> AppResult<()> {
+-        self.verify_company_manager(user_id, company_id).await?;
++        self.verify_manager(
++            user_id,
++            company_id,
++            ManagementTarget::Agent(AgentId::new(agent_id)),
++        )
++        .await?;
+ 
+         let agent = self
+             .agent_persistence
+@@ -640,7 +700,13 @@
+         }
+ 
+         info!("Deleting agent {} for company {}", agent_id, company_id);
+-        self.agent_persistence.delete(agent_id).await
++        self.draft_persistence
++            .delete_company_agent(crate::application::agent::AgentPublicationScope {
++                company: CompanyId::new(company_id),
++                actor: WorkflowActor::authenticated(user_id)?,
++                agent: AgentId::new(agent_id),
++            })
++            .await
+     }
+ 
+     #[instrument(skip_all)]
+--- B2/src/application/use_cases/agent_tests.rs
++++ B3/src/application/use_cases/agent_tests.rs
+@@ -33,6 +33,36 @@
+ 
+ #[async_trait]
+ impl AgentPersistence for MockAgentPersistence {
++    async fn list_managed_agents(
++        &self,
++        _actor: WorkflowActor,
++        company: CompanyId,
++    ) -> AppResult<Vec<Agent>> {
++        self.list_by_company_id(company.as_uuid()).await
++    }
++
++    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
++        if self
++            .get_by_id(id)
++            .await?
++            .is_none_or(|agent| agent.company_id.is_some())
++        {
++            return Err(agent_not_found());
++        }
++        self.update(id, write).await
++    }
++
++    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()> {
++        if self
++            .get_by_id(id)
++            .await?
++            .is_none_or(|agent| agent.company_id.is_some())
++        {
++            return Err(agent_not_found());
++        }
++        self.delete(id).await
++    }
++
+     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
+         let agent = Agent {
+             open_to_public: write.open_to_public,
+@@ -168,6 +198,20 @@
+ 
+ #[async_trait]
+ impl crate::application::agent::AgentDraftPersistence for MockAgentPersistence {
++    async fn delete_company_agent(
++        &self,
++        scope: crate::application::agent::AgentPublicationScope,
++    ) -> AppResult<()> {
++        if self
++            .get_by_id(scope.agent.as_uuid())
++            .await?
++            .is_none_or(|agent| agent.company_id != Some(scope.company.as_uuid()))
++        {
++            return Err(agent_not_found());
++        }
++        self.delete(scope.agent.as_uuid()).await
++    }
++
+     async fn save_company_agent(
+         &self,
+         request: crate::application::agent::SaveCompanyAgent,
+--- B2/src/application/use_cases/company.rs
++++ B3/src/application/use_cases/company.rs
+@@ -124,7 +124,9 @@
+ }
+ 
+ #[async_trait]
+-pub trait CompanyPersistence: Send + Sync {
++pub trait CompanyPersistence:
++    super::administration::AdministrationPersistence + Send + Sync
++{
+     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company>;
+     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>>;
+     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>>;
+--- B2/src/application/use_cases/company_test_support.rs
++++ B3/src/application/use_cases/company_test_support.rs
+@@ -351,3 +351,27 @@
+         CompanyPersistence::company_access(self, user_id, company_id).await
+     }
+ }
++
++#[async_trait]
++impl crate::application::use_cases::administration::AdministrationPersistence
++    for MockCompanyPersistence
++{
++    async fn management_role(
++        &self,
++        actor: Uuid,
++        company: crate::domain::workflow::CompanyId,
++        _target: crate::application::use_cases::administration::ManagementTarget,
++    ) -> AppResult<Option<crate::application::use_cases::administration::ManagementRole>> {
++        use crate::application::use_cases::administration::ManagementRole;
++        Ok(
++            match CompanyPersistence::company_access(self, actor, company.as_uuid())
++                .await?
++                .map(|access| access.membership)
++            {
++                Some(CompanyMembership::Owner) => Some(ManagementRole::Owner),
++                Some(CompanyMembership::Admin) => Some(ManagementRole::Admin),
++                _ => None,
++            },
++        )
++    }
++}
+--- B2/src/application/use_cases/skill.rs
++++ B3/src/application/use_cases/skill.rs
+@@ -194,7 +194,7 @@
+         require_operator(caller)
+     }
+ 
+-    /// The ordered capability relationships stored for one company agent, for an owner-facing
++    /// The ordered capability relationships stored for one company agent, for its manager's
+     /// editor. The capability reader scopes the agent in the same query; the second check keeps a
+     /// global library agent from being mistaken for a company-owned one.
+     pub async fn company_agent_capabilities(
+@@ -203,7 +203,15 @@
+         company_id: Uuid,
+         agent_id: Uuid,
+     ) -> AppResult<Option<StoredAgentCapabilities>> {
+-        self.authorize_read(user_id, company_id).await?;
++        crate::application::use_cases::administration::require_management(
++            self.companies.as_ref(),
++            user_id,
++            crate::domain::workflow::CompanyId::new(company_id),
++            crate::application::use_cases::administration::ManagementTarget::Agent(
++                crate::entities::agent_capability::AgentId::new(agent_id),
++            ),
++        )
++        .await?;
+         Ok(self
+             .capabilities
+             .load_capabilities(company_id, agent_id)
+--- B2/src/application/workflow/authorization.rs
++++ B3/src/application/workflow/authorization.rs
+@@ -97,8 +97,9 @@
+     Cancel,
+     Retry,
+     Reconcile,
+-    CopyTemplate,
+-    ManageDefinition,
++    CopyTemplate(crate::domain::workflow::WorkflowId),
++    CreateDefinition(crate::domain::workflow::WorkflowId),
++    ManageDefinition(crate::domain::workflow::WorkflowId),
+     ManageBinding,
+     ManageSchedule,
+     /// Enter a configuration collection; each returned item still needs its scoped check.
+@@ -121,9 +122,20 @@
+     operation: WorkflowOperation,
+ ) -> AppResult<Option<crate::application::use_cases::administration::ManagementTarget>> {
+     use crate::application::use_cases::administration::ManagementTarget;
+-    if operation == WorkflowOperation::ListManaged {
++    let scoped = match operation {
++        WorkflowOperation::ListManaged => Some(ManagementTarget::AnyUnit),
++        WorkflowOperation::CreateDefinition(workflow)
++        | WorkflowOperation::CopyTemplate(workflow) => {
++            Some(ManagementTarget::DefinitionCreation(workflow))
++        }
++        WorkflowOperation::ManageDefinition(workflow) => {
++            Some(ManagementTarget::Definition(workflow))
++        }
++        _ => None,
++    };
++    if let Some(target) = scoped {
+         return if association == RelatedAssociation::Company {
+-            Ok(Some(ManagementTarget::AnyUnit))
++            Ok(Some(target))
+         } else {
+             Err(not_found())
+         };
+--- B2/src/application/workflow/lifecycle/definitions.rs
++++ B3/src/application/workflow/lifecycle/definitions.rs
+@@ -8,7 +8,12 @@
+ > DefinitionService<A, P, D, C>
+ {
+     pub async fn save(&self, request: SaveDraft) -> LifecycleResult<CompanyWorkflowDraft> {
+-        self.authorize(request.target).await?;
++        let operation = if request.expected.is_none() {
++            WorkflowOperation::CreateDefinition(request.target.workflow)
++        } else {
++            WorkflowOperation::ManageDefinition(request.target.workflow)
++        };
++        self.authorize(request.target, operation).await?;
+         request.content.check()?;
+         let current = self
+             .persistence
+@@ -49,7 +54,8 @@
+         target: DefinitionTarget,
+         expected: DraftRevision,
+     ) -> LifecycleResult<Arc<PublishedBundle>> {
+-        self.authorize(target).await?;
++        self.authorize(target, WorkflowOperation::ManageDefinition(target.workflow))
++            .await?;
+         let state = self
+             .persistence
+             .draft(target.company, target.workflow)
+@@ -66,7 +72,11 @@
+     }
+ 
+     pub async fn publish(&self, request: PublishDraft) -> LifecycleResult<Arc<PublishedBundle>> {
+-        self.authorize(request.target).await?;
++        self.authorize(
++            request.target,
++            WorkflowOperation::ManageDefinition(request.target.workflow),
++        )
++        .await?;
+         if request.version.as_uuid().is_nil() {
+             return Err(
+                 AppError::BadRequest("A publication version identity is required".into()).into(),
+@@ -137,7 +147,8 @@
+         target: DefinitionTarget,
+         expected: DraftRevision,
+     ) -> LifecycleResult<()> {
+-        self.authorize(target).await?;
++        self.authorize(target, WorkflowOperation::ManageDefinition(target.workflow))
++            .await?;
+         let state = self
+             .persistence
+             .draft(target.company, target.workflow)
+@@ -169,7 +180,11 @@
+         Ok(())
+     }
+ 
+-    async fn authorize(&self, target: DefinitionTarget) -> AppResult<()> {
++    async fn authorize(
++        &self,
++        target: DefinitionTarget,
++        operation: WorkflowOperation,
++    ) -> AppResult<()> {
+         if target.company.as_uuid().is_nil() || target.workflow.as_uuid().is_nil() {
+             return Err(AppError::BadRequest(
+                 "Non-nil company and workflow identities required".into(),
+@@ -180,7 +195,7 @@
+                 target.company,
+                 target.actor,
+                 RelatedAssociation::Company,
+-                WorkflowOperation::ManageDefinition,
++                operation,
+             )
+             .await
+     }
+--- B2/src/application/workflow/templates.rs
++++ B3/src/application/workflow/templates.rs
+@@ -51,7 +51,7 @@
+                 request.company,
+                 request.actor,
+                 RelatedAssociation::Company,
+-                WorkflowOperation::CopyTemplate,
++                WorkflowOperation::CopyTemplate(request.workflow),
+             )
+             .await?;
+         let template = catalogue.selected(&request.template, request.revision)?;

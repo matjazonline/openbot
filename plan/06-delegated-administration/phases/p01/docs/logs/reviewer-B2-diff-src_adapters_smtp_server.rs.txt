@@ -1,0 +1,48 @@
+--- B1/src/adapters/smtp/server.rs
++++ B2/src/adapters/smtp/server.rs
+@@ -1100,7 +1100,12 @@
+ 
+     #[async_trait]
+     impl ChannelPersistence for MockChannelPersistence {
+-        async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
++        async fn create(
++            &self,
++            _actor: crate::application::workflow::WorkflowActor,
++            _company_id: Uuid,
++            _write: ChannelWrite,
++        ) -> AppResult<Channel> {
+             unimplemented!()
+         }
+         async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>> {
+@@ -1161,7 +1166,12 @@
+         ) -> AppResult<crate::entities::channel::Channel> {
+             unimplemented!()
+         }
+-        async fn delete(&self, _id: Uuid) -> AppResult<()> {
++        async fn delete(
++            &self,
++            _actor: crate::application::workflow::WorkflowActor,
++            _company_id: Uuid,
++            _id: Uuid,
++        ) -> AppResult<()> {
+             unimplemented!()
+         }
+     }
+@@ -1754,7 +1764,7 @@
+         )
+         .await
+         .unwrap();
+-        ChannelPersistence::create(
++        crate::adapters::persistence::test_support::create_channel(
+             persistence.as_ref(),
+             company.id,
+             ChannelWrite {
+@@ -1840,7 +1850,7 @@
+         )
+         .await
+         .unwrap();
+-        ChannelPersistence::create(
++        crate::adapters::persistence::test_support::create_channel(
+             persistence.as_ref(),
+             company.id,
+             ChannelWrite {

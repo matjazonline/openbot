@@ -1,0 +1,28 @@
+--- B2/src/application/use_cases/skill.rs
++++ B3/src/application/use_cases/skill.rs
+@@ -194,7 +194,7 @@
+         require_operator(caller)
+     }
+ 
+-    /// The ordered capability relationships stored for one company agent, for an owner-facing
++    /// The ordered capability relationships stored for one company agent, for its manager's
+     /// editor. The capability reader scopes the agent in the same query; the second check keeps a
+     /// global library agent from being mistaken for a company-owned one.
+     pub async fn company_agent_capabilities(
+@@ -203,7 +203,15 @@
+         company_id: Uuid,
+         agent_id: Uuid,
+     ) -> AppResult<Option<StoredAgentCapabilities>> {
+-        self.authorize_read(user_id, company_id).await?;
++        crate::application::use_cases::administration::require_management(
++            self.companies.as_ref(),
++            user_id,
++            crate::domain::workflow::CompanyId::new(company_id),
++            crate::application::use_cases::administration::ManagementTarget::Agent(
++                crate::entities::agent_capability::AgentId::new(agent_id),
++            ),
++        )
++        .await?;
+         Ok(self
+             .capabilities
+             .load_capabilities(company_id, agent_id)

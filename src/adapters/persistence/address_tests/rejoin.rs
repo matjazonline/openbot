@@ -72,7 +72,7 @@ impl RejoinCase {
     }
 
     async fn outsider_places(&self) -> OutsiderPlaces {
-        let desk = ChannelPersistence::create(
+        let desk = crate::adapters::persistence::test_support::create_channel(
             &self.fixture.persistence,
             self.fixture.company.id,
             ChannelWrite {

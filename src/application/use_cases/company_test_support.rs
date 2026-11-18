@@ -351,3 +351,27 @@ impl TeamFixture for MockCompanyPersistence {
         CompanyPersistence::company_access(self, user_id, company_id).await
     }
 }
+
+#[async_trait]
+impl crate::application::use_cases::administration::AdministrationPersistence
+    for MockCompanyPersistence
+{
+    async fn management_role(
+        &self,
+        actor: Uuid,
+        company: crate::domain::workflow::CompanyId,
+        _target: crate::application::use_cases::administration::ManagementTarget,
+    ) -> AppResult<Option<crate::application::use_cases::administration::ManagementRole>> {
+        use crate::application::use_cases::administration::ManagementRole;
+        Ok(
+            match CompanyPersistence::company_access(self, actor, company.as_uuid())
+                .await?
+                .map(|access| access.membership)
+            {
+                Some(CompanyMembership::Owner) => Some(ManagementRole::Owner),
+                Some(CompanyMembership::Admin) => Some(ManagementRole::Admin),
+                _ => None,
+            },
+        )
+    }
+}

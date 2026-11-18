@@ -58,7 +58,7 @@ async fn private_endpoint(d: &Deployment) -> PrincipalEndpoint {
 }
 
 async fn restricted_desk(d: &Deployment) -> Uuid {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         d.p(),
         d.fixture.target.company.as_uuid(),
         ChannelWrite {
@@ -148,6 +148,7 @@ pub(in super::super) async fn open_desk(d: &Deployment) {
     ChannelPersistence::update(
         d.p(),
         crate::application::ports::channel::ChannelUpdate {
+            actor: d.fixture.target.actor,
             company_id: d.fixture.target.company.as_uuid(),
             channel_id: d.channel,
             write: ChannelWrite {

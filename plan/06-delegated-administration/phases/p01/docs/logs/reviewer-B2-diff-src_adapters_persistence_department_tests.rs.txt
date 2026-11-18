@@ -1,0 +1,20 @@
+--- B1/src/adapters/persistence/department_tests.rs
++++ B2/src/adapters/persistence/department_tests.rs
+@@ -267,9 +267,14 @@
+     /// Delete the department's own plain desk, which a department delete waits for (decision 9).
+     async fn drop_desk(&self, department: DepartmentId) {
+         use crate::application::ports::channel::ChannelPersistence;
+-        ChannelPersistence::delete(&self.persistence, self.desk_of(department).await)
+-            .await
+-            .expect("a plain department desk deletes");
++        ChannelPersistence::delete(
++            &self.persistence,
++            WorkflowActor::authenticated(self.owner).unwrap(),
++            self.company,
++            self.desk_of(department).await,
++        )
++        .await
++        .expect("a plain department desk deletes");
+     }
+ 
+     async fn roles(&self, department: DepartmentId) -> Vec<DepartmentRoleHolder> {

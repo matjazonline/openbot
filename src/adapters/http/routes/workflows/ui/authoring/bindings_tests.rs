@@ -299,7 +299,7 @@ async fn configure_saves_at_the_revision_seen_and_a_stale_one_keeps_the_choices(
 }
 
 #[tokio::test]
-async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card() {
+async fn binding_configuration_does_not_grant_conversation_view_in_the_tab_form_or_card() {
     let Some(f) = Fixture::new().await else {
         return;
     };
@@ -338,8 +338,8 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
     assert!(admin.contains(&format!(
         r#"<option value="channel:{open}">Desk Open desk</option>"#
     )));
-    let refused = bind(f.admin, board, "").await;
-    assert!(refused.contains("Not saved: A chosen desk"), "{refused}");
+    let configured = bind(f.admin, board, "").await;
+    assert!(configured.contains("Saved binding"), "{configured}");
     let card = async |user: Uuid, channel: Uuid| {
         channel_bindings(f.ui(user), Path(channel), f.query())
             .await

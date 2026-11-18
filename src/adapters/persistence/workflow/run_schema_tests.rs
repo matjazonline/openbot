@@ -255,10 +255,9 @@ struct HistoryFixture {
 }
 impl HistoryFixture {
     async fn new(f: &BindingFixture) -> Self {
-        use crate::application::ports::channel::ChannelPersistence;
         use crate::application::ports::channel::ChannelWrite;
         let company = f.target.company.as_uuid();
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &f.fixture.persistence,
             company,
             ChannelWrite {

@@ -1,0 +1,42 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 46s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 15 tests
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_binding_deactivation_precedes_definition_publication ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds ... FAILED
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_binding_deactivation ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_role_removal ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_unbound_crud_uses_the_recorded_creating_unit ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::manages_unit_definition_uses_any_active_binding_and_recorded_unit_only_when_unbound ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_ownership_is_immutable_tenant_scoped_and_root_defaulted ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_capture_uses_existing_authority_before_creation_permission ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_role_removal_precedes_definition_publication ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_prepared_writers_recheck_current_binding_authority ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_sibling_foreign_missing_and_agent_writes_hide_revision_conflicts ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_old_binding_revisions_confer_no_authority ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_follows_active_bindings_without_adopting_ownership ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_requires_current_target_authority ... ok
+test adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_existing_create_collisions_require_current_management ... ok
+
+failures:
+
+---- adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds stdout ----
+
+thread 'adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds' (30636076) panicked at src/adapters/http/routes/workflows/delegated_definition_integrity_tests.rs:113:5:
+assertion failed: matches!(refused, Err(crate::app_error::AppError::Conflict(_)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds
+
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 4782 filtered out; finished in 8.92s
+
+error: test failed, to rerun pass `--lib`

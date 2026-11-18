@@ -1,0 +1,33 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+error[E0599]: no method named `clone` found for struct `application::workflow::contracts::AdmitWorkflowRequest` in the current scope
+  --> src/adapters/persistence/workflow/delegated_schedule_admission_tests.rs:39:38
+   |
+39 |     let prepared = f.prepare(request.clone()).await;
+   |                                      ^^^^^ method not found in `application::workflow::contracts::AdmitWorkflowRequest`
+   |
+  ::: src/application/workflow/contracts.rs:86:1
+   |
+86 | pub struct AdmitWorkflowRequest {
+   | ------------------------------- method `clone` not found for this struct
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `clone`, perhaps you need to implement it:
+           candidate #1: `Clone`
+
+error[E0599]: no method named `clone` found for struct `application::workflow::contracts::AdmitWorkflowRequest` in the current scope
+  --> src/adapters/persistence/workflow/delegated_schedule_admission_tests.rs:54:31
+   |
+54 |         service.admit(request.clone()).await,
+   |                               ^^^^^ method not found in `application::workflow::contracts::AdmitWorkflowRequest`
+   |
+  ::: src/application/workflow/contracts.rs:86:1
+   |
+86 | pub struct AdmitWorkflowRequest {
+   | ------------------------------- method `clone` not found for this struct
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `clone`, perhaps you need to implement it:
+           candidate #1: `Clone`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

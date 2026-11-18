@@ -28,7 +28,9 @@ pub struct IdentityObservation {
 
 /// The actor facts channel policy needs, looked up by whichever handle the caller arrived with.
 #[async_trait]
-pub trait PrincipalAccessPersistence: Send + Sync {
+pub trait PrincipalAccessPersistence:
+    crate::application::use_cases::administration::AdministrationPersistence
+{
     /// Bounded current-viewer listing, including owner-readable archived personal targets.
     async fn direct_inboxes(
         &self,

@@ -1,0 +1,25 @@
+--- B2/src/adapters/persistence/workflow/management.rs
++++ B3/src/adapters/persistence/workflow/management.rs
+@@ -36,6 +36,22 @@
+         .await?
+         .ok_or_else(missing)?;
+     Ok(level)
++}
++
++/// Captures can prepare a new draft; existing definitions always use their stored/bound owner.
++pub(in crate::adapters::persistence) fn authorize_publication_on(
++    db: &mut PgConnection,
++    company: CompanyId,
++    actor: WorkflowActor,
++    workflow: WorkflowId,
++) -> impl std::future::Future<Output = AppResult<crate::entities::access_level::LevelActor>> + Send + '_
++{
++    authorize_target_on(
++        db,
++        company,
++        actor,
++        ManagementTarget::DefinitionCreation(workflow),
++    )
+ }
+ 
+ pub(in crate::adapters::persistence) fn authorize_association_on(

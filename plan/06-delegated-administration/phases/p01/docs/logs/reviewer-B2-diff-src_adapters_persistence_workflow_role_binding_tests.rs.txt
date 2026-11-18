@@ -1,0 +1,27 @@
+--- B1/src/adapters/persistence/workflow/role_binding_tests.rs
++++ B2/src/adapters/persistence/workflow/role_binding_tests.rs
+@@ -44,7 +44,7 @@
+ }
+ 
+ async fn desk(f: &BindingFixture, department: Option<DepartmentId>) -> Uuid {
+-    ChannelPersistence::create(
++    crate::adapters::persistence::test_support::create_channel(
+         &f.fixture.persistence,
+         f.target.company.as_uuid(),
+         write(department),
+@@ -120,6 +120,7 @@
+         .unwrap();
+     let p = &f.fixture.persistence;
+     let update = ChannelUpdate {
++        actor: f.target.actor,
+         company_id: f.target.company.as_uuid(),
+         channel_id: desk,
+         write: write(None),
+@@ -201,6 +202,7 @@
+         .await
+         .unwrap();
+     let update = ChannelUpdate {
++        actor: f.target.actor,
+         company_id: f.target.company.as_uuid(),
+         channel_id: desk,
+         write: write(Some(root)),

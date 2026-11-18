@@ -51,7 +51,7 @@ async fn foreign_session(p: &PostgresPersistence, owner: Uuid) -> (Session, Uuid
     sqlx::query("INSERT INTO local_agent_profiles(id,company_id,machine_id,name,selection) VALUES($1,$2,$3,'Foreign FK control',$4)")
         .bind(profile).bind(company.as_uuid()).bind(machine).bind(&selection).execute(&mut *tx).await.unwrap();
     tx.commit().await.unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         company.as_uuid(),
         ChannelWrite {

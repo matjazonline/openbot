@@ -1,0 +1,91 @@
+--- B1/src/application/workflow/authorization.rs
++++ B2/src/application/workflow/authorization.rs
+@@ -101,8 +101,37 @@
+     ManageDefinition,
+     ManageBinding,
+     ManageSchedule,
++    /// Enter a configuration collection; each returned item still needs its scoped check.
++    ListManaged,
+     /// Reading a definition, binding, run or decision through the workflow routes.
+     Inspect,
++}
++
++impl WorkflowOperation {
++    fn requires_human_view(self) -> bool {
++        !matches!(
++            self,
++            Self::ManageBinding | Self::ManageSchedule | Self::AdmitMessage
++        )
++    }
++}
++
++fn company_management_target(
++    association: RelatedAssociation,
++    operation: WorkflowOperation,
++) -> AppResult<Option<crate::application::use_cases::administration::ManagementTarget>> {
++    use crate::application::use_cases::administration::ManagementTarget;
++    if operation == WorkflowOperation::ListManaged {
++        return if association == RelatedAssociation::Company {
++            Ok(Some(ManagementTarget::AnyUnit))
++        } else {
++            Err(not_found())
++        };
++    }
++    Ok(association
++        .target()
++        .is_none()
++        .then_some(ManagementTarget::Root))
+ }
+ 
+ /// Required lifecycle authorization for authenticated workflow lifecycle and authoring calls.
+@@ -200,20 +229,12 @@
+             .await?
+             .ok_or_else(not_found)?;
+         use crate::application::use_cases::administration::{ManagementTarget, require_management};
+-        let configuration = matches!(
+-            operation,
+-            WorkflowOperation::ManageBinding | WorkflowOperation::AdmitMessage
+-        );
+-        let Some(target) = association.target() else {
+-            return require_management(
+-                &self.principals,
+-                actor.user_id(),
+-                company,
+-                ManagementTarget::Root,
+-            )
+-            .await
+-            .map(drop);
+-        };
++        if let Some(target) = company_management_target(association, operation)? {
++            return require_management(&self.principals, actor.user_id(), company, target)
++                .await
++                .map(drop);
++        }
++        let target = association.target().ok_or_else(not_found)?;
+         match target {
+             AddressTarget::Desk(id) => {
+                 let channel = self
+@@ -223,7 +244,7 @@
+                     .ok_or_else(not_found)?;
+                 if channel.id != id
+                     || channel.company_id != company.as_uuid()
+-                    || (!configuration && !channel.viewer_access(context))
++                    || (operation.requires_human_view() && !channel.viewer_access(context))
+                 {
+                     return Err(not_found());
+                 }
+@@ -275,13 +296,9 @@
+     operation: WorkflowOperation,
+ ) -> AppResult<crate::application::use_cases::administration::ManagementTarget> {
+     use crate::application::use_cases::administration::ManagementTarget;
+-    let configuration = matches!(
+-        operation,
+-        WorkflowOperation::ManageBinding | WorkflowOperation::AdmitMessage
+-    );
+     if principal.id != expected
+         || principal.company_id != company.as_uuid()
+-        || (!configuration && !principal.direct_viewer_access(context))
++        || (operation.requires_human_view() && !principal.direct_viewer_access(context))
+     {
+         return Err(not_found());
+     }
