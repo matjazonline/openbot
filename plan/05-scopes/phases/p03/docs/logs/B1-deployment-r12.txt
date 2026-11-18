@@ -1,0 +1,29 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 28s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_two_desks_ancestors_lead_level_and_frozen_topology ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_two_desks_ancestors_lead_level_and_frozen_topology stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_two_desks_ancestors_lead_level_and_frozen_topology' (31380098) panicked at src/adapters/persistence/workflow/knowledge_scope_deployment_tests.rs:265:5:
+assertion `left == right` failed
+  left: {"B CANARY", "CHILD CANARY", "ROOT CANARY"}
+ right: {"B CANARY", "ROOT CANARY"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_two_desks_ancestors_lead_level_and_frozen_topology
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4814 filtered out; finished in 3.75s
+
+error: test failed, to rerun pass `--lib`

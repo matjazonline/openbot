@@ -88,6 +88,7 @@ fn bounded_result(
         return Err(invalid());
     }
     let mut highest = None;
+    let mut items = Vec::new();
     for entry in ranked.iter().take(limit.get()) {
         let chunk = &chunks[entry.index];
         body.passages.push(Passage {
@@ -108,10 +109,17 @@ fn bounded_result(
             chunk.access_level,
             |old: crate::entities::access_level::AccessLevel| old.max(chunk.access_level),
         ));
+        items.push(super::KnowledgeSourceItem {
+            document_id: chunk.document_id,
+            chunk_id: chunk.id,
+            unit_id: chunk.unit_id,
+            access_level: chunk.access_level,
+        });
     }
     Ok(KnowledgeObservation::new(
         serde_json::to_value(body).map_err(|_| invalid())?,
         highest,
+        items,
     ))
 }
 

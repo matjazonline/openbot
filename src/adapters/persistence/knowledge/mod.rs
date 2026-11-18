@@ -1,5 +1,7 @@
 //! Short, company-serialized knowledge operations. Model work never runs in these transactions.
 mod bounds;
+mod moves;
+mod permissions;
 mod rows;
 mod search;
 mod writes;
@@ -59,14 +61,20 @@ impl KnowledgeDocuments for PostgresPersistence {
         })
         .await
     }
-    async fn list(&self, scope: KnowledgeScope) -> AppResult<KnowledgeLibraryView> {
+    async fn preflight_search(
+        &self,
+        scope: KnowledgeScope,
+        unit: Option<crate::entities::department::DepartmentId>,
+    ) -> AppResult<()> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
             let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
-                let actor = authorize(&mut tx, scope).await?;
-                let layers = rows::visible(&mut tx, scope, actor.access_level).await?;
-                Ok(KnowledgeLibraryView { actor, layers })
+                let permissions = permissions::load(&mut tx, scope).await?;
+                if let Some(unit) = unit {
+                    permissions.require_read(&mut tx, scope, unit).await?;
+                }
+                Ok(())
             }
             .await;
             tx.rollback().await.map_err(authority::database)?;
@@ -74,18 +82,93 @@ impl KnowledgeDocuments for PostgresPersistence {
         })
         .await
     }
-    async fn preflight_upload(
+    async fn unit_choices(
         &self,
         scope: KnowledgeScope,
-        layers: &[KnowledgeLayerSize],
-    ) -> AppResult<()> {
+        query: KnowledgeUnitQuery,
+    ) -> AppResult<KnowledgeUnitPage> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
             let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
-                let actor = authorize(&mut tx, scope).await?;
-                authorize_layers(actor, layers)?;
-                rows::project_quota(&mut tx, scope, layers).await
+                let permissions = permissions::load(&mut tx, scope).await?;
+                for unit in [query.selected, query.after].into_iter().flatten() {
+                    permissions
+                        .require_write(&mut tx, KnowledgeUploadTarget { scope, unit })
+                        .await?;
+                }
+                permissions.choices(&mut tx, scope, query).await
+            }
+            .await;
+            tx.rollback().await.map_err(authority::database)?;
+            result
+        })
+        .await
+    }
+    async fn list(
+        &self,
+        scope: KnowledgeScope,
+        unit: Option<crate::entities::department::DepartmentId>,
+    ) -> AppResult<KnowledgeLibraryView> {
+        let sent = AtomicBool::new(false);
+        bounded(&sent, async {
+            let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
+            let result = async {
+                let permissions = permissions::load(&mut tx, scope).await?;
+                if let Some(unit) = unit {
+                    permissions.require_read(&mut tx, scope, unit).await?;
+                }
+                let layers = rows::visible(&mut tx, scope, &permissions, unit).await?;
+                let default_unit = permissions.default_for(unit);
+                let choices = permissions
+                    .choices(
+                        &mut tx,
+                        scope,
+                        KnowledgeUnitQuery {
+                            selected: default_unit,
+                            after: None,
+                        },
+                    )
+                    .await?;
+                let writable_units = permissions.writable_visible_units(&layers);
+                Ok(KnowledgeLibraryView {
+                    actor: permissions.actor,
+                    layers,
+                    upload_units: choices.units,
+                    writable_units,
+                    default_unit,
+                    units_truncated: choices.next.is_some(),
+                })
+            }
+            .await;
+            tx.rollback().await.map_err(authority::database)?;
+            result
+        })
+        .await
+    }
+    async fn search_manual(
+        &self,
+        query: ManualKnowledgeQuery,
+    ) -> AppResult<Vec<crate::application::knowledge::search::StoredKnowledgeChunk>> {
+        search::manual(self, query).await
+    }
+    async fn preflight_upload(
+        &self,
+        target: KnowledgeUploadTarget,
+        layers: &[KnowledgeLayerSize],
+    ) -> AppResult<()> {
+        let sent = AtomicBool::new(false);
+        bounded(&sent, async {
+            let scope = target.scope;
+            let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
+            let result = async {
+                let permissions = permissions::load(&mut tx, scope).await?;
+                permissions.require_write(&mut tx, target).await?;
+                // The multipart boundary may authorize its target before reading any files.
+                if !layers.is_empty() {
+                    authorize_layers(permissions.actor, layers)?;
+                }
+                rows::project_quota(&mut tx, target, layers).await
             }
             .await;
             tx.rollback().await.map_err(authority::database)?;
@@ -95,24 +178,26 @@ impl KnowledgeDocuments for PostgresPersistence {
     }
     async fn replace(
         &self,
-        scope: KnowledgeScope,
+        target: KnowledgeUploadTarget,
         documents: &[PreparedKnowledgeDocument],
     ) -> AppResult<Vec<KnowledgeDocumentLayer>> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
+            let scope = target.scope;
             let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
-                let actor = authorize(&mut tx, scope).await?;
+                let permissions = permissions::load(&mut tx, scope).await?;
+                permissions.require_write(&mut tx, target).await?;
                 let layers: Vec<_> = documents
                     .iter()
                     .map(|document| document.file.size())
                     .collect();
-                authorize_layers(actor, &layers)?;
+                authorize_layers(permissions.actor, &layers)?;
                 writes::validate(documents)?;
-                rows::project_quota(&mut tx, scope, &layers).await?;
+                rows::project_quota(&mut tx, target, &layers).await?;
                 let mut ids = Vec::with_capacity(documents.len());
                 for document in documents {
-                    ids.push(writes::replace(&mut tx, scope, document).await?);
+                    ids.push(writes::replace(&mut tx, target, document).await?);
                 }
                 rows::check_quota(&mut tx, scope).await?;
                 rows::by_ids(&mut tx, scope, &ids).await
@@ -127,9 +212,18 @@ impl KnowledgeDocuments for PostgresPersistence {
         bounded(&sent, async {
             let mut tx = authority::start(self.pool(), team_scope(command.scope), None).await?;
             let result = async {
-                let actor = authorize(&mut tx, command.scope).await?;
-                let layer = rows::one_visible(&mut tx, command, actor.access_level).await?;
-                may_write_document(actor, layer.access_level)
+                let permissions = permissions::load(&mut tx, command.scope).await?;
+                let layer = rows::one_visible(&mut tx, command, &permissions).await?;
+                permissions
+                    .require_write(
+                        &mut tx,
+                        KnowledgeUploadTarget {
+                            scope: command.scope,
+                            unit: layer.unit_id,
+                        },
+                    )
+                    .await?;
+                may_write_document(permissions.actor, layer.access_level)
                     .map_err(|error| AppError::Forbidden(error.to_string()))?;
                 if layer.revision != command.expected_revision {
                     return Err(AppError::Conflict(
@@ -149,6 +243,33 @@ impl KnowledgeDocuments for PostgresPersistence {
         })
         .await
     }
+
+    async fn move_document(&self, command: MoveKnowledgeDocument) -> AppResult<()> {
+        let sent = AtomicBool::new(false);
+        bounded(&sent, async {
+            let mut tx = authority::start(self.pool(), team_scope(command.scope), None).await?;
+            let result = moves::move_on(&mut tx, command).await;
+            finish(tx, result, &sent).await
+        })
+        .await
+    }
 }
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) async fn root_target(
+    p: &PostgresPersistence,
+    scope: KnowledgeScope,
+) -> KnowledgeUploadTarget {
+    let unit: uuid::Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(scope.company.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    KnowledgeUploadTarget {
+        scope,
+        unit: crate::entities::department::DepartmentId::new(unit),
+    }
+}

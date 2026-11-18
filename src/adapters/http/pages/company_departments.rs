@@ -59,6 +59,12 @@ pub enum DepartmentDetailPane<'a> {
     },
 }
 
+#[derive(Clone, Copy)]
+pub enum DepartmentKnowledge<'a> {
+    Documents(&'a [crate::entities::knowledge::KnowledgeDocumentLayer]),
+    ScopeLimit,
+}
+
 pub struct DepartmentSection<'a> {
     pub company: &'a Company,
     pub app_domain_name: &'a str,
@@ -72,6 +78,7 @@ pub struct DepartmentSection<'a> {
     pub membership: CompanyMembership,
     pub error: Option<(DepartmentForm, &'a str)>,
     pub notice: Option<&'a str>,
+    pub knowledge: DepartmentKnowledge<'a>,
 }
 
 impl DepartmentSection<'_> {
@@ -471,6 +478,7 @@ fn department_detail(
             {roles_cut}
             {members}
             {desks}
+            {knowledge}
             {edit}
         </div>"##,
         id = department.id,
@@ -483,6 +491,32 @@ fn department_detail(
         },
         members = members_card(section, view),
         desks = desks_card(section, &view.desks),
+        knowledge = knowledge_card(section, department),
+    )
+}
+
+fn knowledge_card(section: &DepartmentSection<'_>, department: &Department) -> String {
+    let DepartmentKnowledge::Documents(layers) = section.knowledge else {
+        return r#"<section id="department-knowledge" class="card bg-base-200 p-4 space-y-2"><h3 class="font-semibold">Knowledge</h3><p data-knowledge-unavailable="scope-limit">Knowledge is unavailable because your readable departments exceed the search limit. Ask an owner or administrator for help.</p></section>"#.into();
+    };
+    let rows = layers
+        .iter()
+        .map(|layer| format!("<li>{}</li>", escape_html_text(&layer.file_name())))
+        .collect::<String>();
+    let rows = if rows.is_empty() {
+        "<li>No documents at your access level.</li>".into()
+    } else {
+        rows
+    };
+    let guidance = if department.is_root {
+        ""
+    } else {
+        "<p>Move or delete this department’s documents before deleting the department. Reparenting leaves the documents in this department.</p>"
+    };
+    format!(
+        r#"<section id="department-knowledge" class="card bg-base-200 p-4 space-y-2"><h3 class="font-semibold">Knowledge</h3><ul>{rows}</ul>{guidance}<a class="link" href="/ui/knowledge?company_id={company}&amp;unit_id={unit}">Open department knowledge</a></section>"#,
+        company = section.company.id,
+        unit = department.id
     )
 }
 

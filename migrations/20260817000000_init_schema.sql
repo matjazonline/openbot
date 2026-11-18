@@ -12195,6 +12195,7 @@ CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDA
 CREATE TABLE public.knowledge_documents (
     id uuid PRIMARY KEY,
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    unit_id uuid NOT NULL,
     name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 253),
     name_key text COLLATE "C" GENERATED ALWAYS AS (casefold(name COLLATE pg_unicode_fast)) STORED,
     access_level public.access_level NOT NULL,
@@ -12204,8 +12205,9 @@ CREATE TABLE public.knowledge_documents (
     revision bigint NOT NULL DEFAULT 1 CHECK (revision>0),
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id,name_key,access_level),
-    UNIQUE (company_id,id,access_level)
+    UNIQUE (company_id,unit_id,name_key,access_level),
+    UNIQUE (company_id,id,access_level),
+    UNIQUE (company_id,id,unit_id,access_level)
 );
 
 CREATE FUNCTION public.knowledge_embedding_is_valid(vector real[]) RETURNS boolean
@@ -12223,6 +12225,7 @@ CREATE TABLE public.knowledge_chunks (
     id uuid PRIMARY KEY,
     company_id uuid NOT NULL,
     document_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
     access_level public.access_level NOT NULL,
     ordinal integer NOT NULL CHECK (ordinal>=0 AND ordinal<4096),
     heading text CHECK (octet_length(heading)<=2048),
@@ -12231,8 +12234,8 @@ CREATE TABLE public.knowledge_chunks (
     embedding real[] NOT NULL CHECK (public.knowledge_embedding_is_valid(embedding)),
     search_text tsvector GENERATED ALWAYS AS
         (to_tsvector('simple',coalesce(heading,'') || ' ' || body)) STORED,
-    FOREIGN KEY (company_id,document_id,access_level)
-        REFERENCES public.knowledge_documents(company_id,id,access_level)
+    FOREIGN KEY (company_id,document_id,unit_id,access_level)
+        REFERENCES public.knowledge_documents(company_id,id,unit_id,access_level)
         ON UPDATE CASCADE ON DELETE CASCADE,
     UNIQUE (document_id,ordinal)
 );
@@ -12240,6 +12243,41 @@ CREATE INDEX knowledge_chunks_search_idx ON public.knowledge_chunks(company_id,e
 
 -- Search saves the canonical harness result and its classification in the same transaction.
 -- Each new/replayed consumption also proves its actual attempt is still live at COMMIT.
+CREATE FUNCTION public.knowledge_source_items_valid(result jsonb, items jsonb, units uuid[], level smallint)
+RETURNS boolean LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE item jsonb; highest smallint := 0;
+BEGIN
+    IF result IS NULL OR items IS NULL OR units IS NULL OR level IS NULL
+        OR jsonb_typeof(items) IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+    IF octet_length(items::text)>4096 THEN RETURN false; END IF;
+    IF cardinality(units)>256
+        OR (cardinality(units)>0 AND (array_ndims(units)<>1 OR array_lower(units,1)<>1)) THEN RETURN false; END IF;
+    IF array_position(units,NULL) IS NOT NULL
+        OR units IS DISTINCT FROM ARRAY(SELECT DISTINCT unit FROM unnest(units) AS selected(unit) ORDER BY unit)
+        OR jsonb_array_length(items)>8 THEN RETURN false; END IF;
+    IF result ? 'passages' THEN
+        IF jsonb_typeof(result->'passages') IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+        IF jsonb_array_length(result->'passages')<>jsonb_array_length(items) THEN RETURN false; END IF;
+    ELSIF jsonb_typeof(result->'error') IS DISTINCT FROM 'object' OR jsonb_array_length(items)<>0 THEN
+        RETURN false;
+    END IF;
+    FOR item IN SELECT value FROM jsonb_array_elements(items) AS source(value) LOOP
+        IF jsonb_typeof(item) IS DISTINCT FROM 'object' THEN RETURN false; END IF;
+        IF (SELECT count(*) FROM jsonb_object_keys(item))<>4
+            OR jsonb_typeof(item->'document_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'chunk_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'unit_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'access_level') IS DISTINCT FROM 'number' THEN RETURN false; END IF;
+        IF (item->>'document_id')::uuid='00000000-0000-0000-0000-000000000000'::uuid
+            OR (item->>'chunk_id')::uuid='00000000-0000-0000-0000-000000000000'::uuid
+            OR NOT ((item->>'unit_id')::uuid=ANY(units))
+            OR (item->>'access_level')::smallint NOT BETWEEN 0 AND 9 THEN RETURN false; END IF;
+        highest := greatest(highest,(item->>'access_level')::smallint);
+    END LOOP;
+    RETURN highest=level;
+EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN RETURN false;
+END $$;
+
 CREATE TABLE public.workflow_knowledge_consumptions (
     company_id uuid NOT NULL,
     run_id uuid NOT NULL,
@@ -12253,6 +12291,9 @@ CREATE TABLE public.workflow_knowledge_consumptions (
     content_level public.access_level NOT NULL,
     -- jsonb's spacing differs from the compact 65536-byte application result representation.
     result jsonb NOT NULL CHECK (jsonb_typeof(result)='object' AND octet_length(result::text)<=131072),
+    queried_unit_ids uuid[] NOT NULL,
+    source_items jsonb NOT NULL,
+    CHECK (public.knowledge_source_items_valid(result,source_items,queried_unit_ids,content_level::smallint)),
     PRIMARY KEY (company_id,run_id,execution_id,job_id,attempt_number,invocation_id),
     FOREIGN KEY (company_id,run_id,execution_id)
         REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
@@ -12292,12 +12333,30 @@ BEGIN
         JOIN public.task_harness_runs AS harness ON harness.company_id=job.company_id AND harness.task_id=job.id
             AND harness.id=NEW.checkpoint_id AND harness.workflow_run_id=run.id
             AND harness.workflow_execution_id=execution.id
+        JOIN public.principals AS actor ON actor.company_id=run.company_id AND actor.kind='agent'
+            AND actor.agent_id::text=harness.workflow_prepared->'selection'->>'agent'
+        LEFT JOIN LATERAL (
+            SELECT array_agg(scope.unit_id ORDER BY scope.unit_id) AS units,bool_and(unit.id IS NOT NULL) AS live
+            FROM public.workflow_run_scopes AS scope
+            JOIN public.workflow_run_scope_snapshots AS snapshot ON snapshot.company_id=scope.company_id
+                AND snapshot.run_id=scope.run_id AND snapshot.state='available'
+            LEFT JOIN public.departments AS unit ON unit.company_id=scope.company_id AND unit.id=scope.unit_id
+            WHERE scope.company_id=run.company_id AND scope.run_id=run.id
+                AND scope.acting_principal_id=actor.id AND scope.access='read'
+        ) AS knowledge ON true
         WHERE job.company_id=NEW.company_id AND job.id=NEW.job_id AND execution.id=NEW.execution_id AND run.id=NEW.run_id
             AND job.status='processing' AND job.worker_id=NEW.worker_id
             AND job.execution_generation=NEW.execution_generation AND job.attempt_ordinal=NEW.attempt_number
             AND job.lock_expires_at>clock_timestamp() AND execution.completed_at IS NULL
             AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
             AND run.content_level>=NEW.content_level
+            AND (
+                (knowledge.live AND cardinality(knowledge.units)>0 AND NEW.queried_unit_ids=knowledge.units)
+                OR ((knowledge.units IS NULL OR NOT knowledge.live)
+                    AND NEW.queried_unit_ids='{}'::uuid[] AND NEW.source_items='[]'::jsonb AND NEW.content_level=0
+                    AND NEW.result=jsonb_build_object('error',jsonb_build_object('code','knowledge.scope_unavailable',
+                        'message','Knowledge scopes are unavailable for this run')))
+            )
             AND EXISTS (
                 SELECT 1 FROM jsonb_array_elements(harness.checkpoint->'invocations') AS saved(invocation)
                 WHERE invocation->'call'->>'invocation_id'=NEW.invocation_id::text
@@ -15692,6 +15751,9 @@ CREATE INDEX department_roles_principal_idx ON public.department_roles USING btr
 -- department. The tenant participates in the FK; ownership cannot cross a company boundary.
 ALTER TABLE ONLY public.channels
     ADD CONSTRAINT channels_department_fk FOREIGN KEY (company_id, department_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.knowledge_documents
+    ADD CONSTRAINT knowledge_documents_unit_fk FOREIGN KEY (company_id, unit_id)
         REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
 CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id);
 

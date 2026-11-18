@@ -363,6 +363,35 @@ pub(super) async fn rows_on(
     Ok(rows)
 }
 
+pub(super) async fn knowledge_units_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    agent: crate::entities::agent_capability::AgentId,
+) -> AppResult<Option<Vec<crate::entities::department::DepartmentId>>> {
+    #[derive(sqlx::FromRow)]
+    struct ReadOwner {
+        unit_id: Uuid,
+        live: bool,
+    }
+    let rows: Vec<ReadOwner> = sqlx::query_as(
+        "SELECT scope.unit_id,unit.id IS NOT NULL AS live FROM workflow_run_scopes AS scope
+         JOIN workflow_run_scope_snapshots AS snapshot ON snapshot.company_id=scope.company_id AND snapshot.run_id=scope.run_id AND snapshot.state='available'
+         JOIN principals AS actor ON actor.company_id=scope.company_id AND actor.id=scope.acting_principal_id AND actor.kind='agent' AND actor.agent_id=$3
+         LEFT JOIN departments AS unit ON unit.company_id=scope.company_id AND unit.id=scope.unit_id
+         WHERE scope.company_id=$1 AND scope.run_id=$2 AND scope.access='read' ORDER BY scope.unit_id LIMIT $4",
+    ).bind(company.as_uuid()).bind(run.as_uuid()).bind(agent.as_uuid()).bind((MAX_RUN_READ_UNITS + 1) as i64)
+        .fetch_all(db).await?;
+    if rows.is_empty() || rows.len() > MAX_RUN_READ_UNITS || rows.iter().any(|row| !row.live) {
+        return Ok(None);
+    }
+    Ok(Some(
+        rows.into_iter()
+            .map(|row| crate::entities::department::DepartmentId::new(row.unit_id))
+            .collect(),
+    ))
+}
+
 pub(super) async fn context_on(
     db: &mut PgConnection,
     company: CompanyId,

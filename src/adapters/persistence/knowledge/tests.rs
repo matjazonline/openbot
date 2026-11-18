@@ -10,6 +10,12 @@ use std::sync::Arc;
 use uuid::Uuid;
 mod constraints;
 mod races;
+#[path = "scope_race_tests.rs"]
+mod scope_races;
+#[path = "scope_test_support.rs"]
+mod scope_support;
+#[path = "scope_tests.rs"]
+mod scopes;
 #[path = "search_tests.rs"]
 mod search;
 #[path = "search_quota_tests.rs"]
@@ -19,6 +25,7 @@ struct Fixture {
     store: Arc<PostgresPersistence>,
     owner: KnowledgeScope,
     member: KnowledgeScope,
+    root: crate::entities::department::DepartmentId,
 }
 impl Fixture {
     async fn new(pool: PgPool) -> Self {
@@ -44,6 +51,15 @@ impl Fixture {
             crate::entities::access_level::AccessLevel::try_from(5_i16).unwrap(),
         )
         .await;
+        let root: Uuid =
+            sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+                .bind(company.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        // These existing level/quota fixtures need an explicit placement, separate from root clearance.
+        sqlx::query("INSERT INTO department_roles (company_id,department_id,role,principal_id) SELECT $1,$2,'reviewer',id FROM principals WHERE company_id=$1 AND user_id=$3")
+            .bind(company.id).bind(root).bind(member.id).execute(&pool).await.unwrap();
         Self {
             pool,
             store,
@@ -55,6 +71,13 @@ impl Fixture {
                 company: CompanyId::new(company.id),
                 actor_id: member.id,
             },
+            root: crate::entities::department::DepartmentId::new(root),
+        }
+    }
+    fn target(&self, scope: KnowledgeScope) -> KnowledgeUploadTarget {
+        KnowledgeUploadTarget {
+            scope,
+            unit: self.root,
         }
     }
     async fn replace(
@@ -64,7 +87,7 @@ impl Fixture {
         text: &str,
     ) -> KnowledgeDocumentLayer {
         self.store
-            .replace(scope, &[prepared(name, text)])
+            .replace(self.target(scope), &[prepared(name, text)])
             .await
             .unwrap()
             .remove(0)
@@ -119,7 +142,7 @@ async fn knowledge_upload_layers_unicode_separator_override_and_duplicate_batch_
     let final_rows = f
         .store
         .replace(
-            f.owner,
+            f.target(f.owner),
             &[
                 prepared("6_straße.md", "third"),
                 prepared("6-STRASSE.md", "fourth"),
@@ -136,12 +159,12 @@ async fn knowledge_upload_layers_unicode_separator_override_and_duplicate_batch_
         .await
         .unwrap();
     assert_eq!(body, "fourth");
-    let visible = f.store.list(f.member).await.unwrap();
+    let visible = f.store.list(f.member, None).await.unwrap();
     assert_eq!(visible.layers.len(), 1);
     assert_eq!(visible.layers[0].id, public.id);
     assert!(matches!(
         f.store
-            .replace(f.member, &[prepared("7_notes.md", "private")])
+            .replace(f.target(f.member), &[prepared("7_notes.md", "private")])
             .await,
         Err(AppError::Forbidden(_))
     ));
@@ -200,17 +223,19 @@ async fn knowledge_upload_authority_and_resource_ids_are_scoped_and_invalid_vect
         Err(AppError::NotFound(_))
     ));
     assert!(matches!(
-        f.store.list(foreign).await,
+        f.store.list(foreign, None).await,
         Err(AppError::NotFound(_))
     ));
     assert!(matches!(
         f.store
-            .preflight_upload(foreign, &[prepared("0_x.md", "x").file.size()])
+            .preflight_upload(f.target(foreign), &[prepared("0_x.md", "x").file.size()])
             .await,
         Err(AppError::NotFound(_))
     ));
     assert!(matches!(
-        f.store.replace(foreign, &[prepared("0_x.md", "x")]).await,
+        f.store
+            .replace(f.target(foreign), &[prepared("0_x.md", "x")])
+            .await,
         Err(AppError::NotFound(_))
     ));
     assert!(matches!(
@@ -227,12 +252,15 @@ async fn knowledge_upload_authority_and_resource_ids_are_scoped_and_invalid_vect
     invalid.chunks[0].embedding = [0.0; 384];
     assert!(
         f.store
-            .replace(f.owner, &[prepared("0_notes.md", "after"), invalid])
+            .replace(
+                f.target(f.owner),
+                &[prepared("0_notes.md", "after"), invalid]
+            )
             .await
             .is_err()
     );
     assert_eq!(f.content(layer.id).await, "before");
-    assert_eq!(f.store.list(f.owner).await.unwrap().layers.len(), 1);
+    assert_eq!(f.store.list(f.owner, None).await.unwrap().layers.len(), 1);
 }
 
 #[tokio::test]

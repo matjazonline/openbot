@@ -1,0 +1,2 @@
+Current init migration exactly matches successful fresh owned schema migration (SQLx SHA384).
+SHA384: ab83928fbe3d2b5c9347b906213ef0d03431893de0e7ac662125137f1e4fabcc2a139c493e35554a311f0f0567ebb390

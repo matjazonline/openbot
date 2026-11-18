@@ -57,6 +57,7 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
         return Err(invalid());
     }
     super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await?;
+    super::knowledge::require_consumed_units_on(db, scope, identity.agent).await?;
     agent_history::check_prepared_on(db, scope, selection.mode(), prepared).await
 }
 

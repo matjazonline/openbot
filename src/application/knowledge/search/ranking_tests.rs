@@ -12,6 +12,8 @@ fn vector(x: f32, y: f32) -> [f32; 384] {
 fn chunk(id: u128, embedding: [f32; 384], keyword_rank: Option<f32>) -> StoredKnowledgeChunk {
     StoredKnowledgeChunk {
         id: Uuid::from_u128(id),
+        document_id: Uuid::from_u128(id),
+        unit_id: crate::entities::department::DepartmentId::new(Uuid::from_u128(1)),
         document_name: "sales.md".into(),
         heading: Some("Sales > Prices".into()),
         body: format!("Passage {id}"),

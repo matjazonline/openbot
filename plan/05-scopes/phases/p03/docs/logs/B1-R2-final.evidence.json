@@ -1,0 +1,452 @@
+{
+  "version": 1,
+  "round": "05SC-P03-B1-R2-final",
+  "artifact": "62d667d9e56395de26652accbbab2ee1eb9f854969e308607cae2aa003cb5907",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_ -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test and per-case migrated databases; 26 passing regressions; final boxed test extraction exercised by final gate",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused-r1.txt",
+          "sha256": "798bce5183404314bf998df84daaa6658f3d7dbbbf52a871e0a14dc9418137e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets --locked --offline",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-sqlx-prepare.txt",
+          "sha256": "8777372d59339af2f8bf8589df71721f09e62103ecb9a12dfa29edea09fe7a7f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-offline-all-targets.txt",
+          "sha256": "c54bca416b8a09e3c2018b0ada16771065b3b9b5469242539af42bc53077e2cf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "e7030463724463a7a6850af00bb87c85b5d202fc026fb92379db1299613ec3b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-modules.txt",
+          "sha256": "e13b83ce9cab8489a157f9b9228297f29dc95219c246b356fd84b86eb8188143"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "Fresh owned pa05_p03_schema on PG18:51167",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-fresh-migrate-r3.txt",
+          "sha256": "d95f0e02c9afcfe27916fd58b86650330da73a87068f51d37a31ef46a4b0b274"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "docker run --rm --name openbot-plan05-p03-network-scope --label phase=05SC-P03 --cap-add=NET_ADMIN -v \"$PWD:/repo:ro\" -w /repo openbot-plan05-network-scope:20261117 python3 -I scripts/tests/network-isolation-scope.py",
+      "fixture": "Owned pinned Ubuntu24 Docker image and private network namespace; all eight real categories",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-linux-scope-test.txt",
+          "sha256": "e82603ee38534631b6639d2c7803c3af3cb93c93f8a5219ddf4fe984c627d4b2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline --all-targets -- --skip doop --skip Doop",
+      "fixture": "Current byte-identical source; owned pa05_p03_core_test; original2048KiB;4706PASS/2FAIL retained",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-stock-all-targets.txt",
+          "sha256": "18fc4bd5aec8ac1782de153a789d10b6915c97c6c6fc1a342cab7e1ad40b461a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "Actual26knowledge_scope_ tests from the full current-source command above",
+      "fixture": "All26scope cases PASS, including boxed257th-native-destination regression; extraction is summary, full log is execution proof",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-current-scope-results.txt",
+          "sha256": "dbdb72eb88fdfb9df09d3bcf364196f24bfaee434dbabfe51267819be36fc8cd"
+        },
+        {
+          "path": "logs/B1-R2-final-stock-all-targets.txt",
+          "sha256": "18fc4bd5aec8ac1782de153a789d10b6915c97c6c6fc1a342cab7e1ad40b461a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "RUST_MIN_STACK=2097152 scripts/test-network-isolation.sh cargo test --locked --offline --lib -- workflow_escalation_agent_real_role_writer_gate_contention_defers_then_admits_once cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry --skip doop --skip Doop --test-threads=1",
+      "fixture": "Exact two full-run failures, unchanged assertions/deadlines/production source;2PASS24.12s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-full-failures-focused-r2.txt",
+          "sha256": "41efbd3800324a16f9cfe6b29febec7f1a56b7a84014c193d1309039b65e4408"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "RUST_MIN_STACK=2097152 scripts/test-network-isolation.sh cargo test --locked --offline --lib -- workflow_escalation_agent_real_ cloudroom_e2e_ --skip doop --skip Doop --test-threads=1",
+      "fixture": "Related actual account/role competing writers and native replay/cut points;8PASS/3existing native-provider ignored,71.80s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-failure-families-r1.txt",
+          "sha256": "0411e13da76b1bc9c15b5e25116e0c50dcb3a85cc411725798aefec7c756bf0d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "RUST_MIN_STACK=2097152 scripts/test-network-isolation.sh cargo test --locked --offline --bin open_bots --test source_modules -- --skip doop --skip Doop",
+      "fixture": "Current binary6PASS and module reachability8PASS at2048KiB",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-other-targets.txt",
+          "sha256": "9bf0f4848a050b4db79e1bb9b49dffb28d89e7f37eb1863289e5e80fdd67bcfc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored --skip doop --skip Doop",
+      "fixture": "Current phase-owned fixtures and pinned artifacts; no changed limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-browser-fixtures.txt",
+          "sha256": "7a2009d8af9568086661c5b23c82330fbf3b8d28382b025589a1357c9149d0cd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test --test-timeout=90000 scripts/tests/knowledge-browser.mjs",
+      "fixture": "Current phase-owned fixtures and pinned artifacts; no changed limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-browser.txt",
+          "sha256": "040bc8772eaaa9f6653ae8fde2c0af3c49d87ff10ba467d5b9e8399ab314d0fc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "npm run check:css",
+      "fixture": "Current phase-owned fixtures and pinned artifacts; no changed limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-generated-css.txt",
+          "sha256": "f30638a22e43908bc636ee6b9c936c94ca4811a7263ea29109924372890e3c7d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC6"
+      ],
+      "command": "Compare current init migration SHA384 to successful fresh owned schema SQLx checksum",
+      "fixture": "Current phase-owned fixtures and pinned artifacts; no changed limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-migration-identity.txt",
+          "sha256": "38bacbafc9bee65c20647a4ba5bb26dc13023e69a036429e2e63d2091f736326"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "python3 -I services/memory/scripts/prepare-model.py --verify",
+      "fixture": "Current phase-owned fixtures and pinned artifacts; no changed limits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-memory-model-verify.txt",
+          "sha256": "5bd882ea629eb39affd316773179234e0d66bae3a15d76675a691f3748cf47be"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/test-network-isolation.sh plan/05-scopes/phases/p03/docs/logs/final-lease-budget.sh --offline",
+      "fixture": "Resumed parent owned DB;139PASS, original50%work budget PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "check_knowledge_image",
+      "fixture": "Owned production image; real retrieval/missing/tampered-model checks PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "check_memory_backup",
+      "fixture": "Owned real memory backup/restore;1PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "env MEMORY_JOURNEY_PROVIDER=stand-in services/memory/scripts/standalone-journey.sh",
+      "fixture": "Owned service journey;13stepsPASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "bash plan/05-scopes/phases/p03/docs/logs/final-memory-fixture.sh",
+      "fixture": "Fresh same-server owned core/service DBs and non-superuser roles;7live testsPASS; exact cleanup",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "check_memory_image",
+      "fixture": "Owned production image; non-root/offline/read-only/RSS/DBrefusal PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "bash plan/05-scopes/phases/p03/docs/logs/final-check.sh",
+      "fixture": "Whole retained runner exit1 solely unchanged native model archive HTTP404; earlier sourceR1full/stock results are baseline only; component current gates separately identified",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "python3 -I services/memory/scripts/prepare-model.py --download",
+      "fixture": "Existing main macOS pinned ONNXruntimeURL404, independentHEAD404; local pinned cached verification succeeds; do not label fresh download PASS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-final-check-r1.txt",
+          "sha256": "56ee5803cbbfcba753244e856f7ed1e0cd71821d6f302deb88ea08847c379b32"
+        },
+        {
+          "path": "logs/B1-R2-memory-runtime-url-diagnostic.txt",
+          "sha256": "6d39ec8418fd0397538f0e9b9cb2e8e43b529f12852bfce33912d327519ce6c4"
+        },
+        {
+          "path": "logs/B1-R2-memory-model-provenance.json",
+          "sha256": "e3ad1ec6a1de4e8594c9fab9867427f60ea350962fcee0282aef602094c1c724"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "git diff --exit-code origin/main -- integrations/cloudroom-plugin services/attribution; git diff --exit-code 2edd0a73cbe76bac2d559c52f8c4c5025402c88b -- services/memory",
+      "fixture": "Inspection of unchanged independent source and accepted Plan04/p02 execution log hashes; not a new service execution",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-independent-evidence-reuse.json",
+          "sha256": "3fa413f45582a3dbd3e5f7d491cdf013831d8d362f37e73a23e84982335fae8d"
+        },
+        {
+          "path": "logs/B1-R2-CI-audit.md",
+          "sha256": "e996e264895e3249b05a054edb344206e0f34fdc3755224280d2fd506e3afcf4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "Fingerprint60reviewed source paths; git add owned implementation; compare all bytes/modes and exact staged path set",
+      "fixture": "Intentional snapshot representation change only, original2a1e2771\u2026b19d8 to final staged62d667d9\u20265907; same HEAD/criteria/exclusions",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-bytes-before-staging.json",
+          "sha256": "97ed85ef2ec6c020e58afd31f629d6945f60ccf10de0e0d5a779d92ddd06a0c2"
+        },
+        {
+          "path": "logs/B1-R2-staging-identity.txt",
+          "sha256": "eedebc90c5a2a44692aae8f45299626773937fc68c590b4506352e62f1714dc3"
+        },
+        {
+          "path": "logs/B1-R2-staged-snapshot.txt",
+          "sha256": "1e3d2c8453fbb38f19783a295ba56547ac38e34bcbff80e25888ba6b8ce41883"
+        }
+      ]
+    }
+  ]
+}

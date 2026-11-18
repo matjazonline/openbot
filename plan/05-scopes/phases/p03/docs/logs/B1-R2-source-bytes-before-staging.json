@@ -1,0 +1,242 @@
+{
+  ".gitignore": {
+    "executable": false,
+    "sha256": "9c16ba1263290b75aefdc56612facd041b7f3e9dc14feae2320ace01a86556b5"
+  },
+  ".trail/learnings/2026-11-17-recheck-consumed-knowledge-owners-before-cached-mac02.md": {
+    "executable": false,
+    "sha256": "dc87840db95dde924fe7940e08458bb32a7e73aeaea899b3019b79cdf073b27f"
+  },
+  "migrations/20260817000000_init_schema.sql": {
+    "executable": false,
+    "sha256": "6619af6b77320b21df1870c8497a9df4fcc81623bf966b0c68d7982e62796080"
+  },
+  "scripts/tests/knowledge-browser.mjs": {
+    "executable": false,
+    "sha256": "44f4bd9a97902e0c991a16f679d38289609caba64757c95f2636de5915e0809f"
+  },
+  "src/adapters/embedding/retrieval_probe.rs": {
+    "executable": false,
+    "sha256": "c72e0584f757fb8d65dcd71815cc6778517edf80a4ea3021940ef58d0228e352"
+  },
+  "src/adapters/http/pages/company_departments.rs": {
+    "executable": false,
+    "sha256": "0142346f49cdcf3c7a292660a76ac833841fdff84aabba5278af4da4d32eaf57"
+  },
+  "src/adapters/http/pages/department_ui_tests.rs": {
+    "executable": false,
+    "sha256": "8ea4140f2f9d89ee27bf86ba07679809bace8f8873126e9fd76d04c770ece69e"
+  },
+  "src/adapters/http/pages/knowledge.rs": {
+    "executable": false,
+    "sha256": "10ecf9ac652477f72bf1d08fd43f7e2b168cf8b2d0aa2fc90f790a37da848501"
+  },
+  "src/adapters/http/pages/knowledge_tests.rs": {
+    "executable": false,
+    "sha256": "c1980bb03833fd26a5db7cf0d45665126c220e36f7e28ea03754ab214a19dc71"
+  },
+  "src/adapters/http/routes/knowledge/manual.rs": {
+    "executable": false,
+    "sha256": "692f8e8210d2cc28022d9acc92e9500cd708ea30ae224ee3d68bb258301b80fd"
+  },
+  "src/adapters/http/routes/knowledge/mod.rs": {
+    "executable": false,
+    "sha256": "6033f2500cb6794523a09fd836a121b14b202a4af7d16dc3dc478965accdee89"
+  },
+  "src/adapters/http/routes/knowledge/review_scope_tests.rs": {
+    "executable": false,
+    "sha256": "09de409b59b4d8e5e218c5736d271be0b768a5926776806ed01703a6cde3437d"
+  },
+  "src/adapters/http/routes/knowledge/scope_tests.rs": {
+    "executable": false,
+    "sha256": "2011794518059247bd1098dd29d1518d9424bfc0146aaebb436a58e630a98092"
+  },
+  "src/adapters/http/routes/knowledge/tests.rs": {
+    "executable": false,
+    "sha256": "e634c3cf7e6acd87e6fc380d152b57c1d65bf38d48d0ddb8388c5e535ac6f9b4"
+  },
+  "src/adapters/http/routes/knowledge/upload.rs": {
+    "executable": false,
+    "sha256": "67580690da0b7013bda6218b02216f52cf656ab41c719cc0a6d395be41a0d0d8"
+  },
+  "src/adapters/http/routes/ui_companies.rs": {
+    "executable": false,
+    "sha256": "a37dcb87431283054e199801bcc13dbe794662ee124e18c4a2696f56cbfdf166"
+  },
+  "src/adapters/http/routes/ui_department_knowledge_tests.rs": {
+    "executable": false,
+    "sha256": "e7dacdaff29e956cc4cf21ea5cfbc3267abfc5072c9341d31b85463742cf281e"
+  },
+  "src/adapters/http/routes/ui_departments.rs": {
+    "executable": false,
+    "sha256": "1dc230868b5a6f6abad5167c5f00d281272d87c14093639719c8b8a498009c3b"
+  },
+  "src/adapters/http/routes/ui_departments_tests.rs": {
+    "executable": false,
+    "sha256": "490a57e2afb90898c2c9ac5f71da717fd79a7e2c3d65301d2d078c790c193c04"
+  },
+  "src/adapters/persistence/knowledge/mod.rs": {
+    "executable": false,
+    "sha256": "21e64cfa07eaf9b3cd7f46dff742677ac4ef361718ffc43e726ad76cd90f8b93"
+  },
+  "src/adapters/persistence/knowledge/moves.rs": {
+    "executable": false,
+    "sha256": "b564c4db5ce15d6832dd021dd3013d8730b228ddc77bc6b6de82da880c796477"
+  },
+  "src/adapters/persistence/knowledge/permissions.rs": {
+    "executable": false,
+    "sha256": "cf2daa7c5831e15dd38fe1066588ef664205b25442677f264cafeacc37122ab1"
+  },
+  "src/adapters/persistence/knowledge/rows.rs": {
+    "executable": false,
+    "sha256": "14d81849675d829a0bb435b2892f4e4d2a250bfd74b821bf2417d05f8733562b"
+  },
+  "src/adapters/persistence/knowledge/scope_race_tests.rs": {
+    "executable": false,
+    "sha256": "7903b6d41137f1bf65cf3f56a48927b8dad44670d521b724d84fe9088b6bbb02"
+  },
+  "src/adapters/persistence/knowledge/scope_test_support.rs": {
+    "executable": false,
+    "sha256": "560fb25498b8f69c76ab11c0aac70b46440e0cd7330201af95b59a60d3942733"
+  },
+  "src/adapters/persistence/knowledge/scope_tests.rs": {
+    "executable": false,
+    "sha256": "82d9b6e3dcf8101adfb50a11974bacc773bbb4ed5412ef5154345f0017a9fabd"
+  },
+  "src/adapters/persistence/knowledge/search.rs": {
+    "executable": false,
+    "sha256": "47f236edef20067b07e70bd0a8b022a42281c1b3e0538ae97cfdf1e539fa2264"
+  },
+  "src/adapters/persistence/knowledge/search_quota_tests.rs": {
+    "executable": false,
+    "sha256": "20ccb2413c3882c64b4a776081a29ca93379617ebd5736198dfc74cd3d96c05d"
+  },
+  "src/adapters/persistence/knowledge/search_tests.rs": {
+    "executable": false,
+    "sha256": "10fd7284e055054dd5c6a2bd352ac85fe04009dd90654aeafd456e8320106b8b"
+  },
+  "src/adapters/persistence/knowledge/tests.rs": {
+    "executable": false,
+    "sha256": "aaf3db336a7e285366d419b4ace00d5367f8c398efcdafd631b84e9fcd81d109"
+  },
+  "src/adapters/persistence/knowledge/tests/constraints.rs": {
+    "executable": false,
+    "sha256": "a650305b6f227d11a44f4b96591c2bba3d4a0aef4b67da8b0e3668b698f53a05"
+  },
+  "src/adapters/persistence/knowledge/tests/races.rs": {
+    "executable": false,
+    "sha256": "9903c9aa107c7ef71fa58848514ca46078c7173dac0ae8b51ea30b84f36dbe78"
+  },
+  "src/adapters/persistence/knowledge/writes.rs": {
+    "executable": false,
+    "sha256": "d145e1b92646c72643e83e08b52a5cf856bda3d67cca612239b32a73085d7bce"
+  },
+  "src/adapters/persistence/root_teardown_test_support.rs": {
+    "executable": false,
+    "sha256": "7e2e9e4aad0a0878befd05b6c0740f2b97a14ff58d2bb61cb75b77c7d7931b11"
+  },
+  "src/adapters/persistence/workflow/agent_preparation.rs": {
+    "executable": false,
+    "sha256": "a23a0ee5e7473794320b473b16cb275011a4f7f32f9df11dc637687987e913a8"
+  },
+  "src/adapters/persistence/workflow/knowledge.rs": {
+    "executable": false,
+    "sha256": "b5181c8fb0532df18effc74e3df5cbf19e4e542d4958807bfe83550f11810a99"
+  },
+  "src/adapters/persistence/workflow/knowledge_checkpoint.rs": {
+    "executable": false,
+    "sha256": "119ee67534046a4c6ef5c3007479befb0d00f9f89e486447e4f1706678ce3991"
+  },
+  "src/adapters/persistence/workflow/knowledge_e2e_support.rs": {
+    "executable": false,
+    "sha256": "70453c703e42b8f4a7197dabe336320788027e16a42e5e144d7bf19510e701b1"
+  },
+  "src/adapters/persistence/workflow/knowledge_e2e_tests.rs": {
+    "executable": false,
+    "sha256": "8b7b8c5f164a5005ec886c10df5ca5684e32f4820789d01fbd7229a3a9b87c08"
+  },
+  "src/adapters/persistence/workflow/knowledge_e2e_upload_tests.rs": {
+    "executable": false,
+    "sha256": "50e6388c2539b9d8b8b8179a038e6cd8ee30cada36aca41618d6eaa0de0f4ea4"
+  },
+  "src/adapters/persistence/workflow/knowledge_scope_deployment_tests.rs": {
+    "executable": false,
+    "sha256": "3ca297865070ebf3cc22c53f8c6860774fda0f109977848cd16d1d5f8afeebb5"
+  },
+  "src/adapters/persistence/workflow/knowledge_scope_fixture.rs": {
+    "executable": false,
+    "sha256": "375b9f914aeb0926aade2f7088c47d37cf16f3f5eb009e935ca91088d125d0e8"
+  },
+  "src/adapters/persistence/workflow/knowledge_scope_proof_tests.rs": {
+    "executable": false,
+    "sha256": "4ab1c618f3c08515abfb7eeb2fa9feafeecb2637200f8b58c9687d7af332d2b8"
+  },
+  "src/adapters/persistence/workflow/knowledge_scope_runtime_tests.rs": {
+    "executable": false,
+    "sha256": "cdc65d71612a9aa8e15125edc4af5d7d7fa5cba5e0f82f815ca6160d1d40b139"
+  },
+  "src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs": {
+    "executable": false,
+    "sha256": "3ce1041591b591a62a90dc37fb68cfacbf8ee2e820d135871d4f6749320719a0"
+  },
+  "src/adapters/persistence/workflow/knowledge_search_lease_tests.rs": {
+    "executable": false,
+    "sha256": "b277ca77b80562122c4644b56ae65f0cfefaf4db51163a852039ff8f44f5c214"
+  },
+  "src/adapters/persistence/workflow/knowledge_search_support.rs": {
+    "executable": false,
+    "sha256": "835afb042987b723a94b66ec11aadcd10162b22b89abd51095d45dfe873d7671"
+  },
+  "src/adapters/persistence/workflow/knowledge_search_tests.rs": {
+    "executable": false,
+    "sha256": "fca88c7799433a03f32ab4a48deffe5241db50d95dd68f2b4a395a864c3b73ac"
+  },
+  "src/adapters/persistence/workflow/run_scopes.rs": {
+    "executable": false,
+    "sha256": "1c725f66b54db70374983d8a71f8e268bd8ad8ed7a5a777941d4e4814ebe7ae1"
+  },
+  "src/application/knowledge/query_embedding_tests.rs": {
+    "executable": false,
+    "sha256": "f11149914bffc437d85ca03c76108a87e329a58dfcd1024ea03cb09018314d22"
+  },
+  "src/application/knowledge/search/ranking.rs": {
+    "executable": false,
+    "sha256": "723d9cca87d74948ca4b8f7cfce14d493faf0cc7ec2ed6f77a261a5b289bf954"
+  },
+  "src/application/knowledge/search/ranking_tests.rs": {
+    "executable": false,
+    "sha256": "1a39c71fb53b0c973480a50d61064ae237037d8def6d62ba5ace549fde81b7c3"
+  },
+  "src/application/knowledge/search/types.rs": {
+    "executable": false,
+    "sha256": "a58a7af237db7ed3595583347608b8f09b85352dd925d78841c8e6b50ffece16"
+  },
+  "src/application/knowledge/service.rs": {
+    "executable": false,
+    "sha256": "6b49d31a4365dc6fb8d2d1a6fb1e7ad407aeead0ea6a3e013a6a3465045c8741"
+  },
+  "src/application/knowledge/service_tests.rs": {
+    "executable": false,
+    "sha256": "90e197483ef50d341c5fc9cb8b2de7ba81215d49b219a765a56731c38056586d"
+  },
+  "src/application/knowledge/types.rs": {
+    "executable": false,
+    "sha256": "e2ececa071005ae4e200e27da8eb76cb0fffd0f2da7ec1fb968e076b1a0c19d9"
+  },
+  "src/application/workflow/knowledge/ports.rs": {
+    "executable": false,
+    "sha256": "4be63d7f8f94a0052818f7f84fc9b9f087aad9086fbe2a2d8fe74144c8899ba3"
+  },
+  "src/application/workflow/knowledge/runtime.rs": {
+    "executable": false,
+    "sha256": "351a73a32c006e7ab61e15df1b37977ed9996d6a4e4029cfd12b54cbd68e72fa"
+  },
+  "src/application/workflow/scopes.rs": {
+    "executable": false,
+    "sha256": "063912030681bd4c682b0b3d9de8cf407df509a7319afe24acfccc5304681465"
+  },
+  "src/domain/entities/knowledge.rs": {
+    "executable": false,
+    "sha256": "0a6cd946e64ec743ca91f40879974e10e554c89aefd14418896d9ad19e7163b7"
+  }
+}

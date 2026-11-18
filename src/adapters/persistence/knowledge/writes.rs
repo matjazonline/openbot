@@ -37,12 +37,14 @@ pub(super) fn validate(documents: &[PreparedKnowledgeDocument]) -> AppResult<()>
 }
 pub(super) async fn replace(
     tx: &mut Transaction<'_, Postgres>,
-    scope: KnowledgeScope,
+    target: KnowledgeUploadTarget,
     document: &PreparedKnowledgeDocument,
 ) -> AppResult<Uuid> {
     let file = &document.file;
-    let id=sqlx::query_scalar::<_,Uuid>("INSERT INTO knowledge_documents (id,company_id,name,access_level,content,content_sha256,uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (company_id,name_key,access_level) DO UPDATE SET name=EXCLUDED.name,content=EXCLUDED.content,content_sha256=EXCLUDED.content_sha256,uploaded_by=EXCLUDED.uploaded_by,revision=knowledge_documents.revision+1,updated_at=clock_timestamp() RETURNING id")
+    let scope = target.scope;
+    let id=sqlx::query_scalar::<_,Uuid>("INSERT INTO knowledge_documents (id,company_id,name,access_level,content,content_sha256,uploaded_by,unit_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (company_id,unit_id,name_key,access_level) DO UPDATE SET name=EXCLUDED.name,content=EXCLUDED.content,content_sha256=EXCLUDED.content_sha256,uploaded_by=EXCLUDED.uploaded_by,revision=knowledge_documents.revision+1,updated_at=clock_timestamp() RETURNING id")
         .bind(Uuid::new_v4()).bind(scope.company.as_uuid()).bind(file.file_name().name().as_str()).bind(file.file_name().level().as_i16()).bind(file.text()).bind(file.sha256().as_slice()).bind(scope.actor_id)
+        .bind(target.unit.as_uuid())
         .fetch_one(&mut **tx).await.map_err(authority::database)?;
     sqlx::query("DELETE FROM knowledge_chunks WHERE company_id=$1 AND document_id=$2")
         .bind(scope.company.as_uuid())
@@ -52,7 +54,7 @@ pub(super) async fn replace(
         .map_err(authority::database)?;
     for (offset, batch) in document.chunks.chunks(64).enumerate() {
         let mut query = QueryBuilder::new(
-            "INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,heading,body,embedding_model,embedding) ",
+            "INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,heading,body,embedding_model,embedding,unit_id) ",
         );
         query.push_values(batch.iter().enumerate(), |mut row, (index, chunk)| {
             row.push_bind(Uuid::new_v4())
@@ -63,7 +65,8 @@ pub(super) async fn replace(
                 .push_bind(&chunk.chunk.heading)
                 .push_bind(&chunk.chunk.body)
                 .push_bind(document.embedding_model.as_str())
-                .push_bind(chunk.embedding.to_vec());
+                .push_bind(chunk.embedding.to_vec())
+                .push_bind(target.unit.as_uuid());
         });
         query
             .build()

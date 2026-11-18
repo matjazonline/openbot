@@ -265,13 +265,51 @@ impl SearchFixture {
             .fetch_one(self.p().pool()).await.unwrap()
     }
 
+    // Protocol-only fixtures: these source identifiers do not prove document retrieval.
+    pub(super) async fn synthetic_observation(
+        &self,
+        text: &str,
+        level: AccessLevel,
+    ) -> crate::application::workflow::knowledge::KnowledgeSearchObservation {
+        use crate::application::knowledge::search::{KnowledgeObservation, KnowledgeSourceItem};
+        let scope = self.claim.fence.scope;
+        let mut db = self.p().pool().acquire().await.unwrap();
+        let units = crate::adapters::persistence::workflow::run_scopes::knowledge_units_on(
+            &mut db,
+            scope.company,
+            scope.run,
+            crate::entities::agent_capability::AgentId::new(self.agent),
+        )
+        .await
+        .unwrap()
+        .expect("fixture has a sealed, available actor projection");
+        let items = vec![KnowledgeSourceItem {
+            document_id: Uuid::from_u128(1),
+            chunk_id: Uuid::from_u128(2),
+            unit_id: units[0],
+            access_level: level,
+        }];
+        crate::application::workflow::knowledge::KnowledgeSearchObservation {
+            queried_units: units,
+            observation: KnowledgeObservation::new(
+                json!({"passages":[{"file":"sales.md","heading":null,"text":text}]}),
+                Some(level),
+                items,
+            ),
+        }
+    }
+
     pub(super) async fn upload_sales(&self) {
         self.library
             .upload(
-                KnowledgeScope {
-                    company: self.fixture.target.company,
-                    actor_id: self.fixture.target.actor.user_id(),
-                },
+                crate::adapters::persistence::knowledge::root_target(
+                    self.p(),
+                    KnowledgeScope {
+                        company: self.fixture.target.company,
+                        actor_id: self.fixture.target.actor.user_id(),
+                    },
+                )
+                .await,
                 vec![
                     KnowledgeUploadFile::from_upload(
                         "0_sales.md",
@@ -442,110 +480,6 @@ pub(super) fn copy_call(call: &KnowledgeToolCall) -> KnowledgeToolCall {
     }
 }
 
-async fn lead_units(f: &Fixture, agent: Uuid) -> crate::entities::department::DepartmentId {
-    use crate::entities::department::DepartmentRole;
-    use crate::ports::department::DepartmentWrite;
-    let company = f.target.company;
-    let actor = f.target.actor.user_id();
-    let departments =
-        crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
-    let root = crate::adapters::persistence::company::root_on(
-        &mut f.persistence.pool().acquire().await.unwrap(),
-        company,
-    )
-    .await
-    .unwrap();
-    let local = departments
-        .create_department(
-            actor,
-            company.as_uuid(),
-            DepartmentWrite {
-                name: "Memory local".into(),
-                slug: "memory-local".into(),
-                ..Default::default()
-            },
-            None,
-        )
-        .await
-        .unwrap()
-        .id;
-    for (slug, parent) in [
-        ("report-a", local),
-        ("report-b", local),
-        ("root-report", root),
-    ] {
-        departments
-            .create_department(
-                actor,
-                company.as_uuid(),
-                DepartmentWrite {
-                    name: slug.into(),
-                    slug: slug.into(),
-                    parent_id: Some(parent),
-                    ..Default::default()
-                },
-                None,
-            )
-            .await
-            .unwrap();
-    }
-    let principal = crate::adapters::persistence::memory::agent_principal_on(
-        &mut f.persistence.pool().acquire().await.unwrap(),
-        company.as_uuid(),
-        agent,
-    )
-    .await
-    .unwrap();
-    // Local is both own and a child readable through the root lead. This makes
-    // the real consumer prove deduplication across overlapping selectors.
-    for unit in [root, local] {
-        departments
-            .assign_role(
-                actor,
-                company.as_uuid(),
-                unit,
-                DepartmentRole::Lead,
-                principal,
-            )
-            .await
-            .unwrap();
-    }
-    local
-}
-
-async fn lead_desk(f: &Fixture, agent: Uuid, viewer: Uuid) -> RelatedAssociation {
-    use crate::ports::channel::{ChannelPersistence, ChannelWrite};
-    // Box substantial topology setup separately from the shared agent fixture.
-    let local = Box::pin(lead_units(f, agent)).await;
-    let company = f.target.company;
-    let principal = crate::adapters::persistence::memory::person_principal_on(
-        &mut f.persistence.pool().acquire().await.unwrap(),
-        company.as_uuid(),
-        viewer,
-    )
-    .await
-    .unwrap();
-    crate::adapters::persistence::test_support::department_use_cases(&f.persistence)
-        .add_member(
-            f.target.actor.user_id(),
-            company.as_uuid(),
-            local,
-            principal,
-        )
-        .await
-        .unwrap();
-    let desk = ChannelPersistence::create(
-        &f.persistence,
-        company.as_uuid(),
-        ChannelWrite {
-            name: "Memory scope tools".into(),
-            slug: "memory-scope-tools".into(),
-            enabled: true,
-            department_id: Some(local),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    RelatedAssociation::Channel(RelatedChannelId::new(desk.id))
-}
+#[path = "knowledge_scope_fixture.rs"]
+mod topology;
+use topology::lead_desk;

@@ -2,7 +2,9 @@ use super::ExactKnowledgeTerm;
 use crate::{
     app_error::{AppError, AppResult},
     application::workflow::CompanyId,
-    entities::{access_level::AccessLevel, value_objects::EmbeddingModelId},
+    entities::{
+        access_level::AccessLevel, department::DepartmentId, value_objects::EmbeddingModelId,
+    },
 };
 use async_trait::async_trait;
 use serde_json::Value;
@@ -34,6 +36,8 @@ impl Default for KnowledgeSearchLimit {
 
 pub struct StoredKnowledgeChunk {
     pub id: Uuid,
+    pub document_id: Uuid,
+    pub unit_id: DepartmentId,
     pub document_name: crate::entities::value_objects::KnowledgeDocumentName,
     pub heading: Option<String>,
     pub body: String,
@@ -48,6 +52,7 @@ pub struct VisibleKnowledgeQuery {
     pub ceiling: AccessLevel,
     pub model: EmbeddingModelId,
     pub exact_terms: Vec<ExactKnowledgeTerm>,
+    pub units: Vec<DepartmentId>,
 }
 
 #[async_trait]
@@ -60,11 +65,29 @@ pub trait KnowledgeChunks: Send + Sync {
 pub struct KnowledgeObservation {
     result: Value,
     highest: Option<AccessLevel>,
+    items: Vec<KnowledgeSourceItem>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KnowledgeSourceItem {
+    pub document_id: Uuid,
+    pub chunk_id: Uuid,
+    pub unit_id: DepartmentId,
+    pub access_level: AccessLevel,
 }
 
 impl KnowledgeObservation {
-    pub(crate) fn new(result: Value, highest: Option<AccessLevel>) -> Self {
-        Self { result, highest }
+    pub(crate) fn new(
+        result: Value,
+        highest: Option<AccessLevel>,
+        items: Vec<KnowledgeSourceItem>,
+    ) -> Self {
+        Self {
+            result,
+            highest,
+            items,
+        }
     }
 
     pub fn result(&self) -> &Value {
@@ -73,5 +96,9 @@ impl KnowledgeObservation {
 
     pub fn highest(&self) -> Option<AccessLevel> {
         self.highest
+    }
+
+    pub fn items(&self) -> &[KnowledgeSourceItem] {
+        &self.items
     }
 }

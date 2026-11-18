@@ -1,0 +1,119 @@
+⬆ trail 0.29.0 → 0.30.5 available: run `trail upgrade` (restart your agent after).
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 336 changed files against 32 learnings and 4 skills
+
+✗ migrations/20260817000000_init_schema.sql:12246
+  brings back valid selected select, which Mac02's learning ruled out
+  Mac02 · Nov 17: Inputs therefore still looked valid while every
+  selected option vanished from its select.
+✗ migrations/20260817000000_init_schema.sql:12336
+  brings back order department principal, which Mac02's learning ruled out
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+✗ migrations/20260817000000_init_schema.sql:20043
+  brings back live read insert, which Mac02's learning ruled out
+  Mac02 · Nov 17: The separate live sample caught BuffileRead during the
+  original insert.
+✗ migrations/20260817000000_init_schema.sql:20051
+  brings back local miss authority, which Mac02's learning ruled out
+  Mac02 · Nov 16: A local HTTPS reproduction isolated Missing Authority
+  Key Identifier.
+✗ migrations/20260817000000_init_schema.sql:20063
+  brings back one read another, which Mac02's learning ruled out
+  Mac02 · Nov 16: Independent review paused one real Chromium tab
+  between reading candidates and cleanup, let another tab persist a
+  new click, then resumed cleanup: the newer click was deleted.
+● migrations/20260817000000_init_schema.sql:14850
+  sets checkpoint to 8, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: In the code: migrations/20260817000000_init_schema.sql
+  functions agent_history_checkpoint_matches and
+  agent_history_preparation_valid; src/application/workflow/agent.rs
+  PREPARED_AGENT_VERSION;
+  plan/05-scopes/phases/p02/docs/logs/B1-scope-tests-r4.txt,
+  B1-core-schema-refresh-r3.txt and B1-memory-focused-r2.txt (192
+  passed, 8 live checks separately required).
+● migrations/20260817000000_init_schema.sql:15935
+  brings back company unit memory, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: A real regression test admitted a company-wide root
+  with an own-unit memory tool descendant; the guard would otherwise
+  fail only when that descendant executed, after earlier effects could
+  occur.
+● migrations/20260817000000_init_schema.sql:15990
+  brings back miss scope row, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Tool-port replay checks and a missing-scope-row
+  continuation test passed, but they did not cover a legitimate
+  department deletion that leaves historical scope rows intact.
+● migrations/20260817000000_init_schema.sql:20044
+  brings back agent retirement principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: The old agent retirement test inserted a principal and
+  waited for its concurrent agent deletion to block.
+● plan/05-scopes/COORDINATION.md:1
+  brings back tool replay check, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Tool-port replay checks and a missing-scope-row
+  continuation test passed, but they did not cover a legitimate
+  department deletion that leaves historical scope rows intact.
+● plan/05-scopes/COORDINATION.md:4
+  brings back order department principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● plan/05-scopes/COORDINATION.md:4
+  brings back check root published, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Checking only the root PublishedBundle and its
+  children missed agent-tool workflow edges.
+● plan/05-scopes/COORDINATION.md:10
+  brings back handle local check, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Returning only cloned Handles from a helper with a
+  local RcDom type-checks and preserves node attributes, but the
+  document root's destruction drains descendant child lists.
+● plan/05-scopes/COORDINATION.md:12
+  brings back original schema valid, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: The original 64 KiB cap rejected a schema-valid
+  100-company page with 120 four-byte Unicode characters per name: the
+  reviewer measured 73,530 serialized bytes before adding a cursor.
+● plan/05-scopes/COORDINATION.md:23
+  brings back failed production desk, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: A populated temporary clone failed to reproduce
+  repeated production desk creation because its statistics and
+  generic-plan shape differed.
+● plan/05-scopes/COORDINATION.md:27
+  brings back tool child test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Tool and child tests then stopped before the provider
+  with agent.unresolved or unused scripted exchanges.
+● plan/05-scopes/COORDINATION.md:31
+  brings back agent test principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: The old agent retirement test inserted a principal and
+  waited for its concurrent agent deletion to block.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:1
+  brings back conflict already accepted, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Reducing the public page size would conflict with the
+  already accepted limit of 100.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:3
+  brings back tool check scope, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Tool-port replay checks and a missing-scope-row
+  continuation test passed, but they did not cover a legitimate
+  department deletion that leaves historical scope rows intact.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:3
+  brings back rust sql required, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Offline compilation passed while Rust wrote version 8
+  and both SQL readers still required 7.
+
+· 5 conflicts · fix them, or say why in the commit message or PR description
+
+🔀 trail · Matjazonline's branch anthropic-latest-models also changes src/main.rs (pushed Nov 6)

@@ -9,6 +9,7 @@ use crate::entities::{
 };
 
 pub const MAX_RUN_READ_UNITS: usize = 256;
+pub const RUN_SCOPE_LIMIT_EXCEEDED: &str = "memory.scope_limit_exceeded";
 pub const MAX_RUN_READ_NAMESPACES: usize = MAX_RUN_READ_UNITS + 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,7 +136,7 @@ fn add_reports(
                 existing.report = true;
             } else {
                 if units.len() >= MAX_RUN_READ_UNITS {
-                    return Err(AppError::BadRequest("memory.scope_limit_exceeded".into()));
+                    return Err(AppError::BadRequest(RUN_SCOPE_LIMIT_EXCEEDED.into()));
                 }
                 units.insert(
                     child.id,

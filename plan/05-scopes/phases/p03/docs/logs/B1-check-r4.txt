@@ -1,0 +1,95 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/adapters/http/routes/knowledge/tests.rs:77:14
+    |
+ 77 |               .list(KnowledgeScope {
+    |  ______________^^^^-
+ 78 | |                 company: CompanyId::new(self.f.company.id),
+ 79 | |                 actor_id: user,
+ 80 | |             })
+    | |______________- argument #2 of type `std::option::Option<domain::entities::department::DepartmentId>` is missing
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:125:14
+    |
+125 |     async fn list(
+    |              ^^^^
+...
+128 |         unit: Option<DepartmentId>,
+    |         ----
+help: provide the argument
+    |
+ 77 |             .list(KnowledgeScope {
+ 78 |                 company: CompanyId::new(self.f.company.id),
+ 79 |                 actor_id: user,
+ 80 ~             }, /* Option<DepartmentId> */)
+    |
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/adapters/http/routes/knowledge/tests.rs:227:10
+    |
+227 |           .list(KnowledgeScope {
+    |  __________^^^^-
+228 | |             company: CompanyId::new(s.f.foreign.id),
+229 | |             actor_id: s.f.stranger.id,
+230 | |         })
+    | |__________- argument #2 of type `std::option::Option<domain::entities::department::DepartmentId>` is missing
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:125:14
+    |
+125 |     async fn list(
+    |              ^^^^
+...
+128 |         unit: Option<DepartmentId>,
+    |         ----
+help: provide the argument
+    |
+227 |         .list(KnowledgeScope {
+228 |             company: CompanyId::new(s.f.foreign.id),
+229 |             actor_id: s.f.stranger.id,
+230 ~         }, /* Option<DepartmentId> */)
+    |
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/search_quota_tests.rs:44:27
+    |
+ 44 |             store.replace(scope, &documents).await
+    |                   ------- ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                   |
+    |                   arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:139:14
+    |
+139 |     async fn replace(
+    |              ^^^^^^^
+140 |         &self,
+141 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0599]: no method named `result` found for struct `application::workflow::knowledge::ports::KnowledgeSearchObservation` in the current scope
+  --> src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs:26:22
+   |
+23 |                   result: f
+   |  _________________________-
+24 | |                     .synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+25 | |                     .await
+26 | |                     .result()
+   | |                     -^^^^^^ method not found in `application::workflow::knowledge::ports::KnowledgeSearchObservation`
+   | |_____________________|
+   |
+   |
+  ::: src/application/workflow/knowledge/ports.rs:86:1
+   |
+86 |   pub struct KnowledgeSearchObservation {
+   |   ------------------------------------- method `result` not found for this struct
+   |
+help: one of the expressions' fields has a method of the same name
+   |
+26 |                     .observation.result()
+   |                      ++++++++++++
+
+Some errors have detailed explanations: E0061, E0308, E0599.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 4 previous errors

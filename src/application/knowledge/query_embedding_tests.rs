@@ -45,7 +45,7 @@ async fn knowledge_search_cancellation_retains_the_actual_shared_native_slot() {
         Err(AppError::ServiceUnavailable(_))
     ));
     assert!(matches!(
-        f.library.upload(scope(), vec![file("body")]).await,
+        f.library.upload(target(), vec![file("body")]).await,
         Err(AppError::ServiceUnavailable(_))
     ));
     f.gate.release();
@@ -86,11 +86,11 @@ async fn knowledge_search_result_holds_the_slot_through_consumption_and_releases
     let embedding = library.embed_query("price").await.unwrap();
     assert!((embedding.vector()[0] - 1.0).abs() < 0.001);
     assert!(matches!(
-        library.upload(scope(), vec![file("body")]).await,
+        library.upload(target(), vec![file("body")]).await,
         Err(AppError::ServiceUnavailable(_))
     ));
     drop(embedding);
-    library.upload(scope(), vec![file("body")]).await.unwrap();
+    library.upload(target(), vec![file("body")]).await.unwrap();
     assert_eq!(docs.writes.load(Ordering::SeqCst), 1);
     library.shutdown().await.unwrap();
 }

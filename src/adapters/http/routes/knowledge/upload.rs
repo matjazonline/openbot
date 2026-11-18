@@ -21,23 +21,62 @@ pub(super) async fn receive(
         };
         (status, refused.to_string()).into_response()
     })?;
-    let multipart = Multipart::from_request(request, &())
+    let mut multipart = Multipart::from_request(request, &())
         .await
         .map_err(IntoResponse::into_response)?;
-    let files = tokio::time::timeout(READ_DEADLINE, files(multipart))
-        .await
-        .map_err(|_| {
-            (
-                StatusCode::REQUEST_TIMEOUT,
-                "The upload took too long; choose the files again",
-            )
-                .into_response()
-        })??;
+    let received = tokio::time::timeout(READ_DEADLINE, async {
+        let unit = unit(&mut multipart).await?;
+        let target = crate::application::knowledge::KnowledgeUploadTarget { scope, unit };
+        s.library
+            .documents()
+            .preflight_upload(target, &[])
+            .await
+            .map_err(IntoResponse::into_response)?;
+        Ok::<_, Box<Response>>((target, files(multipart).await?))
+    })
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::REQUEST_TIMEOUT,
+            "The upload took too long; choose the files again",
+        )
+            .into_response()
+    })??;
     s.library
-        .upload(scope, files)
+        .upload(received.0, received.1)
         .await
         .map_err(mutation_error)
         .map_err(Box::new)
+}
+
+async fn unit(
+    multipart: &mut Multipart,
+) -> Result<crate::entities::department::DepartmentId, Box<Response>> {
+    let invalid = || {
+        Box::new(
+            AppError::BadRequest("Choose a department: unit_id must precede the files".into())
+                .into_response(),
+        )
+    };
+    let mut field = multipart
+        .next_field()
+        .await
+        .map_err(IntoResponse::into_response)?
+        .ok_or_else(invalid)?;
+    if field.name() != Some("unit_id") || field.file_name().is_some() {
+        return Err(invalid());
+    }
+    let mut bytes = Vec::with_capacity(36);
+    while let Some(chunk) = field.chunk().await.map_err(IntoResponse::into_response)? {
+        if chunk.len() > 36usize.saturating_sub(bytes.len()) {
+            return Err(invalid());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let raw = std::str::from_utf8(&bytes).map_err(|_| invalid())?;
+    Uuid::parse_str(raw)
+        .map(crate::entities::department::DepartmentId::new)
+        .map_err(|_| invalid())
 }
 pub(super) async fn files(
     mut multipart: Multipart,

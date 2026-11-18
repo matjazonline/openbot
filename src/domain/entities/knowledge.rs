@@ -88,10 +88,20 @@ pub fn may_write_document(
 #[derive(Debug, Clone, Serialize)]
 pub struct KnowledgeDocumentLayer {
     pub id: uuid::Uuid,
+    pub unit_id: super::department::DepartmentId,
+    pub unit_name: String,
+    pub unit_is_root: bool,
     pub name: KnowledgeDocumentName,
     pub access_level: AccessLevel,
     pub revision: i64,
     pub text_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct KnowledgeUnit {
+    pub id: super::department::DepartmentId,
+    pub name: String,
+    pub is_root: bool,
 }
 impl KnowledgeDocumentLayer {
     pub fn file_name(&self) -> String {

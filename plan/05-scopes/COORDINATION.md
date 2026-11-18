@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md
 - Writer: /root in /Users/mac02/orca/workspaces/openbot/plan03-04
-- Revision: 11
+- Revision: 16
 
 ## Plan-wide instructions
 
@@ -43,7 +43,7 @@
 | --- | --- | --- | --- |
 | p01 accepted in phase; main integration pending | root/A /root; B /root/p05_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p01/docs/{TASK,HANDOFF}.md |
 | p02 accepted and locally committed2edd0a73; main integration at03 | root/A /root; B /root/p05_reviewer | same sequential checkout | phases/p02/docs/{TASK,HANDOFF}.md |
-| p03 planned | /root | same sequential checkout | phases/p03/docs/ when started |
+| p03 source accepted; main publication next | root/A /root; source B /root/p05_reviewer_62 | same sequential checkout | phases/p03/docs/{TASK,HANDOFF}.md |
 | p04 planned | /root | same sequential checkout | phases/p04/docs/ when started |
 
 ## Cross-phase notices
@@ -175,3 +175,55 @@
 - Accepted p02 implementation commit 2edd0a73cbe76bac2d559c52f8c4c5025402c88b (source7a555e95…b51a5,
   independent05SC-P02-B1-R2-N1 PASS). Closed02HANDOFF records the commit; no runtime
   change in revision11. P03may start. Main remains Plan04 until03publication.
+
+- P03/root startup ACK C001–C004/r1 and C005/r2 at revision12, accepted02commit
+  2edd0a73/source7a555e95…b51a5, clean start5fd88652. P03TASK owns current tracing/
+  D3decisions/evidence. Original shared contracts and publication/Doop/STOP unchanged.
+
+
+### 05SC-C006 / r1
+- State: active; independently accepted p03 D3/r1 architecture.
+- Origin: p03TASK D3/r1; original03knowledge requirements and actual existing contracts.
+- Targets: p03/p04 and publication owner.
+- Instruction/change: knowledge owns units, uses exact sealed actor unit sets plus
+  classification, and keeps private historical unit/item consumption; public passage
+  schema remains file/heading/text. Upload explicitly requires unit_id before files;
+  new manual search, bounded UI choices, atomic all-layer moves and current unit write
+  authority must be documented as actually implemented. Existing tree teardown and
+  frozen host context are reused. No legacy files-only upload or principal knowledge.
+- Dependencies/order: no dependent source/schema edits until D3/r1 PASS; complete03
+  review/full source gate before main checkpoint,04docs/evidence after as authorized.
+- Evidence/review: original03 and immutable p03 logs/D3-R1-TASK.md;
+  independent 05SC-P03-D3-R1-N1 PASS at decision level, source
+  5e52c2b5725bf4e40e736e6b40de0f15be7157d3926d154562783f4a29e02ac2 and
+  coordination13 reproduced by root before activation. Behavioral/source proof pending.
+- Verification: p03criterion mapping, actual schema/query/proof/auth/move/browser
+  focused tests and required final source gates; p04documents actual protocol/limits.
+- Responses: p03/root ACK active r1 at revision14; p04 must evaluate active revision.
+
+### 05SC-C007 / r1
+- State: active; user review-model preference and explicit fallback.
+- Origin: user "use Astra6.2/high for review", then "if it's unavailable use the previous one".
+- Targets: p03/p04 independent review owner.
+- Instruction/change: request Astra6.2/high when supported; otherwise use the previous
+  independent Astra/high reviewer. Preserve authorship/review independence and durable
+  evidence. Existing accepted architecture and p01/p02 reviews remain valid.
+- Dependencies/order: apply before assigning the next independent source review.
+- Evidence/review: direct user instruction and fallback authorization; no runtime change.
+- Verification: record actual requested/available model and handle in the review assignment
+  and phase records. Do not claim 6.2 when only the previous model is exposed.
+- Responses: p03/root ACK r1 at revision15; p04 evaluates on entry.
+
+## Accepted p03 source checkpoint
+
+- Root accepted staged source62d667d9e56395de26652accbbab2ee1eb9f854969e308607cae2aa003cb5907,
+  base/HEAD5fd8865225125771205f4e0a7a8a59f595e19905, independent Astra6.2/high
+  05SC-P03-B1-R2-N2 PASS. All F1–F4 resolved; no affected verification gap.
+- Current full run4706PASS/2FAIL/27ignored/85Doopfiltered; both exact failures and
+  their internally competing families PASS current2MiB reruns. Precise timing
+  causes unproven; do not claim a single all-green full run. Native pinned macOS
+  download404 is main-identical; verified cached assets, images/live/runtime gates
+  PASS. Doop remains user-deferred; no wholeCIgreen claim.
+- Revision16 updates execution/evidence status only; active C001–C004/r1,C005/r2,
+  C006/r1,C007/r1 requirements unchanged from reviewed15. C003publication next,
+  then04docs/evidence and STOP before06. P03records retain complete final evidence.

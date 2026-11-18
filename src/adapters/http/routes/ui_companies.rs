@@ -135,6 +135,7 @@ struct Workspace {
     user_use_cases: Arc<UserUseCases>,
     skill_use_cases: Arc<SkillUseCases>,
     department_use_cases: Arc<DepartmentUseCases>,
+    knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -157,6 +158,7 @@ impl FromRequestParts<AppState> for Workspace {
             user_use_cases: state.user_use_cases.clone(),
             skill_use_cases: state.skill_use_cases.clone(),
             department_use_cases: state.department_use_cases.clone(),
+            knowledge: state.knowledge.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -357,8 +359,11 @@ impl Workspace {
             None => DepartmentSelection::None,
         };
         let section = department_section(
-            &self.department_use_cases,
-            &self.config,
+            super::ui_departments::DepartmentSectionServices {
+                departments: &self.department_use_cases,
+                knowledge: &self.knowledge,
+                config: &self.config,
+            },
             self.user_id,
             access,
             selection,

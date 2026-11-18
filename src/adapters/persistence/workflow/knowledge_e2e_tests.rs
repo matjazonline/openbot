@@ -7,6 +7,9 @@ use std::sync::atomic::Ordering;
 mod support;
 use support::*;
 
+#[path = "knowledge_scope_deployment_tests.rs"]
+mod scopes;
+
 #[path = "knowledge_e2e_race_tests.rs"]
 mod races;
 
@@ -135,7 +138,15 @@ async fn knowledge_e2e_customer_cc_lowers_member_run_to_public_before_search() {
 async fn knowledge_e2e_member_upload_ceiling_prefix_new_layer_and_replacement_are_enforced() {
     let j = Box::pin(SalesJourney::new(Vec::new(), Audience::Team)).await;
     let member = j.member(AccessLevel::L3).await;
-    let actor = scope(&j.d, member.user_id);
+    let actor = target(&j.d, member.user_id).await;
+    assert!(
+        j.d.knowledge
+            .upload(actor, vec![file("0_no-placement.md", "must refuse")])
+            .await
+            .is_err()
+    );
+    sqlx::query("INSERT INTO department_roles (company_id,department_id,role,principal_id) SELECT $1,$2,'reviewer',id FROM principals WHERE company_id=$1 AND user_id=$3")
+        .bind(actor.scope.company.as_uuid()).bind(actor.unit.as_uuid()).bind(member.user_id).execute(j.d.p().pool()).await.unwrap();
     assert!(
         j.d.knowledge
             .upload(actor, vec![file("5_sales.md", "forged replacement")])

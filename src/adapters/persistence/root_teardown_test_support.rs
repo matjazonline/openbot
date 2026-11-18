@@ -154,9 +154,12 @@ pub(crate) async fn tree_and_document(p: &PostgresPersistence, company: CompanyI
     );
     let documents = KnowledgeDocuments::replace(
         p,
-        KnowledgeScope {
-            company,
-            actor_id: owner,
+        crate::application::knowledge::KnowledgeUploadTarget {
+            scope: KnowledgeScope {
+                company,
+                actor_id: owner,
+            },
+            unit: leaf,
         },
         &[document()],
     )

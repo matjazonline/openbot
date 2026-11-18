@@ -2,10 +2,7 @@
 //! result update then observes the exact AlreadyApplied value, without a second state machine.
 use super::*;
 use crate::{
-    application::{
-        knowledge::search::KnowledgeObservation,
-        workflow::{agent::PreparedTool, knowledge::*, publication::ResolvedAgent},
-    },
+    application::workflow::{agent::PreparedTool, knowledge::*, publication::ResolvedAgent},
     domain::{entities::access_level::AccessLevel, workflow::StepId},
     services::harness::runs::InvocationState,
 };
@@ -15,6 +12,7 @@ struct LoadedCall {
     checkpoint: RunCheckpoint,
     access: KnowledgeSearchAccess,
     completed: Option<Value>,
+    units: Option<Vec<crate::entities::department::DepartmentId>>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -28,6 +26,8 @@ struct FrozenSearchStep {
 struct SavedConsumption {
     content_level: i16,
     result: Value,
+    queried_unit_ids: Vec<Uuid>,
+    source_items: Value,
 }
 
 #[async_trait]
@@ -59,7 +59,7 @@ impl KnowledgeSearchPersistence for PostgresPersistence {
         &self,
         fence: WorkflowFence,
         call: &KnowledgeToolCall,
-        observation: KnowledgeObservation,
+        observation: KnowledgeSearchObservation,
     ) -> AppResult<Value> {
         let bound = WriteBound::start("knowledge.observe", read_policy()?);
         let attempt = bound
@@ -94,19 +94,39 @@ async fn context_on(
     }
     token_budget::require_progression(tx, fence.scope).await?;
     live(tx, fence, bound).await?;
-    Ok(KnowledgeSearchContext::Pending(loaded.access))
+    Ok(match loaded.units {
+        Some(units) => KnowledgeSearchContext::Pending {
+            access: loaded.access,
+            units,
+        },
+        None => KnowledgeSearchContext::Unavailable,
+    })
 }
 
 async fn observe_on(
     tx: &mut Transaction<'_, Postgres>,
     fence: WorkflowFence,
     call: &KnowledgeToolCall,
-    observation: &KnowledgeObservation,
+    scoped: &KnowledgeSearchObservation,
     bound: &WriteBound,
 ) -> AppResult<Value> {
     let loaded = load_call(tx, fence, call, bound).await?;
     if let Some(result) = &loaded.completed {
         return replay_on(tx, fence, call, &loaded, result, bound).await;
+    }
+    let observation = &scoped.observation;
+    match &loaded.units {
+        Some(units) if *units == scoped.queried_units => {}
+        None if scoped.queried_units.is_empty()
+            && observation.result() == scope_unavailable().result() => {}
+        _ => return Err(missing()),
+    }
+    if observation
+        .items()
+        .iter()
+        .any(|item| !scoped.queried_units.contains(&item.unit_id))
+    {
+        return Err(missing());
     }
     validate_knowledge_observation(observation, loaded.access.ceiling)?;
     let write = WorkflowCheckpointWrite {
@@ -132,15 +152,20 @@ async fn observe_on(
         )
         .await?;
     }
-    record_consumption(
-        tx,
-        fence,
-        call,
-        loaded.checkpoint.run_id.0,
-        observation.highest().unwrap_or(AccessLevel::PUBLIC),
-        observation.result(),
-    )
-    .await?;
+    let proof = SavedConsumption {
+        content_level: observation
+            .highest()
+            .unwrap_or(AccessLevel::PUBLIC)
+            .as_i16(),
+        result: observation.result().clone(),
+        queried_unit_ids: scoped
+            .queried_units
+            .iter()
+            .map(|unit| unit.as_uuid())
+            .collect(),
+        source_items: serde_json::to_value(observation.items()).map_err(|_| invalid())?,
+    };
+    record_consumption(tx, fence, call, loaded.checkpoint.run_id.0, &proof).await?;
     live(tx, fence, bound).await?;
     Ok(observation.result().clone())
 }
@@ -180,10 +205,18 @@ async fn load_call(
     if completed.is_none() && saved.model_request_id.is_some() {
         return Err(AppError::Conflict("Model request is still active".into()));
     }
+    let units = super::super::run_scopes::knowledge_units_on(
+        tx,
+        fence.scope.company,
+        fence.scope.run,
+        frozen.selection.agent().agent_id,
+    )
+    .await?;
     Ok(LoadedCall {
         checkpoint,
         access: frozen.access,
         completed,
+        units,
     })
 }
 
@@ -267,7 +300,7 @@ async fn replay_on(
 ) -> AppResult<Value> {
     let scope = fence.scope;
     let proof = sqlx::query_as::<_, SavedConsumption>(
-        "SELECT content_level::smallint AS content_level,result
+        "SELECT content_level::smallint AS content_level,result,queried_unit_ids,source_items
         FROM workflow_knowledge_consumptions WHERE company_id=$1 AND run_id=$2 AND execution_id=$3
         AND job_id=$4 AND checkpoint_id=$5 AND invocation_id=$6 ORDER BY attempt_number LIMIT 1",
     )
@@ -284,7 +317,15 @@ async fn replay_on(
     if proof.result != *result || level > loaded.access.ceiling {
         return Err(missing());
     }
-    record_consumption(tx, fence, call, loaded.checkpoint.run_id.0, level, result).await?;
+    match &loaded.units {
+        Some(units)
+            if units.iter().map(|unit| unit.as_uuid()).collect::<Vec<_>>()
+                == proof.queried_unit_ids => {}
+        None if proof.queried_unit_ids.is_empty()
+            && proof.result == *scope_unavailable().result() => {}
+        _ => return Err(missing()),
+    }
+    record_consumption(tx, fence, call, loaded.checkpoint.run_id.0, &proof).await?;
     live(tx, fence, bound).await?;
     Ok(result.clone())
 }
@@ -294,18 +335,18 @@ async fn record_consumption(
     fence: WorkflowFence,
     call: &KnowledgeToolCall,
     checkpoint: Uuid,
-    level: AccessLevel,
-    result: &Value,
+    proof: &SavedConsumption,
 ) -> AppResult<()> {
     let scope = fence.scope;
     // An exact replay still schedules the deferred check of this attempt's actual live claim.
     sqlx::query(
         "INSERT INTO workflow_knowledge_consumptions
         (company_id,run_id,execution_id,job_id,attempt_number,execution_generation,worker_id,
-         checkpoint_id,invocation_id,content_level,result)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         checkpoint_id,invocation_id,content_level,result,queried_unit_ids,source_items)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
         ON CONFLICT (company_id,run_id,execution_id,job_id,attempt_number,invocation_id)
-        DO UPDATE SET content_level=EXCLUDED.content_level,result=EXCLUDED.result",
+        DO UPDATE SET content_level=EXCLUDED.content_level,result=EXCLUDED.result,
+        queried_unit_ids=EXCLUDED.queried_unit_ids,source_items=EXCLUDED.source_items",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
@@ -316,8 +357,10 @@ async fn record_consumption(
     .bind(fence.worker.0)
     .bind(checkpoint)
     .bind(call.invocation()?.0)
-    .bind(level.as_i16())
-    .bind(result)
+    .bind(proof.content_level)
+    .bind(&proof.result)
+    .bind(&proof.queried_unit_ids)
+    .bind(&proof.source_items)
     .execute(tx)
     .await?;
     Ok(())
