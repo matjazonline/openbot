@@ -9,9 +9,10 @@
 //! intent) is `memory::deliveries::enqueue_capture_on`.
 use super::*;
 use crate::adapters::persistence::memory::deliveries::{
-    CaptureEnqueue, CaptureIntent, SaveScope, enqueue_capture_on,
+    CaptureEnqueue, CaptureIntent, enqueue_capture_on,
 };
 use crate::application::memory::MemoryCaptureKind;
+use crate::application::workflow::memory_tools::{MemorySaveTarget, memory_write_scope};
 use serde_json::Value;
 
 #[derive(sqlx::FromRow)]
@@ -45,19 +46,21 @@ pub(super) async fn capture_on(
     .bind(exchange)
     .fetch_one(&mut *db)
     .await?;
+    let eligible =
+        super::super::checkpoints::memory_tools::eligible_on(db, scope.company, scope.run, agent)
+            .await?;
     let (kind, target) = match (conversation.scope_kind.as_str(), conversation.attached) {
-        ("thread", _) => (MemoryCaptureKind::Threads, SaveScope::Agent(agent)),
+        ("thread", _) => {
+            let Some(target) = memory_write_scope(&eligible, MemorySaveTarget::Default) else {
+                return Ok(CaptureEnqueue::Skipped("scope_unavailable"));
+            };
+            (MemoryCaptureKind::Threads, target.owner)
+        }
         ("private_session", Some(false)) => {
-            let Some(user) = super::super::checkpoints::memory_tools::user_scope_owner_on(
-                db,
-                scope.company,
-                scope.run,
-            )
-            .await?
-            else {
+            let Some(target) = eligible.iter().find(|scope| scope.private_person) else {
                 return Ok(CaptureEnqueue::Skipped("ineligible"));
             };
-            (MemoryCaptureKind::PrivateSessions, SaveScope::User(user))
+            (MemoryCaptureKind::PrivateSessions, target.owner)
         }
         _ => return Ok(CaptureEnqueue::Skipped("ineligible")),
     };

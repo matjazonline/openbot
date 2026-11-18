@@ -260,6 +260,50 @@ pub(crate) async fn raise_content_level_on(
     Ok(())
 }
 
+/// A cached checkpoint can feed the next model without replaying its local tool callback.
+/// Its consumed knowledge therefore needs the same current unit owners at the authority prefix.
+pub(super) async fn require_consumed_units_on(
+    db: &mut PgConnection,
+    scope: crate::application::workflow::actions::ActionScope,
+    agent: crate::entities::agent_capability::AgentId,
+) -> AppResult<()> {
+    let consumed: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_knowledge_consumptions WHERE company_id=$1 AND run_id=$2 AND execution_id=$3)",
+    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
+        .fetch_one(&mut *db).await?;
+    if !consumed {
+        return Ok(());
+    }
+    let units = super::run_scopes::knowledge_units_on(db, scope.company, scope.run, agent)
+        .await?
+        .map(|units| {
+            units
+                .into_iter()
+                .map(|unit| unit.as_uuid())
+                .collect::<Vec<_>>()
+        });
+    let refusal = crate::application::workflow::knowledge::scope_unavailable();
+    let authorized: bool = sqlx::query_scalar(
+        "SELECT NOT EXISTS(SELECT 1 FROM workflow_knowledge_consumptions AS proof
+         WHERE proof.company_id=$1 AND proof.run_id=$2 AND proof.execution_id=$3
+           AND CASE WHEN $4::uuid[] IS NULL THEN NOT (
+               proof.queried_unit_ids='{}'::uuid[] AND proof.source_items='[]'::jsonb
+               AND proof.content_level=0 AND proof.result=$5
+           ) ELSE proof.queried_unit_ids IS DISTINCT FROM $4 END)",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(units)
+    .bind(refusal.result())
+    .fetch_one(db)
+    .await?;
+    if !authorized {
+        return Err(AppError::BadRequest("knowledge.scope_unavailable".into()));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

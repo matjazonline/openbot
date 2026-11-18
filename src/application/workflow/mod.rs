@@ -58,6 +58,7 @@ pub mod run_views;
 pub mod sample;
 pub mod sample_capture;
 pub mod schedule_admission;
+pub mod scopes;
 mod service;
 pub mod storage;
 pub mod supervise;

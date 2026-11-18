@@ -22,6 +22,9 @@ mod escalation_refusals;
 #[path = "direct_role_admission_tests.rs"]
 mod direct;
 
+#[path = "run_scope_admission_tests.rs"]
+mod scopes;
+
 struct RoleFixture {
     admission: AdmissionFixture,
     department: DepartmentId,
@@ -315,3 +318,41 @@ mod reviewer_tests;
 
 #[path = "role_context_tests.rs"]
 mod context_tests;
+
+#[tokio::test]
+async fn memory_scope_admission_step_own_uses_the_captured_department() {
+    use crate::application::memory::NamespaceOwner;
+    use crate::application::workflow::memory::{MemoryStepScope, UnitSelector};
+    let f = RoleFixture::new().await;
+    let run = f.admitted("memory-own-department").await;
+    let scope = super::child_support::entry(&f.admission, run).await;
+    let mut tx = f.p().pool().begin().await.unwrap();
+    let root = crate::adapters::persistence::company::root_on(&mut tx, f.company())
+        .await
+        .unwrap();
+    // A later desk move does not rewrite the admitted department context.
+    sqlx::query("UPDATE channels SET department_id=$3 WHERE company_id=$1 AND id=$2")
+        .bind(f.company().as_uuid())
+        .bind(f.channel)
+        .bind(root.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let own = crate::adapters::persistence::workflow::memory_steps::step_scope_access_on(
+        &mut tx,
+        scope,
+        MemoryStepScope::Unit(UnitSelector::Own),
+    )
+    .await
+    .unwrap();
+    assert_eq!(own.owner, NamespaceOwner::Unit(f.department));
+    let company = crate::adapters::persistence::workflow::memory_steps::step_scope_access_on(
+        &mut tx,
+        scope,
+        MemoryStepScope::Unit(UnitSelector::Root),
+    )
+    .await
+    .unwrap();
+    assert_eq!(company.owner, NamespaceOwner::Unit(root));
+    tx.rollback().await.unwrap();
+}

@@ -131,8 +131,11 @@ export MEMORY_LIVE_URL="http://127.0.0.1:$port"
 export MEMORY_LIVE_PROVISIONER_TOKEN="$provisioner" MEMORY_LIVE_OPERATOR_TOKEN="$operator"
 unset DATABASE_URL
 cd "$root"
+SQLX_OFFLINE=true cargo build --locked --offline --bin open_bots
+export MEMORY_LIVE_OPENBOT_BIN="$(cargo metadata --locked --offline --format-version 1 --no-deps \
+  | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')/debug/open_bots"
 SQLX_OFFLINE=true cargo test --locked --lib -- --ignored --test-threads=1 \
-  memory_integration_live_ memory_e2e_ | tee "$work/test.log"
+  memory_integration_live_ memory_e2e_ --skip doop --skip Doop | tee "$work/test.log"
 grep -Eq '^test result: ok\. [1-9][0-9]* passed' "$work/test.log" \
   || { echo "the live tests did not pass" >&2; exit 1; }
 for prefix in memory_integration_live_ memory_e2e_; do

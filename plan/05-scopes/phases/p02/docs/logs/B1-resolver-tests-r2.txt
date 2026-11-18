@@ -1,0 +1,37 @@
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0599]: no variant, associated function, or constant named `Validation` found for enum `application::app_error::AppError` in the current scope
+  --> src/application/workflow/scopes.rs:50:15
+   |
+50 |     AppError::Validation("memory.scope_unavailable".into())
+   |               ^^^^^^^^^^ variant, associated function, or constant not found in `application::app_error::AppError`
+   |
+  ::: src/application/app_error.rs:6:1
+   |
+ 6 | pub enum AppError {
+   | ----------------- variant, associated function, or constant `Validation` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Validation` found for enum `application::app_error::AppError` in the current scope
+   --> src/application/workflow/scopes.rs:133:42
+    |
+133 |                     return Err(AppError::Validation("memory.scope_limit_exceeded".into()));
+    |                                          ^^^^^^^^^^ variant, associated function, or constant not found in `application::app_error::AppError`
+    |
+   ::: src/application/app_error.rs:6:1
+    |
+  6 | pub enum AppError {
+    | ----------------- variant, associated function, or constant `Validation` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Validation` found for enum `application::app_error::AppError` in the current scope
+   --> src/application/workflow/scopes_tests.rs:115:72
+    |
+115 | ...Err(AppError::Validation(message)) if message == "memory.scope_limit_exceeded"));
+    |                  ^^^^^^^^^^ variant, associated function, or constant not found in `application::app_error::AppError`
+    |
+   ::: src/application/app_error.rs:6:1
+    |
+  6 | pub enum AppError {
+    | ----------------- variant, associated function, or constant `Validation` not found for this enum
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

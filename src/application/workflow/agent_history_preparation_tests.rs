@@ -18,7 +18,7 @@ fn agent_history_contract_preparation_retains_original_json_and_one_untrusted_pr
         .unwrap();
         assert_eq!(prepared.logical_input().value(), &context);
         let spec = prepared.spec(fence()).unwrap();
-        assert_eq!(spec.prepared["version"], 7);
+        assert_eq!(spec.prepared["version"], 8);
         assert_eq!(spec.prepared["mcp_error_policy"], "observe");
         assert_eq!(spec.prepared["context"], context);
         assert!(spec.prepared.get("prompt").is_none());
@@ -65,4 +65,43 @@ fn agent_history_preparation_current_content_and_reserved_output_precede_history
             crate::app_error::ExecutionFailure::Budget
         ))
     ));
+}
+
+#[test]
+fn memory_scope_tools_host_context_is_frozen_and_counts_before_history() {
+    use crate::application::workflow::scopes::RunScopeContext;
+    use crate::services::harness::runs::LogicalSeed;
+
+    let prepared = PreparedAgent::new(
+        selection(vec![]),
+        &inputs(),
+        PreparedStep::AgentRun { targets: vec![] },
+    )
+    .unwrap();
+    let baseline = prepared.history_budget(&LogicalSeed::default()).unwrap();
+    let context = RunScopeContext {
+        write_unit: Some("support".into()),
+        readable_units: vec!["support".into(), "root".into(), "triage".into()],
+    };
+    let prepared = prepared.with_scope_context(Some(context.clone())).unwrap();
+    let budget = prepared.history_budget(&LogicalSeed::default()).unwrap();
+    assert!(budget.mandatory_tokens > baseline.mandatory_tokens);
+    assert_eq!(budget.history_tokens, baseline.history_tokens);
+    assert_eq!(
+        budget.reserved_output_tokens,
+        baseline.reserved_output_tokens
+    );
+    let spec = prepared.spec(fence()).unwrap();
+    assert_eq!(spec.prepared["scope_context"], json!(context));
+    assert!(prepared.preamble().contains(
+        "Memory write scope: unit:support; searchable units for this run: unit:support, unit:root, unit:triage."
+    ));
+    assert!(
+        prepared
+            .with_scope_context(Some(RunScopeContext {
+                write_unit: Some("foreign".into()),
+                readable_units: vec!["root".into()],
+            }))
+            .is_err()
+    );
 }

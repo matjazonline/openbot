@@ -29,6 +29,13 @@ impl Closure {
         {
             return Err(invalid());
         }
+        // Agent workflow tools add workflows beyond PublishedBundle.children.
+        // Check every selected workflow against the same admitted base context.
+        if self.context_department_id.is_none()
+            && crate::application::workflow::memory::needs_local_unit(&bundle)
+        {
+            return Err(super::super::role_binding::memory_needs_department());
+        }
         // Every reachable workflow uses the root's explicitly bound STEP resources.
         // Validate its current contracts before any root/run/provider can exist.
         super::super::resources::check_readiness(

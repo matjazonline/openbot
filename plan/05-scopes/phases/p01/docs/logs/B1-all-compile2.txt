@@ -1,0 +1,75 @@
+    Blocking waiting for file lock on build directory
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0308]: mismatched types
+   --> src/adapters/persistence/memory/e2e_tests.rs:276:50
+    |
+276 |     let (agent_ns, agent_credential) = ready(&f, "agent").await;
+    |                                        -----     ^^^^^^^ expected `NamespaceOwner`, found `&str`
+    |                                        |
+    |                                        arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/memory/live_tests.rs:91:10
+    |
+ 91 | async fn ready(f: &Fixture, owner: NamespaceOwner) -> (Uuid, ClientCredential) {
+    |          ^^^^^              ---------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/memory/e2e_tests.rs:476:44
+    |
+476 |     let (agent_ns, credential) = ready(&f, "agent").await;
+    |                                  -----     ^^^^^^^ expected `NamespaceOwner`, found `&str`
+    |                                  |
+    |                                  arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/memory/live_tests.rs:91:10
+    |
+ 91 | async fn ready(f: &Fixture, owner: NamespaceOwner) -> (Uuid, ClientCredential) {
+    |          ^^^^^              ---------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/memory/e2e_tests.rs:507:37
+    |
+507 |     let (agent_ns, old) = ready(&f, "agent").await;
+    |                           -----     ^^^^^^^ expected `NamespaceOwner`, found `&str`
+    |                           |
+    |                           arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/memory/live_tests.rs:91:10
+    |
+ 91 | async fn ready(f: &Fixture, owner: NamespaceOwner) -> (Uuid, ClientCredential) {
+    |          ^^^^^              ---------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/memory/e2e_tests.rs:531:38
+    |
+531 |     let (namespace, new) = ready(&f, "agent").await;
+    |                            -----     ^^^^^^^ expected `NamespaceOwner`, found `&str`
+    |                            |
+    |                            arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/memory/live_tests.rs:91:10
+    |
+ 91 | async fn ready(f: &Fixture, owner: NamespaceOwner) -> (Uuid, ClientCredential) {
+    |          ^^^^^              ---------------------
+
+warning: unused variable: `agent_principal`
+   --> src/adapters/persistence/memory/tests.rs:728:9
+    |
+728 |     let agent_principal = f.agent_principal;
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_agent_principal`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `agent`
+   --> src/adapters/persistence/memory/tests.rs:903:9
+    |
+903 |     let agent = f.agent;
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_agent`
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `open_bots` (lib test) generated 2 warnings
+error: could not compile `open_bots` (lib test) due to 4 previous errors; 2 warnings emitted

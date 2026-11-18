@@ -1540,6 +1540,14 @@
             "format": "date-time",
             "type": "string"
           },
+          "subject": {
+            "description": "Opaque provenance only; never an authorization or classification input.",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "title": {
             "description": "At most 256 characters and 1 KiB.",
             "maxLength": 256,
@@ -1960,6 +1968,134 @@
         "required": [
           "sources",
           "replayed"
+        ],
+        "type": "object"
+      },
+      "SubjectDeleteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "observation_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "subject": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "namespace",
+          "subject",
+          "observation_ids"
+        ],
+        "type": "object"
+      },
+      "SubjectDeleted": {
+        "properties": {
+          "deleted": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "type": "object"
+      },
+      "SubjectListRequest": {
+        "additionalProperties": false,
+        "description": "Exact managed cleanup boundary, including expired stored observations.",
+        "properties": {
+          "after": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "default": 100,
+            "format": "uint16",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "namespace": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "subject": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          },
+          "tenant": {
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "namespace",
+          "subject"
+        ],
+        "type": "object"
+      },
+      "SubjectObservation": {
+        "properties": {
+          "access_level": {
+            "$ref": "#/components/schemas/AccessLevel"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "observation_id",
+          "revision",
+          "access_level"
+        ],
+        "type": "object"
+      },
+      "SubjectPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectObservation"
+            },
+            "type": "array"
+          },
+          "next_after": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -2797,6 +2933,160 @@
           }
         ],
         "summary": "Tombstone a namespace and remove its grants",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/observations/subject/delete": {
+      "post": {
+        "operationId": "admin.observations.subject.delete",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubjectDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectDeleted"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete exact tagged IDs in an owned namespace",
+        "tags": [
+          "admin"
+        ],
+        "x-memory-implemented": true
+      }
+    },
+    "/admin/v1/observations/subject/list": {
+      "post": {
+        "operationId": "admin.observations.subject.list",
+        "parameters": [
+          {
+            "description": "Opaque, non-secret correlation id recorded in logs and audit; a malformed value is 400 invalid_request. Never authority.",
+            "in": "header",
+            "name": "x-correlation-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubjectListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectPage"
+                }
+              }
+            },
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "x-request-id": {
+                "description": "The service-minted request id (also in error bodies and audit)",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List exact subject observation IDs in an owned namespace",
         "tags": [
           "admin"
         ],

@@ -5,6 +5,9 @@ use uuid::Uuid;
 #[derive(sqlx::FromRow)]
 struct LayerRow {
     id: Uuid,
+    unit_id: Uuid,
+    unit_name: String,
+    unit_is_root: bool,
     name: String,
     access_level: i16,
     revision: i64,
@@ -28,6 +31,9 @@ impl LayerRow {
         }
         Ok(KnowledgeDocumentLayer {
             id: self.id,
+            unit_id: crate::entities::department::DepartmentId::new(self.unit_id),
+            unit_name: self.unit_name,
+            unit_is_root: self.unit_is_root,
             name: parsed.name().clone(),
             access_level,
             revision: self.revision,
@@ -35,19 +41,22 @@ impl LayerRow {
         })
     }
 }
-const SELECT: &str = "SELECT document.id,document.name,document.access_level::smallint AS access_level,document.revision,octet_length(document.content)::bigint AS text_bytes FROM knowledge_documents AS document";
+const SELECT: &str = "SELECT document.id,document.unit_id,unit.name AS unit_name,unit.is_root AS unit_is_root,document.name,document.access_level::smallint AS access_level,document.revision,octet_length(document.content)::bigint AS text_bytes FROM knowledge_documents AS document JOIN departments AS unit ON (unit.company_id,unit.id)=(document.company_id,document.unit_id)";
 pub(super) async fn visible(
     tx: &mut Transaction<'_, Postgres>,
     scope: KnowledgeScope,
-    level: AccessLevel,
+    permissions: &permissions::Permissions,
+    unit: Option<crate::entities::department::DepartmentId>,
 ) -> AppResult<Vec<KnowledgeDocumentLayer>> {
     let query = format!(
-        "{SELECT} WHERE document.company_id=$1 AND document.access_level<=$2 ORDER BY document.name_key,document.access_level LIMIT 4097"
+        "{SELECT} WHERE document.company_id=$1 AND document.access_level<=$2 AND ($3::uuid[] IS NULL OR document.unit_id=ANY($3)) AND ($4::uuid IS NULL OR document.unit_id=$4) ORDER BY unit.is_root DESC,lower(unit.name),unit.id,document.name_key,document.access_level LIMIT 4097"
     );
     decode(
         sqlx::query_as::<_, LayerRow>(&query)
             .bind(scope.company.as_uuid())
-            .bind(level.as_i16())
+            .bind(permissions.actor.access_level.as_i16())
+            .bind(permissions.read.parameter())
+            .bind(unit.map(|unit| unit.as_uuid()))
             .fetch_all(&mut **tx)
             .await
             .map_err(authority::database)?,
@@ -73,15 +82,16 @@ pub(super) async fn by_ids(
 pub(super) async fn one_visible(
     tx: &mut Transaction<'_, Postgres>,
     command: DeleteKnowledgeLayer,
-    level: AccessLevel,
+    permissions: &permissions::Permissions,
 ) -> AppResult<KnowledgeDocumentLayer> {
     let query = format!(
-        "{SELECT} WHERE document.company_id=$1 AND document.id=$2 AND document.access_level<=$3"
+        "{SELECT} WHERE document.company_id=$1 AND document.id=$2 AND document.access_level<=$3 AND ($4::uuid[] IS NULL OR document.unit_id=ANY($4))"
     );
     sqlx::query_as::<_, LayerRow>(&query)
         .bind(command.scope.company.as_uuid())
         .bind(command.document_id)
-        .bind(level.as_i16())
+        .bind(permissions.actor.access_level.as_i16())
+        .bind(permissions.read.parameter())
         .fetch_optional(&mut **tx)
         .await
         .map_err(authority::database)?
@@ -101,9 +111,10 @@ fn quota() -> AppError {
 }
 pub(super) async fn project_quota(
     tx: &mut Transaction<'_, Postgres>,
-    scope: KnowledgeScope,
+    target: KnowledgeUploadTarget,
     layers: &[KnowledgeLayerSize],
 ) -> AppResult<()> {
+    let scope = target.scope;
     let query = format!("{SELECT} WHERE document.company_id=$1 LIMIT 4097");
     let current = decode(
         sqlx::query_as::<_, LayerRow>(&query)
@@ -112,15 +123,25 @@ pub(super) async fn project_quota(
             .await
             .map_err(authority::database)?,
     )?;
-    let mut projected: HashMap<(KnowledgeDocumentName, AccessLevel), u64> = current
+    let mut projected: HashMap<
+        (
+            crate::entities::department::DepartmentId,
+            KnowledgeDocumentName,
+            AccessLevel,
+        ),
+        u64,
+    > = current
         .into_iter()
-        .map(|row| ((row.name, row.access_level), row.text_bytes))
+        .map(|row| ((row.unit_id, row.name, row.access_level), row.text_bytes))
         .collect();
     for layer in layers {
         if layer.text_bytes > MAX_KNOWLEDGE_FILE_BYTES as u64 {
             return Err(quota());
         }
-        projected.insert((layer.name.clone(), layer.access_level), layer.text_bytes);
+        projected.insert(
+            (target.unit, layer.name.clone(), layer.access_level),
+            layer.text_bytes,
+        );
     }
     if projected.len() > MAX_COMPANY_KNOWLEDGE_LAYERS
         || projected.values().sum::<u64>() > MAX_COMPANY_KNOWLEDGE_BYTES as u64

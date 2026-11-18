@@ -10,12 +10,12 @@ async fn knowledge_upload_competing_replacements_keep_only_the_last_committers_m
     let first = [prepared("3_notes.md", "first")];
     let second = [prepared("3-NOTES.md", "second")];
     let (a, b) = tokio::join!(
-        f.store.replace(f.owner, &first),
-        f.store.replace(f.owner, &second)
+        f.store.replace(f.target(f.owner), &first),
+        f.store.replace(f.target(f.owner), &second)
     );
     a.unwrap();
     b.unwrap();
-    let rows = f.store.list(f.owner).await.unwrap().layers;
+    let rows = f.store.list(f.owner, None).await.unwrap().layers;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].revision, 3);
     assert_eq!(rows[0].id, original.id);
@@ -40,7 +40,10 @@ async fn knowledge_upload_demotion_after_preflight_or_before_a_waiting_write_ref
         .iter()
         .map(|document| document.file.size())
         .collect::<Vec<_>>();
-    f.store.preflight_upload(f.member, &sizes).await.unwrap();
+    f.store
+        .preflight_upload(f.target(f.member), &sizes)
+        .await
+        .unwrap();
     let mut demotion = f.pool.begin().await.unwrap();
     sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
         .bind(f.owner.company.as_uuid())
@@ -56,12 +59,12 @@ async fn knowledge_upload_demotion_after_preflight_or_before_a_waiting_write_ref
     .await
     .unwrap();
     let store = f.store.clone();
-    let scope = f.member;
-    let writer = tokio::spawn(async move { store.replace(scope, &documents).await });
+    let target = f.target(f.member);
+    let writer = tokio::spawn(async move { store.replace(target, &documents).await });
     wait_until_a_backend_is_blocked(&f.pool).await;
     demotion.commit().await.unwrap();
     assert!(matches!(writer.await.unwrap(), Err(AppError::Forbidden(_))));
-    assert!(f.store.list(f.owner).await.unwrap().layers.is_empty());
+    assert!(f.store.list(f.owner, None).await.unwrap().layers.is_empty());
 }
 #[tokio::test]
 async fn knowledge_upload_competing_quota_writers_and_duplicate_projection_cannot_exceed_the_company_limit()
@@ -74,12 +77,12 @@ async fn knowledge_upload_competing_quota_writers_and_duplicate_projection_canno
     let seed: Vec<_> = (0..9)
         .map(|index| prepared(&format!("0_seed{index}.md"), &text))
         .collect();
-    f.store.replace(f.owner, &seed).await.unwrap();
+    f.store.replace(f.target(f.owner), &seed).await.unwrap();
     let first = [prepared("0_a.md", &text)];
     let second = [prepared("0_b.md", &text)];
     let (a, b) = tokio::join!(
-        f.store.replace(f.owner, &first),
-        f.store.replace(f.owner, &second)
+        f.store.replace(f.target(f.owner), &first),
+        f.store.replace(f.target(f.owner), &second)
     );
     assert_eq!(usize::from(a.is_ok()) + usize::from(b.is_ok()), 1);
     let usage: i64 = sqlx::query_scalar(
@@ -95,12 +98,20 @@ async fn knowledge_upload_competing_quota_writers_and_duplicate_projection_canno
         prepared("0_temporary.md", &text),
         prepared("0-TEMPORARY.md", ""),
     ];
-    let final_rows = f.store.replace(f.owner, &temporary).await.unwrap();
+    let final_rows = f
+        .store
+        .replace(f.target(f.owner), &temporary)
+        .await
+        .unwrap();
     assert_eq!(final_rows.len(), 1);
     assert_eq!(final_rows[0].revision, 2);
     assert_eq!(final_rows[0].text_bytes, 0);
     let duplicates = [prepared("0_seed0.md", &text), prepared("0-SEED0.md", "")];
-    let rows = f.store.replace(f.owner, &duplicates).await.unwrap();
+    let rows = f
+        .store
+        .replace(f.target(f.owner), &duplicates)
+        .await
+        .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].text_bytes, 0);
     let too_large = vec![
@@ -108,7 +119,7 @@ async fn knowledge_upload_competing_quota_writers_and_duplicate_projection_canno
         prepared("0_extra2.md", &text),
     ];
     assert!(matches!(
-        f.store.replace(f.owner, &too_large).await,
+        f.store.replace(f.target(f.owner), &too_large).await,
         Err(AppError::BadRequest(_))
     ));
 }
@@ -130,9 +141,10 @@ async fn knowledge_upload_waiting_stale_delete_cannot_remove_a_competing_replace
         .unwrap();
     let writer_store = f.store.clone();
     let scope = f.owner;
+    let target = f.target(scope);
     let writer = tokio::spawn(async move {
         writer_store
-            .replace(scope, &[prepared("0_notes.md", "new")])
+            .replace(target, &[prepared("0_notes.md", "new")])
             .await
     });
     wait_until_a_backend_is_blocked(&f.pool).await;
@@ -160,12 +172,22 @@ async fn knowledge_upload_layer_cap_and_hidden_company_quota_return_generic_erro
         return;
     };
     let f = Fixture::new(db.pool.clone()).await;
-    sqlx::query("INSERT INTO knowledge_documents (id,company_id,name,access_level,content,content_sha256,uploaded_by) SELECT gen_random_uuid(),$1,'hidden-'||sequence::text||'.md',9,'',sha256(''::bytea),$2 FROM generate_series(1,4096) AS seed(sequence)")
-        .bind(f.owner.company.as_uuid()).bind(f.owner.actor_id).execute(&f.pool).await.unwrap();
-    assert!(f.store.list(f.member).await.unwrap().layers.is_empty());
+    sqlx::query("INSERT INTO knowledge_documents (id,company_id,name,access_level,content,content_sha256,uploaded_by,unit_id) SELECT gen_random_uuid(),$1,'hidden-'||sequence::text||'.md',9,'',sha256(''::bytea),$2,$3 FROM generate_series(1,4096) AS seed(sequence)")
+        .bind(f.owner.company.as_uuid()).bind(f.owner.actor_id).bind(f.root.as_uuid()).execute(&f.pool).await.unwrap();
+    assert!(
+        f.store
+            .list(f.member, None)
+            .await
+            .unwrap()
+            .layers
+            .is_empty()
+    );
     let error = f
         .store
-        .preflight_upload(f.member, &[prepared("0_visible.md", "").file.size()])
+        .preflight_upload(
+            f.target(f.member),
+            &[prepared("0_visible.md", "").file.size()],
+        )
         .await
         .unwrap_err();
     assert!(matches!(error, AppError::BadRequest(_)));

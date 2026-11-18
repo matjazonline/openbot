@@ -15,18 +15,18 @@ pub(super) fn array(items: Value, min: usize, max: usize) -> Value {
 pub(super) fn object(properties: Value, required: &[&str]) -> Value {
     json!({"type":"object","properties":properties,"required":required,"additionalProperties":false})
 }
-/// A memory scope (E4): the company, or one agent of this bundle by key. No tenant, company or
-/// user id: steps have no user scope, and the scope is a literal resolved at publication.
+/// A literal unit selector, or a captured agent key. Runtime namespace authority
+/// comes from the admission snapshot.
 pub(super) fn scope() -> Value {
     json!({"oneOf":[
-        object(json!({"kind":{"const":"company"}}), &["kind"]),
-        object(json!({"kind":{"const":"agent"},"agent":identifier()}), &["kind","agent"])
+        object(json!({"unit":{"enum":["own","root"]}}), &["unit"]),
+        object(json!({"agent":identifier()}), &["agent"])
     ]})
 }
 /// One loaded memory (E4): level-aware, with its revision; no namespace or tenant identity.
 pub(super) fn memory_item() -> Value {
     object(
-        json!({"id":uuid(),"scope":{"enum":["company","agent"]},"kind":{"type":"string","maxLength":32},
+        json!({"id":uuid(),"scope":{"type":"string","maxLength":71},"kind":{"type":"string","maxLength":32},
             "title":{"type":"string","maxLength":256},"content":{"type":"string","maxLength":MAX_TEXT},
             "occurred_at":{"type":"string","format":"date-time","maxLength":MAX_DEADLINE},
             "access_level":{"type":"integer","minimum":0,"maximum":9},

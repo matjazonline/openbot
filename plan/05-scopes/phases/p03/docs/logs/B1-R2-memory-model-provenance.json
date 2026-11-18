@@ -1,0 +1,10 @@
+{
+  "services/memory/scripts/prepare-model.py": {
+    "origin_main_blob": "388ff56bd2324870ab48f1e4631caf0f7bc45218",
+    "working_blob": "388ff56bd2324870ab48f1e4631caf0f7bc45218"
+  },
+  "services/memory/assets/model-manifest.json": {
+    "origin_main_blob": "bd86d6fdfecc59beecb6cab967c423369538bede",
+    "working_blob": "bd86d6fdfecc59beecb6cab967c423369538bede"
+  }
+}

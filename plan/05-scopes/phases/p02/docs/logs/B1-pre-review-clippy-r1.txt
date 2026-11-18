@@ -1,0 +1,253 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/delivery_tests.rs:349:9
+    |
+349 |         &mut *f.pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+    = note: `-D clippy::explicit-auto-deref` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::explicit_auto_deref)]`
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/delivery_tests.rs:718:9
+    |
+718 |         &mut *f.pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/delivery_tests.rs:899:13
+    |
+899 |             &mut *f.pool().acquire().await.unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: called `Iterator::last` on a `DoubleEndedIterator`; this will needlessly iterate the entire iterator
+  --> src/adapters/persistence/memory/live_subject_tests.rs:90:26
+   |
+90 |       let summary: Value = String::from_utf8(output.stdout)
+   |  __________________________^
+91 | |         .unwrap()
+92 | |         .lines()
+93 | |         .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+94 | |         .last()
+   | |_______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#double_ended_iterator_last
+   = note: `-D clippy::double-ended-iterator-last` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::double_ended_iterator_last)]`
+help: try
+   |
+94 -         .last()
+94 +         .next_back()
+   |
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/tests.rs:396:17
+    |
+396 |                 &mut *f.pool().acquire().await.unwrap(),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/tests.rs:406:17
+    |
+406 |                 &mut *f.pool().acquire().await.unwrap(),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/tests.rs:745:35
+    |
+745 |         super::agent_principal_on(&mut *f.pool().acquire().await.unwrap(), f.company, second)
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/tests.rs:978:35
+    |
+978 |         super::agent_principal_on(&mut *f.pool().acquire().await.unwrap(), f.company, second)
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+  --> src/adapters/persistence/memory/scope_owner_tests.rs:62:9
+   |
+62 |         &mut *f.pool().acquire().await.unwrap(),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+  --> src/adapters/persistence/memory/scope_owner_tests.rs:70:9
+   |
+70 |         &mut *f.pool().acquire().await.unwrap(),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/memory/scope_owner_tests.rs:256:9
+    |
+256 |         &mut *f.pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: items after a test module
+   --> src/adapters/persistence/workflow/agent_history/recall.rs:438:1
+    |
+438 |   mod freeze_bounds {
+    |   ^^^^^^^^^^^^^^^^^
+...
+493 | / async fn scopes_on(
+494 | |     persistence: &PostgresPersistence,
+495 | |     tx: &mut Transaction<'_, Postgres>,
+496 | |     claim: &ClaimedWorkflow,
+497 | |     bound: &WriteBound,
+498 | | ) -> AppResult<Revalidation> {
+    | |____________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#items_after_test_module
+    = note: `-D clippy::items-after-test-module` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
+    = help: move the items to before the test module was defined
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/memory_steps_tests.rs:113:25
+    |
+113 |                         &mut *p.pool().acquire().await.unwrap(),
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut p.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/memory_steps_tests.rs:509:9
+    |
+509 |         &mut *m.persistence.pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut m.persistence.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+  --> src/adapters/persistence/workflow/memory_steps_e2e_tests.rs:35:21
+   |
+35 |                     &mut *persistence.pool().acquire().await.unwrap(),
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut persistence.pool().acquire().await.unwrap()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+  --> src/adapters/persistence/workflow/memory_park_race_tests.rs:48:9
+   |
+48 |         &mut *p.pool().acquire().await.unwrap(),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut p.pool().acquire().await.unwrap()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/memory_scope_proof_tests.rs:315:9
+    |
+315 |         &mut *t.p().pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut t.p().pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+  --> src/adapters/persistence/workflow/run_scope_child_tests.rs:27:9
+   |
+27 |         &mut *f.persistence.pool().acquire().await.unwrap(),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.persistence.pool().acquire().await.unwrap()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/run_scope_child_tests.rs:133:17
+    |
+133 |                 &mut *p.pool().acquire().await.unwrap(),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut p.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/agent_history_children_integration_tests.rs:154:9
+    |
+154 |         &mut *pool.acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut pool.acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/agent_history_children_integration_tests.rs:161:9
+    |
+161 |         &mut *pool.acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut pool.acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+  --> src/adapters/persistence/workflow/run_scope_native_tests.rs:63:9
+   |
+63 |         &mut *fixture.persistence.pool().acquire().await.unwrap(),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut fixture.persistence.pool().acquire().await.unwrap()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/run_scope_native_tests.rs:207:9
+    |
+207 |         &mut *f.persistence.pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.persistence.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/run_scope_native_tests.rs:305:9
+    |
+305 |         &mut *f.persistence.pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut f.persistence.pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/agent_history_channel_tests.rs:249:13
+    |
+249 |             &mut *pool.acquire().await.unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut pool.acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: deref which would be done by auto-deref
+   --> src/adapters/persistence/workflow/agent_history_channel_tests.rs:357:9
+    |
+357 |         &mut *d.p().pool().acquire().await.unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&mut d.p().pool().acquire().await.unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#explicit_auto_deref
+
+error: unnecessary use of `clone` to create a slice from a reference
+  --> src/application/workflow/scopes_tests.rs:85:20
+   |
+85 |         run_scopes(&[root.clone()], agent, &facts)
+   |                    ^^^^^^^^^^^^^^^ help: try: `std::slice::from_ref(&root)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#cloned_ref_to_slice_refs
+   = note: `-D clippy::cloned-ref-to-slice-refs` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::cloned_ref_to_slice_refs)]`
+
+error: unnecessary use of `clone` to create a slice from a reference
+   --> src/application/workflow/scopes_tests.rs:144:20
+    |
+144 |         run_scopes(&[root.clone()], agent, &facts)
+    |                    ^^^^^^^^^^^^^^^ help: try: `std::slice::from_ref(&root)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#cloned_ref_to_slice_refs
+
+error: could not compile `open_bots` (lib test) due to 28 previous errors

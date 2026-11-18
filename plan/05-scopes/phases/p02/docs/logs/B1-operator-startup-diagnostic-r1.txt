@@ -1,0 +1,8 @@
+exit=1
+stdout:
+  2026-11-17T16:24:49.681249Z  INFO  Connected to database and ran migrations!
+    at src/infra/db.rs:73
+
+
+stderr:
+Error: Internal error: CREDENTIAL_ENCRYPTION_KEYS must contain version:base64-key entries

@@ -1,17 +1,7 @@
 use super::*;
-use crate::application::{
-    knowledge::search::KnowledgeObservation,
-    workflow::checkpoints::{
-        WorkflowCheckpointStore, WorkflowCheckpointUpdate, WorkflowCheckpointWrite,
-    },
+use crate::application::workflow::checkpoints::{
+    WorkflowCheckpointStore, WorkflowCheckpointUpdate, WorkflowCheckpointWrite,
 };
-
-fn observation(text: &str, level: AccessLevel) -> KnowledgeObservation {
-    KnowledgeObservation::new(
-        json!({"passages":[{"file":"sales.md","heading":null,"text":text}]}),
-        Some(level),
-    )
-}
 
 #[tokio::test]
 async fn knowledge_search_generic_checkpoint_result_cannot_bypass_classification() {
@@ -30,7 +20,10 @@ async fn knowledge_search_generic_checkpoint_result_cannot_bypass_classification
             },
             WorkflowCheckpointUpdate::InvocationResult {
                 invocation: call.invocation().unwrap(),
-                result: observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                result: f
+                    .synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                    .await
+                    .observation
                     .result()
                     .clone(),
             },
@@ -66,7 +59,8 @@ async fn knowledge_search_failure_after_result_and_rise_rolls_back_the_entire_ob
             .observe_knowledge(
                 f.claim.fence,
                 &call,
-                observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                f.synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                    .await
             )
             .await
             .is_err()
@@ -79,7 +73,8 @@ async fn knowledge_search_failure_after_result_and_rise_rolls_back_the_entire_ob
         .observe_knowledge(
             f.claim.fence,
             &call,
-            observation("PRIVATE FLOOR 60", AccessLevel::L5),
+            f.synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                .await,
         )
         .await
         .unwrap();
@@ -96,8 +91,10 @@ async fn knowledge_search_competing_observers_keep_one_canonical_result_and_its_
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
     let mut observers = tokio::task::JoinSet::new();
     for candidate in [
-        observation("public list price 100", AccessLevel::PUBLIC),
-        observation("PRIVATE FLOOR 60", AccessLevel::L5),
+        f.synthetic_observation("public list price 100", AccessLevel::PUBLIC)
+            .await,
+        f.synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+            .await,
     ] {
         let store = f.p().clone();
         let fence = f.claim.fence;
@@ -132,7 +129,8 @@ async fn knowledge_search_competing_observers_keep_one_canonical_result_and_its_
         .observe_knowledge(
             f.claim.fence,
             &call,
-            observation("ignored replacement", AccessLevel::L5),
+            f.synthetic_observation("ignored replacement", AccessLevel::L5)
+                .await,
         )
         .await
         .unwrap();
@@ -329,7 +327,8 @@ async fn knowledge_search_observation_above_actual_immutable_ceiling_cannot_comm
             .observe_knowledge(
                 f.claim.fence,
                 &call,
-                observation("foreign ceiling", AccessLevel::L9)
+                f.synthetic_observation("foreign ceiling", AccessLevel::L9)
+                    .await
             )
             .await
             .is_err()
@@ -347,7 +346,8 @@ async fn agent_history_level_accepted_checkpoint_contains_the_real_classified_ob
         .observe_knowledge(
             f.claim.fence,
             &call,
-            observation("PRIVATE FLOOR 60", AccessLevel::L5),
+            f.synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                .await,
         )
         .await
         .unwrap();

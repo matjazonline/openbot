@@ -33,9 +33,48 @@ fn source() -> Value {
         json!({"literal":["The customer prefers concise replies.\nAsked twice."]});
     source["steps"]["start"]["routes"] = json!({"success":"load"});
     source["steps"]["load"] = json!({"type":"memory.load","with":{
-        "scope":{"literal":{"kind":"company"}},"query":{"literal":"concise replies"},
+        "scope":{"literal":{"unit":"root"}},"query":{"literal":"concise replies"},
         "limit":{"literal":5}},"routes":{"success":"$end"}});
     source
+}
+
+/// Unit saves need a real desk in their local unit. Keep this fixture local to
+/// memory tests so company-wide lease fixtures retain their existing behavior.
+async fn memory_fixture() -> (AdmissionFixture, ActivationRequest) {
+    use crate::application::ports::channel::ChannelWrite;
+    use crate::application::workflow::{RelatedAssociation, RelatedChannelId};
+
+    let binding = BindingFixture::from_source(source()).await;
+    let channel = crate::adapters::persistence::test_support::create_channel(
+        &binding.fixture.persistence,
+        binding.target.company.as_uuid(),
+        ChannelWrite {
+            name: "Memory intake".into(),
+            slug: "memory-intake".into(),
+            enabled: true,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let mut configuration = binding.request(None);
+    configuration.association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
+    let configured = binding.service().configure(configuration).await.unwrap();
+    binding
+        .service()
+        .activate(SetBindingActivity {
+            target: binding.target,
+            expected: configured.revision,
+        })
+        .await
+        .unwrap();
+    let f = AdmissionFixture { binding };
+    let mut request = f.request("memory-desk", f.manual());
+    request.association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
+    let command = f.prepare(request).await;
+    f.persistence().admit(&command).await.unwrap();
+    let scope = super::child_support::entry(&f, command.proposed_run_id()).await;
+    (f, scope)
 }
 
 pub(in crate::adapters::persistence::workflow::tests) struct Memory {
@@ -67,13 +106,23 @@ pub(in crate::adapters::persistence::workflow::tests) async fn memory_for(
         .unwrap();
     assert_eq!(
         persistence
-            .ensure_namespace(company, NamespaceOwner::Company)
+            .ensure_namespace(
+                company,
+                NamespaceOwner::Unit(
+                    crate::adapters::persistence::company::root_on(
+                        &mut p.pool().acquire().await.unwrap(),
+                        company
+                    )
+                    .await
+                    .unwrap()
+                )
+            )
             .await
             .unwrap(),
         NamespaceReadiness::NotReady
     );
     let namespace: Uuid = sqlx::query_scalar(
-        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='company'",
+        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='unit'",
     )
     .bind(company.as_uuid())
     .fetch_one(persistence.pool())
@@ -198,7 +247,7 @@ impl MemoryClient for UnderReported {
 /// (F11).
 #[tokio::test]
 async fn memory_integration_save_and_load_steps_round_trip_through_the_intent() {
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = &m.persistence;
     let runtime = MemoryStepRuntime::new(p.clone(), m.client.clone());
@@ -255,7 +304,7 @@ async fn memory_integration_save_and_load_steps_round_trip_through_the_intent() 
     };
     assert_eq!(loaded["items"].as_array().unwrap().len(), 1);
     assert_eq!(loaded["items"][0]["access_level"], 9);
-    assert_eq!(loaded["items"][0]["scope"], "company");
+    assert_eq!(loaded["items"][0]["scope"], "unit:workflow-tests");
     assert_eq!(loaded["exposed_level"], 9);
     assert_eq!(
         level(p, next).await,
@@ -273,7 +322,7 @@ async fn memory_integration_save_and_load_steps_round_trip_through_the_intent() 
 /// intent, and a load likewise; nothing reaches the service.
 #[tokio::test]
 async fn memory_integration_steps_fail_terminally_once_memory_is_disabled() {
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = &m.persistence;
     p.disable_memory(scope.company, f.binding.target.actor, 1)
@@ -307,7 +356,7 @@ async fn memory_integration_steps_fail_terminally_once_memory_is_disabled() {
 #[tokio::test]
 async fn memory_integration_run_cancellation_cancels_the_parked_intent() {
     use crate::application::workflow::{WorkflowInspection, WorkflowRunTransitions};
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = &m.persistence;
     let runtime = MemoryStepRuntime::new(p.clone(), m.client.clone());
@@ -362,7 +411,7 @@ async fn memory_integration_run_cancellation_cancels_the_parked_intent() {
 async fn memory_operations_settled_save_intents_outlive_every_run_that_can_replay_them() {
     use crate::application::memory::MemoryMaintenanceStore;
     use crate::application::workflow::{WorkflowInspection, WorkflowRunTransitions};
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = &m.persistence;
     let runtime = MemoryStepRuntime::new(p.clone(), m.client.clone());
@@ -444,8 +493,26 @@ async fn memory_operations_settled_save_intents_outlive_every_run_that_can_repla
 /// An agent-scope namespace, ready with a sealed token the fake grants (agent ids are plain ids
 /// on namespaces, so the freeze needs no agent row).
 async fn agent_namespace(m: &Memory, scope: ActivationRequest) -> Uuid {
-    let agent = Uuid::new_v4();
-    let namespace = Uuid::new_v4();
+    let agent = crate::use_cases::agent::AgentPersistence::create(
+        &m.persistence,
+        scope.company.as_uuid(),
+        crate::use_cases::agent::AgentWrite {
+            name: "Memory writer".into(),
+            slug: format!("memory-{}", Uuid::new_v4().simple()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    let principal = crate::adapters::persistence::memory::agent_principal_on(
+        &mut m.persistence.pool().acquire().await.unwrap(),
+        scope.company.as_uuid(),
+        agent,
+    )
+    .await
+    .unwrap();
+    let namespace: Uuid = sqlx::query_scalar("SELECT id FROM memory_namespaces WHERE company_id=$1 AND principal_id=$2 AND state <> 'removing'").bind(scope.company.as_uuid()).bind(principal.as_uuid()).fetch_one(m.persistence.pool()).await.unwrap();
     let token = m.fake.client_token(scope.company.as_uuid(), namespace);
     let envelope = m
         .persistence
@@ -456,18 +523,25 @@ async fn agent_namespace(m: &Memory, scope: ActivationRequest) -> Uuid {
             &SecretString::from(token),
         )
         .unwrap();
-    sqlx::query("INSERT INTO memory_namespaces (company_id,id,scope_kind,agent_id,state,credential_id,credential_envelope) VALUES ($1,$2,'agent',$3,'ready',gen_random_uuid(),$4)")
-        .bind(scope.company.as_uuid()).bind(namespace).bind(agent).bind(envelope)
+    sqlx::query("UPDATE memory_namespaces SET state='ready',credential_id=gen_random_uuid(),credential_envelope=$3 WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(namespace).bind(envelope)
         .execute(m.persistence.pool()).await.unwrap();
     agent
 }
 
 async fn freeze_on(pool: &sqlx::PgPool, scope: ActivationRequest, agent: Uuid, key: &str) -> Value {
     use crate::adapters::persistence::memory::deliveries::{
-        SaveEnqueue, SaveIntent, SaveScope, enqueue_save_on,
+        SaveEnqueue, SaveIntent, enqueue_save_on,
     };
     let facts = vec!["A remembered fact".to_owned()];
     let mut tx = pool.begin().await.unwrap();
+    let principal = crate::adapters::persistence::memory::agent_principal_on(
+        &mut tx,
+        scope.company.as_uuid(),
+        agent,
+    )
+    .await
+    .unwrap();
     let saved = enqueue_save_on(
         &mut tx,
         &SaveIntent {
@@ -476,10 +550,12 @@ async fn freeze_on(pool: &sqlx::PgPool, scope: ActivationRequest, agent: Uuid, k
             execution: scope.execution,
             invocation: None,
             wait: None,
-            scope: SaveScope::Agent(agent),
+            scope: NamespaceOwner::Principal(principal),
             key,
             facts: &facts,
             external_sources: Vec::new(),
+            producer: principal,
+            subject: None,
         },
     )
     .await
@@ -534,7 +610,7 @@ async fn raise(pool: &sqlx::PgPool, scope: ActivationRequest, level: AccessLevel
 async fn memory_access_level_competing_recall_and_save_freeze_preserve_the_watermark() {
     for exact in [true, false] {
         for observation_first in [true, false] {
-            let (f, scope) = fixture_source(source()).await;
+            let (f, scope) = memory_fixture().await;
             let m = memory(&f, scope).await;
             let pool = m.persistence.pool().clone();
             let agent = agent_namespace(&m, scope).await;
@@ -590,7 +666,7 @@ async fn memory_access_level_competing_recall_and_save_freeze_preserve_the_water
 /// failing, the step fails, nothing is returned and the run's level is unchanged.
 #[tokio::test]
 async fn memory_access_level_load_output_never_precedes_its_committed_observation() {
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = &m.persistence;
     let runtime = MemoryStepRuntime::new(p.clone(), m.client.clone());
@@ -644,7 +720,7 @@ async fn memory_access_level_load_output_never_precedes_its_committed_observatio
 async fn memory_integration_terminal_intent_wakes_and_fails_the_parked_save() {
     use crate::application::workflow::polling::{PollWork, WorkflowPolling};
     for case in ["disabled", "expired", "refused"] {
-        let (f, scope) = fixture_source(source()).await;
+        let (f, scope) = memory_fixture().await;
         let m = memory(&f, scope).await;
         let p = &m.persistence;
         let runtime = MemoryStepRuntime::new(p.clone(), m.client.clone());
@@ -726,7 +802,7 @@ async fn memory_integration_terminal_intent_wakes_and_fails_the_parked_save() {
 #[tokio::test]
 async fn memory_integration_interrupted_save_without_an_intent_retries() {
     use crate::adapters::persistence::workflow::lease::Retirement;
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = &m.persistence;
     let claim = p
@@ -787,7 +863,7 @@ async fn memory_integration_interrupted_save_without_an_intent_retries() {
 async fn memory_integration_competing_disable_and_run_cancel_settle_every_intent() {
     use crate::application::workflow::WorkflowInspection;
     for round in 0..4 {
-        let (f, scope) = fixture_source(source()).await;
+        let (f, scope) = memory_fixture().await;
         let m = memory(&f, scope).await;
         let p = m.persistence.clone();
         for index in 0..6 {
@@ -860,7 +936,7 @@ async fn memory_integration_competing_disable_and_run_cancel_settle_every_intent
 /// stand-in rolls back, so disable settles every intent.
 #[tokio::test]
 async fn memory_integration_disable_and_run_cancel_overlapping_in_id_order_never_deadlock() {
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = m.persistence.clone();
     for index in 0..6 {
@@ -1002,7 +1078,7 @@ async fn memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_low
     for case in ["audience", "drop", "refused"] {
         let mut load: Value =
             serde_json::from_str(&registry::example("memory.load").unwrap().source).unwrap();
-        load["steps"]["start"]["with"] = json!({"scope":{"literal":{"kind":"company"}},
+        load["steps"]["start"]["with"] = json!({"scope":{"literal":{"unit":"root"}},
             "query":{"literal":"concise replies"},"limit":{"literal":20}});
         let f = AdmissionFixture::with_binding(BindingFixture::from_source(load).await).await;
         let c = Conversation::new(&f).await;
@@ -1035,7 +1111,7 @@ async fn memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_low
         let m = memory(&f, scope).await;
         let p = &m.persistence;
         let namespace: Uuid = sqlx::query_scalar(
-            "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='company'",
+            "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='unit'",
         )
         .bind(scope.company.as_uuid())
         .fetch_one(p.pool())
@@ -1114,7 +1190,7 @@ async fn memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_low
 #[tokio::test]
 async fn memory_integration_run_cancel_during_an_in_flight_delivery_loses_its_completion() {
     use crate::application::workflow::{WorkflowInspection, WorkflowRunTransitions};
-    let (f, scope) = fixture_source(source()).await;
+    let (f, scope) = memory_fixture().await;
     let m = memory(&f, scope).await;
     let p = &m.persistence;
     let runtime = MemoryStepRuntime::new(p.clone(), m.client.clone());

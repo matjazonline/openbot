@@ -1,0 +1,21 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.37s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 9 tests
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_existing_principal_upsert_and_delete_compete_in_both_orders ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_units_create_reparent_membership_retire_and_recreate ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_owners ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_shape_delivery_retains_target_and_subject_provenance ... ok
+test adapters::persistence::memory::tests::memory_scope_returning_member_gets_a_new_namespace_id ... ok
+test adapters::persistence::memory::tests::memory_scope_lifecycle_lease_checks_refuse_incoherent_rows ... ok
+test adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_principal_creation_and_rollback_are_atomic ... ok
+test adapters::persistence::memory::tests::memory_scope_lifecycle_resurrection_is_refused ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 4746 filtered out; finished in 5.36s
+

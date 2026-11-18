@@ -94,6 +94,7 @@ fn section<'a>(
         },
         error,
         notice: None,
+        knowledge: DepartmentKnowledge::Documents(&[]),
     })
 }
 
@@ -350,6 +351,7 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
         membership: crate::entities::company_member::CompanyMembership::Owner,
         error: None,
         notice: None,
+        knowledge: DepartmentKnowledge::Documents(&[]),
     });
     assert!(cut.contains("Only the first 500 people and agents are listed."));
 

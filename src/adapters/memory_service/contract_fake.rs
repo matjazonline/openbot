@@ -17,6 +17,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
+#[path = "contract_fake/subject.rs"]
+mod subject;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FakeTenantState {
     Active,
@@ -57,6 +60,8 @@ pub struct FakeState {
     pub saves: HashMap<String, (Value, Value)>,
     /// Saved observations: (namespace, `ObservationDetail` without `namespace`).
     pub observations: Vec<(String, Value)>,
+    /// Opaque provenance is kept outside response bodies, scoped by actual tenant and ID.
+    pub subjects: HashMap<(String, Uuid), Value>,
     /// `TenantView.generation_daily_token_cap` the tenant endpoints answer (0 by default).
     pub generation_cap: u64,
     /// Generation idempotency key → (namespace, request, first answer); a replay answers
@@ -104,7 +109,7 @@ impl ContractFake {
             contract,
         });
         let app = Router::new()
-            .route("/admin/v1/{group}/{verb}", post(admin))
+            .route("/admin/v1/{*operation}", post(admin))
             .route("/v1/{group}/{verb}", post(client))
             .with_state(shared);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -247,18 +252,11 @@ enum Surface {
 
 async fn admin(
     State(shared): State<Arc<Shared>>,
-    Path((group, verb)): Path<(String, String)>,
+    Path(operation): Path<String>,
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
-    serve(
-        shared,
-        Surface::Admin,
-        format!("{group}/{verb}"),
-        headers,
-        body,
-    )
-    .await
+    serve(shared, Surface::Admin, operation, headers, body).await
 }
 
 async fn client(
@@ -451,6 +449,11 @@ fn handle_client(state: &mut FakeState, operation: &str, body: &Value, token: &s
             for item in body["items"].as_array().into_iter().flatten() {
                 let id = Uuid::new_v4();
                 observations.push(json!({"observation_id":id,"revision":1,"access_level":level,"index_state":"pending"}));
+                if item["subject"].is_string() {
+                    state
+                        .subjects
+                        .insert((tenant.clone(), id), item["subject"].clone());
+                }
                 state.observations.push((
                     namespace.clone(),
                     json!({"observation_id":id,"kind":item["kind"],"title":item["title"],
@@ -589,6 +592,14 @@ fn handle(state: &mut FakeState, operation: &str, body: &Value, admin: &str) -> 
             };
             *active = false;
             Ok(json!({"tenant":tenant,"namespace":namespace,"state":"deleted"}))
+        }
+        "observations/subject/list" | "observations/subject/delete" => {
+            let (tenant, namespace) = (text("tenant"), text("namespace"));
+            managed(state, &tenant)?;
+            if !state.namespaces.contains_key(&(tenant, namespace)) {
+                return Err((StatusCode::NOT_FOUND, "not_found"));
+            }
+            subject::handle(state, operation, body)
         }
         "credentials/issue" => {
             let tenant = text("tenant");

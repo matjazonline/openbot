@@ -352,6 +352,9 @@ pub async fn execute(
                     text(&item.title, "title", 1, MAX_TITLE_CHARS, MAX_TITLE_BYTES)?;
                     text(&item.body, "body", 0, MAX_BODY_CHARS, MAX_BODY_BYTES)?;
                     future(item.expires_at, now, "An item's expires_at")?;
+                    if let Some(subject) = &item.subject {
+                        id(subject, "subject")?;
+                    }
                 }
                 let write = authorize_write(
                     Write {

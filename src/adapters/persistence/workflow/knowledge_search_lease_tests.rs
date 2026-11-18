@@ -1,6 +1,5 @@
 //! Actual database ownership, deferred COMMIT fencing and ambiguous acknowledgment recovery.
 use super::*;
-use crate::application::knowledge::search::KnowledgeObservation;
 use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::{
     Abort, Gate, GatePool, Stall, connect,
 };
@@ -9,13 +8,6 @@ impl GatePool for SearchFixture {
     fn gate_pool(&self) -> &sqlx::PgPool {
         self.p().pool()
     }
-}
-
-fn private_observation() -> KnowledgeObservation {
-    KnowledgeObservation::new(
-        json!({"passages":[{"file":"sales.md","heading":null,"text":"PRIVATE FLOOR 60"}]}),
-        Some(AccessLevel::L5),
-    )
 }
 
 async fn expire(f: &SearchFixture, boundary: &str) {
@@ -112,7 +104,12 @@ async fn knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_r
             let before = f.snapshot().await;
             let error = f
                 .p()
-                .observe_knowledge(f.claim.fence, &call, private_observation())
+                .observe_knowledge(
+                    f.claim.fence,
+                    &call,
+                    f.synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                        .await,
+                )
                 .await
                 .unwrap_err();
             let entered: bool = sqlx::query_scalar("SELECT is_called FROM search_expiry_entered")
@@ -204,7 +201,12 @@ async fn knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_reje
     let f = Box::pin(SearchFixture::new(AccessLevel::L5)).await;
     let call = f.prepare(json!({"query":"floor"})).await;
     f.p()
-        .observe_knowledge(f.claim.fence, &call, private_observation())
+        .observe_knowledge(
+            f.claim.fence,
+            &call,
+            f.synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+                .await,
+        )
         .await
         .unwrap();
     let before = f.snapshot().await;
@@ -223,8 +225,10 @@ async fn knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_reje
     }
     let foreign = Box::pin(SearchFixture::new(AccessLevel::L5)).await;
     let error = sqlx::query("INSERT INTO workflow_knowledge_consumptions
+        (company_id,run_id,execution_id,job_id,attempt_number,execution_generation,worker_id,
+         checkpoint_id,invocation_id,content_level,result,queried_unit_ids,source_items)
         SELECT $2,run_id,execution_id,job_id,attempt_number,execution_generation,worker_id,
-            checkpoint_id,invocation_id,content_level,result FROM workflow_knowledge_consumptions WHERE job_id=$1")
+            checkpoint_id,invocation_id,content_level,result,queried_unit_ids,source_items FROM workflow_knowledge_consumptions WHERE job_id=$1")
         .bind(f.claim.fence.scope.job.0).bind(foreign.claim.fence.scope.company.as_uuid())
         .execute(f.p().pool()).await.unwrap_err();
     assert_eq!(
@@ -255,10 +259,11 @@ async fn knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruct
         let p = f.p().clone();
         let fence = f.claim.fence;
         let pending = copy_call(&call);
-        let task = tokio::spawn(async move {
-            p.observe_knowledge(fence, &pending, private_observation())
-                .await
-        });
+        let observation = f
+            .synthetic_observation("PRIVATE FLOOR 60", AccessLevel::L5)
+            .await;
+        let task =
+            tokio::spawn(async move { p.observe_knowledge(fence, &pending, observation).await });
         let _stalled = gate
             .stalled(&mut observer, &[&|| !task.is_finished()])
             .await;

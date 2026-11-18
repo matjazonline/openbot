@@ -11,6 +11,7 @@ use crate::adapters::persistence::test_support::{OwnDatabase, own_database};
 use crate::application::memory::*;
 use crate::application::workflow::{CompanyId, WorkflowActor};
 use crate::entities::company_member::CompanyAccessRole;
+use crate::entities::{department::DepartmentId, transport::PrincipalId};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
 use crate::use_cases::company_invite::CompanyInvitePersistence;
@@ -27,6 +28,11 @@ pub(super) struct Fixture {
     pub admin: Uuid,
     pub member: Uuid,
     pub agent: Uuid,
+    pub root: DepartmentId,
+    pub agent_principal: PrincipalId,
+    pub owner_principal: PrincipalId,
+    pub admin_principal: PrincipalId,
+    pub member_principal: PrincipalId,
 }
 
 async fn user(persistence: &PostgresPersistence, role: &str) -> (Uuid, String) {
@@ -109,6 +115,23 @@ impl Fixture {
         let admin = join(&persistence, company, CompanyAccessRole::Admin).await;
         let member = join(&persistence, company, CompanyAccessRole::Member).await;
         let agent = agent(&persistence, company).await;
+        let mut db = persistence.pool().acquire().await.unwrap();
+        let root = crate::adapters::persistence::company::root_on(&mut db, CompanyId::new(company))
+            .await
+            .unwrap();
+        let agent_principal = super::agent_principal_on(&mut db, company, agent)
+            .await
+            .unwrap();
+        let owner_principal = super::person_principal_on(&mut db, company, owner)
+            .await
+            .unwrap();
+        let admin_principal = super::person_principal_on(&mut db, company, admin)
+            .await
+            .unwrap();
+        let member_principal = super::person_principal_on(&mut db, company, member)
+            .await
+            .unwrap();
+        drop(db);
         Some(Self {
             database,
             persistence,
@@ -117,6 +140,11 @@ impl Fixture {
             admin,
             member,
             agent,
+            root,
+            agent_principal,
+            owner_principal,
+            admin_principal,
+            member_principal,
         })
     }
 
@@ -176,16 +204,13 @@ impl Fixture {
     }
 
     /// The namespaces of one scope: (id, state).
-    pub(super) async fn namespaces(&self, kind: &str) -> Vec<(Uuid, String)> {
+    pub(super) async fn namespaces(&self, owner: NamespaceOwner) -> Vec<(Uuid, String)> {
+        let key = super::namespace_columns(owner);
         sqlx::query_as(
-            "SELECT id, state FROM memory_namespaces WHERE company_id = $1 AND scope_kind = $2 \
-             ORDER BY created_at, id",
-        )
-        .bind(self.company)
-        .bind(kind)
-        .fetch_all(self.pool())
-        .await
-        .unwrap()
+            "SELECT id, state FROM memory_namespaces WHERE company_id=$1 AND scope_kind=$2 \
+             AND unit_id IS NOT DISTINCT FROM $3 AND principal_id IS NOT DISTINCT FROM $4 ORDER BY created_at,id",
+        ).bind(self.company).bind(key.kind).bind(key.unit).bind(key.principal)
+            .fetch_all(self.pool()).await.unwrap()
     }
 
     pub(super) async fn tenant(&self) -> Option<(String, i64, i64)> {
@@ -337,21 +362,25 @@ async fn memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identiti
     let Some(f) = Fixture::new().await else {
         return;
     };
-    let agent = NamespaceOwner::Agent(f.agent);
+    let agent = NamespaceOwner::Principal(f.agent_principal);
     assert_eq!(f.ensure(agent).await, NamespaceReadiness::NotEnabled);
     f.enable().await.unwrap();
     for owner in [
-        NamespaceOwner::Company,
+        NamespaceOwner::Unit(f.root),
         agent,
-        NamespaceOwner::User(f.member),
+        NamespaceOwner::Principal(f.member_principal),
     ] {
         assert_eq!(f.ensure(owner).await, NamespaceReadiness::NotReady);
         // Idempotent: one namespace and one lifecycle per scope.
         assert_eq!(f.ensure(owner).await, NamespaceReadiness::NotReady);
     }
-    for kind in ["company", "agent", "user"] {
-        let namespaces = f.namespaces(kind).await;
-        assert_eq!(namespaces.len(), 1, "{kind}");
+    for owner in [
+        NamespaceOwner::Unit(f.root),
+        NamespaceOwner::Principal(f.agent_principal),
+        NamespaceOwner::Principal(f.member_principal),
+    ] {
+        let namespaces = f.namespaces(owner).await;
+        assert_eq!(namespaces.len(), 1, "{owner:?}");
         assert_eq!(
             f.lifecycle(Some(namespaces[0].0)).await,
             Some(("present".into(), "pending".into(), 1))
@@ -362,10 +391,26 @@ async fn memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identiti
     let other_company = company(&f.persistence, outsider).await;
     let foreign_agent = super::tests::agent(&f.persistence, other_company).await;
     for owner in [
-        NamespaceOwner::Agent(foreign_agent),
-        NamespaceOwner::Agent(Uuid::new_v4()),
-        NamespaceOwner::User(outsider),
-        NamespaceOwner::User(Uuid::new_v4()),
+        NamespaceOwner::Principal(
+            super::agent_principal_on(
+                &mut f.pool().acquire().await.unwrap(),
+                other_company,
+                foreign_agent,
+            )
+            .await
+            .unwrap(),
+        ),
+        NamespaceOwner::Principal(PrincipalId::random()),
+        NamespaceOwner::Principal(
+            super::person_principal_on(
+                &mut f.pool().acquire().await.unwrap(),
+                other_company,
+                outsider,
+            )
+            .await
+            .unwrap(),
+        ),
+        NamespaceOwner::Principal(PrincipalId::random()),
     ] {
         assert_eq!(
             f.ensure(owner).await,
@@ -375,12 +420,15 @@ async fn memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identiti
     }
     assert!(matches!(
         f.persistence
-            .ensure_namespace(CompanyId::new(Uuid::new_v4()), NamespaceOwner::Company)
+            .ensure_namespace(CompanyId::new(Uuid::new_v4()), NamespaceOwner::Unit(f.root))
             .await,
         Ok(NamespaceReadiness::OwnerUnavailable)
     ));
     // Ready once the credential is stored; never while the tenant is disabled.
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     sqlx::query(
         "UPDATE memory_namespaces SET state = 'ready', credential_id = $2, \
          credential_envelope = 'enc:v2:fixture' WHERE id = $1",
@@ -404,17 +452,25 @@ async fn memory_scope_owner_removal_retires_namespaces_and_upserts_absent_lifecy
         return;
     };
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    f.ensure(NamespaceOwner::User(f.member)).await;
-    f.ensure(NamespaceOwner::Company).await;
-    let (agent_namespace, _) = f.namespaces("agent").await[0].clone();
-    let (user_namespace, _) = f.namespaces("user").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    f.ensure(NamespaceOwner::Principal(f.member_principal))
+        .await;
+    f.ensure(NamespaceOwner::Unit(f.root)).await;
+    let (agent_namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
+    let (user_namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.member_principal))
+        .await[0]
+        .clone();
 
     AgentPersistence::delete(&f.persistence, f.agent)
         .await
         .unwrap();
     assert_eq!(
-        f.namespaces("agent").await,
+        f.namespaces(NamespaceOwner::Principal(f.agent_principal))
+            .await,
         [(agent_namespace, "removing".into())]
     );
     assert_eq!(
@@ -432,7 +488,8 @@ async fn memory_scope_owner_removal_retires_namespaces_and_upserts_absent_lifecy
     .await
     .unwrap();
     assert_eq!(
-        f.namespaces("user").await,
+        f.namespaces(NamespaceOwner::Principal(f.member_principal))
+            .await,
         [(user_namespace, "removing".into())]
     );
     assert_eq!(
@@ -441,7 +498,8 @@ async fn memory_scope_owner_removal_retires_namespaces_and_upserts_absent_lifecy
     );
     // A removed owner cannot be provisioned again.
     assert_eq!(
-        f.ensure(NamespaceOwner::User(f.member)).await,
+        f.ensure(NamespaceOwner::Principal(f.member_principal))
+            .await,
         NamespaceReadiness::OwnerUnavailable
     );
 
@@ -470,7 +528,7 @@ async fn memory_scope_owner_removal_retires_namespaces_and_upserts_absent_lifecy
             Some("tenant_removed".to_owned())
         )));
     assert!(f.tenant().await.is_none());
-    assert!(f.namespaces("company").await.is_empty());
+    assert!(f.namespaces(NamespaceOwner::Unit(f.root)).await.is_empty());
 }
 
 #[tokio::test]
@@ -480,8 +538,12 @@ async fn memory_scope_account_deletion_retires_owned_tenants_and_member_namespac
         return;
     };
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::User(f.member)).await;
-    let (namespace, _) = f.namespaces("user").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.member_principal))
+        .await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.member_principal))
+        .await[0]
+        .clone();
     f.persistence.delete_user_account(f.member).await.unwrap();
     assert_eq!(
         f.lifecycle(Some(namespace)).await,
@@ -518,7 +580,7 @@ async fn memory_scope_lifecycle_resurrection_is_refused() {
         .unwrap();
     assert!(matches!(f.enable().await, Err(AppError::NotFound(_))));
     assert_eq!(
-        f.ensure(NamespaceOwner::Company).await,
+        f.ensure(NamespaceOwner::Unit(f.root)).await,
         NamespaceReadiness::OwnerUnavailable
     );
     assert!(f.tenant().await.is_none());
@@ -552,19 +614,19 @@ async fn memory_scope_lifecycle_lease_checks_refuse_incoherent_rows() {
     };
     for (statement, why) in [
         (
-            insert("pending", Some(Uuid::new_v4()), false, "agent"),
+            insert("pending", Some(Uuid::new_v4()), false, "principal"),
             "pending with a lease owner",
         ),
         (
-            insert("pending", Some(Uuid::new_v4()), true, "agent"),
+            insert("pending", Some(Uuid::new_v4()), true, "principal"),
             "pending with a lease",
         ),
         (
-            insert("claimed", None, true, "agent"),
+            insert("claimed", None, true, "principal"),
             "claimed without an owner",
         ),
         (
-            insert("claimed", Some(Uuid::new_v4()), false, "agent"),
+            insert("claimed", Some(Uuid::new_v4()), false, "principal"),
             "claimed without an expiry",
         ),
         (
@@ -652,9 +714,13 @@ async fn memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_
     let mut provision = f.pool().begin().await.unwrap();
     let pid = backend_pid(&mut provision).await;
     assert_eq!(
-        ensure_on(&mut provision, f.company, NamespaceOwner::Agent(f.agent))
-            .await
-            .unwrap(),
+        ensure_on(
+            &mut provision,
+            f.company,
+            NamespaceOwner::Principal(f.agent_principal)
+        )
+        .await
+        .unwrap(),
         NamespaceReadiness::NotReady
     );
     let persistence = f.persistence.clone();
@@ -663,7 +729,9 @@ async fn memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_
     blocked_by(f.pool(), pid).await;
     provision.commit().await.unwrap();
     delete.await.unwrap().unwrap();
-    let namespaces = f.namespaces("agent").await;
+    let namespaces = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await;
     assert_eq!(namespaces.len(), 1);
     assert_eq!(namespaces[0].1, "removing");
     assert_eq!(
@@ -673,6 +741,10 @@ async fn memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_
 
     // Delete first: provisioning waits on the agent lock, then finds no agent.
     let second = super::tests::agent(&f.persistence, f.company).await;
+    let second_principal =
+        super::agent_principal_on(&mut f.pool().acquire().await.unwrap(), f.company, second)
+            .await
+            .unwrap();
     let mut delete = f.pool().begin().await.unwrap();
     let pid = backend_pid(&mut delete).await;
     sqlx::query("SELECT id FROM agents WHERE id = $1 FOR UPDATE")
@@ -684,13 +756,17 @@ async fn memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_
     let scope = f.scope();
     let provision = tokio::spawn(async move {
         persistence
-            .ensure_namespace(scope, NamespaceOwner::Agent(second))
+            .ensure_namespace(scope, NamespaceOwner::Principal(second_principal))
             .await
     });
     blocked_by(f.pool(), pid).await;
-    retire_namespaces_on(&mut delete, f.company, NamespaceOwner::Agent(second))
-        .await
-        .unwrap();
+    retire_namespaces_on(
+        &mut delete,
+        f.company,
+        NamespaceOwner::Principal(second_principal),
+    )
+    .await
+    .unwrap();
     sqlx::query("UPDATE principals SET kind = 'external', agent_id = NULL WHERE agent_id = $1")
         .bind(second)
         .execute(&mut *delete)
@@ -707,7 +783,9 @@ async fn memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_
         NamespaceReadiness::OwnerUnavailable
     );
     assert_eq!(
-        f.namespaces("agent").await.len(),
+        f.namespaces(NamespaceOwner::Principal(f.agent_principal))
+            .await
+            .len(),
         1,
         "nothing for the deleted agent"
     );
@@ -722,9 +800,13 @@ async fn memory_scope_competing_member_removal_and_provisioning_serialize_in_bot
     // Provisioning first: removal waits on the company lock, then retires the namespace.
     let mut provision = f.pool().begin().await.unwrap();
     let pid = backend_pid(&mut provision).await;
-    ensure_on(&mut provision, f.company, NamespaceOwner::User(f.member))
-        .await
-        .unwrap();
+    ensure_on(
+        &mut provision,
+        f.company,
+        NamespaceOwner::Principal(f.member_principal),
+    )
+    .await
+    .unwrap();
     let persistence = f.persistence.clone();
     let (company, member) = (f.company, f.member);
     let removing_owner = f.owner;
@@ -742,13 +824,16 @@ async fn memory_scope_competing_member_removal_and_provisioning_serialize_in_bot
     blocked_by(f.pool(), pid).await;
     provision.commit().await.unwrap();
     removal.await.unwrap().unwrap();
-    let namespaces = f.namespaces("user").await;
+    let namespaces = f
+        .namespaces(NamespaceOwner::Principal(f.member_principal))
+        .await;
     assert_eq!(namespaces.len(), 1);
     assert_eq!(namespaces[0].1, "removing");
 
     // Removal first: provisioning waits behind the membership's company lock, then finds no
     // member. The removal here is the real one, held open by a lock it must take first.
     let admin = f.admin;
+    let admin_principal = f.admin_principal;
     let mut hold = f.pool().begin().await.unwrap();
     let pid = backend_pid(&mut hold).await;
     sqlx::query("SELECT id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
@@ -773,7 +858,7 @@ async fn memory_scope_competing_member_removal_and_provisioning_serialize_in_bot
     let scope = f.scope();
     let provision = tokio::spawn(async move {
         persistence
-            .ensure_namespace(scope, NamespaceOwner::User(admin))
+            .ensure_namespace(scope, NamespaceOwner::Principal(admin_principal))
             .await
     });
     // Both wait on the held company lock; the removal queued first, so it commits first.
@@ -785,7 +870,9 @@ async fn memory_scope_competing_member_removal_and_provisioning_serialize_in_bot
         NamespaceReadiness::OwnerUnavailable
     );
     assert_eq!(
-        f.namespaces("user").await.len(),
+        f.namespaces(NamespaceOwner::Principal(f.member_principal))
+            .await
+            .len(),
         1,
         "nothing for the removed admin"
     );
@@ -812,10 +899,10 @@ async fn memory_scope_competing_disable_enable_and_provisioning_serialize() {
             .await
     });
     let persistence = f.persistence.clone();
-    let agent = f.agent;
+    let agent_principal = f.agent_principal;
     let provision = tokio::spawn(async move {
         persistence
-            .ensure_namespace(scope, NamespaceOwner::Agent(agent))
+            .ensure_namespace(scope, NamespaceOwner::Principal(agent_principal))
             .await
     });
     crate::adapters::persistence::test_support::wait_until_backends_are_blocked(f.pool(), 2).await;
@@ -885,9 +972,13 @@ async fn memory_scope_competing_agent_delete_and_company_delete_never_deadlock()
         return;
     };
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
     let second = agent(&f.persistence, f.company).await;
-    f.ensure(NamespaceOwner::Agent(second)).await;
+    let second_principal =
+        super::agent_principal_on(&mut f.pool().acquire().await.unwrap(), f.company, second)
+            .await
+            .unwrap();
+    f.ensure(NamespaceOwner::Principal(second_principal)).await;
 
     // Agent delete first, holding its locks; the company delete waits behind them.
     let mut agent_delete = f.pool().begin().await.unwrap();
@@ -916,7 +1007,7 @@ async fn memory_scope_competing_agent_delete_and_company_delete_never_deadlock()
         return;
     };
     g.enable().await.unwrap();
-    g.ensure(NamespaceOwner::Agent(g.agent)).await;
+    g.ensure(NamespaceOwner::Principal(g.agent_principal)).await;
     let (delete, pid) = hold_company_delete(&g).await;
     let persistence = g.persistence.clone();
     let agent_id = g.agent;
@@ -939,7 +1030,8 @@ async fn memory_scope_competing_account_deletion_and_company_delete_never_deadlo
         return;
     };
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::User(f.member)).await;
+    f.ensure(NamespaceOwner::Principal(f.member_principal))
+        .await;
 
     // Account deletion first; the company delete waits behind its member-company lock.
     let mut account = f.pool().begin().await.unwrap();
@@ -965,7 +1057,8 @@ async fn memory_scope_competing_account_deletion_and_company_delete_never_deadlo
         return;
     };
     g.enable().await.unwrap();
-    g.ensure(NamespaceOwner::User(g.member)).await;
+    g.ensure(NamespaceOwner::Principal(g.member_principal))
+        .await;
     let (delete, pid) = hold_company_delete(&g).await;
     let persistence = g.persistence.clone();
     let member = g.member;
@@ -982,8 +1075,12 @@ async fn memory_scope_returning_member_gets_a_new_namespace_id() {
         return;
     };
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::User(f.member)).await;
-    let (old, _) = f.namespaces("user").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.member_principal))
+        .await;
+    let (old, _) = f
+        .namespaces(NamespaceOwner::Principal(f.member_principal))
+        .await[0]
+        .clone();
     CompanyInvitePersistence::remove_member(
         &f.persistence,
         crate::use_cases::company_invite::RemoveCompanyMember {
@@ -1018,10 +1115,13 @@ async fn memory_scope_returning_member_gets_a_new_namespace_id() {
         .unwrap()
         .unwrap();
     assert_eq!(
-        f.ensure(NamespaceOwner::User(f.member)).await,
+        f.ensure(NamespaceOwner::Principal(f.member_principal))
+            .await,
         NamespaceReadiness::NotReady
     );
-    let namespaces = f.namespaces("user").await;
+    let namespaces = f
+        .namespaces(NamespaceOwner::Principal(f.member_principal))
+        .await;
     assert_eq!(namespaces.len(), 2);
     assert_eq!(namespaces[0], (old, "removing".into()));
     assert_ne!(namespaces[1].0, old, "a new namespace id");
@@ -1036,8 +1136,11 @@ async fn memory_scope_lazy_redrive_skips_definite_failures_and_replaces_a_confli
         return;
     };
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     let fail = |outcome: &'static str, age: &'static str| {
         format!(
             "UPDATE memory_lifecycles SET state = 'failed', attempts = 8, outcome_code = '{outcome}', \
@@ -1067,7 +1170,7 @@ async fn memory_scope_lazy_redrive_skips_definite_failures_and_replaces_a_confli
             .await
             .unwrap();
         assert_eq!(
-            f.ensure(NamespaceOwner::Agent(f.agent)).await,
+            f.ensure(NamespaceOwner::Principal(f.agent_principal)).await,
             NamespaceReadiness::NotReady
         );
         assert_eq!(
@@ -1084,14 +1187,22 @@ async fn memory_scope_lazy_redrive_skips_definite_failures_and_replaces_a_confli
             .await
             .unwrap();
         assert_eq!(
-            f.ensure(NamespaceOwner::Agent(f.agent)).await,
+            f.ensure(NamespaceOwner::Principal(f.agent_principal)).await,
             NamespaceReadiness::NotReady
         );
         if age == "1 second" {
-            assert_eq!(f.namespaces("agent").await.len(), 1, "not replaced yet");
+            assert_eq!(
+                f.namespaces(NamespaceOwner::Principal(f.agent_principal))
+                    .await
+                    .len(),
+                1,
+                "not replaced yet"
+            );
         }
     }
-    let namespaces = f.namespaces("agent").await;
+    let namespaces = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await;
     assert_eq!(namespaces.len(), 2);
     assert_eq!(namespaces[0], (namespace, "removing".into()));
     assert_ne!(

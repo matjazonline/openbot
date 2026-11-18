@@ -57,7 +57,10 @@ pub(super) async fn unsealed_chain() -> (AdmissionFixture, Vec<ActivationRequest
     (f, vec![root, child])
 }
 
-pub(super) async fn unsealed_root(f: &AdmissionFixture, key: &str) -> ActivationRequest {
+pub(in crate::adapters::persistence::workflow::tests) async fn unsealed_root(
+    f: &AdmissionFixture,
+    key: &str,
+) -> ActivationRequest {
     let command = f.prepare(f.request(key, f.manual())).await;
     insert(
         f,

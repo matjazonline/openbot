@@ -23,7 +23,7 @@ pub(crate) async fn retire_member_on(
             "Cannot remove company owner from the team.".into(),
         ));
     }
-    sqlx::query(
+    let principals: Vec<Uuid> = sqlx::query_scalar(
         "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2 ORDER BY id FOR UPDATE",
     )
     .bind(company.as_uuid())
@@ -52,12 +52,16 @@ pub(crate) async fn retire_member_on(
         recipient,
     )
     .await?;
-    super::super::memory::retire_namespaces_on(
-        tx,
-        company.as_uuid(),
-        crate::application::memory::NamespaceOwner::User(user),
-    )
-    .await?;
+    for principal in principals {
+        super::super::memory::retire_namespaces_on(
+            tx,
+            company.as_uuid(),
+            crate::application::memory::NamespaceOwner::Principal(
+                crate::entities::transport::PrincipalId::new(principal),
+            ),
+        )
+        .await?;
+    }
     super::super::integrations::lifecycle::revoke_membership_on(
         tx,
         &crate::adapters::integrations::owner::owner_for_user(user),

@@ -1,0 +1,39 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 15s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 26 tests
+test adapters::http::pages::knowledge::tests::knowledge_scope_upload_maximum_library_keeps_destination_choices_bounded_for_every_document ... ok
+test adapters::http::routes::knowledge::tests::scopes::knowledge_scope_upload_http_requires_first_unit_and_rejects_before_collecting_file_body ... ok
+test adapters::http::routes::knowledge::tests::scopes::knowledge_scope_search_native_form_accepts_maximum_encoded_unicode_and_rejects_over_limit ... ok
+test adapters::http::routes::knowledge::tests::scopes::knowledge_scope_http_search_move_and_move_form_scope_valid_foreign_ids ... ok
+test adapters::http::routes::knowledge::tests::review_scopes::knowledge_scope_review_filtered_manual_search_refuses_foreign_and_unreadable_units_before_model_admission ... ok
+test adapters::http::routes::knowledge::tests::scopes::knowledge_scope_search_manual_rechecks_revoked_grant_after_embedding ... ok
+test adapters::http::routes::knowledge::tests::scopes::knowledge_scope_upload_library_groups_filters_and_native_move_restores_form_on_failure ... ok
+test adapters::http::routes::ui_departments::tests::knowledge::knowledge_scope_upload_department_pane_lists_owned_visible_documents_and_move_guidance ... ok
+test adapters::http::routes::knowledge::tests::review_scopes::knowledge_scope_review_hidden_destination_collision_is_generic_but_visible_collision_is_explained ... ok
+test adapters::persistence::knowledge::tests::scope_races::knowledge_scope_move_and_upload_recheck_source_target_hidden_layers_and_revoked_grants ... ok
+test adapters::persistence::knowledge::tests::scopes::knowledge_scope_move_all_layers_keeps_ids_chunks_and_refuses_stale_or_colliding_targets ... ok
+test adapters::persistence::knowledge::tests::scopes::knowledge_scope_move_competing_claimants_cannot_split_layers_or_use_the_same_revision_twice ... ok
+test adapters::persistence::knowledge::tests::scopes::knowledge_scope_schema_owner_chunk_tuple_and_per_unit_layer_identity ... ok
+test adapters::persistence::knowledge::tests::scopes::knowledge_scope_search_manual_roles_ancestors_one_step_leads_and_level ... ok
+test adapters::persistence::knowledge::tests::scopes::knowledge_scope_upload_requires_current_placement_and_parent_lead_without_sideways_grants ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_cached_model_continuation_requires_available_consumed_scope ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_cached_model_continuation_refuses_deleted_report_owner ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_empty_success_keeps_queried_units_separate_from_unavailable_scope ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_missing_rows_records_only_refusal_without_embedding_or_company_fallback ... ok
+test adapters::persistence::knowledge::tests::scope_races::knowledge_scope_move_competes_with_replace_in_both_commit_orders ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_real_items_keep_historical_units_after_move_and_fresh_queries_use_current_owner ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::proofs::knowledge_scope_search_observation_refuses_foreign_subset_item_and_level_without_partial_effects ... ok
+test adapters::http::routes::knowledge::tests::review_scopes::knowledge_scope_review_native_move_reaches_257th_destination_without_filtering_out_source_or_raising_picker_bound ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_keeps_each_acting_agents_units_separate ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_two_desks_ancestors_lead_level_and_frozen_topology ... ok
+test adapters::http::routes::ui_departments::tests::knowledge::knowledge_scope_review_department_limit_refuses_only_knowledge_and_preserves_authorized_roster_and_desks ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 4794 filtered out; finished in 22.05s
+

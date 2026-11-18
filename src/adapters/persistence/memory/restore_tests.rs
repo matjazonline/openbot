@@ -2,9 +2,7 @@
 //! SQL in docs/deploy.md (run verbatim), the credential check of a re-driven present step, and a
 //! `401` that re-verifies a credential without failing the intent waiting on it.
 use super::*;
-use crate::adapters::persistence::memory::deliveries::{
-    LockedRun, SaveIntent, SaveScope, freeze_save_on,
-};
+use crate::adapters::persistence::memory::deliveries::{LockedRun, SaveIntent, freeze_save_on};
 use crate::domain::workflow::{ExecutionId, RunId};
 use crate::entities::access_level::AccessLevel;
 
@@ -46,10 +44,12 @@ async fn save(f: &Fixture, key: &str) {
         execution: ExecutionId::new(Uuid::new_v4()),
         invocation: None,
         wait: None,
-        scope: SaveScope::Company,
+        scope: NamespaceOwner::Unit(f.root),
         key,
         facts: &facts,
         external_sources: Vec::new(),
+        producer: f.agent_principal,
+        subject: None,
     };
     let mut tx = f.pool().begin().await.unwrap();
     freeze_save_on(
@@ -105,9 +105,9 @@ async fn generation_of(f: &Fixture, namespace: Uuid) -> i64 {
 
 /// The company namespace, provisioned through the lifecycle worker.
 async fn provisioned(f: &Fixture, worker: &MemoryLifecycleWorker) -> (Uuid, Uuid) {
-    f.ensure(NamespaceOwner::Company).await;
+    f.ensure(NamespaceOwner::Unit(f.root)).await;
     drain(worker).await;
-    let (namespace, _) = f.namespaces("company").await[0].clone();
+    let (namespace, _) = f.namespaces(NamespaceOwner::Unit(f.root)).await[0].clone();
     let (credential, _) = stored(f, namespace).await.unwrap();
     (namespace, credential)
 }
@@ -341,9 +341,12 @@ async fn memory_operations_a_redriven_absent_lifecycle_deletes_a_restored_namesp
     let worker = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
     drain(&worker).await;
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
     drain(&worker).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     let (credential, _) = stored(&f, namespace).await.unwrap();
     let backup_time = now(&f).await;
     AgentPersistence::delete(&f.persistence, f.agent)

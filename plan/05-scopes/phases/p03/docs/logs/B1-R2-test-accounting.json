@@ -1,0 +1,71 @@
+{
+  "baseline": "plan/05-scopes/phases/p02/docs/logs/B1-R2-final-test-list-r1.txt",
+  "deferred_unchanged_doop_names": 85,
+  "before": 4723,
+  "after": 4749,
+  "removed": [],
+  "added": [
+    "adapters::http::pages::knowledge::tests::knowledge_scope_upload_maximum_library_keeps_destination_choices_bounded_for_every_document",
+    "adapters::http::routes::knowledge::tests::review_scopes::knowledge_scope_review_filtered_manual_search_refuses_foreign_and_unreadable_units_before_model_admission",
+    "adapters::http::routes::knowledge::tests::review_scopes::knowledge_scope_review_hidden_destination_collision_is_generic_but_visible_collision_is_explained",
+    "adapters::http::routes::knowledge::tests::review_scopes::knowledge_scope_review_native_move_reaches_257th_destination_without_filtering_out_source_or_raising_picker_bound",
+    "adapters::http::routes::knowledge::tests::scopes::knowledge_scope_http_search_move_and_move_form_scope_valid_foreign_ids",
+    "adapters::http::routes::knowledge::tests::scopes::knowledge_scope_search_manual_rechecks_revoked_grant_after_embedding",
+    "adapters::http::routes::knowledge::tests::scopes::knowledge_scope_search_native_form_accepts_maximum_encoded_unicode_and_rejects_over_limit",
+    "adapters::http::routes::knowledge::tests::scopes::knowledge_scope_upload_http_requires_first_unit_and_rejects_before_collecting_file_body",
+    "adapters::http::routes::knowledge::tests::scopes::knowledge_scope_upload_library_groups_filters_and_native_move_restores_form_on_failure",
+    "adapters::http::routes::ui_departments::tests::knowledge::knowledge_scope_review_department_limit_refuses_only_knowledge_and_preserves_authorized_roster_and_desks",
+    "adapters::http::routes::ui_departments::tests::knowledge::knowledge_scope_upload_department_pane_lists_owned_visible_documents_and_move_guidance",
+    "adapters::persistence::knowledge::tests::scope_races::knowledge_scope_move_and_upload_recheck_source_target_hidden_layers_and_revoked_grants",
+    "adapters::persistence::knowledge::tests::scope_races::knowledge_scope_move_competes_with_replace_in_both_commit_orders",
+    "adapters::persistence::knowledge::tests::scopes::knowledge_scope_move_all_layers_keeps_ids_chunks_and_refuses_stale_or_colliding_targets",
+    "adapters::persistence::knowledge::tests::scopes::knowledge_scope_move_competing_claimants_cannot_split_layers_or_use_the_same_revision_twice",
+    "adapters::persistence::knowledge::tests::scopes::knowledge_scope_schema_owner_chunk_tuple_and_per_unit_layer_identity",
+    "adapters::persistence::knowledge::tests::scopes::knowledge_scope_search_manual_roles_ancestors_one_step_leads_and_level",
+    "adapters::persistence::knowledge::tests::scopes::knowledge_scope_upload_requires_current_placement_and_parent_lead_without_sideways_grants",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_cached_model_continuation_refuses_deleted_report_owner",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_cached_model_continuation_requires_available_consumed_scope",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_empty_success_keeps_queried_units_separate_from_unavailable_scope",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_missing_rows_records_only_refusal_without_embedding_or_company_fallback",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::knowledge_scope_search_real_items_keep_historical_units_after_move_and_fresh_queries_use_current_owner",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::scopes::proofs::knowledge_scope_search_observation_refuses_foreign_subset_item_and_level_without_partial_effects",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_keeps_each_acting_agents_units_separate",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::scopes::knowledge_scope_search_deployment_two_desks_ancestors_lead_level_and_frozen_topology"
+  ],
+  "disposition": "Doop names excluded from BOTH inventories under C001; no Doop test execution.",
+  "binaries": [
+    {
+      "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889",
+      "sha256": "c4eee6b360040820f391b3b48bb28491e59786f00033d7a875adb13e5e413a12",
+      "arguments": [
+        "--list",
+        "--skip",
+        "doop",
+        "--skip",
+        "Doop"
+      ]
+    },
+    {
+      "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-605f25833b075cb7",
+      "sha256": "79ce81299549aad1e6405c6f0c1cb6451a1708447c0a88f7e703e691d5851550",
+      "arguments": [
+        "--list",
+        "--skip",
+        "doop",
+        "--skip",
+        "Doop"
+      ]
+    },
+    {
+      "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/source_modules-3ea50e7b724998e7",
+      "sha256": "56e1c027dadd1d1184778bb953956d12d67e4216970b6f42c2ff7745025be3e8",
+      "arguments": [
+        "--list",
+        "--skip",
+        "doop",
+        "--skip",
+        "Doop"
+      ]
+    }
+  ]
+}

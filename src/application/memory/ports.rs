@@ -6,7 +6,10 @@ use uuid::Uuid;
 /// UUIDs and namespace external ids are random UUIDs, so a UUID's hyphenated form always fits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TenantExternalId(pub Uuid);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[serde(transparent)]
 pub struct NamespaceExternalId(pub Uuid);
 
 /// Every failure the service can answer, classified once at the adapter boundary (E1).
@@ -92,10 +95,43 @@ pub struct CredentialPage {
     pub next_after: Option<Uuid>,
 }
 
+/// Exact subject cleanup boundary. A subject is provenance, never authority.
+#[derive(Debug, Clone, Copy)]
+pub struct MemorySubjectScope {
+    pub tenant: TenantExternalId,
+    pub namespace: NamespaceExternalId,
+    pub subject: crate::entities::transport::PrincipalId,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubjectObservation {
+    pub observation_id: Uuid,
+    pub revision: i64,
+    pub access_level: u8,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubjectPage {
+    pub items: Vec<SubjectObservation>,
+    pub next_after: Option<Uuid>,
+}
+
 /// Admin operations through OpenBot's one provisioner credential (D3, E2). Every method is a
 /// required, explicit decision: no defaults, because each one changes remote authority.
 #[async_trait]
 pub trait MemoryProvisioner: Send + Sync {
+    async fn list_subject(
+        &self,
+        scope: MemorySubjectScope,
+        after: Option<Uuid>,
+    ) -> Result<SubjectPage, MemoryServiceError>;
+    async fn delete_subject(
+        &self,
+        scope: MemorySubjectScope,
+        observations: &[Uuid],
+    ) -> Result<Vec<Uuid>, MemoryServiceError>;
     /// Idempotent by external id; a tombstoned or foreign-managed id is `Conflict`.
     async fn create_tenant(
         &self,
@@ -201,6 +237,8 @@ pub struct MemorySaveItem {
     pub title: String,
     pub body: String,
     pub occurred_at: chrono::DateTime<chrono::Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
 }
 
 /// `SaveRequest`, frozen into the delivery intent and resent byte-for-byte on every retry.

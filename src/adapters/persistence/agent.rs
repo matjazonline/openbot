@@ -624,15 +624,7 @@ pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
     // principal, as `remove_member` leaves a removed member's: with no identity left, no
     // inbound address can reach them.
     if let Some(company_id) = company_id {
-        retire_direct_workflow_on(transaction, company_id, id).await?;
-        // After the agent lock (memory E9): a lazy provisioning holding it `FOR SHARE`
-        // committed first and its namespace is retired here, or it waits and finds no agent.
-        super::memory::retire_namespaces_on(
-            transaction,
-            company_id,
-            crate::application::memory::NamespaceOwner::Agent(id),
-        )
-        .await?;
+        retire_agent_principal_on(transaction, company_id, id).await?;
         sqlx::query!(
             r#"UPDATE principals
                    SET kind = 'external', agent_id = NULL, updated_at = CURRENT_TIMESTAMP
@@ -658,7 +650,7 @@ pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
     Ok(())
 }
 
-async fn retire_direct_workflow_on(
+async fn retire_agent_principal_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company: Uuid,
     agent: Uuid,
@@ -696,6 +688,14 @@ async fn retire_direct_workflow_on(
         .bind(principal)
         .execute(&mut **tx)
         .await?;
+    super::memory::retire_namespaces_on(
+        tx,
+        company,
+        crate::application::memory::NamespaceOwner::Principal(
+            crate::entities::transport::PrincipalId::new(principal),
+        ),
+    )
+    .await?;
     Ok(())
 }
 

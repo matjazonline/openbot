@@ -13,6 +13,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tower::ServiceExt;
 struct Model {
     calls: AtomicUsize,
+    queries: AtomicUsize,
+    query_gate: std::sync::Mutex<Option<QueryGate>>,
+}
+struct QueryGate {
+    entered: tokio::sync::oneshot::Sender<()>,
+    release: std::sync::mpsc::Receiver<()>,
 }
 impl TextEmbedder for Model {
     fn model_id(&self) -> EmbeddingModelId {
@@ -28,19 +34,40 @@ impl TextEmbedder for Model {
         Ok(vec![vector; passages.len()])
     }
     fn embed_query(&self, _: &str) -> AppResult<[f32; 384]> {
-        panic!("a library upload must not query the model")
+        self.queries.fetch_add(1, Ordering::SeqCst);
+        if let Some(gate) = self.query_gate.lock().unwrap().take() {
+            gate.entered.send(()).unwrap();
+            gate.release
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .map_err(|_| AppError::Timeout("test query gate was not released".into()))?;
+        }
+        let mut vector = [0.0; 384];
+        vector[0] = 1.0;
+        Ok(vector)
     }
 }
 struct Setup {
     f: Fixture,
     services: Services,
     model: Arc<Model>,
+    root: crate::entities::department::DepartmentId,
 }
 impl Setup {
     async fn new() -> Option<Self> {
         let f = Fixture::new().await?;
+        let root: Uuid =
+            sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+                .bind(f.company.id)
+                .fetch_one(f.persistence.pool())
+                .await
+                .unwrap();
+        // Existing HTTP level tests give the member a genuine root placement.
+        sqlx::query("INSERT INTO department_roles (company_id,department_id,role,principal_id) SELECT $1,$2,'reviewer',id FROM principals WHERE company_id=$1 AND user_id=$3")
+            .bind(f.company.id).bind(root).bind(f.member.id).execute(f.persistence.pool()).await.unwrap();
         let model = Arc::new(Model {
             calls: AtomicUsize::new(0),
+            queries: AtomicUsize::new(0),
+            query_gate: std::sync::Mutex::new(None),
         });
         let services = Services {
             library: Arc::new(KnowledgeLibrary::new(f.persistence.clone(), model.clone())),
@@ -48,7 +75,12 @@ impl Setup {
             users: f.users.clone(),
             config: f.config.clone(),
         };
-        Some(Self { f, services, model })
+        Some(Self {
+            f,
+            services,
+            model,
+            root: crate::entities::department::DepartmentId::new(root),
+        })
     }
     fn router(&self) -> Router {
         routes::<Services>()
@@ -59,25 +91,42 @@ impl Setup {
             ))
     }
     async fn upload(&self, user: Uuid, company: Uuid, files: &[File<'_>]) -> Response {
-        self.router()
+        let queries_before = self.model.queries.load(Ordering::SeqCst);
+        let unit: Uuid =
+            sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+                .bind(company)
+                .fetch_one(self.f.persistence.pool())
+                .await
+                .unwrap();
+        let response = self
+            .router()
             .oneshot(request(
                 user,
                 Method::POST,
                 &format!("/api/companies/{company}/knowledge/documents"),
-                multipart(files),
+                multipart_in(crate::entities::department::DepartmentId::new(unit), files),
                 "multipart/form-data; boundary=knowledge-test",
             ))
             .await
-            .unwrap()
+            .unwrap();
+        assert_eq!(
+            self.model.queries.load(Ordering::SeqCst),
+            queries_before,
+            "uploads must not use the query embedder"
+        );
+        response
     }
     async fn layers(&self, user: Uuid) -> Vec<KnowledgeDocumentLayer> {
         self.services
             .library
             .documents()
-            .list(KnowledgeScope {
-                company: CompanyId::new(self.f.company.id),
-                actor_id: user,
-            })
+            .list(
+                KnowledgeScope {
+                    company: CompanyId::new(self.f.company.id),
+                    actor_id: user,
+                },
+                None,
+            )
             .await
             .unwrap()
             .layers
@@ -95,6 +144,14 @@ fn multipart(files: &[File<'_>]) -> Vec<u8> {
         body.extend_from_slice(b"\r\n");
     }
     body.extend_from_slice(b"--knowledge-test--\r\n");
+    body
+}
+fn multipart_in(unit: crate::entities::department::DepartmentId, files: &[File<'_>]) -> Vec<u8> {
+    let mut body = format!(
+        "--knowledge-test\r\nContent-Disposition: form-data; name=\"unit_id\"\r\n\r\n{unit}\r\n"
+    )
+    .into_bytes();
+    body.extend(multipart(files));
     body
 }
 fn request(user: Uuid, method: Method, url: &str, body: Vec<u8>, kind: &str) -> HttpRequest<Body> {
@@ -224,10 +281,13 @@ async fn knowledge_upload_http_all_six_routes_hide_valid_foreign_company_and_doc
         .services
         .library
         .documents()
-        .list(KnowledgeScope {
-            company: CompanyId::new(s.f.foreign.id),
-            actor_id: s.f.stranger.id,
-        })
+        .list(
+            KnowledgeScope {
+                company: CompanyId::new(s.f.foreign.id),
+                actor_id: s.f.stranger.id,
+            },
+            None,
+        )
         .await
         .unwrap()
         .layers
@@ -418,3 +478,8 @@ fn foreign_attempts(s: &Setup, document: Uuid) -> [Attempt; 6] {
 
 #[path = "multipart_tests.rs"]
 mod multipart_tests;
+#[path = "scope_tests.rs"]
+mod scopes;
+
+#[path = "review_scope_tests.rs"]
+mod review_scopes;

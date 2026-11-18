@@ -118,8 +118,8 @@ async fn knowledge_upload_database_embedding_shape_finiteness_norm_and_tenant_le
             .unwrap();
         assert_eq!(result, case.valid, "{}", case.vector);
         let mut tx = f.pool.begin().await.unwrap();
-        let insertion=sqlx::query("INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,body,embedding_model,embedding) VALUES ($1,$2,$3,4,1,'body','test-model',$4::real[])")
-            .bind(Uuid::new_v4()).bind(f.owner.company.as_uuid()).bind(layer.id).bind(&case.vector).execute(&mut *tx).await;
+        let insertion=sqlx::query("INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,body,embedding_model,embedding,unit_id) VALUES ($1,$2,$3,4,1,'body','test-model',$4::real[],$5)")
+            .bind(Uuid::new_v4()).bind(f.owner.company.as_uuid()).bind(layer.id).bind(&case.vector).bind(f.root.as_uuid()).execute(&mut *tx).await;
         assert_eq!(insertion.is_ok(), case.valid);
         tx.rollback().await.unwrap();
     }
@@ -137,8 +137,8 @@ async fn knowledge_upload_database_embedding_shape_finiteness_norm_and_tenant_le
             level: 3,
         },
     ] {
-        let error=sqlx::query("INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,body,embedding_model,embedding) VALUES ($1,$2,$3,$4,1,'body','test-model',$5::real[])")
-            .bind(Uuid::new_v4()).bind(reference.company.as_uuid()).bind(layer.id).bind(reference.level).bind(&valid).execute(&f.pool).await.unwrap_err();
+        let error=sqlx::query("INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,body,embedding_model,embedding,unit_id) VALUES ($1,$2,$3,$4,1,'body','test-model',$5::real[],$6)")
+            .bind(Uuid::new_v4()).bind(reference.company.as_uuid()).bind(layer.id).bind(reference.level).bind(&valid).bind(f.root.as_uuid()).execute(&f.pool).await.unwrap_err();
         assert_eq!(
             error.as_database_error().unwrap().code().as_deref(),
             Some("23503")

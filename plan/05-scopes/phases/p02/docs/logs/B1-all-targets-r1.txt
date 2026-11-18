@@ -1,0 +1,551 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0433]: cannot find type `MemoryToolScope` in this scope
+ --> src/application/workflow/memory_recall_tests.rs:6:22
+  |
+6 |     assert_eq!(share(MemoryToolScope::Company, 2048), 1024);
+  |                      ^^^^^^^^^^^^^^^ use of undeclared type `MemoryToolScope`
+  |
+help: a struct with a similar name exists
+  |
+6 -     assert_eq!(share(MemoryToolScope::Company, 2048), 1024);
+6 +     assert_eq!(share(MemoryScope::Company, 2048), 1024);
+  |
+help: consider importing this enum through its public re-export
+  |
+1 + use crate::application::workflow::memory_tools::MemoryToolScope;
+  |
+
+error[E0433]: cannot find type `MemoryToolScope` in this scope
+ --> src/application/workflow/memory_recall_tests.rs:7:22
+  |
+7 |     assert_eq!(share(MemoryToolScope::Agent, 2048), 512);
+  |                      ^^^^^^^^^^^^^^^ use of undeclared type `MemoryToolScope`
+  |
+help: a struct with a similar name exists
+  |
+7 -     assert_eq!(share(MemoryToolScope::Agent, 2048), 512);
+7 +     assert_eq!(share(MemoryScope::Agent, 2048), 512);
+  |
+help: consider importing this enum through its public re-export
+  |
+1 + use crate::application::workflow::memory_tools::MemoryToolScope;
+  |
+
+error[E0433]: cannot find type `MemoryToolScope` in this scope
+ --> src/application/workflow/memory_recall_tests.rs:8:22
+  |
+8 |     assert_eq!(share(MemoryToolScope::User, 2048), 512);
+  |                      ^^^^^^^^^^^^^^^ use of undeclared type `MemoryToolScope`
+  |
+help: a struct with a similar name exists
+  |
+8 -     assert_eq!(share(MemoryToolScope::User, 2048), 512);
+8 +     assert_eq!(share(MemoryScope::User, 2048), 512);
+  |
+help: consider importing this enum through its public re-export
+  |
+1 + use crate::application::workflow::memory_tools::MemoryToolScope;
+  |
+
+error[E0433]: cannot find type `MemoryToolScope` in this scope
+ --> src/application/workflow/memory_recall_tests.rs:9:22
+  |
+9 |     assert_eq!(share(MemoryToolScope::Agent, 2), 1, "never zero");
+  |                      ^^^^^^^^^^^^^^^ use of undeclared type `MemoryToolScope`
+  |
+help: a struct with a similar name exists
+  |
+9 -     assert_eq!(share(MemoryToolScope::Agent, 2), 1, "never zero");
+9 +     assert_eq!(share(MemoryScope::Agent, 2), 1, "never zero");
+  |
+help: consider importing this enum through its public re-export
+  |
+1 + use crate::application::workflow::memory_tools::MemoryToolScope;
+  |
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+  --> src/adapters/persistence/memory/restore_tests.rs:41:18
+   |
+41 |     let intent = SaveIntent {
+   |                  ^^^^^^^^^^ missing `producer` and `subject`
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+  --> src/adapters/persistence/memory/e2e_tests.rs:19:18
+   |
+19 |     let intent = SaveIntent {
+   |                  ^^^^^^^^^^ missing `producer` and `subject`
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+   --> src/adapters/persistence/workflow/memory_steps_tests.rs:508:10
+    |
+508 |         &SaveIntent {
+    |          ^^^^^^^^^^ missing `producer` and `subject`
+
+error[E0053]: method `provision_recall_scope` has an incompatible type for trait
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1237:16
+     |
+1237 |         scope: MemoryToolScope,
+     |                ^^^^^^^^^^^^^^^ expected `NamespaceOwner`, found `MemoryToolScope`
+     |
+note: type in trait
+    --> src/application/workflow/memory_recall.rs:107:16
+     |
+ 107 |         owner: NamespaceOwner,
+     |                ^^^^^^^^^^^^^^
+     = note: expected signature `fn(&'life0 ToolReadsOnly, WorkflowFence, application::memory::settings::NamespaceOwner) -> Pin<_>`
+                found signature `fn(&'life0 ToolReadsOnly, WorkflowFence, application::workflow::memory_tools::ports::MemoryToolScope) -> Pin<_>`
+help: change the parameter type to match the trait
+     |
+1237 -         scope: MemoryToolScope,
+1237 +         scope: application::memory::settings::NamespaceOwner,
+     |
+
+error[E0053]: method `capture_targets` has an incompatible type for trait
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1224:1
+     |
+1224 | #[async_trait::async_trait]
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `NamespaceOwner`, found `MemoryToolScope`
+     |
+note: type in trait
+    --> src/application/workflow/memory_recall.rs:95:1
+     |
+  95 | #[async_trait]
+     | ^^^^^^^^^^^^^^
+     = note: expected signature `fn(&'life0 ToolReadsOnly, &'life1 ClaimedWorkflow, LeasePolicy) -> Pin<Box<(dyn futures::Future<Output = std::result::Result<Vec<application::memory::settings::NamespaceOwner>, application::app_error::AppError>> + std::marker::Send + 'async_trait)>>`
+                found signature `fn(&'life0 ToolReadsOnly, &'life1 ClaimedWorkflow, LeasePolicy) -> Pin<Box<(dyn futures::Future<Output = std::result::Result<Vec<application::workflow::memory_tools::ports::MemoryToolScope>, application::app_error::AppError>> + std::marker::Send + 'async_trait)>>`
+     = note: this error originates in the attribute macro `async_trait::async_trait` which comes from the expansion of the attribute macro `async_trait` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: change the output type to match the trait
+     |
+1224 - #[async_trait::async_trait]
+1224 + std::pin::Pin<std::boxed::Box<(dyn futures::Future<Output = std::result::Result<Vec<application::memory::settings::NamespaceOwner>, application::app_error::AppError>> + std::marker::Send + 'async_trait)>>
+     |
+
+warning: field `chain_depth` is never read
+  --> src/adapters/persistence/workflow/run_scopes.rs:19:9
+   |
+13 | pub(super) struct ScopeRow {
+   |                   -------- field in this struct
+...
+19 |     pub chain_depth: Option<i16>,
+   |         ^^^^^^^^^^^
+   |
+   = note: `ScopeRow` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+   --> src/adapters/persistence/memory/delivery_tests.rs:102:5
+    |
+102 |     SaveIntent {
+    |     ^^^^^^^^^^ missing `producer` and `subject`
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+   --> src/adapters/persistence/memory/delivery_tests.rs:577:26
+    |
+577 |             let intent = SaveIntent {
+    |                          ^^^^^^^^^^ missing `producer` and `subject`
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+    --> src/adapters/persistence/memory/delivery_tests.rs:1051:30
+     |
+1051 |                 let intent = SaveIntent {
+     |                              ^^^^^^^^^^ missing `producer` and `subject`
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+   --> src/adapters/persistence/memory/live_tests.rs:201:18
+    |
+201 |     let intent = SaveIntent {
+    |                  ^^^^^^^^^^ missing `producer` and `subject`
+
+error[E0063]: missing fields `producer` and `subject` in initializer of `persistence::memory::deliveries::SaveIntent<'_>`
+   --> src/adapters/persistence/memory/live_tests.rs:507:22
+    |
+507 |         let intent = SaveIntent {
+    |                      ^^^^^^^^^^ missing `producer` and `subject`
+
+warning: `open_bots` (lib) generated 1 warning
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/run_scope_admission_tests.rs:80:56
+   |
+80 |         .into_iter().filter(|desk| desk.department_id==Some(report)) {
+   |                                    ------------------  ^^^^^^^^^^^^ expected `DepartmentId`, found `Option<DepartmentId>`
+   |                                    |
+   |                                    expected because this is `domain::entities::department::DepartmentId`
+   |
+   = note: expected struct `DepartmentId`
+                found enum `std::option::Option<DepartmentId>`
+
+error[E0599]: no variant, associated function, or constant named `Company` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/adapters/persistence/workflow/memory_recall_tests.rs:326:30
+    |
+326 |             MemoryToolScope::Company,
+    |                              ^^^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Company` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/adapters/persistence/workflow/memory_tool_tests.rs:785:42
+    |
+785 |                         MemoryToolScope::Agent,
+    |                                          ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0061]: this method takes 3 arguments but 4 arguments were supplied
+   --> src/adapters/persistence/workflow/memory_tool_tests.rs:782:23
+    |
+782 |                     p.save_memory(
+    |                       ^^^^^^^^^^^
+...
+786 |                         vec!["Prefers mornings.".into()],
+    |                         -------------------------------- unexpected argument #4 of type `Vec<_>`
+    |
+note: method defined here
+   --> src/application/workflow/memory_tools/ports.rs:289:14
+    |
+289 |     async fn save_memory(
+    |              ^^^^^^^^^^^
+help: remove the extra argument
+    |
+785 -                         MemoryToolScope::Agent,
+786 -                         vec!["Prefers mornings.".into()],
+785 +                         MemoryToolScope::Agent,
+    |
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/adapters/persistence/workflow/memory_tool_tests.rs:978:61
+    |
+978 |                 .save_memory(fence, &call, MemoryToolScope::Agent, vec!["x".into()])
+    |                                                             ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0061]: this method takes 3 arguments but 4 arguments were supplied
+   --> src/adapters/persistence/workflow/memory_tool_tests.rs:978:18
+    |
+978 |                 .save_memory(fence, &call, MemoryToolScope::Agent, vec!["x".into()])
+    |                  ^^^^^^^^^^^                                       ---------------- unexpected argument #4 of type `Vec<_>`
+    |
+note: method defined here
+   --> src/application/workflow/memory_tools/ports.rs:289:14
+    |
+289 |     async fn save_memory(
+    |              ^^^^^^^^^^^
+help: remove the extra argument
+    |
+978 -                 .save_memory(fence, &call, MemoryToolScope::Agent, vec!["x".into()])
+978 +                 .save_memory(fence, &call, MemoryToolScope::Agent)
+    |
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1004:61
+     |
+1004 |             .save_memory(original, &other, MemoryToolScope::Agent, vec!["x".into()])
+     |                                                             ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+     |
+    ::: src/application/workflow/memory_tools/ports.rs:42:1
+     |
+  42 | pub enum MemoryToolScope {
+     | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0061]: this method takes 3 arguments but 4 arguments were supplied
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1004:14
+     |
+1004 |             .save_memory(original, &other, MemoryToolScope::Agent, vec!["x".into()])
+     |              ^^^^^^^^^^^                                           ---------------- unexpected argument #4 of type `Vec<_>`
+     |
+note: method defined here
+    --> src/application/workflow/memory_tools/ports.rs:289:14
+     |
+ 289 |     async fn save_memory(
+     |              ^^^^^^^^^^^
+help: remove the extra argument
+     |
+1004 -             .save_memory(original, &other, MemoryToolScope::Agent, vec!["x".into()])
+1004 +             .save_memory(original, &other, MemoryToolScope::Agent)
+     |
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1076:57
+     |
+1076 |             .save_memory(stale, &call, MemoryToolScope::Agent, vec!["Again.".into()])
+     |                                                         ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+     |
+    ::: src/application/workflow/memory_tools/ports.rs:42:1
+     |
+  42 | pub enum MemoryToolScope {
+     | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0061]: this method takes 3 arguments but 4 arguments were supplied
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1076:14
+     |
+1076 |             .save_memory(stale, &call, MemoryToolScope::Agent, vec!["Again.".into()])
+     |              ^^^^^^^^^^^                                       --------------------- unexpected argument #4 of type `Vec<_>`
+     |
+note: method defined here
+    --> src/application/workflow/memory_tools/ports.rs:289:14
+     |
+ 289 |     async fn save_memory(
+     |              ^^^^^^^^^^^
+help: remove the extra argument
+     |
+1076 -             .save_memory(stale, &call, MemoryToolScope::Agent, vec!["Again.".into()])
+1076 +             .save_memory(stale, &call, MemoryToolScope::Agent)
+     |
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1105:30
+     |
+1105 |             MemoryToolScope::Agent,
+     |                              ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+     |
+    ::: src/application/workflow/memory_tools/ports.rs:42:1
+     |
+  42 | pub enum MemoryToolScope {
+     | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0061]: this method takes 3 arguments but 4 arguments were supplied
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1102:10
+     |
+1102 |         .save_memory(
+     |          ^^^^^^^^^^^
+...
+1106 |             vec!["Changed.".into()],
+     |             ----------------------- unexpected argument #4 of type `Vec<_>`
+     |
+note: method defined here
+    --> src/application/workflow/memory_tools/ports.rs:289:14
+     |
+ 289 |     async fn save_memory(
+     |              ^^^^^^^^^^^
+help: remove the extra argument
+     |
+1105 -             MemoryToolScope::Agent,
+1106 -             vec!["Changed.".into()],
+1105 +             MemoryToolScope::Agent,
+     |
+
+error[E0308]: mismatched types
+    --> src/adapters/persistence/workflow/memory_tool_tests.rs:1239:46
+     |
+1239 |         self.0.provision_recall_scope(fence, scope).await
+     |                ----------------------        ^^^^^ expected `NamespaceOwner`, found `MemoryToolScope`
+     |                |
+     |                arguments to this method are incorrect
+     |
+note: method defined here
+    --> src/application/workflow/memory_recall.rs:104:14
+     |
+ 104 |     async fn provision_recall_scope(
+     |              ^^^^^^^^^^^^^^^^^^^^^^
+...
+ 107 |         owner: NamespaceOwner,
+     |         -----
+
+error[E0308]: mismatched types
+   --> src/application/workflow/memory_tests.rs:23:9
+    |
+ 22 |     let all = load_output(
+    |               ----------- arguments to this function are incorrect
+ 23 |         MemoryStepScope::Unit(UnitSelector::Root),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `MemoryStepScope`
+    |
+note: function defined here
+   --> src/application/workflow/memory.rs:176:8
+    |
+176 | pub fn load_output(
+    |        ^^^^^^^^^^^
+177 |     scope_label: &str,
+    |     -----------------
+
+error[E0308]: mismatched types
+   --> src/application/workflow/memory_tests.rs:32:9
+    |
+ 31 |     let cut = load_output(
+    |               ----------- arguments to this function are incorrect
+ 32 |         MemoryStepScope::Agent(Uuid::nil()),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `MemoryStepScope`
+    |
+note: function defined here
+   --> src/application/workflow/memory.rs:176:8
+    |
+176 | pub fn load_output(
+    |        ^^^^^^^^^^^
+177 |     scope_label: &str,
+    |     -----------------
+
+error[E0308]: mismatched types
+   --> src/application/workflow/memory_tests.rs:60:9
+    |
+ 59 |     let output = load_output(
+    |                  ----------- arguments to this function are incorrect
+ 60 |         MemoryStepScope::Unit(UnitSelector::Root),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `MemoryStepScope`
+    |
+note: function defined here
+   --> src/application/workflow/memory.rs:176:8
+    |
+176 | pub fn load_output(
+    |        ^^^^^^^^^^^
+177 |     scope_label: &str,
+    |     -----------------
+
+error[E0560]: struct `application::workflow::memory_tools::ports::MemoryRecallRef` has no field named `scope`
+   --> src/application/workflow/memory_tools/builtin_tests.rs:132:9
+    |
+132 |         scope,
+    |         ^^^^^ `application::workflow::memory_tools::ports::MemoryRecallRef` does not have this field
+    |
+    = note: available fields are: `namespace`
+
+error[E0599]: no variant, associated function, or constant named `Company` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/application/workflow/memory_tools/builtin_tests.rs:140:33
+    |
+140 |         recall(MemoryToolScope::Company, 2, 1),
+    |                                 ^^^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Company` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/application/workflow/memory_tools/builtin_tests.rs:141:33
+    |
+141 |         recall(MemoryToolScope::Agent, 3, 4),
+    |                                 ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Company` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/application/workflow/memory_tools/builtin_tests.rs:142:33
+    |
+142 |         recall(MemoryToolScope::Company, 2, 6),
+    |                                 ^^^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Company` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `User` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/application/workflow/memory_tools/builtin_tests.rs:143:33
+    |
+143 |         recall(MemoryToolScope::User, 1, 4),
+    |                                 ^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `User` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/application/workflow/memory_tools/builtin_tests.rs:144:33
+    |
+144 |         recall(MemoryToolScope::Agent, 3, 2),
+    |                                 ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+   --> src/application/workflow/memory_tools/builtin_tests.rs:159:64
+    |
+159 |         save_sources((0..100).map(|id| recall(MemoryToolScope::Agent, id, (id % 10) as i16)));
+    |                                                                ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+    |
+   ::: src/application/workflow/memory_tools/ports.rs:42:1
+    |
+ 42 | pub enum MemoryToolScope {
+    | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0609]: no field `scope` on type `application::workflow::memory_tools::runtime::TimelineInput`
+  --> src/application/workflow/memory_tools/runtime_tests.rs:22:19
+   |
+22 |         (timeline.scope, timeline.before, timeline.after),
+   |                   ^^^^^ unknown field
+   |
+help: a field with a similar name exists
+   |
+22 |         (timeline.scopes, timeline.before, timeline.after),
+   |                        +
+
+error[E0599]: no variant, associated function, or constant named `User` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+  --> src/application/workflow/memory_tools/runtime_tests.rs:23:27
+   |
+23 |         (MemoryToolScope::User, 5, 5)
+   |                           ^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+   |
+  ::: src/application/workflow/memory_tools/ports.rs:42:1
+   |
+42 | pub enum MemoryToolScope {
+   | ------------------------ variant, associated function, or constant `User` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+  --> src/application/workflow/memory_tools/runtime_tests.rs:30:54
+   |
+30 |     assert_eq!(details.items, vec![(MemoryToolScope::Agent, id)]);
+   |                                                      ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+   |
+  ::: src/application/workflow/memory_tools/ports.rs:42:1
+   |
+42 | pub enum MemoryToolScope {
+   | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0609]: no field `scope` on type `application::workflow::memory_tools::ports::MemoryToolSave`
+  --> src/application/workflow/memory_tools/runtime_tests.rs:32:21
+   |
+32 |     assert_eq!(save.scope, MemoryToolScope::Agent, "default agent");
+   |                     ^^^^^ unknown field
+   |
+   = note: available fields are: `target`, `facts`, `subject`
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+  --> src/application/workflow/memory_tools/runtime_tests.rs:32:45
+   |
+32 |     assert_eq!(save.scope, MemoryToolScope::Agent, "default agent");
+   |                                             ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+   |
+  ::: src/application/workflow/memory_tools/ports.rs:42:1
+   |
+42 | pub enum MemoryToolScope {
+   | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Company` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+  --> src/application/workflow/memory_tools/runtime_tests.rs:51:40
+   |
+51 |         .map(|level| (MemoryToolScope::Company, hit(level)))
+   |                                        ^^^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+   |
+  ::: src/application/workflow/memory_tools/ports.rs:42:1
+   |
+42 | pub enum MemoryToolScope {
+   | ------------------------ variant, associated function, or constant `Company` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::workflow::memory_tools::ports::MemoryToolScope` in the current scope
+  --> src/application/workflow/memory_tools/runtime_tests.rs:62:38
+   |
+62 |     let invalid = [(MemoryToolScope::Agent, hit(10))];
+   |                                      ^^^^^ variant, associated function, or constant not found in `application::workflow::memory_tools::ports::MemoryToolScope`
+   |
+  ::: src/application/workflow/memory_tools/ports.rs:42:1
+   |
+42 | pub enum MemoryToolScope {
+   | ------------------------ variant, associated function, or constant `Agent` not found for this enum
+
+Some errors have detailed explanations: E0053, E0061, E0063, E0308, E0433, E0560, E0599, E0609.
+For more information about an error, try `rustc --explain E0053`.
+error: could not compile `open_bots` (lib test) due to 44 previous errors

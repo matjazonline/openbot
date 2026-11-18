@@ -36,6 +36,7 @@ mod memory;
 mod recall;
 mod retention;
 mod search;
+mod subject;
 #[cfg(test)]
 pub mod test_support;
 
@@ -1239,6 +1240,21 @@ impl Store for PgStore {
         .await
     }
 
+    async fn list_subject(
+        &self,
+        actor: Actor,
+        request: &SubjectListRequest,
+    ) -> Result<SubjectPage, ServiceError> {
+        with_retry(|| self.list_subject_once(actor, request)).await
+    }
+    async fn delete_subject(
+        &self,
+        actor: Actor,
+        request: &SubjectDeleteRequest,
+    ) -> Result<SubjectDeleted, ServiceError> {
+        with_retry(|| self.delete_subject_once(actor, request)).await
+    }
+
     async fn create_namespace(
         &self,
         actor: Actor,
@@ -1510,3 +1526,5 @@ mod search_tests;
 #[cfg(test)]
 #[path = "storage_tests.rs"]
 mod storage_tests;
+#[cfg(test)]
+mod subject_tests;

@@ -19,20 +19,15 @@ fn detail(level: u8, body: &str) -> MemoryDetail {
 #[test]
 fn memory_integration_load_output_omits_whole_items_and_keeps_the_exposed_level() {
     let items = vec![detail(2, "short"), detail(5, &"x".repeat(4_000))];
-    let all = load_output(MemoryStepScope::Company, &items, AccessLevel::L5, 1 << 20);
+    let all = load_output("unit:root", &items, AccessLevel::L5, 1 << 20);
     assert_eq!(all["items"].as_array().unwrap().len(), 2);
     assert_eq!(all["omitted"], 0);
     let budget = all["items"][0].to_string().len() + 200;
-    let cut = load_output(
-        MemoryStepScope::Agent(Uuid::nil()),
-        &items,
-        AccessLevel::L5,
-        budget,
-    );
+    let cut = load_output("personal", &items, AccessLevel::L5, budget);
     assert_eq!(cut["items"].as_array().unwrap().len(), 1);
     assert_eq!(cut["omitted"], 1);
     assert_eq!(cut["exposed_level"], 5);
-    assert_eq!(cut["items"][0]["scope"], "agent");
+    assert_eq!(cut["items"][0]["scope"], "personal");
     assert!(cut.to_string().len() <= budget);
 }
 
@@ -51,7 +46,7 @@ fn memory_access_level_load_carries_the_highest_of_the_label_and_its_items() {
     );
     assert_eq!(carried_level(AccessLevel::L3, &[]), Some(AccessLevel::L3));
     assert_eq!(carried_level(AccessLevel::L0, &[detail(10, "c")]), None);
-    let output = load_output(MemoryStepScope::Company, &items, AccessLevel::L6, 1 << 20);
+    let output = load_output("unit:root", &items, AccessLevel::L6, 1 << 20);
     assert_eq!(output["exposed_level"], 6);
 }
 

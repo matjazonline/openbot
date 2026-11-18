@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "round": "05SC-P02-B1-R2",
+  "artifact": "7a555e95283fa22b7face97a1463d8efdfb6cf8c2ab92a3b77e5eae734ab51a5",
+  "checks": [
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib memory_ -- --skip doop --skip Doop",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. Earlier acceptance attempt:185 passed,7 failed,7 ignored; fixture vocabulary/targets and fake Admin path corrected; current combined check above passes",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-memory-focused-r1.txt",
+          "sha256": "6831c75c5d16f9d60ef6d0136c82655d798ae84d45fa3e3eefddca14a7e3f75a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --all-targets",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. services/memory; owned pgvector container openbot-plan05-p02-memory-pg and per-test non-superuser databases;178 passed,0 failed,2 opt-in ignored",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-service-suite-r1.txt",
+          "sha256": "5f6c66f16aa065e872e1017a89a5719392ab1996a2162322b4963cbf588b0def"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "bash scripts/memory-integration.sh",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. Owned pgvector/core_live and temporary service fixture; first execution6 passed,1 failed due to missing required CLI test cipher; corrected fixture below",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-live-integration-r1.txt",
+          "sha256": "737d748c1c2ae9f15419e79f6d2556558991bd8d835397c1a2e8afc295ff91e4"
+        },
+        {
+          "path": "logs/B1-operator-startup-diagnostic-r1.txt",
+          "sha256": "fc5b3415ac0aadd6fcf890755d27993bc94a1c35e2463b1b885f60f42238961d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "bash scripts/memory-integration.sh",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. Owned pgvector/core_live; actual service and CLI;7 passed,0 failed.105 subject records/2unit namespaces/100-row page boundary; auth-incomplete and repeated purge; unrelated subject/principal records survive. Trusted source-label fixture does not replace workflow ceiling tests.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-live-integration-r2.txt",
+          "sha256": "cba4344200b761b0fa1913e72bd2c7b6d13bbc5b62b169b687e81734295b427a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3",
+        "AC5"
+      ],
+      "command": "reset only owned pa05_p02_schema and pa05_p02_core_test public schemas; cargo sqlx migrate run",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. Fresh owned PostgreSQL18 schemas; includes both SQL prepared-version8 readers",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-core-schema-refresh-r3.txt",
+          "sha256": "59189c59db3135f971591ce405c22f81a285730f7da2a454062bb63f5aa19af8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. services/memory; owned pa05_p02_memory_schema on pgvector PostgreSQL18",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-service-migrate-r3.txt",
+          "sha256": "15c2acb840d3e2136239c275ad0fba2fe032dbd5a04cb4c982d0d36129fa350f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. services/memory; owned pa05_p02_memory_schema; subject query cache regenerated",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-service-prepare-r4.txt",
+          "sha256": "00eb2034d6040e1a477c020252f902f0e027dab2ddd38e8f7c8e773c62e88bec"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "memory service OpenAPI generation",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. services/memory; generated operation contracts retained in openapi.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-service-openapi-refresh.txt",
+          "sha256": "ac0980394b40d4261daac3bb8521349fe21292dd8ff8506b131747d5f5fb62d5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Retained R1 evidence; affected service/subject/CLI/schema contracts unchanged by R2. First attempt28 mechanical lint errors; corrected without assertion or runtime changes",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-pre-review-clippy-r1.txt",
+          "sha256": "d9bcf18459a07ca49497a2f3951d2d898acce33f2fbdd8c509904a98dc8d72da"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_ autonomous_agent_ knowledge_search_ native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks --skip doop --skip Doop",
+      "fixture": "Owned p02/per-test DBs;273passed,3new fixture failures,1existing opt-in ignored. All3failures have current passing correction proof below; retain invocation FAIL.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused-r1.txt",
+          "sha256": "d95b977109d33e0cdf1888691adda71772a751dc8dbaa3344e03387fda54d291"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_admission_agent_workflow_tool_own --skip doop --skip Doop",
+      "fixture": "Pre-correction red regression: valid desk passes; missing-context root incorrectly Created;1passed,1failed.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-own-preflight-red-r2.txt",
+          "sha256": "4a40eb55b4109d00ab6a27706856fbc77e0dd6f6eff42f475babc41a423bb8e3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_admission_fresh_seal_rejects_foreign_and_ineligible_live_owners memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target --skip doop --skip Doop",
+      "fixture": "Corrected actual foreign owner PASS; two desk fixtures reached admission but then failed preparation; later domain correction passes below.1passed/2failed.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-corrections-r3.txt",
+          "sha256": "6d116ba33ebc96c0b0c4391ba37485b0c4908519f6c89e656f115ed5a3507758"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target --skip doop --skip Doop",
+      "fixture": "Diagnostic exposed agent.unresolved and zero provider calls; traced to missing app domain in real desk roster context, corrected only fixture.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-desk-preparation-diagnostic-r2.txt",
+          "sha256": "bcd9adb7e59435e4a78de160c7a7f25e3a10b0051c490295e65006565aa294c2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target memory_scope_user_memory_requires_the_actors_own_manual_session --skip doop --skip Doop",
+      "fixture": "Owned real LeadDesk and unchanged Company fixtures;3passed/0failed. Actual prepared tools, ContractFake policy checks; no real-service claim.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-desk-tools-r4.txt",
+          "sha256": "f9369de2759348d70aa32436c52a01b00f27916a6d3d9a1f3ec00f3b57ab7950"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_admission_agent_workflow_tool_own memory_scope_admission_fresh_seal memory_scope_admission_valid_looking memory_scope_admission_competing_topology memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target memory_scope_tools_explicit_unit_save_without_a_local_unit_creates_no_intent native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks --skip doop --skip Doop",
+      "fixture": "Current frozen R2 source; owned p02/per-test databases; actual bounded admission/SQL/ordered topology/MCP/host-tool assertions;10passed/0failed/0ignored.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-focused.txt",
+          "sha256": "30c586dd3aad09d221eba0b44644a59a6a95457cac63a89d210967839be3efa0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Current source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-format-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "Owned pa05_p02_schema; current all-target compilation; root runtime queries generate no cache delta",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-sqlx-r1.txt",
+          "sha256": "c089aed3ff5b1e70767205228e947ad04ac16b413d612b9df76bebbf8589571a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Current all targets, warnings denied",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-clippy-r1.txt",
+          "sha256": "d578747d0b7329b52ced587132fdc810fc7cc7f67a78a537c9789ad9f2d00dfa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --test source_modules -- --skip doop --skip Doop",
+      "fixture": "Current8assertions; all Rust modules connected",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-source-modules-r1.txt",
+          "sha256": "7eb2f089197e54b47ee28c77620448ec790777aac6bf94b050b3c8cf703d6958"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "4808current names;4768baseline;1retained replacement,41added;R1\u2192R2 adds9/removes0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-test-list-r1.txt",
+          "sha256": "ea6b0339216e1c5dad33dff0d871ad3dc752c055a08ce0cb805619a50e2ffc72"
+        },
+        {
+          "path": "logs/B1-R2-test-accounting.json",
+          "sha256": "2e41ba841036547db6a83aabe556dd78cf30865baf2f67457e65ff3bc0cdc62f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "git diff --check",
+      "fixture": "Current source and records",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-whitespace-r1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "trail build",
+      "fixture": "Current deterministic graph refresh",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-trail-build-r1.txt",
+          "sha256": "919b336f0a8b3762fe4b9814f8309f31c1e04da82e53546216cae1aae91749e3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "trail check",
+      "fixture": "Same5unrelated lexical conflicts; TASK semantic disposition and commit rationale required;400KB cap retained.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-trail-check-r1.txt",
+          "sha256": "3df8a099fa12c4b23e0c6c87bc23a6d26f440079aab29a72d96170427f68bdc9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Full repository gate after phase03 integration",
+      "fixture": "No phase02 whole-plan/whole-CI-green claim; Doop user-deferred.",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Required once after03source integrates, before phase03 main publication; not waived."
+    }
+  ]
+}

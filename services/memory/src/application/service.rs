@@ -268,6 +268,34 @@ impl App {
     ) -> Result<Value, ServiceError> {
         let store = &self.store;
         match spec.id {
+            "admin.observations.subject.list" => {
+                let request: SubjectListRequest = decode(input)?;
+                external_id(&request.tenant)?;
+                external_id(&request.namespace)?;
+                external_id(&request.subject)?;
+                if !(1..=100).contains(&request.limit) {
+                    return Err(ServiceError::invalid("limit must be 1–100"));
+                }
+                encode(store.list_subject(actor, &request).await?)
+            }
+            "admin.observations.subject.delete" => {
+                let request: SubjectDeleteRequest = decode(input)?;
+                external_id(&request.tenant)?;
+                external_id(&request.namespace)?;
+                external_id(&request.subject)?;
+                if request.observation_ids.is_empty()
+                    || request.observation_ids.len() > 100
+                    || request
+                        .observation_ids
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        != request.observation_ids.len()
+                {
+                    return Err(ServiceError::invalid("Give 1–100 distinct observation IDs"));
+                }
+                encode(store.delete_subject(actor, &request).await?)
+            }
             "admin.tenants.create" => {
                 let request: TenantCreateRequest = decode(input)?;
                 external_id(&request.external_id)?;

@@ -1,0 +1,6 @@
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/workflow/agent_history/recall.rs:551:
+         );
+     }
+ }
+[31m-
+(B[m 

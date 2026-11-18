@@ -346,14 +346,20 @@ async fn agent_retire_races_agent_principal_upsert() {
 
     // The other order: the agent is gone, so a late writer cannot attach a principal to it.
     let mut late = persistence.pool().begin().await.unwrap();
-    crate::adapters::persistence::participant::create_agent_principal_on(
+    let refused = crate::adapters::persistence::participant::create_agent_principal_on(
         &mut late,
         spoken.company_id,
         agent.id,
         "Racer",
     )
-    .await
-    .unwrap();
+    .await;
+    assert!(
+        matches!(refused, Err(AppError::NotFound(_))),
+        "production upsert refuses before a missing owner write"
+    );
+    // Independently retain the deferred database FK proof even though the API now refuses earlier.
+    sqlx::query("INSERT INTO principals (id,company_id,kind,agent_id,display_label) VALUES (gen_random_uuid(),$1,'agent',$2,'Late raw writer')")
+        .bind(spoken.company_id).bind(agent.id).execute(&mut *late).await.unwrap();
     let refused = late.commit().await;
     assert!(
         refused.is_err(),

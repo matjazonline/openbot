@@ -34,9 +34,24 @@ async fn native_mcp_direct_populated_company_cascade_removes_broker_call_run_and
     let (s, _) = Box::pin(direct_setup()).await;
     let f = Box::pin(McpSetup::from_setup(s)).await;
     let p = f.s.f.persistence.as_ref();
-    p.native_mcp(&f.request(json!({"query":"direct company cascade"})))
+    let admitted = p
+        .native_mcp(&f.request(json!({"query":"direct company cascade"})))
         .await
         .unwrap();
+    let snapshot: Value = sqlx::query_scalar("SELECT jsonb_build_object('state',seal.state,
+        'personal',(SELECT count(*) FROM workflow_run_scopes AS scope WHERE scope.company_id=seal.company_id AND scope.run_id=seal.run_id AND scope.access='personal'),
+        'private',(SELECT count(*) FROM workflow_run_scopes AS scope WHERE scope.company_id=seal.company_id AND scope.run_id=seal.run_id AND scope.access='personal' AND scope.acting_principal_id IS NULL))
+        FROM workflow_run_scope_snapshots AS seal WHERE seal.company_id=$1 AND seal.run_id=$2")
+        .bind(f.s.f.company).bind(admitted.run_id.as_uuid()).fetch_one(p.pool()).await.unwrap();
+    assert_eq!(
+        snapshot["state"], "available",
+        "a conversation origin captures fresh scopes"
+    );
+    assert_eq!(snapshot["personal"], 1);
+    assert_eq!(
+        snapshot["private"], 0,
+        "synthetic Manual never grants the human's private memory"
+    );
     sqlx::query("DELETE FROM companies WHERE id=$1")
         .bind(f.s.f.company)
         .execute(p.pool())
@@ -46,6 +61,8 @@ async fn native_mcp_direct_populated_company_cascade_removes_broker_call_run_and
         "native_mcp_brokers",
         "native_mcp_calls",
         "workflow_runs",
+        "workflow_run_scopes",
+        "workflow_run_scope_snapshots",
         "threads",
     ] {
         let count: i64 =

@@ -1,0 +1,58 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0425]: cannot find value `second_principal` in this scope
+   --> src/adapters/persistence/memory/tests.rs:979:40
+    |
+979 |     f.ensure(NamespaceOwner::Principal(second_principal)).await;
+    |                                        ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0499]: cannot borrow `tx` as mutable more than once at a time
+   --> src/adapters/persistence/workflow/memory_steps_tests.rs:509:21
+    |
+499 |     let saved = enqueue_save_on(
+    |                 --------------- first borrow later used by call
+500 |         &mut tx,
+    |         ------- first mutable borrow occurs here
+...
+509 |                     &mut tx,
+    |                     ^^^^^^^ second mutable borrow occurs here
+
+error[E0599]: no variant, associated function, or constant named `Company` found for enum `application::memory::settings::NamespaceOwner` in the current scope
+   --> src/adapters/persistence/workflow/memory_steps_e2e_tests.rs:31:58
+    |
+ 31 |         .ensure_namespace(scope.company, NamespaceOwner::Company)
+    |                                                          ^^^^^^^ variant, associated function, or constant not found in `application::memory::settings::NamespaceOwner`
+    |
+   ::: src/application/memory/settings.rs:302:1
+    |
+302 | pub enum NamespaceOwner {
+    | ----------------------- variant, associated function, or constant `Company` not found for this enum
+
+error[E0599]: no variant, associated function, or constant named `Agent` found for enum `application::memory::settings::NamespaceOwner` in the current scope
+   --> src/adapters/persistence/workflow/memory_park_race_tests.rs:48:53
+    |
+ 48 |         p.ensure_namespace(company, NamespaceOwner::Agent(setup.agent))
+    |                                                     ^^^^^ variant, associated function, or constant not found in `application::memory::settings::NamespaceOwner`
+    |
+   ::: src/application/memory/settings.rs:302:1
+    |
+302 | pub enum NamespaceOwner {
+    | ----------------------- variant, associated function, or constant `Agent` not found for this enum
+
+warning: unused variable: `agent_principal`
+   --> src/adapters/persistence/memory/tests.rs:728:9
+    |
+728 |     let agent_principal = f.agent_principal;
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_agent_principal`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `agent`
+   --> src/adapters/persistence/memory/tests.rs:903:9
+    |
+903 |     let agent = f.agent;
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_agent`
+
+Some errors have detailed explanations: E0425, E0499, E0599.
+For more information about an error, try `rustc --explain E0425`.
+warning: `open_bots` (lib test) generated 2 warnings
+error: could not compile `open_bots` (lib test) due to 4 previous errors; 2 warnings emitted

@@ -5,11 +5,19 @@
 use super::super::authorization_test_support::{Fixture, denied};
 use super::*;
 use axum::http::StatusCode;
+#[path = "ui_department_knowledge_tests.rs"]
+mod knowledge;
 
 fn workspace(f: &Fixture, user: &crate::entities::user::User) -> Workspace {
     Workspace {
         company_use_cases: f.companies.clone(),
         department_use_cases: f.departments(),
+        knowledge: Arc::new(crate::application::knowledge::KnowledgeLibrary::new(
+            f.persistence.clone(),
+            Arc::new(
+                crate::application::knowledge::test_support::DeterministicTextEmbedder::default(),
+            ),
+        )),
         config: f.config.clone(),
         user_id: user.id,
     }

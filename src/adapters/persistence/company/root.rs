@@ -78,6 +78,13 @@ pub(crate) async fn bootstrap_root_on(
     )
     .execute(&mut *db)
     .await?;
+    let root = root_on(db, CompanyId::new(company.id)).await?;
+    super::super::memory::ensure_on(
+        db,
+        company.id,
+        crate::application::memory::NamespaceOwner::Unit(root),
+    )
+    .await?;
     let joined = join_root_on(
         db,
         RootJoin {

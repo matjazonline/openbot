@@ -207,9 +207,8 @@ pub enum HumanInputClass {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExactnessTarget {
     Run,
-    AgentScope,
-    UserScope,
-    CompanyScope,
+    PrincipalScope,
+    UnitScope,
 }
 
 /// Whether human input of `class` leaves a level exact for `target`. The one place U2 lives:
@@ -219,10 +218,10 @@ pub const fn human_input_exactness(class: HumanInputClass, target: ExactnessTarg
         (HumanInputClass::ConversationalInput, _) => false,
         // Other agents recall company memories in audiences that never received this agent's
         // configuration (U2 addendum).
-        (HumanInputClass::AuthoredConfiguration, ExactnessTarget::CompanyScope) => false,
+        (HumanInputClass::AuthoredConfiguration, ExactnessTarget::UnitScope) => false,
         (
             HumanInputClass::AuthoredConfiguration,
-            ExactnessTarget::Run | ExactnessTarget::AgentScope | ExactnessTarget::UserScope,
+            ExactnessTarget::Run | ExactnessTarget::PrincipalScope,
         ) => true,
     }
 }

@@ -125,6 +125,8 @@ fn embed_documents(
         .map(
             |(index, ((document, chunk), embedding))| StoredKnowledgeChunk {
                 id: Uuid::from_u128(index as u128 + 1),
+                document_id: Uuid::from_u128(index as u128 + 1),
+                unit_id: crate::entities::department::DepartmentId::new(Uuid::from_u128(1)),
                 document_name: document.name.clone(),
                 heading: chunk.heading,
                 body: chunk.body,
@@ -151,6 +153,8 @@ fn answer(
         .iter()
         .map(|chunk| StoredKnowledgeChunk {
             id: chunk.id,
+            document_id: chunk.document_id,
+            unit_id: chunk.unit_id,
             document_name: chunk.document_name.clone(),
             heading: chunk.heading.clone(),
             body: chunk.body.clone(),
@@ -221,6 +225,8 @@ fn bounded_corpus(model: &LocalTextEmbedder) -> anyhow::Result<usize> {
         .enumerate()
         .map(|(index, vector)| StoredKnowledgeChunk {
             id: Uuid::from_u128(index as u128 + 1),
+            document_id: Uuid::from_u128((index % 10) as u128 + 1),
+            unit_id: crate::entities::department::DepartmentId::new(Uuid::from_u128(1)),
             document_name: format!("capacity-{}.md", index % 10).into(),
             heading: Some("h".repeat(2048)),
             body: body.clone(),

@@ -1,0 +1,30 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: unused import: `knowledge::search::KnowledgeObservation`
+ --> src/adapters/persistence/workflow/knowledge_checkpoint.rs:6:9
+  |
+6 |         knowledge::search::KnowledgeObservation,
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0063]: missing fields `document_id` and `unit_id` in initializer of `application::knowledge::search::types::StoredKnowledgeChunk`
+   --> src/adapters/embedding/retrieval_probe.rs:126:55
+    |
+126 |             |(index, ((document, chunk), embedding))| StoredKnowledgeChunk {
+    |                                                       ^^^^^^^^^^^^^^^^^^^^ missing `document_id` and `unit_id`
+
+error[E0063]: missing fields `document_id` and `unit_id` in initializer of `application::knowledge::search::types::StoredKnowledgeChunk`
+   --> src/adapters/embedding/retrieval_probe.rs:152:22
+    |
+152 |         .map(|chunk| StoredKnowledgeChunk {
+    |                      ^^^^^^^^^^^^^^^^^^^^ missing `document_id` and `unit_id`
+
+error[E0063]: missing fields `document_id` and `unit_id` in initializer of `application::knowledge::search::types::StoredKnowledgeChunk`
+   --> src/adapters/embedding/retrieval_probe.rs:222:32
+    |
+222 |         .map(|(index, vector)| StoredKnowledgeChunk {
+    |                                ^^^^^^^^^^^^^^^^^^^^ missing `document_id` and `unit_id`
+
+For more information about this error, try `rustc --explain E0063`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 3 previous errors; 1 warning emitted

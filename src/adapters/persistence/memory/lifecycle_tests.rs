@@ -192,14 +192,17 @@ async fn memory_integration_reconciler_provisions_the_tenant_and_a_namespace_cre
     );
 
     assert_eq!(
-        f.ensure(NamespaceOwner::Agent(f.agent)).await,
+        f.ensure(NamespaceOwner::Principal(f.agent_principal)).await,
         NamespaceReadiness::NotReady
     );
     drain(&worker).await;
-    let (namespace, state) = f.namespaces("agent").await[0].clone();
+    let (namespace, state) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     assert_eq!(state, "ready");
     assert_eq!(
-        f.ensure(NamespaceOwner::Agent(f.agent)).await,
+        f.ensure(NamespaceOwner::Principal(f.agent_principal)).await,
         NamespaceReadiness::Ready(NamespaceExternalId(namespace))
     );
     let (credential, envelope) = stored(&f, namespace).await.unwrap();
@@ -353,8 +356,11 @@ async fn memory_scope_reconciler_refuses_a_changed_provisioner_credential_id() {
     let old = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
     drain(&old).await;
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     let new = rotated(&f, &fake);
     assert!(pass(&new).await);
     assert_eq!(
@@ -380,7 +386,7 @@ async fn memory_scope_reconciler_refuses_a_changed_provisioner_credential_id() {
     );
     assert_eq!(recorded(&f).await, vec![ROTATED_ID]);
     // The old credential no longer manages anything: refused, nothing changed.
-    f.ensure(NamespaceOwner::Company).await;
+    f.ensure(NamespaceOwner::Unit(f.root)).await;
     let calls = fake.calls().len();
     assert!(pass(&old).await);
     assert!(
@@ -402,9 +408,12 @@ async fn memory_operations_rotation_mid_deletion_adopts_and_completes_pending_ab
     let fake = ContractFake::start(ADMIN).await;
     let old = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
     drain(&old).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     CompanyPersistence::delete(&f.persistence, f.company)
         .await
         .unwrap();
@@ -449,9 +458,12 @@ async fn memory_operations_absent_steps_never_complete_on_a_404_that_may_mean_no
     let fake = ContractFake::start(ADMIN).await;
     let worker = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
     drain(&worker).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     // Disabled tenant, and a namespace whose create never landed: the delete answers 404.
     {
         let mut state = fake.state.lock().unwrap();
@@ -544,8 +556,11 @@ async fn memory_scope_reconciler_fences_stolen_and_superseded_claims() {
     );
 
     // A provisioning claim superseded by the agent's deletion stores nothing.
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     let claim = store
         .claim_lifecycle(Uuid::new_v4(), Duration::from_secs(60))
         .await
@@ -582,8 +597,11 @@ async fn memory_scope_reconciler_revokes_strays_and_removes_an_absent_namespace(
     let worker = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
     drain(&worker).await;
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     let label = client_credential_label(NamespaceExternalId(namespace));
     // A stray labelled for this namespace but not stored (an earlier ambiguous issue).
     let stray = Uuid::new_v4();
@@ -610,7 +628,9 @@ async fn memory_scope_reconciler_revokes_strays_and_removes_an_absent_namespace(
         expect("absent", "absent", "settled", 0, None)
     );
     assert!(
-        f.namespaces("agent").await.is_empty(),
+        f.namespaces(NamespaceOwner::Principal(f.agent_principal))
+            .await
+            .is_empty(),
         "the removed row is gone"
     );
     assert!(
@@ -624,7 +644,7 @@ async fn memory_scope_reconciler_revokes_strays_and_removes_an_absent_namespace(
         "the remote namespace is a tombstone"
     );
     assert_eq!(
-        f.ensure(NamespaceOwner::Agent(f.agent)).await,
+        f.ensure(NamespaceOwner::Principal(f.agent_principal)).await,
         NamespaceReadiness::OwnerUnavailable
     );
 }
@@ -638,8 +658,8 @@ async fn memory_integration_reconciler_ambiguous_issue_leaves_a_stray_the_next_p
     let worker = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
     drain(&worker).await;
-    f.ensure(NamespaceOwner::Company).await;
-    let (namespace, _) = f.namespaces("company").await[0].clone();
+    f.ensure(NamespaceOwner::Unit(f.root)).await;
+    let (namespace, _) = f.namespaces(NamespaceOwner::Unit(f.root)).await[0].clone();
     fake.drop_after_write("credentials/issue");
     assert!(pass(&worker).await);
     assert_eq!(
@@ -672,8 +692,11 @@ async fn memory_scope_reconciler_turns_present_into_absent_when_the_owner_is_gon
     let worker = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
     drain(&worker).await;
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     // The agent goes without the memory hook.
     sqlx::query("UPDATE principals SET kind = 'external', agent_id = NULL WHERE agent_id = $1")
         .bind(f.agent)
@@ -690,7 +713,11 @@ async fn memory_scope_reconciler_turns_present_into_absent_when_the_owner_is_gon
         row(&f, Some(namespace)).await,
         expect("absent", "absent", "settled", 0, None)
     );
-    assert!(f.namespaces("agent").await.is_empty());
+    assert!(
+        f.namespaces(NamespaceOwner::Principal(f.agent_principal))
+            .await
+            .is_empty()
+    );
     assert!(credentials(&fake, &f).is_empty(), "never issued for nobody");
 }
 
@@ -855,8 +882,11 @@ async fn memory_scope_reconciler_failed_provisioning_is_redriven_not_permanent()
     let worker = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
     drain(&worker).await;
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     f.disable().await.unwrap();
     drain(&worker).await;
     assert_eq!(
@@ -881,13 +911,13 @@ async fn memory_scope_reconciler_failed_provisioning_is_redriven_not_permanent()
     due(&f).await;
     drain(&worker).await;
     assert_eq!(
-        f.ensure(NamespaceOwner::Agent(f.agent)).await,
+        f.ensure(NamespaceOwner::Principal(f.agent_principal)).await,
         NamespaceReadiness::Ready(NamespaceExternalId(namespace))
     );
     // A retryable failure of a still-provisioning scope is re-driven by `ensure` itself once
     // its cool-down has passed (r2 m1).
-    f.ensure(NamespaceOwner::Company).await;
-    let (company_namespace, _) = f.namespaces("company").await[0].clone();
+    f.ensure(NamespaceOwner::Unit(f.root)).await;
+    let (company_namespace, _) = f.namespaces(NamespaceOwner::Unit(f.root)).await[0].clone();
     sqlx::query(
         "UPDATE memory_lifecycles SET state = 'failed', attempts = 8, outcome_code = 'lease_expired', \
          updated_at = clock_timestamp() - interval '1 hour' WHERE namespace_id = $1",
@@ -897,7 +927,7 @@ async fn memory_scope_reconciler_failed_provisioning_is_redriven_not_permanent()
     .await
     .unwrap();
     assert_eq!(
-        f.ensure(NamespaceOwner::Company).await,
+        f.ensure(NamespaceOwner::Unit(f.root)).await,
         NamespaceReadiness::NotReady
     );
     assert_eq!(
@@ -906,7 +936,7 @@ async fn memory_scope_reconciler_failed_provisioning_is_redriven_not_permanent()
     );
     drain(&worker).await;
     assert!(matches!(
-        f.ensure(NamespaceOwner::Company).await,
+        f.ensure(NamespaceOwner::Unit(f.root)).await,
         NamespaceReadiness::Ready(_)
     ));
 }
@@ -996,8 +1026,11 @@ async fn memory_scope_reconciler_superseded_generation_starts_a_fresh_attempt_bu
         .execute(f.pool())
         .await
         .unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     sqlx::query("UPDATE memory_lifecycles SET attempts = 7 WHERE namespace_id = $1")
         .bind(namespace)
         .execute(f.pool())
@@ -1043,9 +1076,9 @@ async fn memory_scope_reconciler_competing_claimants_get_distinct_rows() {
     };
     f.enable().await.unwrap();
     for owner in [
-        NamespaceOwner::Company,
-        NamespaceOwner::Agent(f.agent),
-        NamespaceOwner::User(f.member),
+        NamespaceOwner::Unit(f.root),
+        NamespaceOwner::Principal(f.agent_principal),
+        NamespaceOwner::Principal(f.member_principal),
     ] {
         f.ensure(owner).await;
     }
@@ -1116,7 +1149,7 @@ async fn memory_scope_reconciler_completion_racing_company_delete_is_lost() {
         return;
     };
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
     sqlx::query("UPDATE memory_lifecycles SET available_at = 'infinity' WHERE resource = 'tenant'")
         .execute(f.pool())
         .await
@@ -1175,8 +1208,11 @@ async fn memory_scope_reconciler_mismatch_refuses_tenant_and_namespace_deletion(
     );
     let other = rotated(&f, &fake);
     f.enable().await.unwrap();
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     AgentPersistence::delete(&f.persistence, f.agent)
         .await
         .unwrap();
@@ -1258,8 +1294,11 @@ async fn memory_integration_reconciler_revocation_without_progress_spends_an_att
     let worker = worker(&f, &fake, PROVISIONER);
     f.enable().await.unwrap();
     drain(&worker).await;
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     let label = client_credential_label(NamespaceExternalId(namespace));
     for _ in 0..17 {
         fake.state
@@ -1302,8 +1341,11 @@ async fn memory_scope_reconciler_deleted_tenant_conflict_mints_no_new_namespaces
         .get_mut(&tenant_key(&f))
         .unwrap()
         .0 = crate::adapters::memory_service::contract_fake::FakeTenantState::Deleted;
-    f.ensure(NamespaceOwner::Agent(f.agent)).await;
-    let (namespace, _) = f.namespaces("agent").await[0].clone();
+    f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
+    let (namespace, _) = f
+        .namespaces(NamespaceOwner::Principal(f.agent_principal))
+        .await[0]
+        .clone();
     drain(&worker).await;
     assert_eq!(
         row(&f, Some(namespace)).await,
@@ -1319,13 +1361,14 @@ async fn memory_scope_reconciler_deleted_tenant_conflict_mints_no_new_namespaces
     .unwrap();
     for _ in 0..3 {
         assert_eq!(
-            f.ensure(NamespaceOwner::Agent(f.agent)).await,
+            f.ensure(NamespaceOwner::Principal(f.agent_principal)).await,
             NamespaceReadiness::NotReady
         );
         drain(&worker).await;
     }
     assert_eq!(
-        f.namespaces("agent").await,
+        f.namespaces(NamespaceOwner::Principal(f.agent_principal))
+            .await,
         [(namespace, "provisioning".into())]
     );
     let lifecycles: i64 =

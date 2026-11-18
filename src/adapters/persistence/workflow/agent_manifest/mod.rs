@@ -31,6 +31,7 @@ struct Closure {
     workflows: BTreeMap<VersionId, WorkflowId>,
     deadline: Instant,
     association: RelatedAssociation,
+    context_department_id: Option<crate::entities::department::DepartmentId>,
     role_facts: Option<roles::RoleFacts>,
     roles: BTreeMap<roles::RoleCaptureKey, roles::RoleCapture>,
 }
@@ -64,6 +65,7 @@ pub(super) async fn capture_on(
         workflows: BTreeMap::new(),
         deadline: Instant::now() + Duration::from_secs(5),
         association: command.association(),
+        context_department_id: None,
         role_facts: None,
         roles: BTreeMap::new(),
     };
@@ -74,6 +76,7 @@ pub(super) async fn capture_on(
         // Keep the bounded graph/capture query futures off the admission poll stack.
         Box::pin(async {
             let context = context_department_on(tx, command).await?;
+            closure.context_department_id = context;
             closure
                 .walk(
                     tx,

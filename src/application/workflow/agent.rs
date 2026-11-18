@@ -26,7 +26,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-pub const PREPARED_AGENT_VERSION: u8 = 7;
+pub const PREPARED_AGENT_VERSION: u8 = 8;
 
 #[path = "agent_mcp_policy.rs"]
 mod mcp_policy;
@@ -164,6 +164,7 @@ pub struct PreparedAgent {
     tools: Vec<PreparedTool>,
     preamble: String,
     department: Option<DepartmentContext>,
+    scope_context: Option<super::scopes::RunScopeContext>,
     context: AgentLogicalInput,
     history_exchange: Option<AgentExchangeId>,
     /// Automatic recall's frozen pack (E7), bound before history.
@@ -214,7 +215,7 @@ impl PreparedAgent {
         if declared.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(invalid("Agent tool declarations collide"));
         }
-        let preamble = preamble(&selection, None);
+        let preamble = preamble(&selection, None, None);
         let context = AgentLogicalInput::new(context.clone())?;
         let mcp_error_policy = McpErrorPolicy::from_inputs(inputs)?;
         if kind != ModelStep::AgentRun && inputs.get("mcp_error_policy").is_some() {
@@ -227,6 +228,7 @@ impl PreparedAgent {
             tools,
             preamble,
             department: None,
+            scope_context: None,
             context,
             history_exchange: None,
             memory: None,
@@ -289,10 +291,31 @@ impl PreparedAgent {
         if self.history.is_some() || (department.is_some() && self.step != ModelStep::AgentRun) {
             return Err(invalid("Department context differs from the model step"));
         }
-        self.preamble = preamble(&self.selection, department.as_ref());
+        self.preamble = preamble(
+            &self.selection,
+            department.as_ref(),
+            self.scope_context.as_ref(),
+        );
         self.department = department;
         Ok(self)
     }
+    /// Scope topology was sealed at admission and is mandatory input to the
+    /// prompt budget. Restore the saved context before restoring selected history.
+    pub fn with_scope_context(
+        mut self,
+        context: Option<super::scopes::RunScopeContext>,
+    ) -> AppResult<Self> {
+        if self.history.is_some() || (context.is_some() && self.step != ModelStep::AgentRun) {
+            return Err(invalid("Run scope context differs from the model step"));
+        }
+        if let Some(context) = &context {
+            context.validate()?;
+        }
+        self.preamble = preamble(&self.selection, self.department.as_ref(), context.as_ref());
+        self.scope_context = context;
+        Ok(self)
+    }
+
     pub fn department(&self) -> Option<&DepartmentContext> {
         self.department.as_ref()
     }
@@ -510,10 +533,17 @@ fn prepared_tool(
     })
 }
 
-fn preamble(selection: &ResolvedAgent, department: Option<&DepartmentContext>) -> String {
+fn preamble(
+    selection: &ResolvedAgent,
+    department: Option<&DepartmentContext>,
+    scopes: Option<&super::scopes::RunScopeContext>,
+) -> String {
     let mut text = selection.agent().instructions.clone();
     if let Some(department) = department {
         department.render(&mut text);
+    }
+    if let Some(scopes) = scopes {
+        scopes.render(&mut text);
     }
     for skill in selection.skills() {
         text.push_str("\n\nSkill ");

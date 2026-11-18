@@ -2,7 +2,7 @@
 //! prompt block, the budget it takes from history, and the recall budget it is fetched within.
 //! Pure: nothing here reaches the network or reloads per tool round.
 use super::*;
-use crate::application::workflow::memory_tools::MemoryToolScope;
+use crate::application::memory::NamespaceExternalId;
 use crate::entities::access_level::AccessLevel;
 use crate::services::harness::runs::LogicalSeed;
 
@@ -27,6 +27,7 @@ pub struct FrozenMemory {
     /// The highest level of the included items and their provenance (0 when none).
     pub exposed_level: AccessLevel,
     pub items: Vec<RecalledMemory>,
+    pub namespaces: Vec<NamespaceExternalId>,
     /// Each scope's `pack_digest`, in scope order.
     pub digests: Vec<String>,
     pub valid_until: Option<chrono::DateTime<chrono::Utc>>,
@@ -46,7 +47,8 @@ pub enum RecallState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecalledMemory {
-    pub scope: MemoryToolScope,
+    pub namespace: NamespaceExternalId,
+    pub scope: String,
     pub observation_id: Uuid,
     pub kind: String,
     pub title: String,
@@ -66,23 +68,35 @@ impl FrozenMemory {
             read_ceiling,
             exposed_level: AccessLevel::PUBLIC,
             items: Vec::new(),
+            namespaces: Vec::new(),
             digests: Vec::new(),
             valid_until: None,
         }
     }
 
     fn validate(&self) -> AppResult<()> {
-        let items_fit = self
-            .items
-            .iter()
-            .all(|item| item.access_level <= self.exposed_level);
+        let items_fit = self.items.iter().all(|item| {
+            item.access_level <= self.exposed_level && self.namespaces.contains(&item.namespace)
+        });
         let consistent = match self.state {
             RecallState::Included => true,
             RecallState::SkippedBudget | RecallState::Unavailable { .. } => {
-                self.items.is_empty() && self.exposed_level == AccessLevel::PUBLIC
+                self.items.is_empty()
+                    && self.namespaces.is_empty()
+                    && self.exposed_level == AccessLevel::PUBLIC
             }
         };
-        if !items_fit || self.exposed_level > self.read_ceiling || !consistent {
+        if !items_fit
+            || self.exposed_level > self.read_ceiling
+            || !consistent
+            || self.namespaces.len() > crate::application::workflow::scopes::MAX_RUN_READ_NAMESPACES
+            || self
+                .namespaces
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                != self.namespaces.len()
+        {
             return Err(invalid(
                 "Frozen memory is above its ceiling or inconsistent",
             ));
@@ -143,7 +157,7 @@ impl PreparedAgent {
             .items
             .iter()
             .map(|item| {
-                json!({"id": item.observation_id, "scope": item.scope.label(), "kind": item.kind,
+                json!({"id": item.observation_id, "scope": item.scope,"namespace":item.namespace, "kind": item.kind,
                     "title": item.title, "text": item.text,
                     "occurred_at": item.occurred_at.to_rfc3339(),
                     "access_level": item.access_level.as_i16(), "revision": item.revision})

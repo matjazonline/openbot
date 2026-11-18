@@ -1,0 +1,42 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0433]: cannot find `ProvisionerId` in `memory`
+  --> src/adapters/persistence/workflow/autonomous_memory_scope_tests.rs:10:37
+   |
+10 |         crate::application::memory::ProvisionerId::parse("scope-preflight").unwrap(),
+   |                                     ^^^^^^^^^^^^^ could not find `ProvisionerId` in `memory`
+
+error[E0433]: cannot find type `ChannelPersistence` in this scope
+  --> src/adapters/persistence/workflow/autonomous_memory_scope_tests.rs:80:16
+   |
+80 |     let desk = ChannelPersistence::create(
+   |                ^^^^^^^^^^^^^^^^^^ use of undeclared type `ChannelPersistence`
+   |
+help: a trait with a similar name exists
+   |
+80 -     let desk = ChannelPersistence::create(
+80 +     let desk = AgentPersistence::create(
+   |
+help: consider importing this trait
+   |
+ 1 + use crate::ports::channel::ChannelPersistence;
+   |
+
+error[E0422]: cannot find struct, variant or union type `ChannelWrite` in module `crate::entities::channel`
+  --> src/adapters/persistence/workflow/autonomous_memory_scope_tests.rs:83:35
+   |
+83 |         crate::entities::channel::ChannelWrite {
+   |                                   ^^^^^^^^^^^^ not found in `crate::entities::channel`
+   |
+help: consider importing this struct
+   |
+ 1 + use crate::ports::channel::ChannelWrite;
+   |
+help: if you import `ChannelWrite`, refer to it directly
+   |
+83 -         crate::entities::channel::ChannelWrite {
+83 +         ChannelWrite {
+   |
+
+Some errors have detailed explanations: E0422, E0433.
+For more information about an error, try `rustc --explain E0422`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

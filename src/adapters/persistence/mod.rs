@@ -328,11 +328,14 @@ mod tests {
                 "memory_deliveries.lease_until",
                 "memory_deliveries.namespace_id",
                 "memory_deliveries.outcome_code",
+                "memory_deliveries.principal_id",
                 "memory_deliveries.request",
                 "memory_deliveries.result",
                 "memory_deliveries.run_id",
                 "memory_deliveries.state",
+                "memory_deliveries.subject_principal_id",
                 "memory_deliveries.transient_retries",
+                "memory_deliveries.unit_id",
                 "memory_deliveries.updated_at",
                 "memory_deliveries.wait_id",
                 "memory_lifecycles.attempts",
@@ -354,15 +357,15 @@ mod tests {
                 "memory_lifecycles.state",
                 "memory_lifecycles.transient_retries",
                 "memory_lifecycles.updated_at",
-                "memory_namespaces.agent_id",
                 "memory_namespaces.company_id",
                 "memory_namespaces.created_at",
                 "memory_namespaces.credential_envelope",
                 "memory_namespaces.credential_id",
                 "memory_namespaces.id",
+                "memory_namespaces.principal_id",
                 "memory_namespaces.scope_kind",
                 "memory_namespaces.state",
-                "memory_namespaces.user_id",
+                "memory_namespaces.unit_id",
                 "memory_tenants.changed_at",
                 "memory_tenants.changed_by",
                 "memory_tenants.company_id",
@@ -401,10 +404,14 @@ mod tests {
         .fetch_all(&pool)
         .await
         .expect("the function catalog is readable");
-        // Exactly the delivery intents' run-cancellation trigger (E9); no legacy memory function.
+        // Only client ownership guards and run-cancellation hooks; no corpus/provider function.
         assert_eq!(
             functions,
-            ["cancel_memory_deliveries_of_run"],
+            [
+                "cancel_memory_deliveries_of_run",
+                "guard_memory_namespace_owner",
+                "memory_lock_namespace_owner"
+            ],
             "memory functions are exactly the client's own"
         );
     }

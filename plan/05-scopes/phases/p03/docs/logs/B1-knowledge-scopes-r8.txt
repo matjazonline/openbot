@@ -1,0 +1,45 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/knowledge_scope_proof_tests.rs:62:9
+   |
+62 |     for invalid in [
+   |         ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/http_tests.rs:1:5
+   |
+ 1 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/http_tests.rs:6:48
+   |
+ 6 | use crate::application::workflow::{actions::*, http::*, lease::*, polling::WorkflowStepKind};
+   |                                                ^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0560]: struct `application::knowledge::search::types::VisibleKnowledgeQuery` has no field named `access`
+  --> src/adapters/persistence/workflow/knowledge_scope_proof_tests.rs:21:13
+   |
+21 |             access,
+   |             ^^^^^^ `application::knowledge::search::types::VisibleKnowledgeQuery` does not have this field
+   |
+   = note: available fields are: `company`, `ceiling`
+
+error[E0277]: the trait bound `ExactKnowledgeTerm: std::convert::From<&str>` is not satisfied
+  --> src/adapters/persistence/workflow/knowledge_scope_proof_tests.rs:24:41
+   |
+24 |             exact_terms: vec!["AX-4410".into()],
+   |                                         ^^^^ unsatisfied trait bound
+   |
+help: the trait `std::convert::From<&str>` is not implemented for `ExactKnowledgeTerm`
+  --> src/application/knowledge/search/query.rs:7:1
+   |
+ 7 | pub struct ExactKnowledgeTerm(String);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `&str` to implement `Into<ExactKnowledgeTerm>`
+
+Some errors have detailed explanations: E0277, E0560, E0659.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

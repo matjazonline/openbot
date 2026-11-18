@@ -56,12 +56,12 @@ impl KnowledgeLibrary {
     }
     pub async fn upload(
         &self,
-        scope: KnowledgeScope,
+        target: KnowledgeUploadTarget,
         files: Vec<KnowledgeUploadFile>,
     ) -> AppResult<Vec<KnowledgeDocumentLayer>> {
         validate_batch(&files)?;
         let sizes: Vec<_> = files.iter().map(KnowledgeUploadFile::size).collect();
-        self.documents.preflight_upload(scope, &sizes).await?;
+        self.documents.preflight_upload(target, &sizes).await?;
         let permit = self.slots.clone().try_acquire_owned().map_err(|_| {
             AppError::ServiceUnavailable("Knowledge indexing is busy; retry shortly".into())
         })?;
@@ -92,9 +92,45 @@ impl KnowledgeLibrary {
         tokio::select! {
             biased;
             _ = cancel.cancelled() => Err(AppError::Timeout("Knowledge indexing was canceled".into())),
-            result = self.documents.replace(scope,&prepared) => result,
+            result = self.documents.replace(target,&prepared) => result,
         }
     }
+    pub async fn search_manual(
+        &self,
+        scope: KnowledgeScope,
+        unit: Option<crate::entities::department::DepartmentId>,
+        query: search::KnowledgeSearchQuery,
+    ) -> AppResult<serde_json::Value> {
+        self.documents.preflight_search(scope, unit).await?;
+        let embedding = self.embed_query(query.question()).await?;
+        let search = async {
+            let chunks = self
+                .documents
+                .search_manual(ManualKnowledgeQuery {
+                    scope,
+                    unit,
+                    model: embedding.model().clone(),
+                    exact_terms: query.exact_terms(),
+                })
+                .await?;
+            embedding.ensure_live()?;
+            let observation = search::rank_chunks(
+                chunks,
+                embedding.vector(),
+                search::KnowledgeSearchLimit::default(),
+                crate::application::workflow::tools::MAX_TOOL_RESULT_BYTES
+                    .min(crate::services::harness::runs::MAX_RESULT_BYTES),
+            )?;
+            embedding.ensure_live()?;
+            Ok(observation.result().clone())
+        };
+        tokio::select! {
+            biased;
+            _ = embedding.cancellation().cancelled() => Err(AppError::Timeout("Knowledge search was canceled".into())),
+            result = tokio::time::timeout_at(embedding.deadline(), search) => result.map_err(|_| AppError::Timeout("Knowledge search exceeded its deadline".into()))?,
+        }
+    }
+
     pub async fn shutdown(&self) -> AppResult<()> {
         {
             let _registration = self.registration.lock().map_err(|_| {

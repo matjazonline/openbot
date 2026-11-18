@@ -1,0 +1,4 @@
+All 60 reviewed implementation paths byte/mode-identical after staging; staged path set exactly matches frozen source.
+Prior unstaged digest:2a1e2771ddb751adc80b3a6b20a8bbd404a9b71fa7e1bd69604e212b288b19d8
+Final staged digest:62d667d9e56395de26652accbbab2ee1eb9f854969e308607cae2aa003cb5907
+No implementation or criterion changed; only snapshot index representation changed.

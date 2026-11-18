@@ -88,15 +88,25 @@ pub(super) enum DepartmentSelection {
 /// Renders the tab's section for `access`'s company: the departments the caller may see, the
 /// selection, and the forms when they manage the company. Shared with the company pane, which
 /// draws the same section under its tabs.
+pub(super) struct DepartmentSectionServices<'a> {
+    pub departments: &'a DepartmentUseCases,
+    pub knowledge: &'a crate::application::knowledge::KnowledgeLibrary,
+    pub config: &'a AppConfig,
+}
+
 pub(super) async fn department_section(
-    departments: &DepartmentUseCases,
-    config: &AppConfig,
+    services: DepartmentSectionServices<'_>,
     user_id: Uuid,
     access: &CompanyAccess,
     selection: DepartmentSelection,
     error: Option<(DepartmentForm, &str)>,
     notice: Option<&str>,
 ) -> AppResult<String> {
+    let DepartmentSectionServices {
+        departments,
+        knowledge,
+        config,
+    } = services;
     let company_id = access.company.id;
     let editable = access.membership.manages_company_operations();
     let listed = departments.visible_departments(user_id, company_id).await?;
@@ -123,6 +133,22 @@ pub(super) async fn department_section(
         }
         _ => DepartmentDetailPane::None,
     };
+    let knowledge = if let Some(view) = &view {
+        knowledge_card_layers(
+            knowledge
+                .documents()
+                .list(
+                    crate::application::knowledge::KnowledgeScope {
+                        company: crate::domain::workflow::CompanyId::new(company_id),
+                        actor_id: user_id,
+                    },
+                    Some(view.detail.department.id),
+                )
+                .await,
+        )?
+    } else {
+        Some(Vec::new())
+    };
     Ok(pages::company_departments_section(
         &pages::DepartmentSection {
             company: &access.company,
@@ -134,13 +160,32 @@ pub(super) async fn department_section(
             membership: access.membership,
             error,
             notice,
+            knowledge: knowledge.as_deref().map_or(
+                pages::DepartmentKnowledge::ScopeLimit,
+                pages::DepartmentKnowledge::Documents,
+            ),
         },
     ))
+}
+
+fn knowledge_card_layers(
+    result: AppResult<crate::application::knowledge::KnowledgeLibraryView>,
+) -> AppResult<Option<Vec<crate::entities::knowledge::KnowledgeDocumentLayer>>> {
+    match result {
+        Ok(view) => Ok(Some(view.layers)),
+        Err(AppError::BadRequest(code))
+            if code == crate::application::knowledge::KNOWLEDGE_SCOPE_LIMIT_EXCEEDED =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     department_use_cases: Arc<DepartmentUseCases>,
+    knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -156,6 +201,7 @@ impl FromRequestParts<AppState> for Workspace {
         Ok(Self {
             company_use_cases: state.company_use_cases.clone(),
             department_use_cases: state.department_use_cases.clone(),
+            knowledge: state.knowledge.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -189,8 +235,11 @@ impl Workspace {
         notice: Option<&str>,
     ) -> AppResult<String> {
         department_section(
-            &self.department_use_cases,
-            &self.config,
+            DepartmentSectionServices {
+                departments: &self.department_use_cases,
+                knowledge: &self.knowledge,
+                config: &self.config,
+            },
             self.user_id,
             access,
             selection,

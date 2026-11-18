@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "round": "05SC-P01-ACCEPT",
+  "artifact": "0713361f3809b86cfbde192b30267041ea50f862c3183afcb4fe38896890dabf",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC5"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "fresh owned pa05_p01_schema on PostgreSQL18:51167",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migrate.txt",
+          "sha256": "5b56a8239980d9032d3eee0e30f159d12a3151ab1ad5809e5a3367c7e3867e9f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_ agent_history_ agent_retire address_namespace_ direct_competing_personal_rejoin department_write root_department",
+      "fixture": "pre-final internal step-type build:363passed/5failed/8ignored; unaffected ownership proofs retained; exact5failures corrected below;2incidentalDoop names excluded from accepted scope",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-focused2.txt",
+          "sha256": "5ee13e319ab0765083936e79ea95e16913a01c18ea3f6b833ee0df7b7d703fad"
+        },
+        {
+          "path": "logs/B1-failure-dispositions.json",
+          "sha256": "0a12ea9b7072697fe27a866f99f32b52889f63c1538ee92f88c0c8e8af89e865"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_integration_delivery_claims_are_fair_across_companies memory_integration_delivery_fences_competing_claimants_and_bounds_attempts memory_integration_delivery_lanes_send_companies_concurrently the_memory_provider_schema_is_gone memory_capture_a_child_branch_is_never_captured --skip doop --skip Doop",
+      "fixture": "pa05_p01_core_test and per-test owned databases on shared PostgreSQL18:51167",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-corrections1.txt",
+          "sha256": "5f5225d6d4c6a2df5809b43b10b206779946c3d10eb5e5791af8afdb93ed39ad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_steps:: memory_steps memory_scope_admission_step_own memory_integration_load_output memory_access_level_load_carries --skip doop --skip Doop",
+      "fixture": "pa05_p01_core_test and per-test owned databases on shared PostgreSQL18:51167",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-step-type-focused.txt",
+          "sha256": "82aa630049d3b1ffda74fb8c9aedabeff8e2fa6587d003db74b50eb7de1e06a5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "owned pa05_p01_schema; .sqlx unchanged; no macro query changed after this execution",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare2.txt",
+          "sha256": "a2417551e36e5cebc4a362d49de1592a7a40c8899c656be02a5a1cf6ff338681"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "offline cache after regeneration; final source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-offline-all-targets.txt",
+          "sha256": "9eac3d209271ca567d42ce6be47c47d8893a3ae1dd08eaa2327932d6c9694eb6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "final source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "all8assertions; module edges unchanged by final internal-type edit/new test in existing module",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-source-modules.txt",
+          "sha256": "0f10b11fb4afe46d5a2efba05fcb3fb13d4c33d680e1ae78a64241a528267492"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "git diff --cached --check",
+      "fixture": "staged implementation and retained workflow records",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-staged-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "trail check",
+      "fixture": "no learning conflicts;10out-of-scope advisories dispositioned inTASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-trail-check.txt",
+          "sha256": "219e60cbf53f68b98205008670cf92edff71e1b7ff75f2fde75cca6da2499b66"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_shape_ memory_scope_lifecycle_ agent_retire_races_agent_principal_upsert memory_scope_returning_member_gets_a_new_namespace_id --skip doop --skip Doop",
+      "fixture": "Reviewer execution: pa05_p01_core_test plus test-owned databases on PostgreSQL18:51167;9passed,0failed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-reviewer-focused.txt",
+          "sha256": "653391bc5f8ee3b269342cb4d8d2c18b6790aef82c811ac40140c14d902ec794"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list; compare discovered : test names to B1-before-tests.txt",
+      "fixture": "Reviewer collection only; no tests executed by list; six added, none removed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-reviewer-test-list.txt",
+          "sha256": "888eb71d09fe61a7e6a5c9868c0bc55f362e5af4b62589230b5ca8e61d3ddd0f"
+        },
+        {
+          "path": "logs/B1-R1-reviewer-collection.json",
+          "sha256": "163c4f374d1d4b536c0a7ec587d7d7d7bae8623ef39f7667998860fef2dfd7f5"
+        }
+      ]
+    }
+  ]
+}

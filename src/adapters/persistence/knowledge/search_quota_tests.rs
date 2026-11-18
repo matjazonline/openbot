@@ -27,7 +27,7 @@ async fn knowledge_search_company_chunk_cap_competing_writes_override_delete_and
     let f = Fixture::new(database.pool.clone()).await;
     f.store
         .replace(
-            f.owner,
+            f.target(f.owner),
             &[document("0_first.md", 4096), document("0_second.md", 4094)],
         )
         .await
@@ -36,12 +36,12 @@ async fn knowledge_search_company_chunk_cap_competing_writes_override_delete_and
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
     for name in ["0_left.md", "0_right.md"] {
         let store = f.store.clone();
-        let scope = f.owner;
+        let target = f.target(f.owner);
         let barrier = barrier.clone();
         let documents = [document(name, 2)];
         writers.spawn(async move {
             barrier.wait().await;
-            store.replace(scope, &documents).await
+            store.replace(target, &documents).await
         });
     }
     let mut winners = Vec::new();
@@ -73,7 +73,7 @@ async fn knowledge_search_company_chunk_cap_competing_writes_override_delete_and
         .unwrap();
     let after = f
         .store
-        .replace(f.owner, &[document("0_after.md", 2)])
+        .replace(f.target(f.owner), &[document("0_after.md", 2)])
         .await
         .unwrap()
         .remove(0);
@@ -82,7 +82,7 @@ async fn knowledge_search_company_chunk_cap_competing_writes_override_delete_and
 
     // Replacing an existing layer releases its old chunks before the final total is checked.
     f.store
-        .replace(f.owner, &[document("0_first.md", 1)])
+        .replace(f.target(f.owner), &[document("0_first.md", 1)])
         .await
         .unwrap();
     let count: i64 =
@@ -97,12 +97,12 @@ async fn knowledge_search_company_chunk_cap_competing_writes_override_delete_and
 async fn assert_corrupted_scan_is_refused(f: &Fixture, document_id: Uuid) {
     // A direct SQL corruption cannot turn the scan bound into a partial successful answer.
     let extra = Uuid::new_v4();
-    sqlx::query("INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,heading,body,embedding_model,embedding)
-        SELECT $1,company_id,document_id,access_level,2,heading,body,embedding_model,embedding
+    sqlx::query("INSERT INTO knowledge_chunks (id,company_id,document_id,access_level,ordinal,heading,body,embedding_model,embedding,unit_id)
+        SELECT $1,company_id,document_id,access_level,2,heading,body,embedding_model,embedding,unit_id
         FROM knowledge_chunks WHERE document_id=$2 LIMIT 1")
         .bind(extra).bind(document_id).execute(&f.pool).await.unwrap();
     let query = super::search::request(
-        f.owner.company,
+        f.target(f.owner),
         AccessLevel::PUBLIC,
         serde_json::json!({"query":"price"}),
     );

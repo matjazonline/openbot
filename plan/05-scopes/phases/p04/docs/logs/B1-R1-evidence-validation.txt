@@ -1,0 +1,2 @@
+plan/05-scopes/phases/p04/docs/logs/B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 5}
+1 evidence manifest(s) validated; declared results are not acceptance

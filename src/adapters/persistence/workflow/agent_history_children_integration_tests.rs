@@ -1,4 +1,7 @@
 use super::*;
+
+#[path = "run_scope_child_tests.rs"]
+mod scope_snapshots;
 use crate::application::workflow::{
     activation::ActivationRequest,
     waits::{WaitProgress, WorkflowWaits},
@@ -45,32 +48,18 @@ struct Branch {
 }
 
 async fn begin(setup: &AgentSetup, graph: &GraphWorkflow, level: AccessLevel) -> Branch {
-    let p = &setup.fixture.persistence;
     let AdmissionResult::Created(run) = admit_graph(setup, graph, "history-child-journey")
         .await
         .unwrap()
     else {
         panic!("new root")
     };
-    let first = claim_run(setup, run).await;
-    stamp(setup, &first, level).await;
-    let output =
-        Box::pin(agent_runtime(setup).execute(&WorkflowStepKind("agent.run".into()), &first))
-            .await
-            .completed_result()
-            .unwrap();
-    assert_eq!(output, json!("parent accepted"));
-    let parent = p
-        .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
-            fence: first.fence,
-            output,
-            policy: lease(),
-        })
-        .await
-        .unwrap()
-        .unwrap()
-        .successor
-        .unwrap();
+    Box::pin(begin_run(setup, run, level)).await
+}
+
+async fn begin_run(setup: &AgentSetup, run: RunId, level: AccessLevel) -> Branch {
+    let p = &setup.fixture.persistence;
+    let parent = Box::pin(complete_parent_to_child(setup, run, level)).await;
     p.park_child(parent).await.unwrap().unwrap();
     let child: Uuid =
         sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND parent_run_id=$2")
@@ -83,6 +72,32 @@ async fn begin(setup: &AgentSetup, graph: &GraphWorkflow, level: AccessLevel) ->
         parent,
         child: claim_run(setup, RunId::new(child)).await,
     }
+}
+
+async fn complete_parent_to_child(
+    setup: &AgentSetup,
+    run: RunId,
+    level: AccessLevel,
+) -> ActivationRequest {
+    let p = &setup.fixture.persistence;
+    let first = claim_run(setup, run).await;
+    stamp(setup, &first, level).await;
+    let output =
+        Box::pin(agent_runtime(setup).execute(&WorkflowStepKind("agent.run".into()), &first))
+            .await
+            .completed_result()
+            .unwrap();
+    assert_eq!(output, json!("parent accepted"));
+    p.complete_io(crate::application::workflow::lease::FencedWorkflowResult {
+        fence: first.fence,
+        output,
+        policy: lease(),
+    })
+    .await
+    .unwrap()
+    .unwrap()
+    .successor
+    .unwrap()
 }
 
 async fn finish_child(setup: &AgentSetup, branch: Branch) -> ClaimedWorkflow {
@@ -135,22 +150,24 @@ async fn seed_capture(setup: &AgentSetup) {
     .execute(pool)
     .await
     .unwrap();
-    for (kind, agent, user) in [
-        ("user", None, Some(actor)),
-        ("agent", Some(setup.agent), None),
-    ] {
+    let person = crate::adapters::persistence::memory::person_principal_on(
+        &mut pool.acquire().await.unwrap(),
+        company,
+        actor,
+    )
+    .await
+    .unwrap();
+    let agent = crate::adapters::persistence::memory::agent_principal_on(
+        &mut pool.acquire().await.unwrap(),
+        company,
+        setup.agent,
+    )
+    .await
+    .unwrap();
+    for principal in [person, agent] {
         sqlx::query(
-            "INSERT INTO memory_namespaces (company_id, id, scope_kind, agent_id, user_id, state, \
-               credential_id, credential_envelope) \
-             VALUES ($1, gen_random_uuid(), $2, $3, $4, 'ready', gen_random_uuid(), 'stand-in')",
-        )
-        .bind(company)
-        .bind(kind)
-        .bind(agent)
-        .bind(user)
-        .execute(pool)
-        .await
-        .unwrap();
+            "INSERT INTO memory_namespaces (company_id,id,scope_kind,principal_id,state,credential_id,credential_envelope) VALUES ($1,gen_random_uuid(),'principal',$2,'ready',gen_random_uuid(),'stand-in')",
+        ).bind(company).bind(principal.as_uuid()).execute(pool).await.unwrap();
     }
     sqlx::query(
         "INSERT INTO memory_agent_capture (company_id, agent_id, kind, enabled, allowance_tokens, \
@@ -282,8 +299,8 @@ async fn journey_with(initial: AccessLevel, capture: bool) {
         assert_eq!(
             captured,
             vec![
-                ("private_session".to_owned(), "user".to_owned()),
-                ("private_session".to_owned(), "user".to_owned())
+                ("private_session".to_owned(), "principal".to_owned()),
+                ("private_session".to_owned(), "principal".to_owned())
             ]
         );
         let texts: String = sqlx::query_scalar(

@@ -2,6 +2,12 @@ use super::contract_fake::ContractFake;
 use super::*;
 use crate::infra::memory_config::ProvisionerToken;
 
+#[path = "subject_tests.rs"]
+mod subject;
+
+#[path = "scope_requests_tests.rs"]
+mod scope_requests;
+
 /// Every credential of the tenant in one page.
 const EVERY: CredentialQuery<'static> = CredentialQuery {
     label: None,

@@ -39,18 +39,39 @@ impl KnowledgeToolDispatch for KnowledgeSearchRuntime {
         fence: WorkflowFence,
         call: KnowledgeToolCall,
     ) -> AppResult<AgentToolObservation> {
-        let access = match self.persistence.knowledge_context(fence, &call).await? {
+        let (access, units) = match self.persistence.knowledge_context(fence, &call).await? {
             KnowledgeSearchContext::Recorded(result) => {
                 return Ok(AgentToolObservation::Completed(result));
             }
-            KnowledgeSearchContext::Pending(access) => access,
+            KnowledgeSearchContext::Pending { access, units } => (access, units),
+            KnowledgeSearchContext::Unavailable => {
+                return self
+                    .persistence
+                    .observe_knowledge(
+                        fence,
+                        &call,
+                        KnowledgeSearchObservation {
+                            queried_units: Vec::new(),
+                            observation: scope_unavailable(),
+                        },
+                    )
+                    .await
+                    .map(AgentToolObservation::Completed);
+            }
         };
         let query = match KnowledgeSearchQuery::parse(&call.arguments) {
             Ok(query) => query,
             Err(_) => {
                 return self
                     .persistence
-                    .observe_knowledge(fence, &call, invalid_query())
+                    .observe_knowledge(
+                        fence,
+                        &call,
+                        KnowledgeSearchObservation {
+                            queried_units: units,
+                            observation: invalid_query(),
+                        },
+                    )
                     .await
                     .map(AgentToolObservation::Completed);
             }
@@ -60,7 +81,14 @@ impl KnowledgeToolDispatch for KnowledgeSearchRuntime {
             Err(AppError::BadRequest(_)) => {
                 return self
                     .persistence
-                    .observe_knowledge(fence, &call, invalid_query())
+                    .observe_knowledge(
+                        fence,
+                        &call,
+                        KnowledgeSearchObservation {
+                            queried_units: units,
+                            observation: invalid_query(),
+                        },
+                    )
                     .await
                     .map(AgentToolObservation::Completed);
             }
@@ -75,13 +103,21 @@ impl KnowledgeToolDispatch for KnowledgeSearchRuntime {
                     ceiling: access.ceiling,
                     model: embedding.model().clone(),
                     exact_terms: query.exact_terms(),
+                    units: units.clone(),
                 })
                 .await?;
             embedding.ensure_live()?;
             let observation = rank_chunks(chunks, embedding.vector(), self.limit, result_bound())?;
             embedding.ensure_live()?;
             self.persistence
-                .observe_knowledge(fence, &call, observation)
+                .observe_knowledge(
+                    fence,
+                    &call,
+                    KnowledgeSearchObservation {
+                        queried_units: units,
+                        observation,
+                    },
+                )
                 .await
         });
         tokio::select! {
@@ -106,6 +142,7 @@ fn invalid_query() -> KnowledgeObservation {
             "Use a shorter question of 1–1000 characters that fits the local model's 512-token limit, with at most eight exact terms of 1–64 characters and no other fields",
         ),
         None,
+        Vec::new(),
     )
 }
 

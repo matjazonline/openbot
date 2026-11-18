@@ -305,6 +305,32 @@ pub static OPERATIONS: &[OperationSpec] = &[
         "Delete every memory in a namespace and tombstone it"
     ),
     op!(
+        "admin.observations.subject.list",
+        Admin,
+        Post,
+        "/admin/v1/observations/subject/list",
+        None,
+        None,
+        Standard,
+        true,
+        SubjectListRequest,
+        SubjectPage,
+        "List exact subject observation IDs in an owned namespace"
+    ),
+    op!(
+        "admin.observations.subject.delete",
+        Admin,
+        Post,
+        "/admin/v1/observations/subject/delete",
+        None,
+        None,
+        Standard,
+        true,
+        SubjectDeleteRequest,
+        SubjectDeleted,
+        "Delete exact tagged IDs in an owned namespace"
+    ),
+    op!(
         "admin.tenants.create",
         Admin,
         Post,

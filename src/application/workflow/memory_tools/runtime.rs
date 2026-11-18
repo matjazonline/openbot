@@ -3,8 +3,8 @@ use crate::{
     app_error::{AppError, AppResult},
     application::{
         memory::{
-            MemoryClient, MemoryDetail, MemoryHit, MemorySearch, MemoryServiceError,
-            MemoryTimeline, ScopedSearch,
+            MemoryClient, MemoryDetail, MemoryHit, MemorySearch, MemorySearchResult,
+            MemoryServiceError, MemoryTimeline, NamespaceExternalId, ScopedSearch,
         },
         workflow::{agent::AgentToolObservation, lease::WorkflowFence, tools::tool_error},
     },
@@ -60,7 +60,14 @@ impl MemoryToolRuntime {
         fence: WorkflowFence,
         call: MemoryToolCall,
     ) -> AppResult<AgentToolObservation> {
-        let access = match self.persistence.memory_tool_context(fence, &call).await? {
+        let context = match self.persistence.memory_tool_context(fence, &call).await {
+            Ok(context) => context,
+            Err(AppError::BadRequest(code)) if code == "memory.scope_unavailable" => {
+                return self.refuse(fence, &call, scope_unavailable()).await;
+            }
+            Err(error) => return Err(error),
+        };
+        let access = match context {
             MemoryToolContext::Recorded(result) => {
                 return Ok(AgentToolObservation::Completed(result));
             }
@@ -73,7 +80,7 @@ impl MemoryToolRuntime {
             MemoryTool::Search => self.search(fence, &call, access).await,
             MemoryTool::Timeline => self.timeline(fence, &call, access).await,
             MemoryTool::Details => self.details(fence, &call, access).await,
-            MemoryTool::Save => self.save(fence, &call, &access).await,
+            MemoryTool::Save => self.save(fence, &call).await,
         };
         match outcome {
             Ok(Answer::Observed(result)) => Ok(AgentToolObservation::Completed(result)),
@@ -102,28 +109,29 @@ impl MemoryToolRuntime {
         access: &'a MemoryToolAccess,
         requested: Option<Vec<MemoryToolScope>>,
     ) -> Result<Vec<&'a ScopeAccess>, Value> {
-        let wanted = |scope: MemoryToolScope| {
-            requested
-                .as_ref()
-                .is_none_or(|requested| requested.contains(&scope))
-        };
         for scope in access
             .not_ready
             .iter()
-            .copied()
-            .filter(|scope| wanted(*scope))
+            .filter(|scope| scope.matches(requested.as_deref()))
         {
-            if let Err(error) = self.persistence.provision_memory_scope(fence, scope).await {
+            if let Err(error) = self
+                .persistence
+                .provision_memory_scope(fence, scope.owner)
+                .await
+            {
                 tracing::warn!(error = %error, "Memory namespace provisioning request failed");
             }
         }
         let chosen: Vec<&ScopeAccess> = access
             .scopes
             .iter()
-            .filter(|entry| wanted(entry.scope))
+            .filter(|entry| entry.scope.matches(requested.as_deref()))
             .collect();
         if chosen.is_empty() {
-            let any_not_ready = access.not_ready.iter().any(|scope| wanted(*scope));
+            let any_not_ready = access
+                .not_ready
+                .iter()
+                .any(|scope| scope.matches(requested.as_deref()));
             return Err(if any_not_ready {
                 tool_error(
                     "memory.not_ready",
@@ -152,6 +160,7 @@ impl MemoryToolRuntime {
             Ok(chosen) => chosen,
             Err(refusal) => return Ok(Answer::Refused(refusal)),
         };
+        let namespaces = chosen.iter().map(|entry| entry.namespace).collect();
         let ceiling = ceiling_u8(access.read_ceiling);
         // Every chosen scope in one interactive operation: one permit, concurrent requests (E1).
         let searches: Vec<ScopedSearch<'_>> = chosen
@@ -175,42 +184,23 @@ impl MemoryToolRuntime {
                 "The memory service answered a different number of searches".into(),
             ));
         }
-        let answers: Vec<_> = chosen
-            .iter()
-            .map(|entry| entry.scope)
-            .zip(results)
-            .collect();
-        // Interleave per scope so one scope cannot crowd out another, then keep `limit`.
-        let mut merged: Vec<(MemoryToolScope, MemoryHit)> = Vec::new();
-        let mut exposed = AccessLevel::PUBLIC;
-        let mut queues: Vec<_> = answers
-            .into_iter()
-            .map(|(scope, result)| (scope, result.exposed_level, result.items.into_iter()))
-            .collect();
-        for (_, level, _) in &queues {
-            exposed = exposed.max(service_level(*level)?);
-        }
-        while merged.len() < input.limit as usize {
-            let mut progressed = false;
-            for (scope, _, items) in queues.iter_mut() {
-                if merged.len() == input.limit as usize {
-                    break;
-                }
-                if let Some(hit) = items.next() {
-                    merged.push((*scope, hit));
-                    progressed = true;
-                }
-            }
-            if !progressed {
-                break;
-            }
-        }
-        let exposed = merged.iter().try_fold(exposed, |level, (_, hit)| {
-            service_level(hit.access_level).map(|item| level.max(item))
-        })?;
+        let answers: Vec<_> = chosen.iter().copied().zip(results).collect();
+        let (merged, exposed) = merge_searches(answers, input.limit)?;
         let (result, refs) = bounded_hits(&merged)?;
-        self.observe(fence, call, &access, result, exposed, refs)
+        self.persistence
+            .observe_memory_read(
+                fence,
+                call,
+                MemoryReadObservation {
+                    result,
+                    namespaces,
+                    exposed,
+                    read_ceiling: access.read_ceiling,
+                    items: refs,
+                },
+            )
             .await
+            .map(Answer::Observed)
     }
 
     async fn timeline(
@@ -222,45 +212,60 @@ impl MemoryToolRuntime {
         let Some(input) = TimelineInput::parse(&call.arguments) else {
             return Ok(Answer::Refused(invalid_input(call.tool)));
         };
-        let chosen = match self.chosen(fence, &access, Some(vec![input.scope])).await {
+        let chosen = match self.chosen(fence, &access, input.scopes).await {
             Ok(chosen) => chosen,
             Err(refusal) => return Ok(Answer::Refused(refusal)),
         };
-        let [entry] = chosen.as_slice() else {
-            return Ok(Answer::Refused(invalid_input(call.tool)));
-        };
-        let answer = match self
-            .client
-            .timeline(
-                &entry.credential,
-                &MemoryTimeline {
+        let namespaces = chosen.iter().map(|entry| entry.namespace).collect();
+        let mut hits = Vec::new();
+        let mut exposed = AccessLevel::PUBLIC;
+        for entry in chosen {
+            let answer = match self
+                .client
+                .timeline(
+                    &entry.credential,
+                    &MemoryTimeline {
+                        namespace: entry.namespace,
+                        read_ceiling: ceiling_u8(access.read_ceiling),
+                        anchor: input.id,
+                        before: input.before,
+                        after: input.after,
+                    },
+                )
+                .await
+            {
+                Ok(answer) => answer,
+                Err(MemoryServiceError::NotFound) => continue,
+                Err(error) => return Ok(Answer::Refused(service_refusal(&error))),
+            };
+            exposed = exposed.max(service_level(answer.exposed_level)?);
+            for hit in answer.items {
+                exposed = exposed.max(service_level(hit.access_level)?);
+                hits.push(LabeledHit {
                     namespace: entry.namespace,
-                    read_ceiling: ceiling_u8(access.read_ceiling),
-                    anchor: input.id,
-                    before: input.before,
-                    after: input.after,
+                    label: entry.scope.label.clone(),
+                    hit,
+                });
+            }
+        }
+        if hits.is_empty() {
+            return Ok(Answer::Refused(not_found()));
+        }
+        let (result, refs) = bounded_hits(&hits)?;
+        self.persistence
+            .observe_memory_read(
+                fence,
+                call,
+                MemoryReadObservation {
+                    result,
+                    namespaces,
+                    exposed,
+                    read_ceiling: access.read_ceiling,
+                    items: refs,
                 },
             )
             .await
-        {
-            Ok(answer) => answer,
-            Err(MemoryServiceError::NotFound) => return Ok(Answer::Refused(not_found())),
-            Err(error) => return Ok(Answer::Refused(service_refusal(&error))),
-        };
-        let exposed = answer
-            .items
-            .iter()
-            .try_fold(service_level(answer.exposed_level)?, |level, hit| {
-                service_level(hit.access_level).map(|item| level.max(item))
-            })?;
-        let hits: Vec<(MemoryToolScope, MemoryHit)> = answer
-            .items
-            .into_iter()
-            .map(|hit| (entry.scope, hit))
-            .collect();
-        let (result, refs) = bounded_hits(&hits)?;
-        self.observe(fence, call, &access, result, exposed, refs)
-            .await
+            .map(Answer::Observed)
     }
 
     async fn details(
@@ -272,19 +277,32 @@ impl MemoryToolRuntime {
         let Some(input) = DetailsInput::parse(&call.arguments) else {
             return Ok(Answer::Refused(invalid_input(call.tool)));
         };
-        let scopes: Vec<MemoryToolScope> = input.items.iter().map(|(scope, _)| *scope).collect();
-        let chosen = match self.chosen(fence, &access, Some(scopes)).await {
-            Ok(chosen) => chosen,
-            Err(refusal) => return Ok(Answer::Refused(refusal)),
-        };
+        let chosen: Vec<_> = access
+            .scopes
+            .iter()
+            .filter(|entry| {
+                input
+                    .items
+                    .iter()
+                    .any(|(namespace, _)| *namespace == entry.namespace)
+            })
+            .collect();
+        if input
+            .items
+            .iter()
+            .any(|(namespace, _)| !chosen.iter().any(|entry| entry.namespace == *namespace))
+        {
+            return Ok(Answer::Refused(scope_unavailable()));
+        }
+        let namespaces = chosen.iter().map(|entry| entry.namespace).collect();
         let ceiling = ceiling_u8(access.read_ceiling);
-        let mut fetched: Vec<(MemoryToolScope, MemoryDetail)> = Vec::new();
+        let mut fetched: Vec<LabeledDetail> = Vec::new();
         let mut exposed = AccessLevel::PUBLIC;
         for entry in &chosen {
             let ids: Vec<Uuid> = input
                 .items
                 .iter()
-                .filter(|(scope, _)| *scope == entry.scope)
+                .filter(|(namespace, _)| *namespace == entry.namespace)
                 .map(|(_, id)| *id)
                 .collect();
             if ids.is_empty() {
@@ -301,64 +319,51 @@ impl MemoryToolRuntime {
             exposed = exposed.max(service_level(answer.exposed_level)?);
             for detail in answer.items {
                 exposed = exposed.max(service_level(detail.access_level)?);
-                fetched.push((entry.scope, detail));
+                fetched.push(LabeledDetail {
+                    namespace: entry.namespace,
+                    label: entry.scope.label.clone(),
+                    detail,
+                });
             }
         }
-        // Requested order; ids the reader may not see are simply absent (no existence oracle).
-        fetched.sort_by_key(|(scope, detail)| {
-            input
-                .items
-                .iter()
-                .position(|item| *item == (*scope, detail.observation_id))
-        });
-        let max = result_bound();
-        let mut kept: Vec<Value> = Vec::new();
-        let mut refs = Vec::new();
-        for (scope, detail) in &fetched {
-            kept.push(detail_json(*scope, detail));
-            let candidate = json!({"items": kept, "omitted": fetched.len() - kept.len()});
-            if candidate.to_string().len() > max {
-                kept.pop();
-                break;
-            }
-            refs.push(MemoryRecallRef::detail(*scope, detail)?);
-        }
-        let omitted = fetched.len() - kept.len();
-        let result = json!({"items": kept, "omitted": omitted});
-        self.observe(fence, call, &access, result, exposed, refs)
+        let (result, refs) = bounded_details(&mut fetched, &input.items)?;
+        self.persistence
+            .observe_memory_read(
+                fence,
+                call,
+                MemoryReadObservation {
+                    result,
+                    namespaces,
+                    exposed,
+                    read_ceiling: access.read_ceiling,
+                    items: refs,
+                },
+            )
             .await
+            .map(Answer::Observed)
     }
 
-    async fn save(
-        &self,
-        fence: WorkflowFence,
-        call: &MemoryToolCall,
-        access: &MemoryToolAccess,
-    ) -> AppResult<Answer> {
+    async fn save(&self, fence: WorkflowFence, call: &MemoryToolCall) -> AppResult<Answer> {
         let Some(input) = SaveInput::parse(&call.arguments) else {
             return Ok(Answer::Refused(invalid_input(call.tool)));
         };
-        if !access.scopes.iter().any(|entry| entry.scope == input.scope)
-            && !access.not_ready.contains(&input.scope)
-        {
-            return Ok(Answer::Refused(tool_error(
-                "memory.scope_unavailable",
-                "That memory scope is not available in this conversation",
-            )));
-        }
-        match self
-            .persistence
-            .save_memory(fence, call, input.scope, input.facts)
-            .await?
-        {
+        match self.persistence.save_memory(fence, call, input).await? {
             MemorySaveOutcome::Accepted(receipt) => Ok(Answer::Observed(receipt)),
             MemorySaveOutcome::NotEnabled => Ok(Answer::Refused(not_enabled())),
             MemorySaveOutcome::ScopeNotAllowed => Ok(Answer::Refused(tool_error(
                 "memory.scope_unavailable",
                 "That memory scope is not available in this conversation",
             ))),
+            MemorySaveOutcome::SubjectNotAllowed => Ok(Answer::Refused(tool_error(
+                "memory.subject_unavailable",
+                "That subject is not visible in this conversation",
+            ))),
             MemorySaveOutcome::NotReady(scope) => {
-                if let Err(error) = self.persistence.provision_memory_scope(fence, scope).await {
+                if let Err(error) = self
+                    .persistence
+                    .provision_memory_scope(fence, scope.owner)
+                    .await
+                {
                     tracing::warn!(error = %error, "Memory namespace provisioning request failed");
                 }
                 Ok(Answer::Refused(tool_error(
@@ -367,31 +372,6 @@ impl MemoryToolRuntime {
                 )))
             }
         }
-    }
-
-    async fn observe(
-        &self,
-        fence: WorkflowFence,
-        call: &MemoryToolCall,
-        access: &MemoryToolAccess,
-        result: Value,
-        exposed: AccessLevel,
-        items: Vec<MemoryRecallRef>,
-    ) -> AppResult<Answer> {
-        let result = self
-            .persistence
-            .observe_memory_read(
-                fence,
-                call,
-                MemoryReadObservation {
-                    result,
-                    exposed,
-                    read_ceiling: access.read_ceiling,
-                    items,
-                },
-            )
-            .await?;
-        Ok(Answer::Observed(result))
     }
 }
 
@@ -414,23 +394,7 @@ impl SearchInput {
         if query.trim().is_empty() || query.chars().count() as u64 > MAX_QUERY_CHARS {
             return None;
         }
-        let scopes = match object.get("scopes") {
-            None => None,
-            Some(scopes) => {
-                let mut parsed = Vec::new();
-                for scope in scopes.as_array()? {
-                    let scope = MemoryToolScope::parse(scope.as_str()?)?;
-                    if parsed.contains(&scope) {
-                        return None;
-                    }
-                    parsed.push(scope);
-                }
-                if parsed.is_empty() {
-                    return None;
-                }
-                Some(parsed)
-            }
-        };
+        let scopes = parse_scopes(object.get("scopes"))?;
         let limit = match object.get("limit") {
             None => 5,
             Some(limit) => limit
@@ -446,7 +410,7 @@ impl SearchInput {
 }
 
 struct TimelineInput {
-    scope: MemoryToolScope,
+    scopes: Option<Vec<MemoryToolScope>>,
     id: Uuid,
     before: u32,
     after: u32,
@@ -457,7 +421,7 @@ impl TimelineInput {
         let object = arguments.as_object()?;
         if object
             .keys()
-            .any(|key| !matches!(key.as_str(), "scope" | "id" | "before" | "after"))
+            .any(|key| !matches!(key.as_str(), "scopes" | "id" | "before" | "after"))
         {
             return None;
         }
@@ -466,7 +430,7 @@ impl TimelineInput {
             Some(value) => value.as_u64().filter(|side| *side <= MAX_TIMELINE_SIDE),
         };
         Some(Self {
-            scope: MemoryToolScope::parse(object.get("scope")?.as_str()?)?,
+            scopes: parse_scopes(object.get("scopes"))?,
             id: Uuid::parse_str(object.get("id")?.as_str()?).ok()?,
             before: side("before")? as u32,
             after: side("after")? as u32,
@@ -475,7 +439,7 @@ impl TimelineInput {
 }
 
 struct DetailsInput {
-    items: Vec<(MemoryToolScope, Uuid)>,
+    items: Vec<(NamespaceExternalId, Uuid)>,
 }
 
 impl DetailsInput {
@@ -493,12 +457,12 @@ impl DetailsInput {
             let item = item.as_object()?;
             if item
                 .keys()
-                .any(|key| !matches!(key.as_str(), "scope" | "id"))
+                .any(|key| !matches!(key.as_str(), "namespace" | "id"))
             {
                 return None;
             }
             let entry = (
-                MemoryToolScope::parse(item.get("scope")?.as_str()?)?,
+                NamespaceExternalId(Uuid::parse_str(item.get("namespace")?.as_str()?).ok()?),
                 Uuid::parse_str(item.get("id")?.as_str()?).ok()?,
             );
             if !items.contains(&entry) {
@@ -509,17 +473,14 @@ impl DetailsInput {
     }
 }
 
-struct SaveInput {
-    scope: MemoryToolScope,
-    facts: Vec<String>,
-}
+type SaveInput = MemoryToolSave;
 
 impl SaveInput {
     fn parse(arguments: &Value) -> Option<Self> {
         let object = arguments.as_object()?;
         if object
             .keys()
-            .any(|key| !matches!(key.as_str(), "facts" | "scope"))
+            .any(|key| !matches!(key.as_str(), "facts" | "scope" | "subject"))
         {
             return None;
         }
@@ -527,46 +488,153 @@ impl SaveInput {
         if raw.is_empty() || raw.len() as u64 > MAX_FACTS {
             return None;
         }
-        let mut facts = Vec::new();
-        for fact in raw {
-            let fact = fact.as_str()?;
-            if fact.trim().is_empty() || fact.chars().count() as u64 > MAX_FACT_CHARS {
-                return None;
-            }
-            facts.push(fact.to_owned());
-        }
-        let scope = match object.get("scope") {
-            None => MemoryToolScope::Agent,
-            Some(scope) => match MemoryToolScope::parse(scope.as_str()?)? {
-                MemoryToolScope::Company => return None,
-                scope => scope,
+        let facts = raw
+            .iter()
+            .map(|fact| {
+                let fact = fact.as_str()?;
+                (!fact.trim().is_empty() && fact.chars().count() as u64 <= MAX_FACT_CHARS)
+                    .then(|| fact.to_owned())
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let target = match object.get("scope") {
+            None => MemorySaveTarget::Default,
+            Some(value) => match value.as_str()? {
+                "unit" => MemorySaveTarget::Unit,
+                "personal" => MemorySaveTarget::Personal,
+                _ => return None,
             },
         };
-        Some(Self { scope, facts })
+        let subject = match object.get("subject") {
+            None => None,
+            Some(value) => Some(crate::entities::transport::PrincipalId::new(
+                Uuid::parse_str(value.as_str()?).ok()?,
+            )),
+        };
+        Some(Self {
+            target,
+            facts,
+            subject,
+        })
     }
 }
 
-fn hit_json(scope: MemoryToolScope, hit: &MemoryHit) -> Value {
-    json!({"scope": scope.label(), "id": hit.observation_id, "revision": hit.revision,
+fn parse_scopes(value: Option<&Value>) -> Option<Option<Vec<MemoryToolScope>>> {
+    let Some(value) = value else {
+        return Some(None);
+    };
+    let values = value.as_array()?;
+    if values.is_empty() || values.len() > MemoryToolScope::ALL.len() {
+        return None;
+    }
+    let mut scopes = Vec::new();
+    for value in values {
+        let scope = MemoryToolScope::parse(value.as_str()?)?;
+        if scopes.contains(&scope) {
+            return None;
+        }
+        scopes.push(scope);
+    }
+    Some(Some(scopes))
+}
+
+struct LabeledHit {
+    namespace: NamespaceExternalId,
+    label: String,
+    hit: MemoryHit,
+}
+
+struct LabeledDetail {
+    namespace: NamespaceExternalId,
+    label: String,
+    detail: MemoryDetail,
+}
+
+fn hit_json(item: &LabeledHit) -> Value {
+    let hit = &item.hit;
+    json!({"scope": item.label,"namespace":item.namespace, "id": hit.observation_id, "revision": hit.revision,
         "kind": hit.kind, "title": hit.title, "snippet": hit.snippet,
         "occurred_at": hit.occurred_at.to_rfc3339(), "access_level": hit.access_level})
 }
 
-fn detail_json(scope: MemoryToolScope, detail: &MemoryDetail) -> Value {
-    json!({"scope": scope.label(), "id": detail.observation_id, "revision": detail.revision,
+fn detail_json(item: &LabeledDetail) -> Value {
+    let detail = &item.detail;
+    json!({"scope": item.label,"namespace":item.namespace, "id": detail.observation_id, "revision": detail.revision,
         "kind": detail.kind, "title": detail.title, "text": detail.body,
         "occurred_at": detail.occurred_at.to_rfc3339(), "access_level": detail.access_level})
 }
 
-/// The hits that fit the tool-result bound, trailing ones dropped, with a reference for each
-/// kept one. The run is still raised to the level of everything the service returned
-/// (conservative, like `memory.load`).
-fn bounded_hits(hits: &[(MemoryToolScope, MemoryHit)]) -> AppResult<(Value, Vec<MemoryRecallRef>)> {
-    let max = result_bound();
-    let mut items: Vec<Value> = hits
+/// Interleave namespaces before applying the shared limit, preserving every
+/// response's exposed level.
+fn merge_searches(
+    answers: Vec<(&ScopeAccess, MemorySearchResult)>,
+    limit: u32,
+) -> AppResult<(Vec<LabeledHit>, AccessLevel)> {
+    let exposed = answers
         .iter()
-        .map(|(scope, hit)| hit_json(*scope, hit))
+        .try_fold(AccessLevel::PUBLIC, |level, (_, result)| {
+            service_level(result.exposed_level).map(|value| level.max(value))
+        })?;
+    let mut queues: Vec<_> = answers
+        .into_iter()
+        .map(|(scope, result)| (scope, result.items.into_iter()))
         .collect();
+    let mut merged = Vec::new();
+    while merged.len() < limit as usize {
+        let mut progressed = false;
+        for (scope, items) in &mut queues {
+            if merged.len() == limit as usize {
+                break;
+            }
+            if let Some(hit) = items.next() {
+                merged.push(LabeledHit {
+                    namespace: scope.namespace,
+                    label: scope.scope.label.clone(),
+                    hit,
+                });
+                progressed = true;
+            }
+        }
+        if !progressed {
+            break;
+        }
+    }
+    let exposed = merged.iter().try_fold(exposed, |level, item| {
+        service_level(item.hit.access_level).map(|value| level.max(value))
+    })?;
+    Ok((merged, exposed))
+}
+
+fn bounded_details(
+    fetched: &mut [LabeledDetail],
+    requested: &[(NamespaceExternalId, Uuid)],
+) -> AppResult<(Value, Vec<MemoryRecallRef>)> {
+    // Unreadable IDs are absent; preserve the caller's order without an existence oracle.
+    fetched.sort_by_key(|item| {
+        requested
+            .iter()
+            .position(|wanted| *wanted == (item.namespace, item.detail.observation_id))
+    });
+    let max = result_bound();
+    let mut kept: Vec<Value> = Vec::new();
+    let mut refs = Vec::new();
+    for item in fetched.iter() {
+        kept.push(detail_json(item));
+        let candidate = json!({"items": kept, "omitted": fetched.len() - kept.len()});
+        if candidate.to_string().len() > max {
+            kept.pop();
+            break;
+        }
+        refs.push(MemoryRecallRef::detail(item.namespace, &item.detail)?);
+    }
+    let omitted = fetched.len() - kept.len();
+    let result = json!({"items": kept, "omitted": omitted});
+    Ok((result, refs))
+}
+
+/// Keep whole hits within the result bound, with a reference for each retained hit.
+fn bounded_hits(hits: &[LabeledHit]) -> AppResult<(Value, Vec<MemoryRecallRef>)> {
+    let max = result_bound();
+    let mut items: Vec<Value> = hits.iter().map(hit_json).collect();
     let mut result = json!({"items": items});
     while result.to_string().len() > max && !items.is_empty() {
         items.pop();
@@ -574,7 +642,7 @@ fn bounded_hits(hits: &[(MemoryToolScope, MemoryHit)]) -> AppResult<(Value, Vec<
     }
     let refs = hits[..items.len()]
         .iter()
-        .map(|(scope, hit)| MemoryRecallRef::hit(*scope, hit))
+        .map(|item| MemoryRecallRef::hit(item.namespace, &item.hit))
         .collect::<AppResult<_>>()?;
     Ok((result, refs))
 }
@@ -593,14 +661,14 @@ fn invalid_input(tool: MemoryTool) -> Value {
         "memory.invalid_input",
         match tool {
             MemoryTool::Search => {
-                "Give a query of 1–1024 characters, optional scopes from company, agent and user, and an optional limit of 1–10"
+                "Give a query of 1–1024 characters, optional scopes from personal, unit, ancestors and reports, and an optional limit of 1–10"
             }
             MemoryTool::Timeline => {
-                "Give a scope, a memory id from search_memory, and optional before/after counts of 0–5"
+                "Give a memory id from search_memory, optional scopes, and optional before/after counts of 0–5"
             }
-            MemoryTool::Details => "Give 1–4 items, each with a scope and a memory id",
+            MemoryTool::Details => "Give 1–4 items, each with a namespace and a memory id",
             MemoryTool::Save => {
-                "Give 1–8 facts of 1–4096 characters each, and optionally scope agent or user"
+                "Give 1–8 facts of 1–4096 characters each, and optionally scope unit or personal and a visible principal subject"
             }
         },
     )
@@ -610,6 +678,13 @@ fn not_enabled() -> Value {
     tool_error(
         "memory.not_enabled",
         "Memory is not enabled for this company",
+    )
+}
+
+fn scope_unavailable() -> Value {
+    tool_error(
+        "memory.scope_unavailable",
+        "That memory scope is not available in this conversation",
     )
 }
 

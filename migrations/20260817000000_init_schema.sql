@@ -12196,6 +12196,7 @@ CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDA
 CREATE TABLE public.knowledge_documents (
     id uuid PRIMARY KEY,
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    unit_id uuid NOT NULL,
     name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 253),
     name_key text COLLATE "C" GENERATED ALWAYS AS (casefold(name COLLATE pg_unicode_fast)) STORED,
     access_level public.access_level NOT NULL,
@@ -12205,8 +12206,9 @@ CREATE TABLE public.knowledge_documents (
     revision bigint NOT NULL DEFAULT 1 CHECK (revision>0),
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id,name_key,access_level),
-    UNIQUE (company_id,id,access_level)
+    UNIQUE (company_id,unit_id,name_key,access_level),
+    UNIQUE (company_id,id,access_level),
+    UNIQUE (company_id,id,unit_id,access_level)
 );
 
 CREATE FUNCTION public.knowledge_embedding_is_valid(vector real[]) RETURNS boolean
@@ -12224,6 +12226,7 @@ CREATE TABLE public.knowledge_chunks (
     id uuid PRIMARY KEY,
     company_id uuid NOT NULL,
     document_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
     access_level public.access_level NOT NULL,
     ordinal integer NOT NULL CHECK (ordinal>=0 AND ordinal<4096),
     heading text CHECK (octet_length(heading)<=2048),
@@ -12232,8 +12235,8 @@ CREATE TABLE public.knowledge_chunks (
     embedding real[] NOT NULL CHECK (public.knowledge_embedding_is_valid(embedding)),
     search_text tsvector GENERATED ALWAYS AS
         (to_tsvector('simple',coalesce(heading,'') || ' ' || body)) STORED,
-    FOREIGN KEY (company_id,document_id,access_level)
-        REFERENCES public.knowledge_documents(company_id,id,access_level)
+    FOREIGN KEY (company_id,document_id,unit_id,access_level)
+        REFERENCES public.knowledge_documents(company_id,id,unit_id,access_level)
         ON UPDATE CASCADE ON DELETE CASCADE,
     UNIQUE (document_id,ordinal)
 );
@@ -12241,6 +12244,41 @@ CREATE INDEX knowledge_chunks_search_idx ON public.knowledge_chunks(company_id,e
 
 -- Search saves the canonical harness result and its classification in the same transaction.
 -- Each new/replayed consumption also proves its actual attempt is still live at COMMIT.
+CREATE FUNCTION public.knowledge_source_items_valid(result jsonb, items jsonb, units uuid[], level smallint)
+RETURNS boolean LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE item jsonb; highest smallint := 0;
+BEGIN
+    IF result IS NULL OR items IS NULL OR units IS NULL OR level IS NULL
+        OR jsonb_typeof(items) IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+    IF octet_length(items::text)>4096 THEN RETURN false; END IF;
+    IF cardinality(units)>256
+        OR (cardinality(units)>0 AND (array_ndims(units)<>1 OR array_lower(units,1)<>1)) THEN RETURN false; END IF;
+    IF array_position(units,NULL) IS NOT NULL
+        OR units IS DISTINCT FROM ARRAY(SELECT DISTINCT unit FROM unnest(units) AS selected(unit) ORDER BY unit)
+        OR jsonb_array_length(items)>8 THEN RETURN false; END IF;
+    IF result ? 'passages' THEN
+        IF jsonb_typeof(result->'passages') IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+        IF jsonb_array_length(result->'passages')<>jsonb_array_length(items) THEN RETURN false; END IF;
+    ELSIF jsonb_typeof(result->'error') IS DISTINCT FROM 'object' OR jsonb_array_length(items)<>0 THEN
+        RETURN false;
+    END IF;
+    FOR item IN SELECT value FROM jsonb_array_elements(items) AS source(value) LOOP
+        IF jsonb_typeof(item) IS DISTINCT FROM 'object' THEN RETURN false; END IF;
+        IF (SELECT count(*) FROM jsonb_object_keys(item))<>4
+            OR jsonb_typeof(item->'document_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'chunk_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'unit_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'access_level') IS DISTINCT FROM 'number' THEN RETURN false; END IF;
+        IF (item->>'document_id')::uuid='00000000-0000-0000-0000-000000000000'::uuid
+            OR (item->>'chunk_id')::uuid='00000000-0000-0000-0000-000000000000'::uuid
+            OR NOT ((item->>'unit_id')::uuid=ANY(units))
+            OR (item->>'access_level')::smallint NOT BETWEEN 0 AND 9 THEN RETURN false; END IF;
+        highest := greatest(highest,(item->>'access_level')::smallint);
+    END LOOP;
+    RETURN highest=level;
+EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN RETURN false;
+END $$;
+
 CREATE TABLE public.workflow_knowledge_consumptions (
     company_id uuid NOT NULL,
     run_id uuid NOT NULL,
@@ -12254,6 +12292,9 @@ CREATE TABLE public.workflow_knowledge_consumptions (
     content_level public.access_level NOT NULL,
     -- jsonb's spacing differs from the compact 65536-byte application result representation.
     result jsonb NOT NULL CHECK (jsonb_typeof(result)='object' AND octet_length(result::text)<=131072),
+    queried_unit_ids uuid[] NOT NULL,
+    source_items jsonb NOT NULL,
+    CHECK (public.knowledge_source_items_valid(result,source_items,queried_unit_ids,content_level::smallint)),
     PRIMARY KEY (company_id,run_id,execution_id,job_id,attempt_number,invocation_id),
     FOREIGN KEY (company_id,run_id,execution_id)
         REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
@@ -12293,12 +12334,30 @@ BEGIN
         JOIN public.task_harness_runs AS harness ON harness.company_id=job.company_id AND harness.task_id=job.id
             AND harness.id=NEW.checkpoint_id AND harness.workflow_run_id=run.id
             AND harness.workflow_execution_id=execution.id
+        JOIN public.principals AS actor ON actor.company_id=run.company_id AND actor.kind='agent'
+            AND actor.agent_id::text=harness.workflow_prepared->'selection'->>'agent'
+        LEFT JOIN LATERAL (
+            SELECT array_agg(scope.unit_id ORDER BY scope.unit_id) AS units,bool_and(unit.id IS NOT NULL) AS live
+            FROM public.workflow_run_scopes AS scope
+            JOIN public.workflow_run_scope_snapshots AS snapshot ON snapshot.company_id=scope.company_id
+                AND snapshot.run_id=scope.run_id AND snapshot.state='available'
+            LEFT JOIN public.departments AS unit ON unit.company_id=scope.company_id AND unit.id=scope.unit_id
+            WHERE scope.company_id=run.company_id AND scope.run_id=run.id
+                AND scope.acting_principal_id=actor.id AND scope.access='read'
+        ) AS knowledge ON true
         WHERE job.company_id=NEW.company_id AND job.id=NEW.job_id AND execution.id=NEW.execution_id AND run.id=NEW.run_id
             AND job.status='processing' AND job.worker_id=NEW.worker_id
             AND job.execution_generation=NEW.execution_generation AND job.attempt_ordinal=NEW.attempt_number
             AND job.lock_expires_at>clock_timestamp() AND execution.completed_at IS NULL
             AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
             AND run.content_level>=NEW.content_level
+            AND (
+                (knowledge.live AND cardinality(knowledge.units)>0 AND NEW.queried_unit_ids=knowledge.units)
+                OR ((knowledge.units IS NULL OR NOT knowledge.live)
+                    AND NEW.queried_unit_ids='{}'::uuid[] AND NEW.source_items='[]'::jsonb AND NEW.content_level=0
+                    AND NEW.result=jsonb_build_object('error',jsonb_build_object('code','knowledge.scope_unavailable',
+                        'message','Knowledge scopes are unavailable for this run')))
+            )
             AND EXISTS (
                 SELECT 1 FROM jsonb_array_elements(harness.checkpoint->'invocations') AS saved(invocation)
                 WHERE invocation->'call'->>'invocation_id'=NEW.invocation_id::text
@@ -14789,7 +14848,7 @@ RETURNS boolean LANGUAGE sql VOLATILE AS $$
         WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
             AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
             AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
-            AND checkpoint.workflow_prepared->>'version'='7'
+            AND checkpoint.workflow_prepared->>'version'='8'
             AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
                 OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
             AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
@@ -14861,7 +14920,7 @@ BEGIN
           AND execution.completed_at IS NULL FOR SHARE OF run NOWAIT;
     PERFORM 1 FROM public.agent_history_conversations WHERE company_id=owner.company_id
         AND id=owner.conversation_id AND active_exchange_id=owner.id FOR UPDATE;
-    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '7'
+    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '8'
         OR document->>'mcp_error_policy' NOT IN ('observe','fail_step')
         OR document->>'mcp_error_policy' IS DISTINCT FROM
             (CASE WHEN source.frozen_inputs ? 'mcp_error_policy'
@@ -15727,6 +15786,9 @@ $$;
 ALTER TABLE ONLY public.channels
     ADD CONSTRAINT channels_department_fk FOREIGN KEY (company_id, department_id)
         REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.knowledge_documents
+    ADD CONSTRAINT knowledge_documents_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
 CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id);
 
 -- Why `checked_department` may not sit under `proposed_parent`, or NULL when it may: 'cycle' when
@@ -15902,31 +15964,76 @@ CREATE TABLE public.memory_tenants (
     changed_by uuid NOT NULL,
     changed_at timestamptz NOT NULL
 );
+-- Shared owner lock protocol for application ensures and direct namespace writes. The
+-- metadata probe chooses the prefix only; the final locked read authenticates it.
+CREATE FUNCTION public.memory_lock_namespace_owner(company uuid, unit uuid, actor uuid)
+RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE owner_kind text; owner_user uuid; owner_agent uuid; found_owner uuid;
+BEGIN
+    IF num_nonnulls(unit,actor) <> 1 THEN RETURN false; END IF;
+    IF actor IS NOT NULL THEN
+        SELECT principal.kind,principal.user_id,principal.agent_id
+          INTO owner_kind,owner_user,owner_agent FROM public.principals AS principal
+         WHERE principal.company_id=company AND principal.id=actor;
+        IF owner_kind IS NULL OR owner_kind NOT IN ('person','agent') THEN RETURN false; END IF;
+        IF owner_user IS NOT NULL THEN
+            PERFORM 1 FROM public.users WHERE id=owner_user FOR SHARE;
+            IF NOT FOUND THEN RETURN false; END IF;
+        END IF;
+    END IF;
+    PERFORM 1 FROM public.companies WHERE id=company FOR SHARE;
+    IF NOT FOUND THEN RETURN false; END IF;
+    IF unit IS NOT NULL THEN
+        SELECT department.id INTO found_owner FROM public.departments AS department
+         WHERE department.company_id=company AND department.id=unit FOR SHARE;
+        RETURN found_owner IS NOT NULL;
+    END IF;
+    IF owner_agent IS NOT NULL THEN
+        PERFORM 1 FROM public.agents WHERE company_id=company AND id=owner_agent FOR SHARE;
+        IF NOT FOUND THEN RETURN false; END IF;
+    END IF;
+    SELECT principal.id INTO found_owner FROM public.principals AS principal
+     WHERE principal.company_id=company AND principal.id=actor AND principal.kind=owner_kind
+       AND principal.user_id IS NOT DISTINCT FROM owner_user
+       AND principal.agent_id IS NOT DISTINCT FROM owner_agent FOR SHARE;
+    RETURN found_owner IS NOT NULL;
+END $$;
 CREATE TABLE public.memory_namespaces (
     company_id uuid NOT NULL REFERENCES public.memory_tenants(company_id) ON DELETE CASCADE,
-    -- The service namespace external id: random, never an encoded scope.
+    -- Random opaque service identity; owner IDs survive their owner's deletion until cleanup.
     id uuid NOT NULL,
-    scope_kind text NOT NULL CHECK (scope_kind IN ('company', 'agent', 'user')),
-    -- Plain ids, not FKs: the owner may be deleted while removal is still reconciling, and the
-    -- owner-row lock protocol (E2) orders provisioning against that deletion instead.
-    agent_id uuid,
-    user_id uuid,
+    scope_kind text NOT NULL CHECK (scope_kind IN ('unit', 'principal')),
+    unit_id uuid,
+    principal_id uuid,
     state text NOT NULL CHECK (state IN ('provisioning', 'ready', 'removing')),
     credential_id uuid,
-    -- `enc:v2` under CredentialContext::memory_client_credential; the envelope records its key version.
     credential_envelope text CHECK (octet_length(credential_envelope) <= 4096),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (company_id, id),
-    CHECK ((scope_kind = 'company' AND agent_id IS NULL AND user_id IS NULL)
-        OR (scope_kind = 'agent' AND agent_id IS NOT NULL AND user_id IS NULL)
-        OR (scope_kind = 'user' AND agent_id IS NULL AND user_id IS NOT NULL)),
+    CHECK ((scope_kind = 'unit' AND unit_id IS NOT NULL AND principal_id IS NULL)
+        OR (scope_kind = 'principal' AND principal_id IS NOT NULL AND unit_id IS NULL)),
     CHECK ((credential_id IS NULL) = (credential_envelope IS NULL)),
     CHECK (state <> 'ready' OR credential_id IS NOT NULL)
 );
--- One live namespace per scope; a returning agent or user gets a new row and id (E9).
 CREATE UNIQUE INDEX memory_namespaces_live_scope ON public.memory_namespaces (company_id, scope_kind,
-    COALESCE(agent_id, '00000000-0000-0000-0000-000000000000'::uuid),
-    COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE state <> 'removing';
+    COALESCE(unit_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(principal_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE state <> 'removing';
+CREATE FUNCTION public.guard_memory_namespace_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='UPDATE' THEN
+        IF (NEW.company_id,NEW.id,NEW.scope_kind,NEW.unit_id,NEW.principal_id)
+           IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.scope_kind,OLD.unit_id,OLD.principal_id) THEN
+            RAISE EXCEPTION 'Memory namespace ownership is immutable'
+                USING ERRCODE='23514',CONSTRAINT='memory_namespace_owner';
+        END IF;
+    ELSIF NOT public.memory_lock_namespace_owner(NEW.company_id,NEW.unit_id,NEW.principal_id) THEN
+        RAISE EXCEPTION 'Memory namespace owner is missing, foreign or ineligible'
+            USING ERRCODE='23514',CONSTRAINT='memory_namespace_owner';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_memory_namespace_owner BEFORE INSERT OR UPDATE ON public.memory_namespaces
+    FOR EACH ROW EXECUTE FUNCTION public.guard_memory_namespace_owner();
 -- Capture policy (E8, U3): per agent and conversation kind, off unless an owner or admin turns it
 -- on. Each change records who, why and when. An agent's final delete removes its rows; capture
 -- locks run → tenant → namespace → this row, so that cascade (after removal's namespace lock)
@@ -15953,7 +16060,7 @@ CREATE TABLE public.memory_lifecycles (
     company_id uuid NOT NULL,
     resource text NOT NULL CHECK (resource IN ('tenant', 'namespace')),
     namespace_id uuid,
-    owner_kind text NOT NULL CHECK (owner_kind IN ('company', 'agent', 'user')),
+    owner_kind text NOT NULL CHECK (owner_kind IN ('company', 'unit', 'principal')),
     owner_id uuid NOT NULL,
     provisioner_credential_id uuid NOT NULL,
     desired text NOT NULL CHECK (desired IN ('present', 'disabled', 'absent')),
@@ -15971,7 +16078,7 @@ CREATE TABLE public.memory_lifecycles (
     outcome_code text CHECK (outcome_code ~ '^[a-z_]{1,64}$'),
     updated_at timestamptz NOT NULL,
     CHECK ((resource = 'namespace') = (namespace_id IS NOT NULL)),
-    CHECK (resource <> 'tenant' OR owner_kind = 'company'),
+    CHECK ((resource = 'tenant') = (owner_kind = 'company')),
     CHECK (owner_kind <> 'company' OR owner_id = company_id),
     -- Only a claimed row carries lease data, and it carries all of it.
     CHECK ((state = 'claimed') = (lease_owner IS NOT NULL)),
@@ -15992,6 +16099,10 @@ CREATE TABLE public.memory_deliveries (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     id uuid NOT NULL,
     namespace_id uuid NOT NULL,
+    -- Retained provenance; owner and subject rows may disappear while delivery reconciles.
+    unit_id uuid,
+    principal_id uuid,
+    subject_principal_id uuid,
     kind text NOT NULL CHECK (kind IN ('save', 'generation')),
     -- Origin: a save comes from a run's execution (and, for a tool, its invocation); a
     -- generation from an agent-history exchange.
@@ -16075,6 +16186,8 @@ CREATE TABLE public.workflow_memory_consumptions (
     invocation_id uuid NOT NULL,
     read_ceiling public.access_level NOT NULL,
     exposed_level public.access_level NOT NULL,
+    namespace_ids uuid[] NOT NULL CHECK (cardinality(namespace_ids) BETWEEN 1 AND 258
+        AND array_position(namespace_ids,NULL) IS NULL),
     items jsonb NOT NULL CHECK (jsonb_typeof(items) = 'array' AND jsonb_array_length(items) <= 64
         AND octet_length(items::text) <= 65536),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -20072,3 +20185,204 @@ CREATE FUNCTION public.workflow_definition_management_role(
     )
     SELECT role FROM candidates WHERE role IS NOT NULL ORDER BY role LIMIT 1
 $$;
+
+-- Plan05 p02: an admission seals all actors' memory/knowledge topology together.
+-- Retained owner IDs intentionally have no live-owner FK: historical snapshots
+-- survive rename/retirement, and current readers still require a live owner.
+CREATE TABLE public.workflow_run_scope_snapshots (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    state text NOT NULL CHECK (state IN ('available','unavailable')),
+    reason text,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,run_id),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+    CHECK ((state='available' AND reason IS NULL)
+        OR (state='unavailable' AND reason='source_scope_unavailable'))
+);
+
+CREATE TABLE public.workflow_run_scopes (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    acting_principal_id uuid,
+    unit_id uuid,
+    principal_id uuid,
+    access text NOT NULL CHECK (access IN ('read','write','personal')),
+    unit_slug text,
+    chain_depth smallint CHECK (chain_depth BETWEEN 0 AND 7),
+    own boolean NOT NULL DEFAULT false,
+    ancestor boolean NOT NULL DEFAULT false,
+    report boolean NOT NULL DEFAULT false,
+    UNIQUE NULLS NOT DISTINCT (company_id,run_id,acting_principal_id,unit_id,principal_id,access),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_run_scope_snapshots(company_id,run_id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    CHECK ((access='personal' AND principal_id IS NOT NULL AND unit_id IS NULL
+            AND unit_slug IS NULL AND chain_depth IS NULL AND NOT own AND NOT ancestor AND NOT report)
+        OR (access IN ('read','write') AND unit_id IS NOT NULL AND principal_id IS NULL
+            AND unit_slug IS NOT NULL AND octet_length(unit_slug) BETWEEN 1 AND 63
+            AND unit_slug ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
+            AND (own OR ancestor OR report)
+            AND own=(chain_depth IS NOT NULL AND chain_depth=0)
+            AND (NOT own OR NOT ancestor)
+            AND (chain_depth IS NULL OR chain_depth=0 OR ancestor)
+            AND (access<>'write' OR own)))
+);
+CREATE INDEX workflow_run_scopes_actor ON public.workflow_run_scopes(company_id,run_id,acting_principal_id);
+
+-- One retained tuple representation also handles NULL base actors exactly.
+CREATE FUNCTION public.workflow_scope_tuples(tenant uuid, selected_run uuid)
+RETURNS TABLE(acting_principal_id uuid,unit_id uuid,principal_id uuid,access text,
+    unit_slug text,chain_depth smallint,own boolean,ancestor boolean,report boolean)
+LANGUAGE sql STABLE AS $$
+    SELECT scope.acting_principal_id,scope.unit_id,scope.principal_id,scope.access,
+        scope.unit_slug,scope.chain_depth,scope.own,scope.ancestor,scope.report
+    FROM public.workflow_run_scopes AS scope WHERE scope.company_id=tenant AND scope.run_id=selected_run
+$$;
+
+-- A broker's canonical native session supplies the source and harness. No caller
+-- can nominate an arbitrary source run or another actor's report group.
+CREATE FUNCTION public.workflow_native_scope_tuples(tenant uuid, source_run uuid, harness uuid, actor uuid)
+RETURNS TABLE(acting_principal_id uuid,unit_id uuid,principal_id uuid,access text,
+    unit_slug text,chain_depth smallint,own boolean,ancestor boolean,report boolean)
+LANGUAGE sql STABLE AS $$
+    SELECT scope.* FROM public.workflow_scope_tuples(tenant,source_run) AS scope
+    WHERE scope.acting_principal_id=harness
+        OR (scope.acting_principal_id IS NULL AND (scope.access<>'personal' OR EXISTS (
+            SELECT 1 FROM public.workflow_runs AS source
+            JOIN public.principals AS person ON person.company_id=source.company_id
+                AND person.id=scope.principal_id AND person.historical_person_user_id=actor
+            WHERE source.company_id=tenant AND source.id=source_run AND source.actor_id=actor)))
+$$;
+
+CREATE FUNCTION public.guard_workflow_scope_row() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
+    ) THEN RETURN OLD; END IF;
+    IF TG_OP<>'INSERT' THEN
+        RAISE EXCEPTION 'run scope snapshot is immutable' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_row';
+    END IF;
+    -- Read prefix matches native NOWAIT authority; the new run is the seal mutex.
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR SHARE NOWAIT;
+    PERFORM 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE NOWAIT;
+    IF NOT FOUND OR EXISTS (SELECT 1 FROM public.workflow_run_scope_snapshots
+        WHERE company_id=NEW.company_id AND run_id=NEW.run_id) THEN
+        RAISE EXCEPTION 'run scope cannot be appended after its seal' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_row';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_scope_row_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_scopes
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_scope_row();
+
+CREATE FUNCTION public.guard_workflow_scope_seal() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE admitted public.workflow_runs%ROWTYPE; inherited uuid; harness uuid; native_source uuid;
+    source_state text; expected_available boolean;
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
+    ) THEN RETURN OLD; END IF;
+    IF TG_OP<>'INSERT' THEN
+        RAISE EXCEPTION 'run scope seal is immutable' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_seal';
+    END IF;
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR SHARE NOWAIT;
+    SELECT * INTO admitted FROM public.workflow_runs
+        WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE NOWAIT;
+    IF NOT FOUND THEN RAISE EXCEPTION 'scope seal has no run' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    inherited := admitted.parent_run_id;
+    IF admitted.native_mcp_call_id IS NOT NULL THEN
+        SELECT session.workflow_run_id,principal.id INTO native_source,harness
+        FROM public.native_mcp_calls AS call
+        JOIN public.local_agent_sessions AS session ON session.company_id=call.company_id
+            AND session.id=call.source_session_id
+        LEFT JOIN public.principals AS principal ON principal.company_id=session.company_id
+            AND principal.agent_id=session.agent_id AND principal.kind='agent'
+        WHERE call.company_id=NEW.company_id AND call.id=admitted.native_mcp_call_id
+            AND call.run_id=admitted.id AND call.actor_id=admitted.actor_id;
+        IF NOT FOUND THEN RAISE EXCEPTION 'scope seal has no canonical native source' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    END IF;
+    IF inherited IS NOT NULL THEN
+        SELECT state INTO source_state FROM public.workflow_run_scope_snapshots
+            WHERE company_id=NEW.company_id AND run_id=inherited;
+        IF source_state IS DISTINCT FROM 'available' OR NEW.state<>'available'
+            OR admitted.actor_id IS DISTINCT FROM (SELECT actor_id FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=inherited) OR EXISTS (
+            (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id)
+                EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,inherited))
+            UNION ALL
+            (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,inherited)
+                EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id))
+        ) THEN RAISE EXCEPTION 'child scopes must exactly copy its sealed parent' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    ELSIF native_source IS NOT NULL THEN
+        SELECT state INTO source_state FROM public.workflow_run_scope_snapshots
+            WHERE company_id=NEW.company_id AND run_id=native_source;
+        expected_available := source_state='available' AND harness IS NOT NULL AND EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id
+                AND run_id=native_source AND acting_principal_id=harness AND access='personal'
+                AND principal_id=harness);
+        IF COALESCE(expected_available,false) THEN
+            IF NEW.state<>'available' OR EXISTS (
+                (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id)
+                    EXCEPT SELECT * FROM public.workflow_native_scope_tuples(NEW.company_id,native_source,harness,admitted.actor_id))
+                UNION ALL
+                (SELECT * FROM public.workflow_native_scope_tuples(NEW.company_id,native_source,harness,admitted.actor_id)
+                    EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id))
+            ) THEN RAISE EXCEPTION 'native scopes must copy its canonical harness projection' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+        ELSIF NEW.state<>'unavailable' OR EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id AND run_id=NEW.run_id
+        ) THEN RAISE EXCEPTION 'missing native source scope confers zero authority' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    ELSE
+        -- Fresh admission validates live owner identity, never a historical slug.
+        IF NEW.state<>'available' OR EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes AS scope
+            LEFT JOIN public.departments AS unit ON unit.company_id=scope.company_id AND unit.id=scope.unit_id
+            LEFT JOIN public.principals AS person ON person.company_id=scope.company_id AND person.id=scope.principal_id
+            LEFT JOIN public.principals AS acting ON acting.company_id=scope.company_id AND acting.id=scope.acting_principal_id
+            WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id
+                AND ((scope.unit_id IS NOT NULL AND (unit.id IS NULL OR unit.slug::text<>scope.unit_slug))
+                    OR (scope.principal_id IS NOT NULL AND (person.id IS NULL OR person.kind NOT IN ('person','agent')))
+                    OR (scope.acting_principal_id IS NOT NULL AND (acting.id IS NULL OR acting.kind<>'agent'))
+                    OR (scope.acting_principal_id IS NOT NULL AND scope.access='personal'
+                        AND scope.principal_id<>scope.acting_principal_id)
+                    OR (scope.acting_principal_id IS NULL AND scope.access='personal' AND (
+                        person.kind IS DISTINCT FROM 'person' OR person.user_id IS DISTINCT FROM admitted.actor_id
+                        OR NOT EXISTS (SELECT 1 FROM public.workflow_agent_sessions AS bound
+                            JOIN public.agent_history_sessions AS session ON session.company_id=bound.company_id AND session.id=bound.session_id
+                            JOIN public.workflow_admissions AS admission ON admission.company_id=bound.company_id AND admission.run_id=bound.run_id
+                            WHERE bound.company_id=NEW.company_id AND bound.run_id=NEW.run_id
+                                AND session.creator_user_id=admitted.actor_id AND session.channel_id IS NULL AND session.thread_id IS NULL
+                                AND jsonb_array_length(substring(admission.source_key FROM 4)::jsonb)=2
+                                AND substring(admission.source_key FROM 4)::jsonb->>0='manual')))))
+            OR NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS scope
+                JOIN public.departments AS root ON root.company_id=scope.company_id AND root.id=scope.unit_id AND root.is_root
+                WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id
+                    AND scope.acting_principal_id IS NULL AND scope.access='read')
+        THEN RAISE EXCEPTION 'fresh scope seal requires valid live owners and base root' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes AS scope
+        WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id AND scope.acting_principal_id IS NOT NULL
+            AND (NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS personal
+                WHERE personal.company_id=scope.company_id AND personal.run_id=scope.run_id
+                    AND personal.acting_principal_id=scope.acting_principal_id AND personal.access='personal'
+                    AND personal.principal_id=scope.acting_principal_id)
+                OR NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS readable
+                    JOIN public.departments AS root ON root.company_id=readable.company_id AND root.id=readable.unit_id AND root.is_root
+                    WHERE readable.company_id=scope.company_id AND readable.run_id=scope.run_id
+                        AND readable.acting_principal_id=scope.acting_principal_id AND readable.access='read'))
+    ) OR EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes AS scope
+        WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id AND scope.access='write'
+            AND NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS readable
+                WHERE readable.company_id=scope.company_id AND readable.run_id=scope.run_id
+                    AND readable.acting_principal_id IS NOT DISTINCT FROM scope.acting_principal_id
+                    AND readable.unit_id=scope.unit_id AND readable.access='read' AND readable.own)
+    ) OR EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id AND run_id=NEW.run_id
+            AND access='read' GROUP BY acting_principal_id HAVING count(*)>256
+    ) THEN RAISE EXCEPTION 'invalid write authority or read scope budget' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_scope_seal_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_scope_snapshots
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_scope_seal();

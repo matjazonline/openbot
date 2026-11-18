@@ -300,6 +300,7 @@ CREATE INDEX generation_operation_sources_by_source
     ON generation_operation_sources (tenant_id, source_id);
 
 CREATE TABLE observations (
+    subject text CHECK (subject ~ '^[A-Za-z0-9._:-]{1,128}$'),
     tenant_id uuid NOT NULL,
     namespace_id uuid NOT NULL,
     id uuid NOT NULL,
@@ -356,6 +357,7 @@ CREATE TABLE observations (
 );
 CREATE INDEX observations_search ON observations USING gin (search_tsv);
 CREATE INDEX observations_scope ON observations (tenant_id, namespace_id, access_level);
+CREATE INDEX observations_subject ON observations (tenant_id,namespace_id,subject,id) WHERE subject IS NOT NULL;
 CREATE INDEX observations_timeline ON observations (tenant_id, namespace_id, occurred_at, id);
 CREATE INDEX observations_index_due ON observations (next_index_at)
     WHERE index_state IN ('pending', 'failed');

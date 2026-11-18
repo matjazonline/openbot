@@ -85,6 +85,7 @@ pub(in crate::adapters::persistence) mod management;
 pub mod mcp;
 mod member_dependents;
 mod memory_steps;
+mod run_scopes;
 pub(crate) use member_dependents::{
     prelock_account_companies_on, refresh_account_dependents_on, refresh_member_dependents_on,
 };

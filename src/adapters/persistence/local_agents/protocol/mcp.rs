@@ -109,6 +109,7 @@ async fn owner_on(
         machine: authority.machine,
         installation: authority.session.installation_id,
         session: authority.session.id,
+        source: authority.session.association.clone(),
         harness: authority.session.harness.clone(),
         invocation: invocation.clone(),
         association,

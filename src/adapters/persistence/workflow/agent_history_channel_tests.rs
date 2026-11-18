@@ -209,7 +209,7 @@ mod retention;
 /// deployment's own delivery worker sends it to the fake service. Seeded rows stand in for an
 /// enabled tenant and a ready agent namespace (no lifecycle worker run is needed for that).
 #[tokio::test]
-async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_the_thread_level() {
+async fn memory_capture_a_thread_exchange_is_captured_into_the_unit_memory_at_the_thread_level() {
     use crate::adapters::memory_service::contract_fake::ContractFake;
     let fake = ContractFake::start(MEMORY_ADMIN).await;
     fake.state.lock().unwrap().generation_cap = 100_000;
@@ -238,12 +238,20 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
     let mut selected = example(1);
     prepend_agent(&mut selected);
     Box::pin(bind(&d, selected)).await;
+    let unit_namespace = ready_capture_unit(&d, &fake).await;
     let agents: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM agents WHERE company_id = $1")
         .bind(company)
         .fetch_all(pool)
         .await
         .unwrap();
     for agent in &agents {
+        let principal = crate::adapters::persistence::memory::agent_principal_on(
+            &mut pool.acquire().await.unwrap(),
+            company,
+            *agent,
+        )
+        .await
+        .unwrap();
         let namespace = Uuid::new_v4();
         let envelope = d
             .p()
@@ -257,13 +265,13 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
             )
             .unwrap();
         sqlx::query(
-            "INSERT INTO memory_namespaces (company_id, id, scope_kind, agent_id, state, \
+            "INSERT INTO memory_namespaces (company_id, id, scope_kind, principal_id, state, \
                credential_id, credential_envelope) \
-             VALUES ($1, $2, 'agent', $3, 'ready', gen_random_uuid(), $4)",
+             VALUES ($1, $2, 'principal', $3, 'ready', gen_random_uuid(), $4)",
         )
         .bind(company)
         .bind(namespace)
-        .bind(agent)
+        .bind(principal.as_uuid())
         .bind(envelope)
         .execute(pool)
         .await
@@ -299,17 +307,6 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
         json!(true),
         "armed at preparation"
     );
-    let (agent, namespace): (Uuid, Uuid) = sqlx::query_as(
-        "SELECT exchange.agent_id, namespace.id FROM agent_history_exchanges AS exchange \
-         JOIN memory_namespaces AS namespace ON namespace.company_id = exchange.company_id \
-           AND namespace.agent_id = exchange.agent_id \
-         WHERE exchange.company_id = $1 AND exchange.id = $2",
-    )
-    .bind(company)
-    .bind(exchange)
-    .fetch_one(pool)
-    .await
-    .unwrap();
     let state: String = sqlx::query_scalar(
         "SELECT state FROM memory_deliveries WHERE company_id = $1 AND kind = 'generation'",
     )
@@ -325,8 +322,8 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
     };
     assert_eq!(
         sent_to,
-        namespace.hyphenated().to_string(),
-        "agent {agent}'s own memory"
+        unit_namespace.hyphenated().to_string(),
+        "the frozen local unit receives thread learning"
     );
     assert_eq!(
         body["producing_ceiling"],
@@ -349,4 +346,35 @@ async fn memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_t
     );
     assert!(events.iter().all(|event| event["access_level"] == json!(0)));
     assert_eq!(d.llm.finish().await.unwrap(), 1);
+}
+
+async fn ready_capture_unit(
+    d: &Deployment,
+    fake: &crate::adapters::memory_service::contract_fake::ContractFake,
+) -> Uuid {
+    let company = d.fixture.target.company;
+    let root = crate::adapters::persistence::company::root_on(
+        &mut d.p().pool().acquire().await.unwrap(),
+        company,
+    )
+    .await
+    .unwrap();
+    let namespace = Uuid::new_v4();
+    let envelope = d
+        .p()
+        .credential_cipher()
+        .unwrap()
+        .seal_envelope(
+            &crate::adapters::persistence::credentials::CredentialContext::memory_client_credential(
+                company.as_uuid(),
+                namespace,
+            ),
+            &secrecy::SecretString::from(fake.client_token(company.as_uuid(), namespace)),
+        )
+        .unwrap();
+    sqlx::query("INSERT INTO memory_namespaces(company_id,id,scope_kind,unit_id,state,credential_id,credential_envelope)
+        VALUES($1,$2,'unit',$3,'ready',gen_random_uuid(),$4)")
+        .bind(company.as_uuid()).bind(namespace).bind(root.as_uuid()).bind(envelope)
+        .execute(d.p().pool()).await.unwrap();
+    namespace
 }

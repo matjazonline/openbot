@@ -15,6 +15,9 @@ mod descendants;
 #[path = "autonomous_agent_sample_closure_tests.rs"]
 mod samples;
 
+#[path = "autonomous_memory_scope_tests.rs"]
+mod memory_scopes;
+
 struct GraphWorkflow {
     workflow: WorkflowId,
     version: VersionId,
@@ -28,7 +31,7 @@ fn model_source(agent: &AgentKey, kind: ModelStep) -> Value {
     source
 }
 
-async fn publish_graph(setup: &AgentSetup, mut source: Value, params: Value) -> GraphWorkflow {
+async fn publish_graph_definition(setup: &AgentSetup, mut source: Value) -> GraphWorkflow {
     let p = &setup.fixture.persistence;
     let fixture = Fixture {
         _db: setup.fixture._db.clone(),
@@ -65,13 +68,41 @@ async fn publish_graph(setup: &AgentSetup, mut source: Value, params: Value) -> 
         actor: fixture.target.actor,
         binding: WorkflowBindingId::new(Uuid::new_v4()),
     };
+    GraphWorkflow {
+        workflow: fixture.target.workflow,
+        version,
+        binding: target,
+    }
+}
+
+async fn publish_graph(setup: &AgentSetup, source: Value, params: Value) -> GraphWorkflow {
+    let graph = Box::pin(publish_graph_definition(setup, source)).await;
+    Box::pin(activate_graph(
+        setup,
+        &graph,
+        params,
+        RelatedAssociation::Company,
+    ))
+    .await;
+    graph
+}
+
+async fn activate_graph(
+    setup: &AgentSetup,
+    graph: &GraphWorkflow,
+    params: Value,
+    association: RelatedAssociation,
+) {
+    let p = &setup.fixture.persistence;
+    let target = graph.binding;
+    let version = graph.version;
     let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = bindings
         .configure(ConfigureBinding {
             escalation: None,
             target,
             expected: None,
-            association: RelatedAssociation::Company,
+            association,
             version,
             params,
             resources: BTreeMap::new(),
@@ -87,11 +118,6 @@ async fn publish_graph(setup: &AgentSetup, mut source: Value, params: Value) -> 
         })
         .await
         .unwrap();
-    GraphWorkflow {
-        workflow: fixture.target.workflow,
-        version,
-        binding: target,
-    }
 }
 
 async fn register_child(setup: &AgentSetup, child: &GraphWorkflow, name: &str) -> AgentToolBinding {
