@@ -122,3 +122,9 @@ logs/B1-trail-disposition.md). R2 manifest logs/B1-R2.evidence.json validated (5
 logs/B1-R2-evidence-validation.txt). No Rust/DB rerun (docs-only; accepted p03 source proof reused
 with its retained 2 FAIL/27 ignored/85 Doop-filtered and native 404 limits). Coordination r18
 applicable notices satisfied. Status: accepted in phase; integration = commit + push main next.
+
+## Publication (2026-11-18)
+
+Accepted batch committed as 7f2a9cc1e58a3d675844a9684316cf625c89c3fb and normally pushed to
+main (3d7148b1..7f2a9cc1); git ls-remote confirms the exact SHA. Status: integrated. Plan05
+complete; STOP before Plan06. Reviewer agent finished; no p04 resources to clean up.

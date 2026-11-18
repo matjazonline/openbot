@@ -11,4 +11,6 @@
 - Retained limits: p03 full run 4706 PASS/2 FAIL/27 ignored/85 Doop-filtered; native fresh
   download 404 main-identical; Trail lexical conflict docs/departments.md:223 (disposition log).
 - Resources: none owned by p04. p02/p03 resources untouched.
-- Next: commit, push main, prove remote SHA (logs/B1-publication-*.txt), STOP before Plan06.
+- Integrated: commit 7f2a9cc1e58a3d675844a9684316cf625c89c3fb pushed to main; remote SHA confirmed
+  (logs/B1-publication-{push,remote}.txt). Plan05 p01–p04 complete and integrated.
+- STOPPED before Plan06 per user. Doop remains separate. No further action in this phase.

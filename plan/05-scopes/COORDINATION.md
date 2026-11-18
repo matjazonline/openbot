@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md
 - Writer: Claude Code root (Opus 5.5/high) in /Users/mac02/orca/workspaces/openbot/plan03-04
-- Revision: 19
+- Revision: 20
 
 ## Plan-wide instructions
 
@@ -44,7 +44,7 @@
 | p01 accepted in phase; main integration pending | root/A /root; B /root/p05_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p01/docs/{TASK,HANDOFF}.md |
 | p02 accepted and locally committed2edd0a73; main integration at03 | root/A /root; B /root/p05_reviewer | same sequential checkout | phases/p02/docs/{TASK,HANDOFF}.md |
 | p03 accepted/integrated main3d7148b1 | root/A /root; source B /root/p05_reviewer_62 | same sequential checkout | phases/p03/docs/{TASK,HANDOFF}.md |
-| p04 accepted (05SC-P04-B1-R2-N1 PASS, db7a281d…210f); main publication | root/A Claude Code root; B Fable 5.2/medium (implement-opus-reviewed-2_4) | same sequential checkout | phases/p04/docs/{TASK,HANDOFF}.md |
+| p04 accepted/integrated main7f2a9cc1 | root/A Claude Code root; B Fable 5.2/medium (implement-opus-reviewed-2_4) | same sequential checkout | phases/p04/docs/{TASK,HANDOFF}.md |
 
 ## Cross-phase notices
 
@@ -258,3 +258,9 @@
   C001–C004/r1, C005/r2, C006/r1 satisfied for documentation/evidence; C007 superseded (r18).
 - Next: commit, normal push to main, confirm remote SHA, then STOP before Plan06. Doop separate.
 - Revision19 changes execution status only, no active requirement.
+
+## Plan05 publication (revision20)
+
+- P04 commit 7f2a9cc1e58a3d675844a9684316cf625c89c3fb normally pushed to main; remote exact SHA
+  confirmed. Plan05 p01–p04 integrated. C001 satisfied: STOP before Plan06; Doop separate.
+- Revision20 changes publication status only.
