@@ -749,7 +749,7 @@ tenant and lets the lifecycle worker create it in the service under the configur
 credential. Disabling stops new memory work and disables the service tenant; data is retained. A
 run that was already shown memory fails with `memory.context_revoked` if it resumes after the
 disable.
-Deleting a company, agent, member or account records a durable request to delete the matching
+Deleting a company, department, agent, member or account records a durable request to delete the matching
 service tenant or namespace, which the worker sends after creating it first (so an earlier
 uncertain create cannot land later). An outage, a capacity refusal or a revoked provisioner
 credential is retried without limit, backing off to five minutes. A definite refusal ends the
@@ -776,6 +776,34 @@ read or saved; the step retries, then fails). Automatic recall and capture stop,
 with memory it was shown earlier retries `memory.context_unavailable` instead of showing it
 unchecked. Restore the URL, or disable memory in those companies, which removes the tools from the
 editor and refuses new publication.
+
+OpenBot derives `unit` namespaces from departments and `principal` namespaces from company people
+and agents; roles, desks and external correspondents own none. Namespace identities are recorded
+with their owners and reconciled by the lifecycle worker. The root is an ordinary unit inside
+the company tenant boundary. Run scopes are captured at admission; see
+[department memory and knowledge](departments.md#memory-and-knowledge) and the
+[agent tool vocabulary](agent-authoring.md#memory-and-knowledge-scopes).
+
+#### Memory about a person
+
+Explicit memory saves may attach an authorized principal UUID as `subject`. Operators can inspect
+and purge those tagged observations using the application's configured database, memory URL and
+provisioner credential:
+
+```sh
+open_bots memory subject list --company COMPANY_UUID --subject PRINCIPAL_UUID
+open_bots memory subject purge --company COMPANY_UUID --subject PRINCIPAL_UUID
+```
+
+These commands walk the company's unit namespaces through the service's managed subject API;
+they do not query the memory database directly. Output is JSON Lines with per-namespace results
+and a final `complete`, `progress` and `error` summary. Failure or the 60-second command deadline
+returns an unsuccessful exit with partial progress; rerun the same command to finish remaining
+records. A successful purge removes matching tagged observations, not personal namespaces,
+untagged facts, source messages, knowledge documents or context already retained by a run.
+The walk is paged across namespaces rather than globally atomic; a later save may add new facts.
+The service's [OpenBot integration notes](../services/memory/README.md#openbot-integration) describe
+the boundary.
 
 Capture (owner/admin, per agent, off by default) turns completed private-session or thread
 exchanges into generation requests. It runs only while the service reports a generation cap above

@@ -1,0 +1,13 @@
+base:   3d7148b1b496e491e139fc90e0534ef8d7d296ab
+digest: 499d9b65b220c1c968394cf561c3252ce9338c8876226019b65bb1b700761a42
+files:
+  docs/agent-authoring.md
+  docs/departments.md
+  docs/deploy.md
+  plan/05-scopes/04-integration-and-final-verification.md
+  plan/05-scopes/phases/p03/docs/HANDOFF.md
+  plan/05-scopes/phases/p03/docs/logs/B1-publication-precommit-snapshot.txt
+  plan/05-scopes/phases/p03/docs/logs/B1-publication-push.txt
+  plan/05-scopes/phases/p03/docs/logs/B1-publication-remote.txt
+  plan/05-scopes/README.md
+  services/memory/README.md

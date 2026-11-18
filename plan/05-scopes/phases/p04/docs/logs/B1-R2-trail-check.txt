@@ -1,0 +1,117 @@
+⬆ trail 0.29.0 → 0.30.5 available: run `trail upgrade` (restart your agent after).
+checking 11 changed files against 33 learnings and 4 skills
+
+✗ docs/departments.md:223
+  brings back input every selected, which Mac02's learning ruled out
+  Mac02 · Nov 17: Inputs therefore still looked valid while every
+  selected option vanished from its select.
+● docs/agent-authoring.md:10
+  brings back company memory tool, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: A real regression test admitted a company-wide root
+  with an own-unit memory tool descendant; the guard would otherwise
+  fail only when that descendant executed, after earlier effects could
+  occur.
+● docs/agent-authoring.md:77
+  brings back tool check miss, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Tool-port replay checks and a missing-scope-row
+  continuation test passed, but they did not cover a legitimate
+  department deletion that leaves historical scope rows intact.
+● docs/agent-authoring.md:79
+  brings back separate live read, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: The separate live sample caught BuffileRead during the
+  original insert.
+● docs/agent-authoring.md:79
+  brings back tool child agent, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Tool and child tests then stopped before the provider
+  with agent.unresolved or unused scripted exchanges.
+● docs/agent-authoring.md:79
+  brings back native source fact, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● docs/agent-authoring.md:79
+  brings back department principal root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● docs/agent-authoring.md:82
+  brings back actual child check, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: The inner privileged timer passed that actual-child
+  check.
+● docs/agent-authoring.md:102
+  brings back separate local key, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● docs/departments.md:208
+  brings back check root children, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Checking only the root PublishedBundle and its
+  children missed agent-tool workflow edges.
+● docs/departments.md:208
+  brings back native source fact, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● docs/departments.md:208
+  brings back company page name, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: The original 64 KiB cap rejected a schema-valid
+  100-company page with 120 four-byte Unicode characters per name: the
+  reviewer measured 73,530 serialized bytes before adding a cursor.
+● docs/departments.md:208
+  brings back department principal root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● docs/departments.md:212
+  brings back direct service exact, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Direct LaunchServices navigation downloaded the exact
+  artifact successfully within seconds.
+● docs/departments.md:214
+  brings back independent read another, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Independent review paused one real Chromium tab
+  between reading candidates and cleanup, let another tab persist a
+  new click, then resumed cleanup: the newer click was deleted.
+● docs/departments.md:218
+  brings back actual child check, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: The inner privileged timer passed that actual-child
+  check.
+● docs/departments.md:219
+  brings back check scope continuation, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Tool-port replay checks and a missing-scope-row
+  continuation test passed, but they did not cover a legitimate
+  department deletion that leaves historical scope rows intact.
+● docs/departments.md:222
+  brings back leave local path, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Shortening only a CI directory would leave other long
+  local paths broken.
+● docs/deploy.md:780
+  brings back document department fact, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: After a report document was moved and its empty
+  department deleted, the actual resumed runtime sent cached protected
+  facts to the scripted provider.
+● docs/deploy.md:780
+  brings back source fact ordinary, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+
+· 1 conflict · fix it, or say why in the commit message or PR description

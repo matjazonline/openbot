@@ -7,7 +7,8 @@ publishing them. A stale save keeps submitted fields for reconciliation with the
 
 Assign capabilities on the agent:
 
-- Built-ins provide message send/reply and knowledge search. Message authority still comes from
+- Built-ins provide message send/reply, knowledge search and, while company memory is enabled,
+  memory tools. Message authority still comes from
   the workflow's actual desk or principal target and source message. Ordinary edits cannot add Builder provisioning
   privileges; a trusted Builder copy may retain or drop its existing provisioning bindings.
 - HTTP choices identify a company connection and approved operation.
@@ -72,6 +73,62 @@ shared desk; it is optional. The Builder's `create_agent` provisions the same di
 while `create_desk_for_agent` creates a shared desk for an existing agent. Deleting an unused agent
 removes its owned direct binding and workflow. Retained direct threads, runs or other publication
 consumers refuse deletion, preserving history.
+
+## Memory and knowledge scopes
+
+Memory follows departments (`unit` namespaces) and live company people and agents (`principal`
+namespaces). Desks and roles own no memory. Enable memory in company Settings before publishing
+an agent that binds `search_memory`, `memory_timeline`, `memory_details` or `save_memory`.
+Assignments expose the tools; each call still needs its actual scope and current authority.
+
+Admission captures each acting agent's readable unit set separately: the desk's department,
+its ancestors to root, and direct children of departments where that agent holds `lead`.
+Another agent in the same workflow does not inherit those lead reads. Knowledge searches exactly
+that unit set; memory can also read the acting agent's personal namespace. A person's personal
+memory is available only through the existing authenticated own-session rule.
+
+A deskless run uses the agent's single unambiguous department placement when there is one.
+Otherwise it reads only the root, gains no lead direct-child reads, and its default write is
+personal. Retries and children keep captured placement; a workflow-origin native continuation
+reuses its source's captured scope and cannot replace missing historical context with freshly
+widened unit access. Current account, incarnation, audience, credential, source and lease
+checks continue to apply.
+
+For agent memory search and timeline, `scopes` accepts these selectors:
+
+| Selector | Selects within the captured scope |
+| --- | --- |
+| `personal` | Authorized principal memory, including a person's namespace only with own-session proof. |
+| `unit` | The local write unit, when one is resolved. |
+| `ancestors` | The rest of the captured local-to-root chain. |
+| `reports` | Direct-child units readable through this agent's lead roles. |
+
+Omit `scopes` to use all readable namespaces. For example, search with
+`{"query":"return policy","scopes":["unit","ancestors"]}`. Results label their scope, such as
+`unit:support` or `reports:returns`, and carry namespace-aware identities. Pass both identifiers
+to details: `{"items":[{"namespace":"NAMESPACE_UUID","id":"OBSERVATION_UUID"}]}`.
+Use the actual returned identifiers. `company` and `user` are no longer accepted selectors.
+
+Save accepts `facts`, optional `scope` (`unit` or `personal`), and optional `subject`. An omitted
+scope writes to the local unit, falling back to personal only when no local unit is resolved.
+An explicit `unit` save without a local unit is refused. Read permission on an ancestor or report
+unit gives no write permission there. For example,
+`{"facts":["Prefers email follow-up."],"scope":"unit","subject":"PRINCIPAL_UUID"}` tags a fact
+about a principal the run is authorized to see; `subject` does not change its owner or level.
+The [operator subject command](deploy.md#memory-about-a-person) can list or purge those tagged
+unit observations.
+
+Workflow `memory.load` and `memory.save` use strict scope literals: `{"unit":"own"}`,
+`{"unit":"root"}` or `{"agent":"agent_key"}`. Reads remain within the captured set;
+writes remain local or personal, so selecting root does not authorize an upward write from a
+child unit. A reachable `unit: own` step needs a local unit: activating a company-wide binding
+without a desk is refused with `binding.memory_scope_needs_desk`. The old `{"company":true}`
+form is removed.
+
+On a department desk the host context names the memory write unit and searchable knowledge units.
+Levels remain separate from placement: consuming a higher-level fact still raises the existing
+watermark and can withhold a lower-audience reply. Changing a lead or re-parenting a department
+moves no stored facts; later admissions use the new placement.
 
 ## Skill directories
 

@@ -1,0 +1,17 @@
+docs/departments.md -> agent-authoring.md#memory-and-knowledge-scopes
+docs/agent-authoring.md -> deploy.md#memory-about-a-person
+docs/deploy.md -> departments.md#memory-and-knowledge
+docs/deploy.md -> agent-authoring.md#memory-and-knowledge-scopes
+docs/deploy.md -> ../services/memory/README.md#openbot-integration
+services/memory/README.md -> ../../docs/departments.md#memory-and-knowledge
+services/memory/README.md -> ../../docs/agent-authoring.md#memory-and-knowledge-scopes
+services/memory/README.md -> ../../docs/deploy.md#memory-about-a-person
+plan/05-scopes/README.md -> phases/p04/docs/TASK.md
+plan/05-scopes/README.md -> ../../docs/departments.md#memory-and-knowledge
+plan/05-scopes/README.md -> ../../docs/agent-authoring.md#memory-and-knowledge-scopes
+plan/05-scopes/README.md -> ../../services/memory/README.md#openbot-integration
+plan/05-scopes/04-integration-and-final-verification.md -> phases/p01/docs/TASK.md
+plan/05-scopes/04-integration-and-final-verification.md -> phases/p02/docs/TASK.md
+plan/05-scopes/04-integration-and-final-verification.md -> phases/p03/docs/logs/B1-R2-final.evidence.json
+plan/05-scopes/04-integration-and-final-verification.md -> phases/p04/docs/TASK.md
+16 added local links/anchors PASS; five existing startup plan registrations/no-compatibility notes PASS; runtime/schema/dependency/script byte-identical to accepted03commit.

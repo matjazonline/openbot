@@ -36,3 +36,11 @@ logs/B1-R2-trail-disposition.md, fetch/merge only if needed, pushHEAD:main and p
 remoteSHA. Commit/push explicitly authorized. Record publication once, then start
 Plan05p04docs/evidence under its own records, independent review/publish, STOP
 before06. Source phase accepted; main integration/publication still pending here.
+
+## Publication completed
+
+Accepted source committed3d7148b1b496e491e139fc90e0534ef8d7d296ab and normally
+pushedHEAD:main. gitls-remote confirmed exact same SHA on refs/heads/main.
+B1-publication-{push,remote,precommit-snapshot}.txt retain proof. P01/p02/p03
+are integrated/published. P04now owns final docs/evidence and publication; no
+more p03source/record edits expected. Final known failure dispositions unchanged.

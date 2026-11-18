@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "round": "05SC-P04-B1-R2",
+  "artifact": "db7a281d2171092056186a794140a1c710c1b67174817a19e183457a5257210f",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "git diff --cached --check",
+      "fixture": "Current staged documentation/publication records only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC5"
+      ],
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/check-integration-docs.py",
+      "fixture": "Existing integration documentation boundary; no changed script/runtime",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-integration-docs.txt",
+          "sha256": "343d6a63877af585156726a735f57e3f8fe6fab25c0474f934715501d500d189"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "Python -I audit of new Markdown links/anchors, existing startup registrations, no-compatibility notes and git diff HEAD runtime/schema/dependency/script paths",
+      "fixture": "16added local links/anchors and five startup plan paths; exact runtime matches published03; R2 corrections add no links (one table row, one paragraph, one count); R1 audit reused",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-doc-contract-audit.txt",
+          "sha256": "f5d99dbaa09cc16d0ab63bbd37675a86b7908ceb9979680b12bce42017c8aa8e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "Retain exact accepted p03source/review/manifest identity and unchanged runtime audit",
+      "fixture": "Reuse complete independently accepted03proof; inherited failure limits explicitly retained, no Rust/DBrerun for docs",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-runtime-proof-reuse.json",
+          "sha256": "d2752bd364671e493a5b910669898a563689f1550e899acdb18e6afd55fb23f4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "trail build",
+      "fixture": "Deterministic graph refresh; runtime unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-trail-build.txt",
+          "sha256": "0c06a379f0ed17d40073ded0f68ed49cb7edf5758fd465adec364ef59f8e1485"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "trail check",
+      "fixture": "One lexical documentation wording match to RcDom ownership learning; actual parser/runtime unchanged; no semantic contradiction; R2 rerun reports the identical single conflict at docs/departments.md:223",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-trail-check.txt",
+          "sha256": "cd7e2834bd6b291feccec6a433be8ac65c745f164b537ea8135e5ed9b1d79c5b"
+        },
+        {
+          "path": "logs/B1-trail-disposition.md",
+          "sha256": "69adb928099a5893465f8542718fa7f808d645f0645a31ce88b8bd945e9f6564"
+        }
+      ]
+    }
+  ]
+}

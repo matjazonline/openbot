@@ -1,0 +1,44 @@
+05SC-P04-B1-R1 independent reviewer (B) focused checks, 2026-11-18
+Worktree /Users/mac02/orca/workspaces/openbot/plan03-04, branch feature/plan05-scopes
+HEAD/base 3d7148b1b496e491e139fc90e0534ef8d7d296ab
+Reviewer model as reported by the host: Fable 5.1 (claude-fable-5-1); effort not exposed.
+
+snapshot.sh 'plan/05-scopes/phases/p04/docs' 'plan/05-scopes/COORDINATION.md'
+  start:  digest 499d9b65b220c1c968394cf561c3252ce9338c8876226019b65bb1b700761a42 (10 files, matches assignment)
+  end:    see B1-R1-reviewer-end-snapshot.txt
+git log 3d7148b1..HEAD -> empty (whole batch is the staged diff)
+git diff --cached --name-only 3d7148b1 | grep -v '^(docs/|plan/|services/memory/README.md)' -> empty (no runtime/schema/script/dependency file)
+git status --porcelain -> staged batch, unstaged COORDINATION.md, untracked p04 records only
+git diff --cached --check 3d7148b1 -> exit 0
+diff COORDINATION.md vs logs/B1-R1-coordination-r18.md -> identical (revision 18)
+diff `git show 3d7148b1:plan/05-scopes/README.md` vs logs/original-README.md -> identical
+diff `git show 3d7148b1:plan/05-scopes/04-...md` vs logs/original-04-...md -> identical
+check-evidence.py logs/B1-R1.evidence.json --expect-artifact 499d9b65... -> valid {FAIL 1, NOT EXERCISED 0, PASS 5}
+shasum -a 256 plan/05-scopes/phases/p03/docs/logs/B1-R2-final.evidence.json -> 004bd93f...db58 (matches B1-runtime-proof-reuse.json prior_sha256)
+git ls-remote origin refs/heads/main -> 3d7148b1b496e491e139fc90e0534ef8d7d296ab (matches p03 B1-publication-remote.txt)
+git log -1 3d7148b1 -> 2026-11-18 02:11:28 +0100 (README status date correct)
+Heading uniqueness for the four new anchors -> 1 each
+
+Source facts inspected (read-only grep/sed), all matching the docs unless marked:
+  memory tool names: src/domain/entities/agent_capability.rs:101-120, catalog.rs:297-300 (offered only while memory enabled, catalog.rs:245-260)
+  selectors personal/unit/ancestors/reports; omitted scopes = all: src/application/workflow/memory_tools/ports.rs:43-69,88-95; parse_scopes runtime.rs:516-532 (unknown -> None -> invalid input)
+  details {"items":[{"namespace","id"}]}: runtime.rs:441-472
+  save facts/scope(unit|personal)/subject; Default->unit then personal; Unit without local unit -> None -> memory.scope_unavailable: runtime.rs:477-514, ports.rs:98-125, runtime.rs:353-356
+  hit labels unit:<slug> / reports:<slug>: memory_tool_checkpoint.rs:238-245
+  workflow scope literals {"unit":"own"|"root"} / {"agent":key}: registry/schemas.rs:20-25, persistence/workflow/memory_steps.rs:50-73
+  binding.memory_scope_needs_desk: role_binding.rs:119-133
+  run scopes: scopes.rs:70-120 (empty chain -> root read only, no add_reports); run_scopes.rs:89-168 (lead query only when chain non-empty); scopes_tests.rs:67-90
+    -> docs/agent-authoring.md deskless paragraph MISMATCH, see finding 05SC-P04-B1-R1-F1
+  MAX_RUN_READ_UNITS=256, memory.scope_limit_exceeded -> knowledge scope_limit: scopes.rs:11-12, knowledge/permissions.rs:326-337
+  manual knowledge read/write authority: knowledge/permissions.rs:66-182 (placements=members+roles; owner/admin All; lead children)
+  knowledge routes GET/POST documents, POST search(query,exact_terms,unit_id), POST documents/{id}/move(expected_revision,target_unit_id): routes/knowledge/mod.rs:49-65, manual.rs:5-11,95-98; also DELETE documents/{id} (not in docs table, suggestion S1)
+  upload unit_id must precede files: routes/knowledge/upload.rs:57,66
+  /ui/knowledge?company_id=: mod.rs:66,424; department card link company_departments.rs:517; destination paging pages/knowledge.rs:174-250; root-first grouping knowledge.rs:56-65
+  preflight authority before embedding, authority again in search, then rank: application/knowledge/service.rs:98-120
+  department delete: department/lifecycle.rs:196-285 (children, desks, role history, FK violation -> 409; retire_namespaces_on Unit); knowledge_documents_unit_fk ON DELETE RESTRICT migrations/20260817000000_init_schema.sql:15756-15757
+  CLI syntax, 60 s deadline, JSON Lines, final complete/progress/error, unsuccessful exit with partial progress, unit namespace walk: src/main.rs:128-152,171-173; src/memory_subject.rs:14,34-80,82-158
+  env names MEMORY_SERVICE_URL / MEMORY_SERVICE_PROVISIONER_TOKEN: src/infra/memory_config.rs:10-11
+  service ops admin.observations.subject.list/delete and HTTP paths: services/memory/src/application/operations.rs:308-311, service.rs:271-281, openapi.json:2942-3021
+  NO_BACKWARD_COMPATIBILITY_NOTES five plan/05-scopes paths: src/main.rs:289-293
+  04 completion-record numbers vs p03 records: 4706/2/27/85, 26 scope cases, bin 6/source_modules 8, lease 139, live memory 7, backup 1, journey 13 steps, Linux scope 8 categories, native 404 (p03 TASK.md:415,604-641; REVIEW.md:43-45; notes:123-126)
+  "180 service tests" vs p02 TASK.md:617 "service suite178PASS/2ignored" and p02 notes:261 -> finding 05SC-P04-B1-R1-F2

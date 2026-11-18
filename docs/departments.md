@@ -203,11 +203,78 @@ departments they belong to or lead and the department of each desk they can read
 department of a desk in front of them is always named; any other department is not found as a
 filter.
 
+## Memory and knowledge
+
+Each department, including the root, owns a memory namespace. Each company person and agent
+owns a principal namespace. These identities follow their owners through renames and department
+moves; deleting an owner retires its namespace through the memory lifecycle worker. Desks and
+roles own no namespace, and an external correspondent gets none. Changing a lead moves no facts.
+Memory must be enabled in company Settings before the service can be used.
+
+A run captures its readable units when admitted, separately for each acting agent. It reads the
+desk's department and its ancestors to the root. An agent holding a department's `lead` role also
+reads that department's direct children; the entitlement follows that agent, even on another desk.
+It grants no grandchildren or sibling units. Memory adds the agent's personal namespace; knowledge
+has no personal namespace. A person’s personal memory requires their actual authenticated own
+session. [Agent authoring](agent-authoring.md#memory-and-knowledge-scopes) describes the selectors
+and deskless runs.
+
+The default memory write goes to the local unit, or to personal memory when no local unit is
+resolved. A personal save selects the acting principal's namespace. A run cannot write an ancestor
+or another readable report unit merely because it can read it. Read levels and consumed-watermark
+rules remain independent: belonging to a department never raises a reader's level.
+
+The captured placement survives retries, children, renames and later tree or lead changes; later
+admissions use the new topology. Current account, tenant, incarnation, audience, credential,
+source and lease checks still apply. A deleted knowledge owner can stop a cached continuation;
+retaining a historical result does not authorize sending it to another model request.
+
+### The knowledge library
+
+Documents belong to a department, with every access-level layer of the same file in that unit.
+The library at `/ui/knowledge?company_id={company}` groups them by department, root first. Its
+filter selects a department; a department's Knowledge card links to that filtered library.
+Only layers within the viewer's current level are shown.
+
+Manual library reads and search use the person's current memberships and roles, their ancestor
+units, and direct-child units of departments they lead. Owners and admins can read every unit,
+still within their own level. A run's knowledge search uses its captured agent unit set instead.
+Both unit and level filtering happen before search ranking. A resolved knowledge read set is
+bounded to 256 units; exceeding it makes that knowledge scope unavailable rather than searching
+a partial set. The department's separately authorized roster and desks remain available.
+
+Choose a department when uploading. Upload authority requires membership or a role in that unit,
+the `lead` role in its parent, or company owner/admin authority, and each file's level must fit the
+uploader's level. Level-prefixed names such as `3_handbook.md` keep their existing meaning.
+The native form supplies its selected department. A multipart API upload must put the required
+`unit_id` field before the file fields; omitting it does not implicitly select the root.
+
+**Move to** changes ownership of the whole file, with all level layers and chunks together.
+The mover needs current write authority in the source and destination and authority for the
+whole file. The destination picker pages through larger writable-unit lists. A stale revision
+or refused move leaves the file unchanged. Moving a document to a common ancestor makes it
+available to future eligible readers in both branches; there is no separate sideways grant.
+Existing consumption proofs keep the unit recorded when the content was read.
+
+The knowledge JSON routes are under `/api/companies/{company_id}/knowledge`:
+
+| Method and path | Input |
+| --- | --- |
+| `GET /documents` | Optional `unit_id` filter. |
+| `POST /documents` | Multipart: first `unit_id`, then file fields. |
+| `POST /search` | JSON `query`, optional `unit_id` and `exact_terms`. |
+| `POST /documents/{document_id}/move` | JSON `expected_revision` and `target_unit_id`. |
+| `DELETE /documents/{document_id}` | JSON `expected_revision`. |
+
+These routes recheck current company, unit and level authority. A filtered search refuses an
+unreadable unit before embedding and checks authority again when reading the results.
+
 ## Delete
 
-The root cannot be deleted. A child department is deleted only when it owns no desks and has no child departments: reassign or delete
-its desk (including its own desk) and move or delete its children first. Its members and role
-rows go with it.
+The root cannot be deleted. A child department is deleted only when it owns no desks or knowledge
+documents and has no child departments. Reassign or delete its desks, move or delete its documents,
+and move or delete its children first. Its members and role rows go with it; its memory namespace
+is retired through the durable lifecycle worker.
 
 ## JSON API
 
@@ -225,7 +292,7 @@ someone outside the company.
 | `PUT` / `DELETE /departments/{department_id}/members/{principal_id}` | Adds or removes a member. |
 | `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role: `lead` replaces the current lead; `reviewer` adds or removes that holder. |
 
-Refusals: `409 Conflict` for a taken slug or a department that still owns desks or has children;
+Refusals: `409 Conflict` for a taken slug or a department that still owns desks or knowledge documents, or has children;
 `400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither
 a person nor an agent; `404 Not Found` for a principal or parent department that is not the
 company's.

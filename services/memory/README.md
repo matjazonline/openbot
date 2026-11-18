@@ -121,6 +121,47 @@ recorded source content are cleared 30 days after the last operation using them 
 operation uses them; identity, revision, level and digest stay for provenance while anything
 references the source (see Retention).
 
+## OpenBot integration
+
+OpenBot owns the organization model. It maps each department, including the root, to an opaque
+unit namespace, and each live company person or agent to a principal namespace. Desks, roles and
+external correspondents own none. OpenBot records those namespace identities with owner creation
+and retirement, then its lifecycle worker reconciles the service; memory use still requires an
+enabled company tenant. The service receives opaque tenant/namespace ids and current grants,
+read sets and access levels. It does not resolve departments, roles or tree ancestry.
+
+OpenBot freezes a per-acting-principal unit set at run admission. Memory reads that set plus
+permitted personal memory, and knowledge uses the same units without a principal axis. Default
+memory writes stay in the local unit or fall back to personal when there is no local unit.
+The host combines returned `exposed_level` values with its consumed watermark; namespace choice
+never raises the read ceiling. See the host's [department guide](../../docs/departments.md#memory-and-knowledge)
+and [agent scope vocabulary](../../docs/agent-authoring.md#memory-and-knowledge-scopes).
+
+The subject extension is opaque provenance: explicit saved observations can carry `subject`,
+a principal UUID chosen and authorized by OpenBot. It grants no read authority and does not
+select a namespace. The managed provisioner operations `admin.observations.subject.list` and
+`admin.observations.subject.delete` list metadata for a subject and delete selected matching observations
+within one managed tenant/namespace. Their HTTP routes are `/admin/v1/observations/subject/list`
+and `/admin/v1/observations/subject/delete`; the operation registry defines the exact payloads.
+The delete rechecks the namespace, subject and listed observation ids. These operations do not
+interpret a person, inspect free text or delete other namespaces implicitly.
+
+The host operator command walks company unit namespaces through that API:
+
+```sh
+open_bots memory subject list --company COMPANY_UUID --subject PRINCIPAL_UUID
+open_bots memory subject purge --company COMPANY_UUID --subject PRINCIPAL_UUID
+```
+
+Use the host's configured database and `MEMORY_SERVICE_URL` /
+`MEMORY_SERVICE_PROVISIONER_TOKEN`. Output is JSON Lines with per-namespace results and a final
+`complete`, `progress` and `error` summary. An error or the command's 60-second deadline exits
+unsuccessfully with partial progress; rerun the same command to finish remaining records.
+Purge deletes explicitly tagged observations in company unit namespaces. It leaves personal
+namespaces, other subjects, untagged observations, messages, knowledge and already retained model
+context outside that operation. It is a paged operation, not a transaction across all units.
+See [the host operator notes](../../docs/deploy.md#memory-about-a-person).
+
 ## Deletion, purge and forgetting
 
 - **Correct** overwrites an observation in place (title, body, `revision + 1`); the old text, its

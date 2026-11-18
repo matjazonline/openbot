@@ -1,8 +1,8 @@
 # Plan coordination: 05-scopes
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md
-- Writer: /root in /Users/mac02/orca/workspaces/openbot/plan03-04
-- Revision: 16
+- Writer: Claude Code root (Opus 5.5/high) in /Users/mac02/orca/workspaces/openbot/plan03-04
+- Revision: 19
 
 ## Plan-wide instructions
 
@@ -43,8 +43,8 @@
 | --- | --- | --- | --- |
 | p01 accepted in phase; main integration pending | root/A /root; B /root/p05_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p01/docs/{TASK,HANDOFF}.md |
 | p02 accepted and locally committed2edd0a73; main integration at03 | root/A /root; B /root/p05_reviewer | same sequential checkout | phases/p02/docs/{TASK,HANDOFF}.md |
-| p03 source accepted; main publication next | root/A /root; source B /root/p05_reviewer_62 | same sequential checkout | phases/p03/docs/{TASK,HANDOFF}.md |
-| p04 planned | /root | same sequential checkout | phases/p04/docs/ when started |
+| p03 accepted/integrated main3d7148b1 | root/A /root; source B /root/p05_reviewer_62 | same sequential checkout | phases/p03/docs/{TASK,HANDOFF}.md |
+| p04 accepted (05SC-P04-B1-R2-N1 PASS, db7a281d…210f); main publication | root/A Claude Code root; B Fable 5.2/medium (implement-opus-reviewed-2_4) | same sequential checkout | phases/p04/docs/{TASK,HANDOFF}.md |
 
 ## Cross-phase notices
 
@@ -227,3 +227,34 @@
 - Revision16 updates execution/evidence status only; active C001–C004/r1,C005/r2,
   C006/r1,C007/r1 requirements unchanged from reviewed15. C003publication next,
   then04docs/evidence and STOP before06. P03records retain complete final evidence.
+
+## Phase03 publication / phase04 entry
+
+- Accepted p03commit3d7148b1b496e491e139fc90e0534ef8d7d296ab normally pushed to main,
+  remote exactSHAconfirmed. C003checkpoint satisfied. P01/p02/p03 now integrated.
+- P04/root ACK C001–C004/r1,C005/r2,C006/r1,C007/r1 at revision17; source prerequisite
+  p03staged62d667d9…5907/05SC-P03-B1-R2-N2 PASS. Finish actual-behavior docs and
+  final evidence record, publish and STOP before06. Doop remains separate.
+- Revision17 changes execution/publication status only, no active requirement.
+
+## Writer transfer / p04 workflow change (revision18)
+
+- Codex /root stopped at usage limit after freezing p04 B1 staged artifact
+  499d9b65b220c1c968394cf561c3252ce9338c8876226019b65bb1b700761a42 (base/HEAD 3d7148b1);
+  /root/p05_reviewer_62 produced no p04 review record and is unreachable.
+- Latest user instruction (2026-11-18): continue under implement-opus-reviewed-2_4.
+  Root/A is Claude Code Opus 5.5 at effort high (user-authorized in place of xhigh);
+  B is a new independent Fable 5.2/medium reviewer. Supersedes the workflow/role
+  sentence of plan-wide instructions for p04 only; earlier phases' review identities stand.
+- No active requirement changed: C001–C004/r1, C005/r2, C006/r1, C007/r1 unchanged;
+  push main, STOP before06, Doop separate. C007/r1's Astra reviewer preference is
+  superseded for p04 by the user's selection of this workflow's Fable reviewer; p03
+  review identities under C007 stand. Revision18 changes writer/workflow only.
+
+## Phase04 acceptance (revision19)
+
+- P04 B1 accepted in phase: independent 05SC-P04-B1-R2-N1 PASS (Fable 5.1, user-authorized),
+  digest db7a281d2171092056186a794140a1c710c1b67174817a19e183457a5257210f, base 3d7148b1.
+  C001–C004/r1, C005/r2, C006/r1 satisfied for documentation/evidence; C007 superseded (r18).
+- Next: commit, normal push to main, confirm remote SHA, then STOP before Plan06. Doop separate.
+- Revision19 changes execution status only, no active requirement.
