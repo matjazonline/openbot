@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/06-delegated-administration/COORDINATION.md
 - Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, worktree /Users/mac02/orca/workspaces/openbot/plan06
-- Revision: 10
+- Revision: 11
 
 ## Plan-wide instructions
 
@@ -40,7 +40,7 @@
 | --- | --- | --- | --- |
 | p01 accepted in phase (B1–B4; 01A.2 removal carried to p02) | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
 | p02 accepted in phase (B1 02A + 01A.2, B2 02B) | Claude root/A; Opus B | same sequential worktree | phases/p02/docs/{TASK,HANDOFF}.md |
-| p03 starting (03A docs, 03B final gate) | Claude root/A; Opus B | same sequential worktree | phases/p03/docs/ when started |
+| p03 accepted in phase (B1 03A docs + 03B final gate; B PASS 06DA-P03-B1-R2 at f8bfaccd…); committed locally, not pushed. Plan06 not declared complete: required gates unavailable locally (Docker images, onnxruntime-1.24.4 memory gates, plugin Node pin, Linux isolation scope) and the deferred Doop assertion stays red | Claude root/A; Opus B | same sequential worktree | phases/p03/docs/{TASK,HANDOFF,REVIEW}.md |
 
 ## Cross-phase notices
 

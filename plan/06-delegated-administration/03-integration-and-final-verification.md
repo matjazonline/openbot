@@ -33,13 +33,19 @@ only behavior the code has.
 
 | Evidence | Status |
 | --- | --- |
-| 01 focused checks (predicate, owners, competing) | Pending |
-| 02 route tests and audit checks | Pending |
-| Authorization suites after each batch | Pending |
-| Formatting, offline compilation, clippy and reachability | Pending |
-| Fresh migrations and SQLx metadata | Pending |
-| Database-backed full suite and network isolation | Pending |
-| Stack and lease budgets | Pending |
-| Docs, startup plan paths and graph refresh | Pending |
+| 01 focused checks (predicate, owners, competing) | Passed; batches accepted, records in `phases/p01/docs` |
+| 02 route tests and audit checks | Passed; batches accepted, records in `phases/p02/docs` |
+| Authorization suites after each batch | Passed after each batch; `phases/p01/docs` and `phases/p02/docs` TASK |
+| Formatting, offline compilation, clippy and reachability | Passed (`tests/source_modules.rs` run separately, see p03 TASK) |
+| Fresh migrations and SQLx metadata | Passed; `.sqlx` unchanged on a fresh UTF-8 schema |
+| Database-backed full suite and network isolation | Run isolated; 4883 passed, 1 failed: the deferred Doop assertion that also fails on main. Linux isolation scope runs in CI only |
+| Stack and lease budgets | Lease passed; stack: no overflow at 2048 KiB, red only on the same Doop assertion |
+| Docs, startup plan paths and graph refresh | Done |
+
+Unavailable locally, not passed: Docker image gates, memory gates needing the pinned onnxruntime
+1.24.4 (its release is gone upstream), the plugin package's Node 24.21.0 pin, and Doop (deferred).
+Failed in the `scripts/check.sh` run and passed only on rerun: the browser protocols (one test
+hung; cause not established) and the transport boundary and attribution service gates (missing
+`rg` and Python 3.11). `phases/p03/docs/TASK.md` records every gate.
 
 Do not declare the implementation complete while a required check is unavailable.

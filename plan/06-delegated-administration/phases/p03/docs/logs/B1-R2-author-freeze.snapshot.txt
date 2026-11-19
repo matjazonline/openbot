@@ -1,0 +1,7 @@
+base:   a93cd38844c76dd48dbbe42ceba8ebf68864d4df
+digest: f8bfaccd7dadb06a774f1bde3dffd5001be0b3fb5246f67f9804df5d73f2d160
+files:
+  docs/authentication-operations.md
+  docs/departments.md
+  docs/workflow-operations.md
+  plan/06-delegated-administration/03-integration-and-final-verification.md

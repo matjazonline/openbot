@@ -178,7 +178,8 @@ fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-i
 
 The desk's **Automatic response** card chooses one active message binding and a version1
 subject/body projection from its final business result. Other bindings observe. Selection requires
-current company administration, desk visibility, run-as visibility and resource readiness.
+current management of the desk's department ([Administration](departments.md#administration)),
+desk visibility, run-as visibility and resource readiness.
 `GET` and `PUT /api/companies/{company_id}/channels/{channel_id}/response` use the same checks.
 PUT carries `expected_revision` (null for the first save), `responder` (null to clear), and optional
 `approval_policy`. A responder contains `binding_id`, `expected_binding_state_revision`, and
@@ -282,8 +283,8 @@ retry until their expiry; switching capture off stops new windows, not ones alre
 Private memory is reachable only from a person's own manual start in a private session (not in a
 desk or thread), and from children of that run run as the same person. Scheduled and
 message-triggered runs never reach it. The author of the workflow, its binding or its agent is not
-checked: an owner or admin who manually runs a colleague's workflow lets that workflow's agent read
-their private memory, and the workflow can send what it read wherever its author chose. Run only
+checked: a person who manually runs a colleague's workflow lets that workflow's agent read their
+private memory, and the workflow can send what it read wherever its author chose. Run only
 workflows you trust with your private memory, as authorized admins can already inspect a private
 run.
 

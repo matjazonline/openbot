@@ -1,0 +1,4 @@
+Applied 20260817000000/migrate init schema (483.973833ms)
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.91s
+query data written to .sqlx in the current directory; please check this into version control

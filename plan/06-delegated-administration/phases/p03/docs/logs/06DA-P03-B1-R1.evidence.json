@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "round": "06DA-P03-B1-R1",
+  "artifact": "61b33200230c82b9b1c12e746326ceb6c6d14f44dc9b5823e4bce65e44c5c57d",
+  "checks": [
+    {
+      "criteria": [
+        "03B.1"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets (fresh schema)",
+      "fixture": "owned UTF-8 PostgreSQL18 127.0.0.1:55407 / openbot_p06_final_sqlx",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sqlx-prepare.txt",
+          "sha256": "9411e69f66ad224f4d460ea310b8c0b9826b0e49c892161307a1a0b8aaa54a4e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.2",
+        "03B.4"
+      ],
+      "command": "scripts/check.sh (DATABASE_URL=@55407/postgres; disposable openbot_check_* DB)",
+      "fixture": "owned UTF-8 PostgreSQL18 127.0.0.1:55407; HEAD a93cd388 + docs edits (logs/final-check-head.txt)",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/final-check.txt",
+          "sha256": "86fde2f31822caa1d60e9e25ddc5d14eead07ebc90c3520c2c7bbf284e71a07a"
+        },
+        {
+          "path": "logs/final-check-head.txt",
+          "sha256": "fdca50ecdf550489ca0f244243d2ad3d5c186fbb693ca9350db3fb7660671c4f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.4-reachability",
+        "03B.4-db-suite"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --bins --test source_modules",
+      "fixture": "owned UTF-8 PostgreSQL18 127.0.0.1:55407 / fresh migrated openbot_p06_final_rest",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-remaining-targets.txt",
+          "sha256": "79073c2699044f330dac72b6c5b3acb89bf524c35916626747495c5f0dcdbeb3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.2-browser"
+      ],
+      "command": "node --test --test-timeout=300000 <the gate's 12 browser files> (fixtures copied from the run's CHECK_WORK)",
+      "fixture": "Playwright headless_shell 1193; Node 24.22.3",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-browser-rerun.txt",
+          "sha256": "56676fa485da618c85f86b43fb92867ec1b82f7d22fd020398e6d2f502a355e3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.2-transport",
+        "03B.2-attribution",
+        "03B.3-unavailable"
+      ],
+      "command": "scratchpad/env-rerun.sh (rg 15.0.0 shim, Python 3.13.18): transport boundary, memory extracted, memory journey, attribution extracted",
+      "fixture": "PATH shim in session scratchpad; owned UTF-8 PostgreSQL18 127.0.0.1:55407",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/final-env-rerun.txt",
+          "sha256": "752ca00a4b566277b2496db113661ecf4294c34b8437a9bf0ced206f49ec202f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.5"
+      ],
+      "command": "trail build",
+      "fixture": "worktree .trail/cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-trail-build.txt",
+          "sha256": "2a30594814ee7d2af8b24b57db6b8cb600cc63435861772c9681d993bdd9d398"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.3"
+      ],
+      "command": "Docker image gates (knowledge, memory, attribution)",
+      "fixture": "no Docker daemon",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "no /var/run/docker.sock; failures in logs/final-check.txt"
+    },
+    {
+      "criteria": [
+        "03B.3"
+      ],
+      "command": "Memory gates needing onnxruntime 1.24.4 (model preparation, extracted suite artifacts, standalone journey, OpenBot+memory integration)",
+      "fixture": "upstream release v1.24.4 absent (archive URLs and release tag 404)",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "pinned SHA-256 runtime unavailable; partial reruns in logs/final-env-rerun.txt"
+    },
+    {
+      "criteria": [
+        "03B.3"
+      ],
+      "command": "Reproducible plugin package and runtime install",
+      "fixture": "Node 24.22.3 installed, pin 24.21.0",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "package.mjs refuses an unpinned Node runtime"
+    },
+    {
+      "criteria": [
+        "03B.4-network"
+      ],
+      "command": "Linux network-isolation scope (scripts/tests/network-isolation-scope.py)",
+      "fixture": "macOS",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Linux-only; check.sh: NOT EXERCISED locally; required in CI"
+    }
+  ]
+}

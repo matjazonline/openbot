@@ -11,8 +11,11 @@ status comes from the root `admin` role. The company owner remains `companies.us
 by the root's single `owner` role. The company remains the tenant boundary: the root is inside
 that boundary and cannot be deleted or re-parented.
 
-Owners and admins manage departments on the company's **Departments** tab
-(`/ui/companies?company_id={company}&tab=departments`) or through the JSON API below. A plain member
+Departments are managed on the company's **Departments** tab
+(`/ui/companies?company_id={company}&tab=departments`) or through the JSON API below by the
+owner, a root admin, or a department lead, each within the part of the tree they manage: a lead
+looks after what is inside their department, while the department's own name, deletion and roles
+belong to whoever manages its parent (see [Administration](#administration)). A plain member
 sees, read-only, the departments they belong to or lead; a write from them is answered `404`, as
 for someone outside the company.
 
@@ -35,8 +38,8 @@ can be published. `reviewer` may have several holders. A holder need not be a me
 name a role instead of a fixed person or agent (see [Roles](workflow-language-v1.md#roles)), and a
 desk's workflow binding can escalate to a role's holders (see "Escalation"). The root also has
 `owner` and `admin`: they cannot be placed on child departments. The owner mirror cannot be
-cleared or edited independently. Root team/admin mutations retain the Team page's owner-only
-policy; ordinary department management remains available to admins.
+cleared or edited independently. The root's roles, and its people, are changed by the owner only;
+every other department follows [Administration](#administration).
 
 Deleting an agent, or removing a person from the company, clears every role they hold in the same
 transaction and records each cleared role as a department administration event. Nobody is
@@ -102,10 +105,10 @@ address refuses the creation. With an agent lead the desk is answered by that ag
 autonomous workflow; with a person lead, or none, it is a plain Members desk.
 
 Changing the lead re-points the department-owned binding on the desk to the new agent lead, or
-pauses it for a person lead or none; the binding then runs as the admin who changed the lead. A
+pauses it for a person lead or none; the binding then runs as the person who changed the lead. A
 plain desk that gets an agent lead is given the autonomous workflow, so it starts answering. A desk
 whose responder someone chose on its settings is left as they set it. The change is refused, and
-nothing moves, when the desk asks reviewers to approve replies, when the admin cannot see the desk,
+nothing moves, when the desk asks reviewers to approve replies, when that person cannot see the desk,
 or when its workflow uses resources, has edits the desk does not run, or has no agent reply step to
 hand over. Reassign the desk, or fix its workflow, first.
 
@@ -120,7 +123,8 @@ not listed. The context is frozen with the run's prepared request, so a retry se
 attempt saw.
 
 The Agent Builder's `list_company_agents` tool names each agent's departments, roles and direct
-address and can list one department (`department` slug); it stays an owner's or admin's tool. The
+address and can list one department (`department` slug). It answers whoever manages a department,
+for the agents and departments they manage. The
 plan's intake schema for a member's desk arrives with `channel.call`; the directory does not carry
 one yet.
 
@@ -198,10 +202,10 @@ needs to be able to see the run to act on it.
 - **JSON**: desk responses carry required `department_id` and `access_mode` (`members` or `public`); agent responses carry
   `departments` (`id`, `name`, `slug`, `roles`) and `more_departments`.
 
-Owners and admins see every department in these filters and headings. A plain member sees the
-departments they belong to or lead and the department of each desk they can read, so the
-department of a desk in front of them is always named; any other department is not found as a
-filter.
+Owners and admins see every department in these filters and headings. Anyone else sees the
+departments they belong to or lead, every department they manage, and the department of each desk
+they can read, so the department of a desk in front of them is always named; any other department
+is not found as a filter.
 
 ## Memory and knowledge
 
@@ -237,15 +241,15 @@ filter selects a department; a department's Knowledge card links to that filtere
 Only layers within the viewer's current level are shown.
 
 Manual library reads and search use the person's current memberships and roles, their ancestor
-units, and direct-child units of departments they lead. Owners and admins can read every unit,
-still within their own level. A run's knowledge search uses its captured agent unit set instead.
+units, and every unit they manage (the departments they lead and everything below them). Owners
+and admins can read every unit, still within their own level. A run's knowledge search uses its captured agent unit set instead.
 Both unit and level filtering happen before search ranking. A resolved knowledge read set is
 bounded to 256 units; exceeding it makes that knowledge scope unavailable rather than searching
 a partial set. The department's separately authorized roster and desks remain available.
 
 Choose a department when uploading. Upload authority requires membership or a role in that unit,
-the `lead` role in its parent, or company owner/admin authority, and each file's level must fit the
-uploader's level. Level-prefixed names such as `3_handbook.md` keep their existing meaning.
+managing it (the `lead` role there or in any ancestor), or company owner/admin authority, and each
+file's level must fit the uploader's level. Moving and deleting follow the same unit authority. Level-prefixed names such as `3_handbook.md` keep their existing meaning.
 The native form supplies its selected department. A multipart API upload must put the required
 `unit_id` field before the file fields; omitting it does not implicitly select the root.
 
@@ -269,6 +273,43 @@ The knowledge JSON routes are under `/api/companies/{company_id}/knowledge`:
 These routes recheck current company, unit and level authority. A filtered search refuses an
 unreadable unit before embedding and checks authority again when reading the results.
 
+## Administration
+
+A person **manages** a department when they are the company owner, hold `admin` on the root, or
+hold `lead` on that department or any of its ancestors. Managing a department includes everything
+below it. An agent holding `lead` coordinates work but administers nothing: configuration is done
+by people. Managing a department grants no conversation access: a manager reads a members-only
+desk only through its own desk grants.
+
+| What | Who may change it |
+| --- | --- |
+| A department's name, slug, description, charter, deletion | Whoever manages its parent. The root's name, description and charter: the owner, a root admin or a root lead; its slug and parent never change and it cannot be deleted. |
+| Moving a department | Whoever manages both its current and its new parent. |
+| A child department | Whoever manages the department it is created under. |
+| Members of a department | Whoever manages the department. Removing a person from the root removes them from the company and is the owner's; removing an agent from the root takes the owner or a root admin. |
+| Roles (`lead`, `reviewer`) | Whoever manages the department's parent. The root's roles are the owner's. |
+| A desk, its settings, bindings and schedules | Whoever manages the desk's department (both departments when moving it). |
+| An agent: authoring, publication, tools, skills, deletion | Whoever manages any department the agent belongs to; an agent in none is the root's. |
+| A workflow definition | Whoever manages a department of one of its active bindings; an unbound definition, its creating department (chosen at creation, the root by default). |
+| Knowledge documents | See "The knowledge library". |
+| The company itself (edit, delete), its model connections, skills and onboarding | The owner. |
+| Team access levels, invitations, connections, memory, local agents, runs, deliveries and the dashboard | Company administration: the owner and root admins, as described on those pages. A person who leads the root manages every department but is not a company administrator. |
+
+Root admins may invite people as members; an invitation carrying the admin role, or addressed to
+a current admin, is the owner's. Lists and pickers show what the viewer manages: desks a manager
+can only read appear read-only and link to the conversation. A refusal of anything the viewer does
+not manage is `404`, as for a stranger; a refusal inside their authority (an access level above
+their own, an admin-role invitation) is `403` with a reason.
+
+Each department's **Recent administration** card, shown to its managers, lists its last ten
+events: who created, edited or moved it, added or removed members, and assigned or cleared roles,
+each with the role that allowed it (`owner`, `admin` or the lead of a department), beside the
+system's own removals of role holders who lost their standing. The history is append-only and is
+written in the same transaction as the change it records; a deletion is recorded too, though a
+deleted department has no card to show it. Desk email
+bindings, workflow bindings and workflow definitions record the acting role on their own audit
+rows the same way.
+
 ## Delete
 
 The root cannot be deleted. A child department is deleted only when it owns no desks or knowledge
@@ -278,9 +319,9 @@ is retired through the durable lifecycle worker.
 
 ## JSON API
 
-All under `/api/companies/{company_id}`. Writes are for owners and admins; reads are open to a
-plain member for the departments they belong to or lead. Anything else is answered `404`, as for
-someone outside the company.
+All under `/api/companies/{company_id}`. Writes follow [Administration](#administration); reads
+cover the departments the caller belongs to, leads or manages. Anything else is answered `404`, as
+for someone outside the company.
 
 | Method and path | Does |
 | --- | --- |

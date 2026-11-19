@@ -59,8 +59,14 @@ application redaction cannot alter an upstream log or remove a signed path token
 A signed-in session identifies an account. Company membership is read from that account's current
 principal and membership in the company's root department. Access levels live on root member rows;
 admin status is the root `admin` role. The owner remains `companies.user_id`, mirrored by the
-root's `owner` role. Root team and admin-role administration is owner-only; owners and admins
-manage ordinary departments through the existing management checks.
+root's `owner` role. Root roles and the root's people are the owner's; root admins may invite
+members but not admins. Desks, agents, workflow definitions and schedules are managed by whoever
+manages their department, and a department by whoever manages its parent: the owner, a root admin,
+or the lead of that department or an ancestor ([Administration](departments.md#administration)).
+The company itself, its model connections, skills and onboarding are the owner's; team access
+levels, connections, memory, local agents and the company-wide run views stay with the owner and
+root admins. A refusal of something the caller does not manage is `404`, as for someone outside
+the company; a refusal inside their authority, such as an access level above their own, is `403`.
 
 Members desks read their owning department's materialized grants and explicit grants. Company
 owners retain their exemption; a company admin needs a view grant to read a child department's
