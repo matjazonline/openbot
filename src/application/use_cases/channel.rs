@@ -200,7 +200,7 @@ impl ChannelUseCases {
         company_id: Uuid,
         unit: Option<crate::entities::department::DepartmentId>,
     ) -> AppResult<()> {
-        use crate::application::use_cases::administration::{ManagementTarget, require_management};
+        use crate::application::ports::administration::{ManagementTarget, require_management};
         require_management(
             self.participant_persistence.as_ref(),
             user_id,

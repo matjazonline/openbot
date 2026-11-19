@@ -166,7 +166,7 @@ impl DepartmentUseCases {
         company_id: Uuid,
         unit: Option<DepartmentId>,
     ) -> AppResult<DepartmentScope> {
-        use super::administration::{ManagementTarget, require_management};
+        use crate::application::ports::administration::{ManagementTarget, require_management};
         require_management(
             self.departments.as_ref(),
             user_id,
@@ -200,7 +200,7 @@ impl DepartmentUseCases {
         company: Uuid,
         unit: DepartmentId,
     ) -> AppResult<DepartmentScope> {
-        use super::administration::{ManagementRole, ManagementTarget};
+        use crate::application::ports::administration::{ManagementRole, ManagementTarget};
         let department = self
             .departments
             .get(CompanyId::new(company), unit)

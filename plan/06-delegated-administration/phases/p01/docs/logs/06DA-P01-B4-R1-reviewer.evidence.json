@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B4-R1",
+  "artifact": "2c9a298f7c0fb765c1fbfd6858d2c80a245039f9d4699b1de7e39647463b691b",
+  "checks": [
+    {
+      "criteria": ["01B.6", "01B.7", "B4-REGRESSION"],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- company_invite knowledge delegated_admin_memory workflow_and_transport_depend ui_team_authorization company_access_level (reviewer independent run)",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05 (tests create own databases); SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/06DA-P01-B4-R1-reviewer-focused.txt", "sha256": "86a5b3dcab3d79ec5ce84a029bde499e011de0dc436ff33e1a24ed405f24d3dd"}
+      ]
+    },
+    {
+      "criteria": ["01B.7", "user-decision-b", "06DA-P01-B4-F2"],
+      "command": "two concurrent psql sessions replaying create_invite statement order (lock_invite email FOR UPDATE -> companies FOR NO KEY UPDATE -> INSERT ON CONFLICT DO UPDATE)",
+      "fixture": "owned PostgreSQL18 127.0.0.1:55406 scratch DB openbot_p06_b4r1_reviewer_race (minimal tables, dropped after run)",
+      "status": "FAIL",
+      "files": [
+        {"path": "logs/06DA-P01-B4-R1-reviewer-invite-race.txt", "sha256": "a4b27c0c5d03a2bd0735a1fcb8d6b7d4d5cdd962fce7d76c751cbb6338d22626"}
+      ]
+    }
+  ]
+}

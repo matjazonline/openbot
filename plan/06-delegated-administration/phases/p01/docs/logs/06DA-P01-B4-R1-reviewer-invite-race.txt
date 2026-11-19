@@ -1,0 +1,84 @@
+# 06DA-P01-B4-R1 reviewer reproduction (B4-F2): PostgreSQL READ COMMITTED semantics of create_invite's statement order
+# Owned PG18 cluster 127.0.0.1:55406, scratch DB openbot_p06_b4r1_reviewer_race (minimal companies/company_invites tables; dropped afterwards).
+# Statements mirror src/adapters/persistence/company_invite.rs create_invite: lock_invite(email) FOR UPDATE -> lock_team company FOR NO KEY UPDATE -> INSERT ... ON CONFLICT(company_id,email) DO UPDATE.
+# App-side require_inviter/assign checks run between the two SELECTs on the admin side, using previous=None.
+
+== owner.sql
+\set ON_ERROR_STOP 1
+\echo owner: begin
+BEGIN;
+-- create_invite: lock_invite(email) FOR UPDATE OF invite, then lock_team (company FOR NO KEY UPDATE)
+SELECT id, role AS owner_previous_role FROM company_invites WHERE company_id=1 AND email='x@example.test'::citext FOR UPDATE;
+SELECT user_id FROM companies WHERE id=1 FOR NO KEY UPDATE;
+INSERT INTO company_invites(company_id,email,role,access_level,status) VALUES(1,'x@example.test','admin',7,'pending')
+ ON CONFLICT(company_id,email) DO UPDATE SET role=EXCLUDED.role,access_level=EXCLUDED.access_level,status='pending';
+\echo owner: inserted admin invite, holding company lock 2s
+SELECT pg_sleep(2);
+COMMIT;
+\echo owner: committed
+
+== admin.sql
+\set ON_ERROR_STOP 1
+SELECT pg_sleep(0.5);
+\echo admin: begin
+BEGIN;
+SELECT id, role AS admin_previous_role FROM company_invites WHERE company_id=1 AND email='x@example.test'::citext FOR UPDATE;
+\echo admin: previous=None, so require_inviter([Member]) and assign(PUBLIC -> level) pass; now waiting for company lock
+SELECT user_id FROM companies WHERE id=1 FOR NO KEY UPDATE;
+\echo admin: acquired company lock after owner commit
+INSERT INTO company_invites(company_id,email,role,access_level,status) VALUES(1,'x@example.test','member',0,'pending')
+ ON CONFLICT(company_id,email) DO UPDATE SET role=EXCLUDED.role,access_level=EXCLUDED.access_level,status='pending';
+COMMIT;
+\echo admin: committed
+
+== owner output
+owner: begin
+BEGIN
+ id | owner_previous_role 
+----+---------------------
+(0 rows)
+
+ user_id 
+---------
+     100
+(1 row)
+
+INSERT 0 1
+owner: inserted admin invite, holding company lock 2s
+ pg_sleep 
+----------
+ 
+(1 row)
+
+COMMIT
+owner: committed
+
+== admin output
+ pg_sleep 
+----------
+ 
+(1 row)
+
+admin: begin
+BEGIN
+ id | admin_previous_role 
+----+---------------------
+(0 rows)
+
+admin: previous=None, so require_inviter([Member]) and assign(PUBLIC -> level) pass; now waiting for company lock
+ user_id 
+---------
+     100
+(1 row)
+
+admin: acquired company lock after owner commit
+INSERT 0 1
+COMMIT
+admin: committed
+
+== final row
+ company_id |     email      |  role  | access_level | status  
+------------+----------------+--------+--------------+---------
+          1 | x@example.test | member |            0 | pending
+(1 row)
+

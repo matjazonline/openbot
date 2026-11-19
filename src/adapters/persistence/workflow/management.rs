@@ -1,6 +1,6 @@
 //! Configuration authority preserves person/company locks without granting history access.
 use super::*;
-use crate::application::use_cases::administration::ManagementTarget;
+use crate::application::ports::administration::ManagementTarget;
 use crate::entities::{
     agent_capability::AgentId, department::DepartmentId, transport::PrincipalId,
 };

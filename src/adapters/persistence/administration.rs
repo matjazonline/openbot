@@ -6,7 +6,7 @@ use uuid::Uuid;
 use super::{PostgresPersistence, department::PostgresDepartments};
 use crate::{
     app_error::{AppError, AppResult},
-    application::use_cases::administration::{
+    application::ports::administration::{
         AdministrationPersistence, ManagementRole, ManagementTarget,
     },
     domain::workflow::CompanyId,

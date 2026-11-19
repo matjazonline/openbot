@@ -1,5 +1,5 @@
 use super::{authority::*, rows::*, *};
-use crate::application::use_cases::administration::ManagementTarget;
+use crate::application::ports::administration::ManagementTarget;
 use crate::entities::department::DepartmentId;
 
 pub(super) async fn read_draft(

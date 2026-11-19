@@ -1217,3 +1217,52 @@ async fn memory_scope_lazy_redrive_skips_definite_failures_and_replaces_a_confli
     );
     assert_eq!(state(&f, namespaces[1].0).await, "pending");
 }
+
+#[tokio::test]
+async fn delegated_admin_memory_settings_stay_with_root_managers() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    // Leading a unit manages that unit, never the company-level memory tenant.
+    let departments =
+        crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
+    let unit = departments
+        .create_department(
+            f.owner,
+            f.company,
+            crate::application::ports::department::DepartmentWrite {
+                name: "Unit".into(),
+                slug: "unit".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    departments
+        .assign_role(
+            f.owner,
+            f.company,
+            unit.id,
+            crate::entities::department::DepartmentRole::Lead,
+            f.member_principal,
+        )
+        .await
+        .unwrap();
+    let refused = f
+        .persistence
+        .enable_memory(f.scope(), Fixture::actor(f.member), 0, PROVISIONER)
+        .await;
+    assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
+    assert!(f.tenant().await.is_none());
+    f.persistence
+        .enable_memory(f.scope(), Fixture::actor(f.admin), 0, PROVISIONER)
+        .await
+        .unwrap();
+    let refused = f
+        .persistence
+        .disable_memory(f.scope(), Fixture::actor(f.member), 1)
+        .await;
+    assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
+    assert_eq!(f.tenant().await, Some(("enabled".into(), 1, 0)));
+}

@@ -176,8 +176,16 @@ async fn company_access_returns_owner_admin_member_and_no_relation() {
         })
         .await
         .ok();
-    persistence.delete_invite(invite.id).await.ok();
-    persistence.delete_invite(admin_invite.id).await.ok();
+    for invite_id in [invite.id, admin_invite.id] {
+        persistence
+            .delete_invite(crate::use_cases::company_invite::DeleteCompanyInvite {
+                actor_id: owner.0,
+                company_id: company.id,
+                invite_id,
+            })
+            .await
+            .ok();
+    }
     persistence.delete(company.id).await.ok();
 }
 

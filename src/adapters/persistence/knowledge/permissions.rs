@@ -145,7 +145,6 @@ async fn ordinary(
         leads: Vec::new(),
     };
     for child in children {
-        write.insert(child.id);
         let unit: ScopeUnit = child.into();
         facts.leads.push(LeadChildren {
             principal,
@@ -153,8 +152,19 @@ async fn ordinary(
             children: vec![unit],
         });
     }
+    // A unit manager administers the knowledge of its whole subtree, which includes the
+    // one-step lead children. Frozen workflow scopes are sealed separately and do not widen.
+    let managed: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM departments WHERE company_id=$1 AND unit_management_role($2,$1,id) IS NOT NULL
+         ORDER BY id LIMIT $3",
+    ).bind(scope.company.as_uuid()).bind(scope.actor_id).bind((MAX_RUN_READ_UNITS + 1) as i64)
+        .fetch_all(&mut **tx).await.map_err(authority::database)?;
+    if managed.len() > MAX_RUN_READ_UNITS {
+        return Err(scope_limit());
+    }
+    write.extend(&managed);
     let chains = chains(tx, scope, placements).await?;
-    let mut read = BTreeSet::new();
+    let mut read: BTreeSet<Uuid> = managed.into_iter().collect();
     if chains.is_empty() {
         read.extend(
             run_scopes(&[], principal, &facts)?

@@ -53,6 +53,22 @@ impl TeamAuthority {
         }
         Ok(())
     }
+    /// The persistence recheck of the invitation rule: root admins write member invitations only.
+    pub(super) fn require_inviter(
+        &self,
+        roles: impl IntoIterator<Item = crate::entities::company_member::CompanyAccessRole>,
+    ) -> AppResult<()> {
+        if roles
+            .into_iter()
+            .all(|role| self.actor.membership.may_invite_as(role))
+        {
+            return Ok(());
+        }
+        Err(AppError::Forbidden(
+            "Admins manage member invitations; only the company owner may invite an administrator."
+                .into(),
+        ))
+    }
     pub(super) fn assign(&self, current: LevelTarget, requested: AccessLevel) -> AppResult<()> {
         may_assign_level(self.actor, current, requested).map_err(level_error)
     }
@@ -190,6 +206,46 @@ pub(super) async fn read_invite(
         .fetch_optional(&mut **tx)
         .await
         .map_err(database)
+}
+/// The address's invitation as committed under the company lock. Every role and level writer
+/// holds that lock, so this read is stable for the rest of the transaction.
+pub(super) async fn read_invite_by_email(
+    tx: &mut Transaction<'_, Postgres>,
+    company: Uuid,
+    email: &str,
+) -> AppResult<Option<CompanyInviteDb>> {
+    sqlx::query_as(&format!("{INVITE_SELECT} AND invite.email=$2::citext"))
+        .bind(company)
+        .bind(email)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(database)
+}
+/// Accepting a member invitation demotes a current admin, so only the owner may address one.
+pub(super) async fn refuse_admin_address(
+    tx: &mut Transaction<'_, Postgres>,
+    team: &TeamAuthority,
+    company: Uuid,
+    email: &str,
+) -> AppResult<()> {
+    if team.actor.membership.is_owner() {
+        return Ok(());
+    }
+    let admin: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM users AS account CROSS JOIN LATERAL membership_of(account.id,$1) AS member
+         WHERE account.email=$2::citext AND member.role='admin')",
+    )
+    .bind(company)
+    .bind(email)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(database)?;
+    if admin {
+        return Err(AppError::Forbidden(
+            "Only the company owner may invite a current administrator.".into(),
+        ));
+    }
+    Ok(())
 }
 pub(super) async fn refuse_owner_address(
     tx: &mut Transaction<'_, Postgres>,

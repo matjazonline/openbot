@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     application::{
-        use_cases::administration::{ManagementRole, ManagementTarget, require_management},
+        ports::administration::{ManagementRole, ManagementTarget, require_management},
         workflow::WorkflowActor,
     },
     domain::workflow::CompanyId,

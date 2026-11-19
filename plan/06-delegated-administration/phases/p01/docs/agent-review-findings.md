@@ -106,3 +106,127 @@ B1-F2: delegated_administration_boundary_tests invokes actual save_binding, conf
 ### 06DA-P01-D3-F1 — implementation resolution 2026-11-17 / B3-R1
 
 **FIXED** at `831c4502e070a2fa76966cc2ccdec073f50f34dea936055963fcfb1ab1566d6a`, note 06DA-P01-B3-R1/N1. Creation/copy operations and capture/public prepared boundaries retain destination WorkflowId. Same-company existing rows use current Definition authority before conflicts or metadata; only actual absence uses creating-unit authority. HTTP copy Conflict handling explicitly reauthorizes the existing target before raw draft/revision lookup. Tests exercise real sibling create collisions, role-revoked and binding-reassigned copy replay, direct prepared save/copy/publish refusals, fresh versus forged capture, authorized collision and idempotency controls, unchanged ownership/revision/events, and competing role/binding publication boundaries. All new cases passed in the independent 39-test run, including the decisive replay/boundary fixtures. This closes the implementation finding; it does not complete the remaining phase or final repository verification.
+
+## 06DA-P01-B4-F1 — invite deletion has no locked persistence recheck of the new admin rule
+
+- Date: 2026-11-18; implement-opus-reviewed-2_4; p01/B4 batch review, round note 06DA-P01-B4-R1-N1 ([notes](agent-review-notes.md), [TASK](TASK.md) "Batch B4", [REVIEW](REVIEW.md)). Reviewer: Claude Opus 5.5 (`claude-opus-5-5`), effort not exposed to the reviewer (assigned xhigh). Worktree `/Users/mac02/orca/workspaces/openbot/plan06`, branch `plan06`, HEAD `174c83b37a7ed4156abe15dbf3870a0e04f68f68`, artifact `2c9a298f7c0fb765c1fbfd6858d2c80a245039f9d4699b1de7e39647463b691b`. Not a gated decision (B4 ungated).
+- **Actionable / medium / authorization + concurrency (requirements 01B.7, 01A.4, user decision (b)) — OPEN.**
+- Evidence: `src/application/use_cases/company_invite.rs:252–266` now admits any level manager (owner/admin), reads the invite without a lock, checks `require_inviter(access.membership, [invite.role])` at :263, then calls `delete_invite(invite_id)`. `src/adapters/persistence/company_invite.rs:329–336` is a bare `DELETE FROM company_invites WHERE id = $1`: no transaction, no actor, no `authority::start`/`lock_invite`/`lock_team`, no role recheck and no `company_id` predicate. Before B4 this path was owner-only, so the missing recheck had nothing to protect; B4 makes the outcome depend on the actor's current admin role and on the invite's current role, and neither is rechecked when the write happens.
+- Observed versus required: (i) the owner promotes a pending member invite to admin (`update_invite`, which locks it) between the admin's read and the delete, and the admin then deletes an admin invitation, breaking decision (b) "any invite carrying role=admin … stays owner-only"; (ii) the owner removes or demotes the admin (`update_member_role`/`remove_member`, both under `lock_team`) after `level_manager` and before the delete, and the delete commits after the role is gone. That is the outcome the plan's `delegated_admin_competing_` check forbids ("either refused or applied under the old role"); (iii) a call that skips the use case deletes any invite, contrary to 01A.4 and the 01B focused check ("the persistence recheck refuses a write that bypassed the use case"). TASK I1 acknowledges "delete = existing (use-case only … pre-existing)". That carries over pre-B4 code but does not dispose of the new authority. `src/adapters/persistence/AGENTS.md` also asks writes to keep the tenant identifier.
+- Missing verification: `delegated_admin_invites_root_admin_writes_member_invitations_only` checks delete only through the use case (owner's admin invite refused, own member invite deleted). It has no direct-persistence refusal and no competing case. Source and control-flow inspection only; no executed reproduction of this race.
+- Required correction: run deletion under the same account→invite→company lock order as create/update (`start`, `lock_invite` by id within the company, `lock_team`), recheck `require_inviter` against the locked row's role, and scope the DELETE by `company_id`. Pass the actor and company through the port; no compatibility needed. Add a direct-persistence refusal of an admin deleting an admin invite, plus a competing test (admin delete against owner promotion of that invite, or against removal of the admin role) showing that the delete is refused or lands before the change. Keep the use-case check for its error message.
+- Instruction lesson: when a batch widens who may call an existing write, the write's existing lack of a recheck is a new gap, not a "pre-existing" disposition. Existing guidance (plan 01A.4; AGENTS.md competing-claimant rule) already covers this, so no new instruction is proposed.
+
+## 06DA-P01-B4-F2 — invite creation checks the previous role from a read taken before the serializing lock
+
+- Date/workflow/round/reviewer/worktree/artifact: same as 06DA-P01-B4-F1.
+- **Actionable / medium / authorization + concurrency (01B.7, user decision (b), level ceilings) — OPEN.**
+- Evidence: `src/adapters/persistence/company_invite.rs:124–145` reads `previous` by `lock_invite(email)` (:125) *before* `lock_team` (:126). When no committed row exists yet, `SELECT … FOR UPDATE` returns nothing and locks nothing. `require_inviter(previous_role ∪ [requested])` (:132) and `assign(LevelTarget::Assignable(current=PUBLIC), …)` (:138–139) are then judged against that stale `None`. The final `INSERT … ON CONFLICT(company_id,email) DO UPDATE SET role=EXCLUDED.role, access_level=…` (:141–145) overwrites whatever row committed in the meantime.
+- Reproduction (executed, isolated): `logs/06DA-P01-B4-R1-reviewer-invite-race.txt` (sha256 `a4b27c0c5d03a2bd0735a1fcb8d6b7d4d5cdd962fce7d76c751cbb6338d22626`). On the owned PG18 cluster, in a scratch database that was dropped afterwards, two sessions ran the same statement sequence as `create_invite`. The owner inserts an `admin`/level 7 invitation for an address while holding the company lock. The admin session's `lock_invite` returns 0 rows, it waits on the company lock, acquires it after the owner commits, and its upsert leaves the row `member`/level 0/pending. In production, the admin's `require_inviter([Member])` and `assign(PUBLIC→0)` both pass on `previous=None`. The owner's admin invitation is demoted, which decision (b) forbids. The same window lets an admin overwrite an invitation whose level is above its own, bypassing the `TargetAboveActor` ceiling that `assign` enforces for a visible row. Stand-in limitation: minimal tables reproduce PostgreSQL's READ COMMITTED behavior for the exact statement order. The Rust writers themselves were not raced.
+- Before B4 only the owner could create invitations, so owner against owner was harmless. B4 makes the stale read an authorization input. Update is not affected: it locks an existing row by id, and `FOR UPDATE` re-reads the latest version.
+- Required correction: decide `previous_role`/`current` from a read taken after `lock_team`, or make the conflict update conditional, e.g. refuse when the conflicting row's role or level would fail `require_inviter`/`assign` for this actor. Keep the account→invite→company order or justify a new one. Add a competing test with real writers: an owner admin-invite create and an admin member-invite create for the same new address, in the order that exposes the window. It should show the admin is refused (or its write applies first and the owner's write then wins), never an admin-demoted owner invitation. Optionally do the same for a level above the admin's own.
+- Instruction lesson: a lock that `SELECT … FOR UPDATE` takes on a row that may not exist yet does not serialize later inserts. Any upsert whose authorization depends on the prior row must re-read that row under the serializing lock. Candidate for `src/adapters/persistence/AGENTS.md` ("Preserve the existing correctness guards"): "Authorize upserts against the row as read after the serializing lock. A pre-lock miss does not lock the key." Evidence: this finding only. Scope: persistence upserts gated by row-dependent authority.
+
+## 06DA-P01-B4-F3 — a root admin's member invitation demotes an existing admin who accepts it
+
+- Date/workflow/round/reviewer/worktree/artifact: same as 06DA-P01-B4-F1.
+- **Optional suggestion / low / requirements — OPEN (for root/user decision).**
+- Evidence: `create_company_invite` and `create_invite` do not refuse an address that already belongs to a current admin member. On acceptance, `accept_pending_invite` → `join_root_on` → `set_admin_on(…, Member)` (`src/adapters/persistence/company/root.rs:182–190`) deletes the accepted member's `admin` root role. After B4, a root admin can send a member invitation to a fellow admin's address. If that admin accepts it, their root role changes, even though D1 item 5 and TASK I1 keep root role changes (`update_member_role`) owner-only. This needs the target's own consent, so it is not an escalation. It is still an indirect root-role change that decision (b) does not mention. Inspection only.
+- Suggested disposition: refuse admin-issued invitations to addresses of current admin members (persistence check under `lock_team`), or record with the user that a consensual acceptance may step an admin down.
+- Instruction lesson: none supported beyond tracing accept-side effects of invite payload fields.
+
+## 06DA-P01-B4-F4 — level-only edits of admin invitations remain open to root admins
+
+- Date/workflow/round/reviewer/worktree/artifact: same as 06DA-P01-B4-F1.
+- **Optional suggestion (scope question) / low / requirements — OPEN.**
+- Evidence: `set_invite_access_level` (`src/application/use_cases/company_level_use_cases.rs:69–93`; persistence `src/adapters/persistence/company_invite.rs:298–328`) lets any level manager change the access level of any pending invite, including one carrying role=admin, within the actor's own ceiling. This predates B4 (identical at d748c2ff) and B4 leaves it unchanged. Read literally, user decision (b) says "any invite carrying role=admin … stays owner-only". An admin can still lower the owner's admin invitation's level through this endpoint. "Stays" can reasonably be read as covering only the formerly owner-only create/update/delete, so this is not classified as a defect.
+- Suggested disposition: root confirms the scope of (b) with the user. Then either apply `require_inviter([invite.role])` to the level endpoint (use case and locked persistence row) or record that level-only edits stay under the access-level plan's ceilings.
+
+## 06DA-P01-B4-F5 — contract-impact row claims the team UI admits admins, but its invite forms stay owner-gated
+
+- Date/workflow/round/reviewer/worktree/artifact: same as 06DA-P01-B4-F1.
+- **Optional suggestion / low / verification records — OPEN.**
+- Evidence: the TASK "Contract impact" row "CompanyInvite authority" lists "HTTP company invite routes/team UI" with disposition "admin allowed for member invites only". The routes do forward admins to the use case. The pages still render invite create/edit/delete controls only when `actor.membership.is_owner()` (`src/adapters/http/pages/companies.rs:286,312,536`), so admins reach the new authority only through direct form/JSON requests. This fails closed and UI work belongs to 02A, but the recorded disposition does not match the consumer.
+- Suggested disposition: change the row to say the UI is unchanged and owner-gated, deferred to 02A, so 02A picks it up (including Forbidden handling in the HTMX create/update handlers, which return only BadRequest/Conflict as inline alerts).
+
+### 06DA-P01-B4-F1 — recheck 2026-11-19 / B4-R2 (note 06DA-P01-B4-R2-N1)
+
+**SOURCE FIXED; required competing proof missing — remains OPEN, downgraded to low / verification.** Reviewed source = frozen `4228a622933c9bfbf84f4e55fcc2bd71ff3325f5538c80814ec861e1640544df`. Changes inspected:
+- `delete_invite(DeleteCompanyInvite)` now runs `start` (actor account), `lock_invite(company,id)` FOR UPDATE, then `lock_team`, the same order as update and level edits. It rechecks `require_inviter([locked role])` and deletes `WHERE company_id AND id` in a transaction.
+- The port change reaches every caller and implementor: the use case, the mock, the two persistence tests and the new tests; `PostgresPersistence` and the mock are the only implementors.
+- The stale `.sqlx` entry for the old DELETE is the only cache file removed.
+
+Executed proof `delegated_admin_invites_persistence_rechecks_delete_level_and_admin_address` (passes in the reviewer runs) covers direct-persistence refusals: admin on the owner's admin invite Forbidden, member Forbidden, foreign-company and stranger NotFound, roles unchanged, and the admin's own member invite deleted. By inspection the locked recheck cures the race: a promotion via `update_invite` serializes on the row lock and the delete re-reads the latest row; a role removal serializes on the company lock and the actor is reread under it.
+
+The R1 correction required a competing-claimant test, and AGENTS.md requires one for a changed concurrency protocol. None was added for delete, and TASK has no disposition for its omission. Remaining action: one real competing test, e.g. `competing_writes(WriteBarrier::CompanyInvites, owner update_invite member→admin, admin delete_invite)` asserting the delete is Forbidden and the invite remains, or the reverse order showing the delete commits first. Alternatively, a role-removal/delete pair.
+
+### 06DA-P01-B4-F2 — recheck 2026-11-19 / B4-R2
+
+**FIXED** at source `4228a622…`. `create_invite` now authorizes against `read_invite_by_email` read after `lock_team`.
+
+Soundness against every invite writer:
+- create, update, level edit and delete all hold the company lock (`lock_team`) through commit, and acceptance takes the company lock before its status UPDATE. So no role or level change can commit between the post-lock read and the upsert.
+- `decline_pending_invite` takes no company lock but changes only `status`. That is irrelevant to the role/level authorization, and the upsert's reopen-to-pending is pre-existing.
+- A new row can only be inserted by another create, which needs the company lock.
+- Not re-locking the row after the company lock is correct. A post-company relock would invert against update, level edit and delete (invite→company), not against acceptance as the new learning states; see the note.
+
+`delegated_admin_competing_owner_admin_invite_precedes_admin_member_upsert` discriminates:
+- The owner's INSERT blocks on the `company_invites` SHARE barrier while holding the company lock. The admin's `lock_invite(email)` therefore finds no row, and `competing_writes` proves the admin then waits on that writer's backend.
+- After release, the admin is Forbidden and the role stays Admin. The R1 code would have produced Member, matching my R1 reproduction.
+- The reverse test is a valid control: the admin's member invite commits first and the owner's upsert then wins.
+
+Both pass in the author's and the reviewer's runs.
+
+### 06DA-P01-B4-F3 — recheck 2026-11-19 / B4-R2
+
+**FIXED (under user decision (b)).** `refuse_admin_address` refuses a non-owner create or update addressed to any account whose `membership_of` role is admin. It uses `users.email = $addr::citext`. Acceptance matches `company_invites.email = $user_email`, and the reviewer probe showed that `citext = text` resolves to an exact text comparison. Since `invite_address` lowercases, every acceptance-matchable invite address equals some admin's stored address exactly, and citext equality is reflexive, so the refusal covers every acceptance match. It can over-refuse ASCII case variants, which fails closed.
+
+Tests: the admin's member invite to an admin's address is Forbidden through the use case and persistence, the update redirect is Forbidden, and the owner may still address one.
+
+Residual (accepted, consent-based; not blocking): the check runs at write time. A pending member invitation whose address later becomes an admin's, through promotion or an email change, can still demote that admin when they accept it themselves.
+
+### 06DA-P01-B4-F4 — recheck 2026-11-19 / B4-R2
+
+**FIXED.** `set_invite_access_level` persistence now rechecks `require_inviter([role])` after the pending check; the use case relies on that persistence Forbidden. The same post-status order in `update_invite` keeps a closed invite as "no change". The intermediate FAIL `logs/B4-R2-invite-tests.txt` (acceptance demotes the acting admin before its own edit locks) was inspected and is now passing. Tests cover the admin's level edit on the owner's admin invite (Forbidden) and on a member invite (applied).
+
+### 06DA-P01-B4-F5 — recheck 2026-11-19 / B4-R2
+
+**FIXED in records.** The TASK correction says the team UI does not yet expose invite forms to admins and that this belongs to 02A. For 02A: the second surface, `src/adapters/http/routes/ui_team.rs`, is also owner-gated at the form (`invite_form_pane` uses `require_owner`, :298). Its `TeamView::role` doc comment (:581–585), "the invite calls refuse a non-owner outright", is now stale.
+
+## 06DA-P01-B4-F6 — an existing team-route authorization test now fails, and the declared filter never ran it
+
+- Date: 2026-11-19; implement-opus-reviewed-2_4; p01/B4 correction recheck, round note 06DA-P01-B4-R2-N1. Reviewer: Claude Opus 5.5 (`claude-opus-5-5`), effort not exposed. Worktree `/Users/mac02/orca/workspaces/openbot/plan06`, HEAD `174c83b37a7ed4156abe15dbf3870a0e04f68f68`. Source = frozen `4228a622933c9bfbf84f4e55fcc2bd71ff3325f5538c80814ec861e1640544df`; the tree digest is `abb60051…` only because of an untracked `.trail` learning. The defect has existed since the R1 artifact `2c9a298f…` (the I1 use-case change) and was missed by the R1 review.
+- **Actionable / medium / verification + requirements (01B.7, user decision (b)) — OPEN.**
+- Evidence: `adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes` (`src/adapters/http/routes/ui_team_authorization_tests.rs:90–115`, untouched since d748c2ff) fails deterministically with `expected 403 Forbidden, got success` (`src/adapters/http/routes/authorization_test_support.rs:272`). Its `denied_mutations` sends the workspace route `ui_team::create_invite` a role=Member invite for a fresh address as an admin and expects Forbidden. Under I1 that is now allowed, so it succeeds. The route has no owner gate of its own (`ui_team.rs:409–440`).
+- Reviewer logs: `logs/06DA-P01-B4-R2-reviewer-focused.txt` (70 PASS / 1 FAIL) and the sweep of every lib test matching `team` or `invite`, `logs/06DA-P01-B4-R2-reviewer-team-invite-sweep.txt` (76 PASS / 1 FAIL, only this test).
+- Why the evidence missed it: the author's R1 and R2 focused commands and contract table cite the filter `ui_team_authorization`. The test file is mounted as module `ui_team::authorization_tests`, so the filter matches zero tests: neither `B4-focused-final.txt` nor `B4-R2-focused-final.txt` contains it. My R1 run used the same filter and is equally void for it. The M1 full run predates the I1 change.
+- Impact: the suite is red on an affected-behavior check. The contradicting assertion is a pre-existing encoding of the old owner-only invite rule, and the evidence claimed a check family that never ran.
+- Required correction: update this test intentionally to user decision (b). Keep the member refusal and the owner-only role/remove refusals. Assert that the admin's workspace-route member invite succeeds, and that an admin-role invite or an admin-address invite through the same route is refused (HTTP 403 via `inline_team_mutation_error` propagation). Re-run with filters that actually match (e.g. `ui_team::` or `authorization_tests`) and correct the TASK filter names. Re-scan other declared filters for zero matches.
+- Instruction lesson (observed): a libtest substring filter built from a file name can silently match nothing when `#[path]` mounts the file under a different module name. Candidate for the verification-contracts reference: "For each declared focused filter, confirm from the run output that it matched at least one test. A name filter with zero matches is NOT EXERCISED, not PASS." Evidence: this finding (author R1/R2 and reviewer R1 runs).
+
+### 06DA-P01-B4-F1 — recheck 2026-11-19 / B4-R3 (note 06DA-P01-B4-R3-N1)
+
+**FIXED** at `ee4c49d0820f1ca469e825507a06b714ec3f308a54a0b2ea417739eb04f320f4`.
+
+New test `delegated_admin_competing_owner_promotion_precedes_admin_invite_delete` uses real writers:
+- First writer: the owner's `update_invite`, member→admin. `invite_update_command` defaults to the company owner. It takes the row lock and the company lock, then blocks on the `company_invites` SHARE barrier at its UPDATE.
+- Second writer: the admin's `delete_invite`. `competing_writes` proves it waits on the first writer's backend; that wait is its `lock_invite` FOR UPDATE.
+- After release, the delete re-reads the promoted row and is Forbidden, the update returns role Admin, and the invite remains Admin.
+- Against R1's unlocked `DELETE … WHERE id` the row would be gone, so the test discriminates.
+
+It passes in the author's R3 run and in the reviewer's run. Together with the R2 direct-persistence refusals, this closes F1.
+
+### 06DA-P01-B4-F6 — recheck 2026-11-19 / B4-R3
+
+**FIXED** at `ee4c49d0…`.
+
+`team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes` now parameterizes `denied_mutations` by invite role:
+- A member actor's member invite is refused.
+- An admin actor's admin invite is refused.
+- `update_member_role` and `remove_member` stay refused for both, as owner-only.
+- A route-level positive asserts a root admin's member invite through `ui_team::create_invite` succeeds, with stored role `member`.
+- The DB-error and foreign/unknown callers keep the Member invite role and their expected 500 and 404.
+
+This matches user decision (b). The test passes in the author's R3 run (`logs/B4-R3-focused-final.txt`) and in the reviewer's run (`logs/06DA-P01-B4-R3-reviewer-focused.txt`).
+
+The filter defect is corrected: I independently counted matches in `logs/B4-R3-discovery-after.txt` for all 16 declared filters, and each matches at least one test (`ui_team` 7, `team` 30, `invite` 51, `workflow_and_transport_depend` 1, …). TASK records the root cause. The candidate instruction recorded in F6 stands for later analysis.

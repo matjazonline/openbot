@@ -48,6 +48,8 @@ pub(crate) enum WriteBarrier {
     BindingEvents,
     DeskGrants,
     Agents,
+    KnowledgeDocuments,
+    CompanyInvites,
 }
 impl WriteBarrier {
     fn sql(&self) -> &'static str {
@@ -56,6 +58,8 @@ impl WriteBarrier {
             Self::BindingEvents => "LOCK TABLE workflow_binding_events IN SHARE MODE",
             Self::DeskGrants => "LOCK TABLE channel_principal_grants IN SHARE MODE",
             Self::Agents => "LOCK TABLE agents IN SHARE MODE",
+            Self::KnowledgeDocuments => "LOCK TABLE knowledge_documents IN SHARE MODE",
+            Self::CompanyInvites => "LOCK TABLE company_invites IN SHARE MODE",
         }
     }
 }

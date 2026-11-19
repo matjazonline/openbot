@@ -58,7 +58,7 @@ pub struct DepartmentScope {
 
 #[async_trait]
 pub trait DepartmentPersistence:
-    crate::application::use_cases::administration::AdministrationPersistence
+    crate::application::ports::administration::AdministrationPersistence
 {
     async fn create(
         &self,

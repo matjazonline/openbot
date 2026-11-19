@@ -94,9 +94,7 @@ async fn authorize_on(
         tx,
         target.company,
         target.actor,
-        crate::application::use_cases::administration::ManagementTarget::Definition(
-            target.workflow,
-        ),
+        crate::application::ports::administration::ManagementTarget::Definition(target.workflow),
     )
     .await?;
     Ok(())

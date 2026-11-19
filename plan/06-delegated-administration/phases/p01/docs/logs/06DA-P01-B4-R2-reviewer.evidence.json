@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B4-R2",
+  "artifact": "4228a622933c9bfbf84f4e55fcc2bd71ff3325f5538c80814ec861e1640544df",
+  "checks": [
+    {
+      "criteria": ["06DA-P01-B4-F1", "06DA-P01-B4-F2", "06DA-P01-B4-F3", "06DA-P01-B4-F4", "06DA-P01-B4-F6", "01B.6", "01B.7"],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- company_invite company_access_level company_tests:: ui_team delegated_admin_memory delegated_scopes (reviewer; 70 PASS / 1 FAIL ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes)",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05 (tests create own databases); SQLX_OFFLINE=true; tree differs from artifact only by an untracked .trail learning",
+      "status": "FAIL",
+      "files": [{"path": "logs/06DA-P01-B4-R2-reviewer-focused.txt", "sha256": "4beb31a9e6022a907cca6edd31a9720d0f4f886bc9161eb97316bd1030ff3d50"}]
+    },
+    {
+      "criteria": ["06DA-P01-B4-F6", "01B.7"],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- team invite (reviewer sweep; 76 PASS / 1 FAIL, same test)",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "FAIL",
+      "files": [{"path": "logs/06DA-P01-B4-R2-reviewer-team-invite-sweep.txt", "sha256": "3e88974bb31eda38857c130c7da6fef7970dcd83ee707433b924fc6cb67d43b7"}]
+    }
+  ]
+}

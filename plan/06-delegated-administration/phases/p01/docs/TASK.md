@@ -1196,3 +1196,190 @@ PostgreSQL18 cluster stopped successfully (B3-owned-postgres-stop.txt); its data
 allownedDBs, targetcache, pluginfixtures, source and evidence retained for resumption.
 No unrelatedprocess/resource touched. This concludes only the authorized independent
 checkpoint, not the complete original Plan06 implementation.
+
+## 2026-11-18 handover to Claude Code / implement-opus-reviewed-2_4
+
+- Workflow now implement-opus-reviewed-2_4 (records shared across variants within p01).
+  Root/A: Claude Code root, session b36d9dc4-495e-4131-9804-05ebcc381915, Opus 5.5,
+  effort xhigh confirmed by the user. B: Opus 5.5 / xhigh, general-purpose, no
+  inherited context (user chose Opus over the skill's Fable/medium; Fable alias gives 5.1).
+  Prior Codex root and its reviewer /root/p06_reviewer are finished; not reused.
+- Compaction: CLAUDE_AUTOCOMPACT_PCT_OVERRIDE unset; user declined to add it. Default
+  auto-compaction, never claimed as 75%.
+- Coordination authority r5 (pin logs/B4-coordination-r5.md, sha256
+  6bc308a75150785346dce0964cfa0b02e0bef7faf76d98a5fe45cbfca858d5df). No notices.
+- Git (user-authorized): WIP commit d7d81ad8 of accepted B1–B3 (source snapshot tars
+  left untracked); merge of origin/main be1b504b (Plan05 complete) as 174c83b3.
+  Plan05 producer contract is now the published main source, not a dirty tree.
+
+## Batch B4 — Plan05 integration, 01B.6 knowledge/memory, 01B.7 invites
+
+Not architecture-gated: knowledge and invite changes reuse the accepted D1 predicate
+(unit_management_role) and the existing company-serialized transactions; no schema,
+transaction-boundary or lock-order change. Reviewed together in one batch review.
+
+**Merge resolutions (174c83b3, see `git show --remerge-diff 174c83b3`)**
+1. init schema: both tails kept (Plan06 definition management functions, then Plan05
+   run scope snapshot tables/guards). Fresh migration + live SQLx check pass.
+2. department creation: Plan05's `insert_department_on` (creates the unit memory
+   namespace) with Plan06's lead-before-desk order (B1 decision: the lead's desk
+   grant needs the role first).
+3. agent preparation: Plan06 `authorize_model_source_on` then Plan05
+   `require_consumed_units_on`; both checks are independent refusals.
+4. Plan05's new fixtures (8 call sites) use Plan06's actor-checked
+   `ChannelPersistence::create/delete` via `test_support::{create_channel,company_owner_actor}`.
+
+**B4 decisions**
+- K1 (user): manual knowledge Permissions for an ordinary person add every unit where
+  `unit_management_role(actor, company, unit)` is not NULL to BOTH read and write
+  selections (src/adapters/persistence/knowledge/permissions.rs `ordinary`). Bounded by
+  MAX_RUN_READ_UNITS with the existing generic scope-limit error. Owner/admin remain
+  `All`. Level ceilings, hidden-layer and collision rules unchanged. Frozen workflow
+  run scopes (`run_scopes`, scope snapshots) unchanged. The one-step lead-children
+  write insert is removed as subsumed (children of a led unit are always managed);
+  the lead-children facts still feed `run_scopes` read computation unchanged.
+- K2: knowledge writes already lock_team (company) inside the same transaction as
+  role writes' company lock, so stale-role commits are impossible; proven by
+  competing tests in both orders.
+- M1: memory settings stay root-managed (owner/admin) — existing behavior; added a
+  delegated regression that a unit lead is NotFound for enable/disable.
+- I1 (user): `CompanyMembership::may_invite_as(role)`: owner any role; admin only
+  Member; others none. Use case (create/update/delete) and persistence recheck
+  (create_invite/update_invite under lock_team) both enforce it over every role the
+  write touches: create = requested + any existing invite for that address (upsert);
+  update = previous + requested; delete = existing (use-case only; persistence
+  delete_invite has no actor, pre-existing). Membership level ceilings unchanged.
+  update_member_role/remove_member stay owner-only (root roles, D1 item 5).
+- Department placement of an invited person = department manager: already B1
+  (add_member requires managing the department); no change.
+- Regression fix (found by M1 full run): Plan06 B1 made workflow/authorization.rs
+  import `use_cases::administration`, violating the shared-port boundary test
+  `workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports`.
+  The module moved unchanged to `application/ports/administration.rs`; 50 references
+  updated. No behavior change.
+- Intentional test changes: Plan05 `knowledge_scope_search_manual_roles_ancestors_one_step_leads_and_level`
+  renamed `..._managed_subtree_and_level`; lead-of-A now lists/searches {root,a,b,c}.
+  `knowledge_scope_upload_requires_current_placement_and_parent_lead_without_sideways_grants`:
+  grandchild C now writable by lead of A; root/foreign still NotFound.
+- Deferred within plan: `manages_company_operations` removal (01A.2) — remaining
+  consumers are root-level operations and UI/list filtering owned by 02A; removal is
+  done with 02A's consumer dispositions.
+
+**B4 acceptance mapping**
+
+| Criterion | Production path/case | Decisive assertion | Evidence | Status |
+| --- | --- | --- | --- | --- |
+| 01B.6 subtree knowledge | lead of A on D (3 below): list/search/replace/move/delete | D listed & searched; replace/move/delete succeed; L6 layer Forbidden & untouched | delegated_admin_knowledge_lead_manages_the_whole_subtree_within_its_level | PASS |
+| 01B.6 no sideways/upward | sibling, root, other company | replace/move/list/delete NotFound; sibling doc remains | same | PASS |
+| 01B.6 revocation | lead removed | D replace/list NotFound | same | PASS |
+| 01B.6 competing | upload vs lead removal both orders (real writers, barrier proves waits) | upload-first commits then removal; removal-first upload NotFound, no row | delegated_admin_competing_knowledge_upload_precedes_role_removal, delegated_admin_competing_role_removal_precedes_knowledge_upload | PASS |
+| 01B.6 memory root-level | unit lead enable/disable | NotFound; tenant unchanged | delegated_admin_memory_settings_stay_with_root_managers | PASS |
+| 01B.7 invites | admin member invite create/update/delete; admin-role create/promote/overwrite/demote/delete; member | admin member ops succeed; admin-role ops Forbidden in use case AND persistence; owner's admin invite unchanged; member refused | delegated_admin_invites_root_admin_writes_member_invitations_only | PASS |
+| Plan05 integration | merged tree | full lib suite on merge baseline | logs/M1-merge-lib-tests.txt: 4846 PASS/5 FAIL/30 ignored | see failures |
+| Boundary regression | dependency scan | no use_cases import in workflow/transport | workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports in B4-focused-final | PASS |
+
+**Contract impact**
+
+| Changed contract | Consumers | Disposition | Checks |
+| --- | --- | --- | --- |
+| knowledge Permissions read/write | list, unit_choices, preflight_search, search_manual, preflight_upload, replace, delete, move (persistence/knowledge mod/rows/search/moves); HTTP knowledge routes/pages, department pane knowledge | all consume the same selections; widened only for managers | knowledge (persistence+HTTP+pages+workflow knowledge) in B4-focused-final |
+| CompanyInvite authority | use case create/update/delete; persistence create_invite/update_invite; HTTP company invite routes/team UI | admin allowed for member invites only | company_invite, ui_team_authorization, company_access_level, company_owner families |
+| administration port path | 50 imports | path only | full all-target clippy |
+
+**M1 merge-baseline failures (logs/M1-merge-lib-tests.txt; reruns logs/M1-isolated-reruns.txt)**
+- workflow_and_transport_…reverse_usecase_imports: Plan06 regression, FIXED in B4.
+- security_auth_limits_login_counter_is_shared_and_success_resets_it and
+  security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest:
+  deterministic on the owned cluster; it was initdb'd with C locale
+  (`lower('Älice')`='Älice' there, 'älice' on the system en_US.UTF-8 server). Files
+  untouched by Plan05/06 since d748c2ff. Environment-unrelated; final gate must use a
+  UTF-8-locale cluster.
+- cloudroom_e2e_cut_points_…: timeout under full-suite load; PASS isolated.
+- doop_agent_current_preparation_reaches_ready_before_model_io: asserts prepared
+  version 7; Plan05 on main set PREPARED_AGENT_VERSION=8 and ran with Doop filtered.
+  Pre-existing on origin/main; Doop deferral preserves it unchanged.
+
+**B4 frozen artifact**: base 174c83b37a7ed4156abe15dbf3870a0e04f68f68, digest
+2c9a298f7c0fb765c1fbfd6858d2c80a245039f9d4699b1de7e39647463b691b, exclusions
+plan/06-delegated-administration/phases/p01/docs and
+plan/06-delegated-administration/COORDINATION.md (logs/B4-author-freeze.snapshot.txt).
+Review scope: merge commit 174c83b3 resolution (vs both parents) plus working-tree delta.
+Checks (owned PG18 127.0.0.1:55406, DB openbot_p06_merge05, SQLX_OFFLINE=true):
+fmt PASS, diff --check PASS, sqlx prepare --check PASS, source_modules 8 PASS,
+focused 562 PASS/0 FAIL/2 ignored (B4-focused-final.txt). Discovery 4881→4886:
++5 new, 1 rename, 0 removed (B4-discovery-{before,after}.txt).
+Next: independent B4 batch review (06DA-P01-B4-R1).
+
+### B4 R1 findings and correction (R2)
+
+B4-R1 (note 06DA-P01-B4-R1-N1): CHANGES REQUIRED. All five findings are dispositioned
+in one correction:
+- F1 (medium) FIXED: `CompanyInvitePersistence::delete_invite` now takes
+  `DeleteCompanyInvite{actor_id,company_id,invite_id}`; persistence locks the account,
+  the invite row (company-scoped) and the company, rechecks `require_inviter([role])`,
+  and deletes `WHERE company_id AND id`. Callers updated (use case, use-case mock,
+  two persistence tests). The removed `query!` drops one .sqlx file (regenerated).
+- F2 (medium) FIXED: create_invite authorizes against `authority::read_invite_by_email`
+  read after `lock_team`. All role/level writers hold the company lock, so the read is
+  stable; a plain read avoids re-locking the row after the company (accept takes
+  company then invite row). Real competing tests, both orders, via a new
+  `WriteBarrier::CompanyInvites`.
+- F3 (low, under user decision b) FIXED: `authority::refuse_admin_address`: a
+  non-owner create/update addressed to a current root admin is Forbidden (acceptance
+  would demote them). The owner may still address one.
+- F4 (low, under user decision b) FIXED: `set_invite_access_level` rechecks
+  `require_inviter([role])`. The recheck in it and in update_invite now runs after the
+  pending-status check, so a closed invitation stays "no change" (None). The existing
+  race `access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels`
+  exposed the order: acceptance demotes the acting admin before the edit locks.
+- F5 (low) FIXED in records: the "Contract impact" invite row is corrected. Team UI
+  invite forms are still owner-only (companies.rs); exposing them to admins and admin
+  delete buttons is carried to 02A.
+
+New tests: delegated_admin_invites_persistence_rechecks_delete_level_and_admin_address,
+delegated_admin_competing_owner_admin_invite_precedes_admin_member_upsert,
+delegated_admin_competing_admin_member_invite_precedes_owner_admin_upsert.
+
+R2 frozen: base 174c83b3, digest 4228a622933c9bfbf84f4e55fcc2bd71ff3325f5538c80814ec861e1640544df,
+same exclusions (logs/B4-R2-author-freeze.snapshot.txt). Coordination r5 unchanged.
+Checks: fmt, diff --check, sqlx prepare --check, source_modules PASS; focused 565 PASS/0 FAIL/2
+ignored (B4-R2-focused-final.txt). Discovery vs R1: +3 new tests, 0 removed (B4-R2-discovery-after.txt).
+
+Correction to the R1 "Contract impact" invite row: consumers are use case
+create/update/delete, persistence create/update/delete/set_invite_access_level and
+the HTTP invite routes. The team UI does NOT expose invite forms to admins yet (02A).
+
+### B4 R2 findings and correction (R3)
+
+B4-R2 (note 06DA-P01-B4-R2-N1): F2–F5 closed; F1 open (low), F6 new (medium), digest
+drift from an untracked trail learning added after freeze.
+- F6 FIXED: `team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes`
+  (src/adapters/http/routes/ui_team_authorization_tests.rs) encoded owner-only invites.
+  It now refuses member-actor member invites and admin-actor admin invites, and asserts a
+  root admin's member invite through the workspace route succeeds and stores role member.
+  Root cause of the miss: focused filters `ui_team_authorization` and
+  `company_access_level` matched zero tests (modules mount as `ui_team::authorization_tests`
+  and `company_invite::access_level_tests`). Every R3 filter was checked against
+  `--list` and matches at least one test; `ui_team`, `invite` and `team` added.
+- F1 FIXED: competing test
+  `delegated_admin_competing_owner_promotion_precedes_admin_invite_delete` (owner
+  promotes to admin while the admin's delete waits; delete Forbidden, role Admin).
+- Digest: the trail learning is part of the change. A replacement learning corrects its
+  lock-order wording (`...-mac02-2.md`, replaces l-1a464501; both untracked, included in
+  the digest, not edited further).
+R3 frozen: base 174c83b3, digest ee4c49d0820f1ca469e825507a06b714ec3f308a54a0b2ea417739eb04f320f4, same exclusions
+(logs/B4-R3-author-freeze.snapshot.txt). Checks: fmt, diff --check, sqlx --check,
+source_modules PASS; focused 593 PASS/0 FAIL/2 ignored (B4-R3-focused-final.txt);
+discovery +1 vs R2, 0 removed (B4-R3-discovery-after.txt).
+
+### Root B4 acceptance — p01 complete in phase
+
+06DA-P01-B4-R3/N1 PASS for ee4c49d0820f1ca469e825507a06b714ec3f308a54a0b2ea417739eb04f320f4.
+Root reproduced the digest and file list (logs/B4-root-acceptance.snapshot.txt), validated
+the author and reviewer R3 manifests, coordination r5 is byte-identical to its pin, and no
+finding is open (F1–F6 fixed). B4 ACCEPTED IN PHASE. With B1–B3, p01 (doc 01) is accepted
+in phase except the deliberate 01A.2 removal of `manages_company_operations`, carried to
+p02/02A with its consumer dispositions. Not integrated, not pushed; no full Plan06 claim.
+Remaining unrelated/deferred: C-locale auth pair, Doop version assertion, cloudroom load
+timeout (final gate on a UTF-8 cluster). User authorized committing B4 locally (2026-11-19).
+Next: p02 (doc 02) in phases/p02/docs.

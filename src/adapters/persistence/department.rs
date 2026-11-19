@@ -59,7 +59,7 @@ async fn require_department_management_on(
     scope: DepartmentScope,
     unit: Option<DepartmentId>,
 ) -> AppResult<()> {
-    use crate::application::use_cases::administration::ManagementTarget;
+    use crate::application::ports::administration::ManagementTarget;
     super::administration::management_role_on(
         tx,
         scope.actor.user_id(),

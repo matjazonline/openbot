@@ -62,7 +62,7 @@ pub(in crate::adapters::persistence) async fn authorize_company_with_locks(
         db,
         actor.user_id(),
         company,
-        crate::application::use_cases::administration::ManagementTarget::Root,
+        crate::application::ports::administration::ManagementTarget::Root,
     )
     .await?
     .ok_or_else(missing)?;

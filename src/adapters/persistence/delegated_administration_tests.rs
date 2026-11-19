@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::use_cases::administration::{
+use crate::application::ports::administration::{
     AdministrationPersistence, ManagementRole, ManagementTarget, manages_unit,
 };
 

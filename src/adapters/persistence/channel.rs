@@ -340,7 +340,7 @@ impl ChannelPersistence for PostgresPersistence {
             actor,
         )
         .await?;
-        use crate::application::use_cases::administration::ManagementTarget;
+        use crate::application::ports::administration::ManagementTarget;
         super::workflow::management::authorize_target_on(
             &mut tx,
             crate::domain::workflow::CompanyId::new(company_id),

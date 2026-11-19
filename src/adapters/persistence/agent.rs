@@ -480,7 +480,7 @@ impl AgentPersistence for PostgresPersistence {
             &mut tx,
             company,
             actor,
-            crate::application::use_cases::administration::ManagementTarget::AnyUnit,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
         )
         .await?;
         let rows: Vec<AgentDb> = sqlx::query_as(&format!(

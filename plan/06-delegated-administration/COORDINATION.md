@@ -1,37 +1,40 @@
 # Plan coordination: 06-delegated-administration
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/06-delegated-administration/COORDINATION.md
-- Writer: /root, session 01a1e945-99f4-76e0-965e-403847e819b2, worktree /Users/mac02/orca/workspaces/openbot/plan06
-- Revision: 4
+- Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, worktree /Users/mac02/orca/workspaces/openbot/plan06
+- Revision: 6
 
 ## Plan-wide instructions
 
-- User requests the complete original Plan06 under implement-astra-reviewed-2-3,
-  beginning with a dependency check. Root/A is Sol6.1/xhigh (current session
-  turn_context confirms both); independent reviewer B will be Astra/high without
-  inherited context. No commit, push, deployment or shared database reset requested.
+- 2026-11-18 handover: the user asked this Claude Code session to continue Plan06
+  under implement-opus-reviewed-2_4 from the prior Codex root's stop. The Codex root
+  (/root, session 01a1e945-…) had finished and stopped; it no longer writes here.
+  Root/A is Opus 5.5/xhigh; independent reviewer B is Opus 5.5/xhigh by user choice
+  (in place of the skill's Fable/medium). Default auto-compaction, not 75% (user skipped).
+- Plan05 is complete on origin/main (be1b504b). User authorized a WIP commit of the
+  accepted p01 B1–B3 work (d7d81ad8) and a merge of origin/main (174c83b3) on branch
+  plan06. No push, deployment or shared database reset is authorized.
 - No backward compatibility. Use fresh owned databases for schema verification.
 - Preserve the existing conversation/read policy, owner-only operations and all
   tenant, identity, classification, transaction and concurrency boundaries.
 - Execute original documents 01, 02, 03 in order, with focused checks and independent
   acceptance at stable batch boundaries and one complete final repository gate.
-- Plan05 is being implemented concurrently in another worktree. Read its authority
-  at /Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md.
-  Do not edit its source, records, fixtures or resources or import its evolving dirty
-  tree. Accepted artifact identity is required before dependency integration.
-
-- Latest user instruction: proceed with the independent work and STOP when Plan05
-  phase03 is necessary. Do not implement or import an unfinished Plan05 contract.
+- User decisions 2026-11-18: (a) a unit manager's manual knowledge read AND write
+  cover the whole managed subtree; frozen workflow run scopes and agent memory stay
+  as Plan05 defined. (b) Root admins may create/update/delete company invites with
+  role=member; any invite carrying role=admin (before or after) stays owner-only.
+- Plan05 Doop deferral (05SC-C001/04RU-C005) is inherited: Doop failures and
+  assertions are preserved, not relabeled, and not fixed here.
 
 ## Phase directory
 
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
-| p01 B1/B2/B3 accepted in phase; stopped before01B.6/05ph03 | /root author; /root/p06_reviewer independent B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
-| p02 planned | /root | same sequential worktree | phases/p02/docs/ when started |
-| p03 planned | /root | same sequential worktree | phases/p03/docs/ when started |
+| p01 accepted in phase (B1–B4; 01A.2 removal carried to p02) | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
+| p02 starting (02A routes/pages + 01A.2, 02B audit) | Claude root/A; Opus B | same sequential worktree | phases/p02/docs/ when started |
+| p03 planned | Claude root | same sequential worktree | phases/p03/docs/ when started |
 
 ## Cross-phase notices
 
-None. The external Plan05 dependency is recorded in p01 TASK/HANDOFF; no new shared
-contract has been agreed or published to another phase.
+None. Plan05 is integrated from its published main commit; no shared contract has
+been agreed or published to another phase.

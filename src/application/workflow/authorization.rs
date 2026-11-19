@@ -120,8 +120,8 @@ impl WorkflowOperation {
 fn company_management_target(
     association: RelatedAssociation,
     operation: WorkflowOperation,
-) -> AppResult<Option<crate::application::use_cases::administration::ManagementTarget>> {
-    use crate::application::use_cases::administration::ManagementTarget;
+) -> AppResult<Option<crate::application::ports::administration::ManagementTarget>> {
+    use crate::application::ports::administration::ManagementTarget;
     let scoped = match operation {
         WorkflowOperation::ListManaged => Some(ManagementTarget::AnyUnit),
         WorkflowOperation::CreateDefinition(workflow)
@@ -240,7 +240,7 @@ where
             .access_context_for_user(company.as_uuid(), actor.user_id())
             .await?
             .ok_or_else(not_found)?;
-        use crate::application::use_cases::administration::{ManagementTarget, require_management};
+        use crate::application::ports::administration::{ManagementTarget, require_management};
         if let Some(target) = company_management_target(association, operation)? {
             return require_management(&self.principals, actor.user_id(), company, target)
                 .await
@@ -306,8 +306,8 @@ fn principal_management_target(
     company: CompanyId,
     context: crate::entities::participant::PrincipalAccessContext,
     operation: WorkflowOperation,
-) -> AppResult<crate::application::use_cases::administration::ManagementTarget> {
-    use crate::application::use_cases::administration::ManagementTarget;
+) -> AppResult<crate::application::ports::administration::ManagementTarget> {
+    use crate::application::ports::administration::ManagementTarget;
     if principal.id != expected
         || principal.company_id != company.as_uuid()
         || (operation.requires_human_view() && !principal.direct_viewer_access(context))

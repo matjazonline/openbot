@@ -13,8 +13,9 @@ use crate::{
         value_objects::AvatarUrl,
     },
     use_cases::company_invite::{
-        CompanyInvitePersistence, CreateCompanyInvite, InviteLevelChange, MemberLevelChange,
-        MemberRoleChange, RemoveCompanyMember, UpdateCompanyInvite, invite_address,
+        CompanyInvitePersistence, CreateCompanyInvite, DeleteCompanyInvite, InviteLevelChange,
+        MemberLevelChange, MemberRoleChange, RemoveCompanyMember, UpdateCompanyInvite,
+        invite_address,
     },
 };
 
@@ -121,10 +122,17 @@ impl CompanyInvitePersistence for PostgresPersistence {
             company_id: command.company_id,
         };
         let mut tx = authority::start(&self.pool, scope, None).await?;
-        let previous =
-            authority::lock_invite(&mut tx, scope.company_id, InviteTarget::Email(&email)).await?;
+        authority::lock_invite(&mut tx, scope.company_id, InviteTarget::Email(&email)).await?;
         let team = authority::lock_team(&mut tx, scope, None).await?;
-        team.require_owner()?;
+        // Creation upserts by address, so it may also rewrite an existing invitation. Authorize
+        // against the row as committed under the company lock: one created while this writer
+        // waited is invisible to the earlier row lock.
+        let previous = authority::read_invite_by_email(&mut tx, scope.company_id, &email).await?;
+        let previous_role = previous
+            .as_ref()
+            .map(|row| CompanyAccessRole::from_str(&row.role).map_err(AppError::Internal))
+            .transpose()?;
+        team.require_inviter(previous_role.into_iter().chain([command.role]))?;
         let current = previous
             .as_ref()
             .map(|row| AccessLevel::try_from(row.access_level))
@@ -133,6 +141,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             .unwrap_or(AccessLevel::PUBLIC);
         team.assign(LevelTarget::Assignable(current), command.access_level)?;
         authority::refuse_owner_address(&mut tx, team.owner_id, &email).await?;
+        authority::refuse_admin_address(&mut tx, &team, scope.company_id, &email).await?;
         let id: Uuid = sqlx::query_scalar("INSERT INTO company_invites(id,company_id,email,role,access_level,status)
             VALUES($1,$2,$3,$4,$5::smallint,'pending') ON CONFLICT(company_id,email)
             DO UPDATE SET role=EXCLUDED.role,access_level=EXCLUDED.access_level,status='pending',created_at=CURRENT_TIMESTAMP RETURNING id")
@@ -215,18 +224,19 @@ impl CompanyInvitePersistence for PostgresPersistence {
             return Ok(None);
         };
         let team = authority::lock_team(&mut tx, scope, None).await?;
-        team.require_owner()?;
+        let previous_role =
+            CompanyAccessRole::from_str(&previous.role).map_err(AppError::Internal)?;
+        let role = command.role.unwrap_or(previous_role);
         if previous.status != "pending" {
             return Ok(None);
         }
+        team.require_inviter([previous_role, role])?;
         let current = AccessLevel::try_from(previous.access_level)
             .map_err(|e| AppError::Internal(e.into()))?;
         let requested = command.access_level.unwrap_or(current);
         team.assign(LevelTarget::Assignable(current), requested)?;
         authority::refuse_owner_address(&mut tx, team.owner_id, &email).await?;
-        let role = command
-            .role
-            .unwrap_or(CompanyAccessRole::from_str(&previous.role).map_err(AppError::Internal)?);
+        authority::refuse_admin_address(&mut tx, &team, scope.company_id, &email).await?;
         sqlx::query("UPDATE company_invites SET email=$3,role=$4,access_level=$5::smallint WHERE company_id=$1 AND id=$2 AND status='pending'")
             .bind(scope.company_id).bind(command.invite_id).bind(email).bind(role.as_str()).bind(requested.as_i16())
             .execute(&mut *tx).await.map_err(authority::database)?;
@@ -310,6 +320,9 @@ impl CompanyInvitePersistence for PostgresPersistence {
         if previous.status != "pending" {
             return Ok(None);
         }
+        team.require_inviter([
+            CompanyAccessRole::from_str(&previous.role).map_err(AppError::Internal)?
+        ])?;
         let current = AccessLevel::try_from(previous.access_level)
             .map_err(|e| AppError::Internal(e.into()))?;
         team.assign(LevelTarget::Assignable(current), change.access_level)?;
@@ -321,13 +334,30 @@ impl CompanyInvitePersistence for PostgresPersistence {
         row.map(TryInto::try_into).transpose()
     }
 
-    async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
-        sqlx::query!("DELETE FROM company_invites WHERE id = $1", id)
-            .execute(&self.pool)
+    async fn delete_invite(&self, command: DeleteCompanyInvite) -> AppResult<()> {
+        let scope = TeamScope {
+            actor_id: command.actor_id,
+            company_id: command.company_id,
+        };
+        let mut tx = authority::start(&self.pool, scope, None).await?;
+        let invite = authority::lock_invite(
+            &mut tx,
+            scope.company_id,
+            InviteTarget::Id(command.invite_id),
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Invite not found".into()))?;
+        let team = authority::lock_team(&mut tx, scope, None).await?;
+        team.require_inviter([
+            CompanyAccessRole::from_str(&invite.role).map_err(AppError::Internal)?
+        ])?;
+        sqlx::query("DELETE FROM company_invites WHERE company_id=$1 AND id=$2")
+            .bind(scope.company_id)
+            .bind(command.invite_id)
+            .execute(&mut *tx)
             .await
-            .map_err(AppError::from)?;
-
-        Ok(())
+            .map_err(authority::database)?;
+        tx.commit().await.map_err(authority::database)
     }
 
     async fn list_invites_for_user(
@@ -577,3 +607,7 @@ mod owner_tests;
 #[cfg(test)]
 #[path = "company_access_level_tests.rs"]
 mod access_level_tests;
+
+#[cfg(test)]
+#[path = "delegated_invite_tests.rs"]
+mod delegated_invite_tests;

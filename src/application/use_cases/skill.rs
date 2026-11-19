@@ -203,11 +203,11 @@ impl SkillUseCases {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<Option<StoredAgentCapabilities>> {
-        crate::application::use_cases::administration::require_management(
+        crate::application::ports::administration::require_management(
             self.companies.as_ref(),
             user_id,
             crate::domain::workflow::CompanyId::new(company_id),
-            crate::application::use_cases::administration::ManagementTarget::Agent(
+            crate::application::ports::administration::ManagementTarget::Agent(
                 crate::entities::agent_capability::AgentId::new(agent_id),
             ),
         )

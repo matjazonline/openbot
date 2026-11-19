@@ -60,7 +60,7 @@ pub(in crate::adapters::persistence) async fn lock_company_on(
         tx,
         scope.company,
         scope.actor,
-        crate::application::use_cases::administration::ManagementTarget::AnyUnit,
+        crate::application::ports::administration::ManagementTarget::AnyUnit,
     )
     .await?;
     Ok(())
@@ -86,7 +86,7 @@ impl<'a, 'db> LockedAgentPublication<'a, 'db> {
             tx,
             scope.company,
             scope.actor,
-            crate::application::use_cases::administration::ManagementTarget::Agent(scope.agent),
+            crate::application::ports::administration::ManagementTarget::Agent(scope.agent),
         )
         .await?;
         sqlx::query_scalar::<_, Uuid>(

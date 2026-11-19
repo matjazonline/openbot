@@ -105,13 +105,20 @@ impl ModelAuthority {
             .unwrap()
             .unwrap();
         assert!(!channel.viewer_access(context));
-        let role = crate::application::use_cases::administration::AdministrationPersistence::management_role(
-            self.p(), self.h.s.owner().user_id(), self.scope().company,
-            crate::application::use_cases::administration::ManagementTarget::Unit(channel.department_id),
-        ).await.unwrap();
+        let role =
+            crate::application::ports::administration::AdministrationPersistence::management_role(
+                self.p(),
+                self.h.s.owner().user_id(),
+                self.scope().company,
+                crate::application::ports::administration::ManagementTarget::Unit(
+                    channel.department_id,
+                ),
+            )
+            .await
+            .unwrap();
         assert_eq!(
             role,
-            Some(crate::application::use_cases::administration::ManagementRole::Admin)
+            Some(crate::application::ports::administration::ManagementRole::Admin)
         );
     }
 

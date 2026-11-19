@@ -125,7 +125,7 @@ impl CompanyWrite {
 
 #[async_trait]
 pub trait CompanyPersistence:
-    super::administration::AdministrationPersistence + Send + Sync
+    crate::application::ports::administration::AdministrationPersistence + Send + Sync
 {
     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>>;

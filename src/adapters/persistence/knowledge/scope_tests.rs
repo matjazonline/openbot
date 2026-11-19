@@ -74,7 +74,7 @@ async fn knowledge_scope_schema_owner_chunk_tuple_and_per_unit_layer_identity() 
 }
 
 #[tokio::test]
-async fn knowledge_scope_search_manual_roles_ancestors_one_step_leads_and_level() {
+async fn knowledge_scope_search_manual_roles_ancestors_managed_subtree_and_level() {
     let db = own_database().await.unwrap();
     let f = Fixture::new(db.pool.clone()).await;
     without_placement(&f).await;
@@ -102,8 +102,9 @@ async fn knowledge_scope_search_manual_roles_ancestors_one_step_leads_and_level(
         BTreeSet::from([f.root, a])
     );
     grant(&f, a, DepartmentRole::Lead).await;
+    // Leading A manages A's whole subtree, past the one-step child B; never the sibling.
     let visible = f.store.list(f.member, None).await.unwrap();
-    assert_eq!(units(&visible.layers), BTreeSet::from([f.root, a, b]));
+    assert_eq!(units(&visible.layers), BTreeSet::from([f.root, a, b, c]));
     assert!(
         !visible
             .layers
@@ -116,7 +117,7 @@ async fn knowledge_scope_search_manual_roles_ancestors_one_step_leads_and_level(
             .iter()
             .map(|chunk| chunk.unit_id)
             .collect::<BTreeSet<_>>(),
-        BTreeSet::from([f.root, a, b])
+        BTreeSet::from([f.root, a, b, c])
     );
     assert!(
         manual(&f, f.owner)
@@ -197,7 +198,15 @@ async fn knowledge_scope_upload_requires_current_placement_and_parent_lead_witho
         .replace(target(f.member, b), &[prepared("5_b.md", "report")])
         .await
         .unwrap();
-    for denied in [c, f.root, other.root] {
+    // Leading A manages its whole subtree, including the grandchild C.
+    f.store
+        .replace(
+            target(f.member, c),
+            &[prepared("0_c.md", "managed subtree")],
+        )
+        .await
+        .unwrap();
+    for denied in [f.root, other.root] {
         assert!(matches!(
             f.store
                 .replace(target(f.member, denied), &[prepared("0_no.md", "no")])

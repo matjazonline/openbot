@@ -121,8 +121,11 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
         ))
     }
 
-    async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
-        self.invites.lock().unwrap().retain(|i| i.id != id);
+    async fn delete_invite(&self, command: DeleteCompanyInvite) -> AppResult<()> {
+        self.invites
+            .lock()
+            .unwrap()
+            .retain(|i| i.id != command.invite_id);
         Ok(())
     }
 

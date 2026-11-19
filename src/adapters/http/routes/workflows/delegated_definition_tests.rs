@@ -1,8 +1,8 @@
 //! Definition management uses current active bindings, with immutable creating-unit fallback.
 use super::*;
+use crate::application::ports::administration::{AdministrationPersistence, ManagementTarget};
 use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::department::DepartmentWrite;
-use crate::application::use_cases::administration::{AdministrationPersistence, ManagementTarget};
 use crate::domain::workflow::WorkflowId;
 use crate::entities::{department::DepartmentId, transport::PrincipalId};
 

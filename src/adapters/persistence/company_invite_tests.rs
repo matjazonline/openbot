@@ -482,7 +482,14 @@ async fn postgres_company_invite_and_member_persistence_works() {
     assert_eq!(owner_kind, "person");
 
     // 7. Delete invite
-    persistence.delete_invite(invite.id).await.unwrap();
+    persistence
+        .delete_invite(crate::use_cases::company_invite::DeleteCompanyInvite {
+            actor_id: owner.id,
+            company_id: company.id,
+            invite_id: invite.id,
+        })
+        .await
+        .unwrap();
     let invites_after = persistence
         .list_invites_by_company(company.id)
         .await

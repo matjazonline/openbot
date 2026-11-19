@@ -62,7 +62,7 @@ impl SqlActionAuthority for ProvisioningActionAuthority {
             tx,
             request.scope.company,
             authority.actor,
-            crate::application::use_cases::administration::ManagementTarget::AnyUnit,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
         )
         .await?;
         let kind =
@@ -249,7 +249,7 @@ impl SqlLocalAction for ProvisioningEffects {
                     tx,
                     company,
                     requester,
-                    crate::application::use_cases::administration::ManagementTarget::Root,
+                    crate::application::ports::administration::ManagementTarget::Root,
                 )
                 .await
                 {
@@ -292,7 +292,7 @@ async fn authorize_requester(
         tx,
         company,
         requester,
-        crate::application::use_cases::administration::ManagementTarget::AnyUnit,
+        crate::application::ports::administration::ManagementTarget::AnyUnit,
     )
     .await
     {

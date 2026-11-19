@@ -611,17 +611,17 @@ use source_validation::validate_source;
 mod snapshot_cases;
 
 #[async_trait::async_trait]
-impl crate::application::use_cases::administration::AdministrationPersistence for MemoryStore {
+impl crate::application::ports::administration::AdministrationPersistence for MemoryStore {
     async fn management_role(
         &self,
         actor: uuid::Uuid,
         company: crate::domain::workflow::CompanyId,
-        _target: crate::application::use_cases::administration::ManagementTarget,
+        _target: crate::application::ports::administration::ManagementTarget,
     ) -> crate::app_error::AppResult<
-        Option<crate::application::use_cases::administration::ManagementRole>,
+        Option<crate::application::ports::administration::ManagementRole>,
     > {
+        use crate::application::ports::administration::ManagementRole;
         use crate::application::ports::participant::PrincipalAccessPersistence;
-        use crate::application::use_cases::administration::ManagementRole;
         use crate::entities::company_member::CompanyMembership;
         let context = self
             .access_context_for_user(company.as_uuid(), actor)

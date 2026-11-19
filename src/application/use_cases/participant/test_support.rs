@@ -520,18 +520,18 @@ impl PrincipalAccessPersistence for FailingParticipantDirectory {
 }
 
 #[async_trait::async_trait]
-impl crate::application::use_cases::administration::AdministrationPersistence
+impl crate::application::ports::administration::AdministrationPersistence
     for InMemoryParticipantDirectory
 {
     async fn management_role(
         &self,
         actor: uuid::Uuid,
         company: crate::domain::workflow::CompanyId,
-        _target: crate::application::use_cases::administration::ManagementTarget,
+        _target: crate::application::ports::administration::ManagementTarget,
     ) -> crate::app_error::AppResult<
-        Option<crate::application::use_cases::administration::ManagementRole>,
+        Option<crate::application::ports::administration::ManagementRole>,
     > {
-        use crate::application::use_cases::administration::ManagementRole;
+        use crate::application::ports::administration::ManagementRole;
         use crate::entities::company_member::CompanyMembership;
         let membership = match &self.team {
             Some(team) => team.company_access(actor, company.as_uuid()).await?,
@@ -546,16 +546,16 @@ impl crate::application::use_cases::administration::AdministrationPersistence
 }
 
 #[async_trait::async_trait]
-impl crate::application::use_cases::administration::AdministrationPersistence
+impl crate::application::ports::administration::AdministrationPersistence
     for FailingParticipantDirectory
 {
     async fn management_role(
         &self,
         _actor: uuid::Uuid,
         _company: crate::domain::workflow::CompanyId,
-        _target: crate::application::use_cases::administration::ManagementTarget,
+        _target: crate::application::ports::administration::ManagementTarget,
     ) -> crate::app_error::AppResult<
-        Option<crate::application::use_cases::administration::ManagementRole>,
+        Option<crate::application::ports::administration::ManagementRole>,
     > {
         Err(outage())
     }

@@ -1,0 +1,105 @@
+# cmd: SQLX_OFFLINE=true TEST_DATABASE_URL/DATABASE_URL=postgres://mac02@127.0.0.1:55406/openbot_p06_merge05 MEMORY_TEST_DATABASE_URL=postgres://mac02@127.0.0.1:55406/postgres scripts/test-network-isolation.sh cargo test --locked --offline --lib -- team invite
+# source = frozen 4228a622… (tree abb60051… differs only by untracked .trail learning); HEAD 174c83b3
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 77 tests
+test adapters::http::pages::team_level_tests::access_level_ui_admin_caps_and_owner_fixed_controls_match_the_domain ... ok
+test adapters::http::pages::tests::the_invite_forms_keep_a_rejected_submit_in_the_form ... ok
+test adapters::http::pages::tests::a_member_sees_the_team_but_none_of_its_invites ... ok
+test adapters::http::pages::tests::the_invite_pane_only_edits_an_invite_that_is_still_pending ... ok
+test adapters::http::pages::tests::the_team_tab_sits_inside_its_company_pane_and_lights_the_company_rail_icon ... ok
+test adapters::http::pages::tests::team_settings_list_groups_members_and_invites_and_swaps_out_of_band ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_json_is_numeric_bounded_and_rejects_role_injection ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_browser_form_accepts_integer_strings_and_rejects_extra_fields ... ok
+test adapters::http::routes::company_invite::tests::company_invites_page_renders_html_components ... ok
+test adapters::http::pages::team_level_tests::access_level_both_team_pages_give_admins_only_level_controls ... ok
+test adapters::http::routes::ui::stream_tests::message_source_tests::security_email_identity_unverified_team_keeps_attention_and_internal_notes ... ok
+test adapters::http::routes::ui::stream_tests::message_source_tests::security_email_identity_one_session_loses_invite_channel_and_operator_after_address_change ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback ... ok
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::http::routes::ui_team::trace_tests::security_trace_redaction_team_query_is_not_a_handler_span_field ... ok
+test adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes ... FAILED
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::department::tests::root::root_membership_department_routes_preserve_owner_only_team_mutations ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden ... ok
+test adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_sql_domain_owner_and_defaults_are_enforced ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_joint_readers_external_observed_and_former_members_are_public ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_native_writers_apply_caps_scope_and_owner_only_role_powers ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_invite_copies_new_grants_and_never_restores_existing_grants ... ok
+test adapters::persistence::account_identity::tests::account_email_change_races_invite_acceptance ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_edit_of_an_invite_accepted_after_the_read_is_refused ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_refuses_the_owner_address_and_malformed_ones ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_update_matches_only_a_pending_invite_of_its_company ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_accepting_an_invite_to_own_company_stays_owner ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_deleted_by_hand ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_demoted_by_hand ... ok
+test adapters::persistence::company_invite::owner_tests::root_department_owner_role_follows_company_owner ... ok
+test adapters::persistence::attention::tests::a_run_awaiting_reconciliation_is_unassigned_team_work ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_assignment_committed_first_finishes_before_later_demotion ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_demotion_committed_first_refuses_a_waiting_assignment ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_owner_loss_is_rechecked_after_a_waiting_invite_write ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_busy_authority_returns_a_bounded_conflict_without_a_write ... ok
+test adapters::http::routes::ui::stream_tests::direct_tests::direct_thread_ui_private_reads_and_retirement_do_not_expose_a_target_to_teammates ... ok
+test adapters::persistence::company_invite::tests::postgres_company_invite_and_member_persistence_works ... ok
+test adapters::persistence::company_invite::tests::removing_a_member_demotes_their_principal_and_spares_the_owner ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_competing_admin_member_invite_precedes_owner_admin_upsert ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_concurrent_address_change_defeats_stale_invite_acceptance ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_decline_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_accept_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_competing_owner_admin_invite_precedes_admin_member_upsert ... ok
+test adapters::persistence::department::tests::department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_departments ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_removing_a_teammate_drops_only_derived_grants ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_a_person_lead_or_none_is_a_plain_team_desk ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_invites_persistence_rechecks_delete_level_and_admin_address ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_invites_root_admin_writes_member_invitations_only ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::competing::root_competing_account_deletion_first_invite_cannot_restore_membership ... ok
+test application::use_cases::company_invite::tests::company_invites_crud_and_accept_flow ... ok
+test application::use_cases::company_invite::tests::members_may_list_the_team_and_everyone_else_is_told_nothing ... ok
+test application::use_cases::company_invite::tests::the_owner_removes_a_member ... ok
+test application::use_cases::thread::tests::a_team_member_who_mistypes_a_channel_is_told_which_ones_they_can_use ... ok
+test application::use_cases::thread::tests::a_team_member_writing_to_help_is_answered_and_nothing_is_routed ... ok
+test application::use_cases::thread::tests::test_participant_modes_company_team_public_and_explicit ... ok
+test domain::entities::company_invite::tests::access_level_invite_payload_requires_current_fields ... ok
+test domain::entities::knowledge::tests::knowledge_upload_permission_matrix_requires_team_and_does_not_widen_levels ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::competing::root_competing_invite_first_account_deletion_cleans_the_new_root_membership ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_department_creation_and_company_rename_round_trip ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_department_database_guards_preserve_shape_level_and_incarnation ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_reacceptance_preserves_level_and_rejoin_changes_only_membership_identity ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_roles_and_equivalent_department_mutations_keep_owner_authority ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_roster_is_bounded_and_does_not_bound_authorization ... ok
+test adapters::persistence::workflow::tests::admission_tests::attention_decision_tests::attention_lists_a_decision_for_its_reviewers_and_once_in_team_work ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::level::agent_history_level_classified_current_input_allows_unchanged_team_audience ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::system_relay::relay_identity_pure_workflow_system_reply_cannot_enter_a_team_only_desk ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::attention_groups_a_bindings_refusals_into_one_team_work_row ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_level_five_team_reply_is_stamped_and_level_zero_viewer_gets_placeholder ... ok
+
+failures:
+
+---- adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes stdout ----
+
+thread 'adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes' (33611193) panicked at src/adapters/http/routes/authorization_test_support.rs:272:18:
+expected 403 Forbidden, got success
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes
+
+test result: FAILED. 76 passed; 1 failed; 0 ignored; 0 measured; 4812 filtered out; finished in 19.20s
+
+error: test failed, to rerun pass `--lib`

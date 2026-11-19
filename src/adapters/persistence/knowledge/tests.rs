@@ -9,6 +9,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 mod constraints;
+#[path = "delegated_scope_tests.rs"]
+mod delegated_scopes;
 mod races;
 #[path = "scope_race_tests.rs"]
 mod scope_races;

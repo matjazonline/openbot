@@ -132,7 +132,7 @@ pub(crate) async fn update_channel_on(
             tx,
             request.actor.user_id(),
             company,
-            crate::application::use_cases::administration::ManagementTarget::Unit(unit),
+            crate::application::ports::administration::ManagementTarget::Unit(unit),
         )
         .await?
         .ok_or_else(channel_not_found)?;

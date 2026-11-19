@@ -85,6 +85,16 @@ impl CompanyMembership {
     pub fn manages_company_operations(self) -> bool {
         matches!(self, Self::Owner | Self::Admin)
     }
+
+    /// Inviting into the company is root management; an invite carrying a root role is a root
+    /// role assignment, which only the owner makes.
+    pub fn may_invite_as(self, role: CompanyAccessRole) -> bool {
+        match self {
+            Self::Owner => true,
+            Self::Admin => role == CompanyAccessRole::Member,
+            Self::Member | Self::None => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

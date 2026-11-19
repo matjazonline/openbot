@@ -8,7 +8,7 @@ pub(super) async fn root_role_authority_on(
     department: DepartmentId,
     role: DepartmentRole,
 ) -> AppResult<()> {
-    use crate::application::use_cases::administration::{ManagementRole, ManagementTarget};
+    use crate::application::ports::administration::{ManagementRole, ManagementTarget};
     let current = lock_department_on(tx, company, department).await?;
     if current.is_root {
         if super::super::administration::management_role_on(

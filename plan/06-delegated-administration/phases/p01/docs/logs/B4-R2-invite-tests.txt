@@ -1,0 +1,77 @@
+
+running 60 tests
+test adapters::http::routes::company_invite::levels::tests::access_level_json_is_numeric_bounded_and_rejects_role_injection ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_browser_form_accepts_integer_strings_and_rejects_extra_fields ... ok
+test adapters::http::routes::company_invite::tests::company_invites_page_renders_html_components ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_joint_readers_external_observed_and_former_members_are_public ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_sql_domain_owner_and_defaults_are_enforced ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_native_writers_apply_caps_scope_and_owner_only_role_powers ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_invite_copies_new_grants_and_never_restores_existing_grants ... ok
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_refuses_the_owner_address_and_malformed_ones ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_edit_of_an_invite_accepted_after_the_read_is_refused ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_update_matches_only_a_pending_invite_of_its_company ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_deleted_by_hand ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_accepting_an_invite_to_own_company_stays_owner ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_demoted_by_hand ... ok
+test adapters::persistence::company_invite::owner_tests::root_department_owner_role_follows_company_owner ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_assignment_committed_first_finishes_before_later_demotion ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels ... FAILED
+test adapters::persistence::company_invite::access_level_tests::races::access_level_demotion_committed_first_refuses_a_waiting_assignment ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_busy_authority_returns_a_bounded_conflict_without_a_write ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_owner_loss_is_rechecked_after_a_waiting_invite_write ... ok
+test adapters::persistence::company_invite::tests::postgres_company_invite_and_member_persistence_works ... ok
+test adapters::persistence::company_invite::tests::removing_a_member_demotes_their_principal_and_spares_the_owner ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_concurrent_address_change_defeats_stale_invite_acceptance ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_accept_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_decline_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_competing_admin_member_invite_precedes_owner_admin_upsert ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_competing_owner_admin_invite_precedes_admin_member_upsert ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_invites_persistence_rechecks_delete_level_and_admin_address ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::delegated_admin_invites_root_admin_writes_member_invitations_only ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::competing::root_competing_account_deletion_first_invite_cannot_restore_membership ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::competing::root_competing_invite_first_account_deletion_cleans_the_new_root_membership ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_department_creation_and_company_rename_round_trip ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_department_database_guards_preserve_shape_level_and_incarnation ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_reacceptance_preserves_level_and_rejoin_changes_only_membership_identity ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_roles_and_equivalent_department_mutations_keep_owner_authority ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_roster_is_bounded_and_does_not_bound_authorization ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_execution_tests::workflow_action_reconciliation_audit_execution_positive ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_sql_tests::refusal_sql_tests::workflow_action_reconciliation_audit_sql_actual_refusal_linkage ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_sql_tests::workflow_action_reconciliation_audit_sql_genuine_foreign_company ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_sql_tests::workflow_action_reconciliation_audit_sql_genuine_foreign_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::other_audit_tests::workflow_action_reconciliation_other_audit_genuine_final_positive ... ok
+test application::use_cases::company_invite::tests::company_invites_crud_and_accept_flow ... ok
+test application::use_cases::company_invite::tests::members_may_list_the_team_and_everyone_else_is_told_nothing ... ok
+test application::use_cases::company_invite::tests::the_owner_removes_a_member ... ok
+test domain::entities::company_invite::tests::access_level_invite_payload_requires_current_fields ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::other_audit_tests::workflow_action_reconciliation_other_audit_genuine_unique_rollback ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_cancelled ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::negative_tests::workflow_action_reconciliation_command_probe_native_negatives_and_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_failed ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_human_reason ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::workflow_action_reconciliation_command_probe_positive_calibration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::workflow_action_reconciliation_receipt_sql_authentic_foreign_company_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_execution_tests::workflow_action_reconciliation_audit_execution_native_and_transport_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::workflow_action_reconciliation_reopen_matching_final_positives ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::workflow_action_reconciliation_reopen_native_and_transport_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_controls ... ok
+
+failures:
+
+---- adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels stdout ----
+
+thread 'adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels' (33572823) panicked at src/adapters/persistence/company_access_level_race_tests.rs:153:35:
+called `Result::unwrap()` on an `Err` value: Forbidden("Only the company owner may invite an administrator.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels
+
+test result: FAILED. 59 passed; 1 failed; 0 ignored; 0 measured; 4829 filtered out; finished in 24.85s
+
