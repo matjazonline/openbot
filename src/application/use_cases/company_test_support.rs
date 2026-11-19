@@ -245,6 +245,7 @@ impl CompanyPersistence for MockCompanyPersistence {
                         access_level: crate::entities::access_level::fixture_level(membership),
                         company: company.clone(),
                         membership,
+                        administers_units: membership.administers_company(),
                     })
             })
             .collect())
@@ -269,6 +270,7 @@ impl CompanyPersistence for MockCompanyPersistence {
                 access_level: crate::entities::access_level::fixture_level(membership),
                 company: company.clone(),
                 membership,
+                administers_units: membership.administers_company(),
             }))
     }
 
@@ -373,5 +375,13 @@ impl crate::application::ports::administration::AdministrationPersistence
                 _ => None,
             },
         )
+    }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(Vec::new())
     }
 }

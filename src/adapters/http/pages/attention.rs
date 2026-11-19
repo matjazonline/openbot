@@ -413,6 +413,8 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: crate::entities::company_member::CompanyMembership::Owner,
+            administers_units: crate::entities::company_member::CompanyMembership::Owner
+                .administers_company(),
         };
         let html = attention_page(&AttentionPageView {
             user: &user,
@@ -520,6 +522,8 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: crate::entities::company_member::CompanyMembership::Owner,
+            administers_units: crate::entities::company_member::CompanyMembership::Owner
+                .administers_company(),
         };
         let full = attention_page(&AttentionPageView {
             user: &user,

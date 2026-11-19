@@ -1343,6 +1343,7 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: CompanyMembership::Admin,
+            administers_units: CompanyMembership::Admin.administers_company(),
         };
         let html = dashboard_page(&DashboardShell {
             department: None,
@@ -1386,6 +1387,7 @@ mod tests {
             avatar_url: None,
             is_operator: true,
             company_membership: CompanyMembership::Admin,
+            administers_units: CompanyMembership::Admin.administers_company(),
         };
         let company_html = dashboard_page(&DashboardShell {
             department: None,
@@ -1461,6 +1463,7 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: CompanyMembership::None,
+            administers_units: false,
         };
         let process = ProcessGauges::default();
         let machine = MachineIdentity {
@@ -1499,6 +1502,7 @@ mod tests {
             avatar_url: None,
             is_operator: true,
             company_membership: CompanyMembership::None,
+            administers_units: false,
         };
         let machine = MachineIdentity {
             id: crate::entities::runtime_metrics::MachineId::new("serving-machine"),
@@ -1833,6 +1837,7 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: CompanyMembership::Admin,
+            administers_units: CompanyMembership::Admin.administers_company(),
         };
         let process = ProcessGauges::default();
         let machine = MachineIdentity {

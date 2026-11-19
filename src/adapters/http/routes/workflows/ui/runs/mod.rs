@@ -346,6 +346,7 @@ impl Ui {
             .reads()
             .list_definitions(
                 super::company(company),
+                None,
                 PageRequest::new(None, Some(MAX_BINDING_OPTIONS))?,
             )
             .await?;

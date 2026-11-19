@@ -256,7 +256,8 @@ async fn skill_bundle_http_members_cannot_upload_and_admins_keep_read_access() {
     let (_, archive) = source(&app, &owner).await;
     let id = import(&app, &f, &owner, &archive).await;
     let uri = format!("/ui/companies/{}/skills/{id}/bundle", f.company);
-    for (actor, read_status) in [(f.member, StatusCode::FORBIDDEN), (f.admin, StatusCode::OK)] {
+    // Refusals tell nothing (Plan06 02A.4); reading skills needs unit management.
+    for (actor, read_status) in [(f.member, StatusCode::NOT_FOUND), (f.admin, StatusCode::OK)] {
         let actor = cookie(&f, &authority, actor).await;
         for suffix in ["", "/files"] {
             assert_eq!(
@@ -287,7 +288,7 @@ async fn skill_bundle_http_members_cannot_upload_and_admins_keep_read_access() {
                     .await
                     .unwrap()
                     .status(),
-                StatusCode::FORBIDDEN,
+                StatusCode::NOT_FOUND,
                 "company membership does not grant owner-only import"
             );
         }

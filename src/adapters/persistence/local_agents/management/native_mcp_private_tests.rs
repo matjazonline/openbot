@@ -59,7 +59,7 @@ async fn native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but
     assert!(p.binding(company, binding).await.unwrap().is_none());
     assert!(p.binding_summary(company, binding).await.unwrap().is_none());
     assert!(
-        p.list_definitions(company, PageRequest::new(None, None).unwrap())
+        p.list_definitions(company, None, PageRequest::new(None, None).unwrap())
             .await
             .unwrap()
             .items

@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/06-delegated-administration/COORDINATION.md
 - Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, worktree /Users/mac02/orca/workspaces/openbot/plan06
-- Revision: 6
+- Revision: 9
 
 ## Plan-wide instructions
 
@@ -23,6 +23,12 @@
   cover the whole managed subtree; frozen workflow run scopes and agent memory stay
   as Plan05 defined. (b) Root admins may create/update/delete company invites with
   role=member; any invite carrying role=admin (before or after) stays owner-only.
+- User decisions 2026-11-19: (c) unit managers may read company model choices and the
+  skills list for agent authoring and use the prompt generator; writing them stays
+  owner-only. (d) Runs, Deliveries and Dashboard stay root-only (owner/admin).
+- User decisions 2026-11-19 (cont.): (e) binding outside managed units stays a 404, no
+  `binding.outside_managed_units` code; (f) reviewer stays Opus 5.5 (Fable 5.2 unavailable).
+- User 2026-11-19: commit each independently accepted batch locally on plan06; never push.
 - Plan05 Doop deferral (05SC-C001/04RU-C005) is inherited: Doop failures and
   assertions are preserved, not relabeled, and not fixed here.
 
@@ -31,7 +37,7 @@
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
 | p01 accepted in phase (B1–B4; 01A.2 removal carried to p02) | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
-| p02 starting (02A routes/pages + 01A.2, 02B audit) | Claude root/A; Opus B | same sequential worktree | phases/p02/docs/ when started |
+| p02 B1 (02A) accepted; B2 (02B audit) implementing | Claude root/A; Opus B | same sequential worktree | phases/p02/docs/{TASK,HANDOFF}.md |
 | p03 planned | Claude root | same sequential worktree | phases/p03/docs/ when started |
 
 ## Cross-phase notices

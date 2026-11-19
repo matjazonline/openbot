@@ -160,7 +160,12 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
         ),
-        run_counts = super::run_counts::run_counts_bar(company.id),
+        // Run counts are a company-wide read view (Plan06 U4): company administrators only.
+        run_counts = if page.user.company_membership.administers_company() {
+            super::run_counts::run_counts_bar(company.id)
+        } else {
+            String::new()
+        },
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );

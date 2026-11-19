@@ -401,19 +401,17 @@ async fn render_shell(
     status: StatusCode,
     content: String,
 ) -> AppResult<Response> {
-    let company = s
-        .companies
-        .readable_company(user.id, company)
-        .await?
-        .company;
+    let access = s.companies.readable_company(user.id, company).await?;
     let account = super::ui::load_account(&s.users, user.id).await?;
     let email = account.email.as_str().into();
+    // The knowledge actor's membership is current for this request; the rail hint comes with it.
     let reader = super::ui::workspace_user(&account, &email, &s.config)
-        .with_company_membership(view.actor.membership);
+        .with_company_membership(view.actor.membership)
+        .with_unit_hint(access.administers_units);
     let html = pages::ui_shell(&pages::UiShell {
         title: "Knowledge",
         user: &reader,
-        company: Some(&company),
+        company: Some(&access.company),
         section: pages::UiSection::Knowledge,
         content: &content,
     });

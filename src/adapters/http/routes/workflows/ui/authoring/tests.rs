@@ -345,6 +345,7 @@ async fn a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph
         .reads()
         .list_definitions(
             CompanyId::new(f.company),
+            None,
             PageRequest::new(None, None).unwrap(),
         )
         .await
@@ -419,6 +420,7 @@ async fn a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused() {
         .reads()
         .list_definitions(
             CompanyId::new(f.company),
+            None,
             PageRequest::new(None, None).unwrap(),
         )
         .await

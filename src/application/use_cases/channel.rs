@@ -166,6 +166,13 @@ pub(crate) async fn readable_channels(
         .collect())
 }
 
+/// One row of the desk workspace: a desk and whether the viewer manages it or may only read it.
+#[derive(Debug, Clone)]
+pub struct WorkspaceChannel {
+    pub channel: Channel,
+    pub managed: bool,
+}
+
 #[derive(Clone)]
 pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
@@ -255,6 +262,80 @@ impl ChannelUseCases {
         self.channel_persistence
             .list_by_company_id(company_id)
             .await
+    }
+
+    /// The desks a person manages: every desk whose department they manage (all of them for a
+    /// root manager). For configuration lists and pickers; each write rechecks its own desk.
+    #[instrument(skip_all)]
+    pub async fn list_managed_channels(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Vec<Channel>> {
+        Ok(self
+            .workspace_channels(user_id, company_id, None)
+            .await?
+            .into_iter()
+            .filter_map(|desk| desk.managed.then_some(desk.channel))
+            .collect())
+    }
+
+    /// The desk workspace list (Plan06 U6): the desks the viewer manages, then those they may only
+    /// read, each marked. Requires managing at least one unit.
+    #[instrument(skip_all)]
+    pub async fn list_workspace_channels(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+    ) -> AppResult<Vec<WorkspaceChannel>> {
+        self.workspace_channels(viewer.user_id, company_id, Some(viewer))
+            .await
+    }
+
+    async fn workspace_channels(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        reader: Option<&Viewer>,
+    ) -> AppResult<Vec<WorkspaceChannel>> {
+        use crate::application::ports::administration::{ManagementTarget, require_management};
+        let company = crate::domain::workflow::CompanyId::new(company_id);
+        let participants = self.participant_persistence.as_ref();
+        require_management(participants, user_id, company, ManagementTarget::AnyUnit).await?;
+        let managed: std::collections::HashSet<_> = participants
+            .managed_units(user_id, company)
+            .await?
+            .into_iter()
+            .collect();
+        let readable: std::collections::HashSet<Uuid> = match reader {
+            Some(viewer) => self
+                .list_readable_channels(viewer, company_id)
+                .await?
+                .into_iter()
+                .map(|channel| channel.id)
+                .collect(),
+            None => Default::default(),
+        };
+        let (mut managed_desks, mut readable_desks) = (Vec::new(), Vec::new());
+        for channel in self
+            .channel_persistence
+            .list_by_company_id(company_id)
+            .await?
+        {
+            if managed.contains(&channel.department_id) {
+                managed_desks.push(WorkspaceChannel {
+                    channel,
+                    managed: true,
+                });
+            } else if readable.contains(&channel.id) {
+                readable_desks.push(WorkspaceChannel {
+                    channel,
+                    managed: false,
+                });
+            }
+        }
+        managed_desks.append(&mut readable_desks);
+        Ok(managed_desks)
     }
 
     /// Manager-only reads use the same visibility decision as the mailbox.

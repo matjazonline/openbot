@@ -95,6 +95,7 @@ fn desk_wording_settings_breadcrumb() {
             company: &company,
             app_domain_name: "example.com",
             channels: &[],
+            read_only: &Default::default(),
             selected_channel_id: None,
         },
         pane_html: "",

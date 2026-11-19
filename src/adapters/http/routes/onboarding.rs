@@ -384,6 +384,7 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: CompanyMembership::Owner,
+            administers_units: CompanyMembership::Owner.administers_company(),
         };
         let channel = Channel {
             enabled: true,

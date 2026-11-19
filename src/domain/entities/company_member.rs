@@ -81,8 +81,11 @@ impl CompanyMembership {
         matches!(self, Self::Owner)
     }
 
-    /// Whether this account may manage the company's operational workspaces and automation.
-    pub fn manages_company_operations(self) -> bool {
+    /// Company-level administration: the owner or a root admin. This is distinct from unit
+    /// management — a person who leads the root manages every unit through
+    /// `unit_management_role`, yet does not administer the company (Plan06 U5): team levels,
+    /// invitations, connections, memory settings and the company-wide read views stay here.
+    pub fn administers_company(self) -> bool {
         matches!(self, Self::Owner | Self::Admin)
     }
 

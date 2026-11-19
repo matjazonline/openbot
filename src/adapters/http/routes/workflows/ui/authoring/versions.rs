@@ -17,6 +17,12 @@ impl Ui {
             .await?;
         let usage_truncated = usage.truncated;
         let (visible, hidden) = self.visible_usage(company, usage, "workflow-usage").await?;
+        // The tool registry is company-wide; only company administrators are offered the form.
+        let tool_form_html = match self.companies.managed_company(self.user, company).await {
+            Ok(_) => self.tool_form_html(company, detail),
+            Err(AppError::NotFound(_)) => String::new(),
+            Err(error) => return Err(error),
+        };
         Ok(pages::workflow_versions(&pages::VersionsView {
             company_id: company,
             workflow: detail.summary.workflow.as_uuid(),
@@ -28,7 +34,7 @@ impl Ui {
             hidden_bindings: hidden,
             banner,
             compare_html,
-            tool_form_html: &self.tool_form_html(company, detail),
+            tool_form_html: &tool_form_html,
         }))
     }
 }
@@ -39,7 +45,7 @@ pub(super) async fn compare(
     Path(workflow): Path<Uuid>,
     Query(query): Query<CompareQuery>,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let detail = ui.detail(company, workflow).await?;
     let side = |name: &str| -> AppResult<Option<Uuid>> {
         match name {

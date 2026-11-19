@@ -37,7 +37,8 @@ async fn attention_application_gating_refuses_team_work_and_hides_foreign_tenant
             query("team_work"),
         )
         .await,
-        StatusCode::FORBIDDEN,
+        // Company administration; anyone else is told nothing (Plan06 02A.4).
+        StatusCode::NOT_FOUND,
         &f.company.name,
     )
     .await;
@@ -48,7 +49,7 @@ async fn attention_application_gating_refuses_team_work_and_hides_foreign_tenant
             Path(f.company.id),
         )
         .await,
-        StatusCode::FORBIDDEN,
+        StatusCode::NOT_FOUND,
         &f.company.name,
     )
     .await;
@@ -352,4 +353,68 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
         &f.company.name,
     )
     .await;
+}
+
+/// Plan06 U4/U5: the team view and the operational summary are company administration; a unit
+/// lead keeps its own queue and is told nothing about the rest.
+#[tokio::test]
+async fn delegated_admin_routes_attention_team_views_hide_from_unit_leads() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let d = f.delegation().await;
+    let query = |view: &str| {
+        Query(ListQuery {
+            view: Some(view.into()),
+            cursor: None,
+            limit: None,
+            department_id: None,
+        })
+    };
+    denied(
+        list_attention(
+            State(f.attention.clone()),
+            State(f.departments()),
+            Fixture::viewer(&d.lead),
+            Path(f.company.id),
+            query("team_work"),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.company.name,
+    )
+    .await;
+    denied(
+        operational_summary(
+            State(f.attention.clone()),
+            Fixture::viewer(&d.lead),
+            Path(f.company.id),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.company.name,
+    )
+    .await;
+    assert!(
+        list_attention(
+            State(f.attention.clone()),
+            State(f.departments()),
+            Fixture::viewer(&d.lead),
+            Path(f.company.id),
+            query("my_work"),
+        )
+        .await
+        .is_ok()
+    );
+    for user in [&d.admin, &f.owner] {
+        assert!(
+            operational_summary(
+                State(f.attention.clone()),
+                Fixture::viewer(user),
+                Path(f.company.id),
+            )
+            .await
+            .is_ok()
+        );
+    }
 }

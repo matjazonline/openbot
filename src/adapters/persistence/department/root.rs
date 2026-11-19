@@ -71,7 +71,7 @@ pub(super) async fn remove_root_member(
     };
     let mut tx = authority::start(&persistence.pool, team_scope, expected_user).await?;
     let team = authority::lock_team(&mut tx, team_scope, expected_user).await?;
-    if !team.actor.membership.manages_company_operations() {
+    if !team.actor.membership.administers_company() {
         return Err(company_not_found());
     }
     lock_department_on(&mut tx, scope.company, department).await?;

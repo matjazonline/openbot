@@ -42,10 +42,19 @@ pub async fn list(
     Query(query): Query<ListQuery>,
 ) -> WorkflowResult<Json<Value>> {
     let company = company(company_id);
-    authorize(&engine, company, actor(&user)?, RelatedAssociation::Company).await?;
+    let actor = actor(&user)?;
+    engine
+        .authorization()
+        .authorize(
+            company,
+            actor,
+            RelatedAssociation::Company,
+            WorkflowOperation::ListManaged,
+        )
+        .await?;
     let page = engine
         .reads()
-        .list_definitions(company, query.page()?)
+        .list_definitions(company, Some(actor), query.page()?)
         .await?;
     let next = page
         .more

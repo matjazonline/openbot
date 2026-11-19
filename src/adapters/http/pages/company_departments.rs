@@ -71,19 +71,62 @@ pub struct DepartmentSection<'a> {
     /// The departments the viewer may see: all of them for an owner or admin, otherwise their own.
     pub departments: &'a [Department],
     pub detail: DepartmentDetailPane<'a>,
-    /// The people and agents the forms offer; empty unless the viewer manages the company.
+    /// The people and agents the forms offer; empty unless the viewer manages a unit.
     pub choices: &'a [DepartmentPrincipal],
     /// The company has more people and agents than `choices` lists.
     pub choices_cut: bool,
     pub membership: CompanyMembership,
+    /// The departments the viewer manages (Plan06): each control follows the server's rule for
+    /// its target, so the pane offers nothing the viewer would be refused.
+    pub managed: &'a std::collections::HashSet<DepartmentId>,
     pub error: Option<(DepartmentForm, &'a str)>,
     pub notice: Option<&'a str>,
     pub knowledge: DepartmentKnowledge<'a>,
 }
 
 impl DepartmentSection<'_> {
-    fn editable(&self) -> bool {
-        self.membership.manages_company_operations()
+    /// Manages at least one department, so may create one under it.
+    fn administers(&self) -> bool {
+        !self.managed.is_empty()
+    }
+
+    fn manages(&self, department: DepartmentId) -> bool {
+        self.managed.contains(&department)
+    }
+
+    fn manages_root(&self) -> bool {
+        self.membership.administers_company()
+            || self
+                .departments
+                .iter()
+                .find(|department| department.is_root)
+                .is_some_and(|root| self.manages(root.id))
+    }
+
+    /// Editing, moving or deleting a department needs its parent; the root needs root management.
+    fn manages_placement(&self, department: &Department) -> bool {
+        match department.parent_id {
+            Some(parent) => self.manages(parent),
+            None => self.manages(department.id),
+        }
+    }
+
+    /// The lead of a department is assigned by its parent's manager; the root's roles by the owner.
+    fn assigns_roles(&self, department: &Department) -> bool {
+        match department.parent_id {
+            Some(parent) => self.manages(parent),
+            None => self.membership.is_owner(),
+        }
+    }
+
+    /// Members follow the department's own manager. The root's membership is the company's
+    /// team: only company administrators add or remove root agents (persons: the owner).
+    fn manages_members(&self, department: &Department) -> bool {
+        if department.is_root {
+            self.membership.administers_company()
+        } else {
+            self.manages(department.id)
+        }
     }
 
     fn error_for(&self, form: DepartmentForm) -> String {
@@ -118,7 +161,7 @@ fn section_endpoint(company_id: Uuid, rest: &str) -> String {
 
 pub fn company_departments_section(section: &DepartmentSection<'_>) -> String {
     let company_id = section.company.id;
-    let new_button = if section.editable() {
+    let new_button = if section.administers() {
         format!(
             r##"<button type="button" class="btn btn-primary btn-sm"
                 hx-get="{new_endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -130,8 +173,10 @@ pub fn company_departments_section(section: &DepartmentSection<'_>) -> String {
     } else {
         String::new()
     };
-    let intro = if section.editable() {
+    let intro = if section.membership.administers_company() {
         "Departments group desks and the people and agents who work them."
+    } else if section.administers() {
+        "The departments you belong to, lead or manage."
     } else {
         "The departments you belong to or lead."
     };
@@ -164,7 +209,7 @@ pub fn company_departments_section(section: &DepartmentSection<'_>) -> String {
 /// The tree, as nested menus: a child department sits indented under its parent.
 fn department_tree_list(section: &DepartmentSection<'_>) -> String {
     if section.departments.is_empty() {
-        let message = if section.editable() {
+        let message = if section.administers() {
             "No departments yet."
         } else {
             "You are not in any department."
@@ -265,7 +310,9 @@ fn parent_options(
 ) -> String {
     department_tree(section.departments)
         .into_iter()
-        .filter(|(_, department)| Some(department.id) != editing && !department.is_root)
+        .filter(|(_, department)| {
+            Some(department.id) != editing && !department.is_root && section.manages(department.id)
+        })
         .map(|(depth, department)| {
             let id = department.id.as_uuid();
             format!(
@@ -325,7 +372,9 @@ fn department_fields(
         parent_field = if is_root {
             r#"<input type="hidden" name="parent_id" value=""><p class="text-xs opacity-60">The company is the root department. Its name and slug follow company settings.</p>"#.to_owned()
         } else {
-            format!(r#"<label class="form-control"><span class="label text-xs opacity-70">Parent department</span><select class="select w-full" name="parent_id"><option value="">Company root</option>{parents}</select></label>"#)
+            format!(r#"<label class="form-control"><span class="label text-xs opacity-70">Parent department</span><select class="select w-full" name="parent_id"{required}>{root}{parents}</select></label>"#,
+                root = if section.manages_root() { r#"<option value="">Company root</option>"# } else { "" },
+                required = if section.manages_root() { "" } else { " required" })
         },
         name = escape_html_attr(&draft.name),
         slug = escape_html_attr(&draft.slug),
@@ -460,7 +509,7 @@ fn department_detail(
     draft: Option<&DepartmentDraft>,
 ) -> String {
     let department = &view.detail.department;
-    let edit = if section.editable() {
+    let edit = if section.manages_placement(department) {
         edit_form(
             section,
             department.id,
@@ -490,7 +539,7 @@ fn department_detail(
             ""
         },
         members = members_card(section, view),
-        desks = desks_card(section, &view.desks),
+        desks = desks_card(section, view.detail.department.id, &view.desks),
         knowledge = knowledge_card(section, department),
     )
 }
@@ -530,7 +579,7 @@ fn lead_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> String {
         .find(|holder| holder.role == DepartmentRole::Lead);
     let current = match holder {
         Some(holder) => {
-            let clear = if section.editable() {
+            let clear = if section.assigns_roles(&view.detail.department) {
                 format!(
                     r##"<button type="button" class="btn btn-ghost btn-xs"
                         hx-delete="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -550,7 +599,7 @@ fn lead_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> String {
         }
         None => r#"<p id="department-lead" class="text-sm opacity-60">No lead.</p>"#.to_string(),
     };
-    let form = if section.editable() {
+    let form = if section.assigns_roles(&view.detail.department) {
         format!(
             r##"<form class="mt-3 flex flex-wrap items-end gap-2"
                 hx-put="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -589,7 +638,7 @@ fn removable_member(
     view: &DepartmentView,
     principal: crate::entities::transport::PrincipalId,
 ) -> bool {
-    if !section.editable() {
+    if !section.manages_members(&view.detail.department) {
         return false;
     }
     if !view.detail.department.is_root {
@@ -672,7 +721,7 @@ fn members_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> Strin
     } else {
         format!(r#"<ul id="department-members" class="divide-y divide-base-300">{rows}</ul>"#)
     };
-    let form = if section.editable() {
+    let form = if section.manages_members(&view.detail.department) {
         let candidates: Vec<DepartmentPrincipal> = section
             .choices
             .iter()
@@ -718,14 +767,18 @@ fn members_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> Strin
     )
 }
 
-fn desks_card(section: &DepartmentSection<'_>, desks: &[DepartmentDesk]) -> String {
+fn desks_card(
+    section: &DepartmentSection<'_>,
+    department: DepartmentId,
+    desks: &[DepartmentDesk],
+) -> String {
     let company_id = section.company.id;
     let rows: String = desks
         .iter()
         .map(|desk| {
             let name = escape_html_text(&desk.name);
-            // Desk settings are for owners and admins; a member reads the address only.
-            let name = if section.editable() {
+            // Desk settings are for the department's managers; anyone else reads the address only.
+            let name = if section.manages(department) {
                 format!(
                     r#"<a class="link-hover" href="/ui/channels?company_id={company_id}&amp;channel_id={id}">{name}</a>"#,
                     id = desk.id,

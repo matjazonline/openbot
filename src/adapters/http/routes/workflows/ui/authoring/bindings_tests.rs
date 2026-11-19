@@ -823,3 +823,197 @@ async fn workflow_role_binding_activation_refusal_names_the_step_on_the_bindings
     );
     assert!(!f.usage(workflow).await[0].binding.active);
 }
+
+/// Plan06 02A.1: a definition bound on a desk in a lead's unit is the lead's to edit and bind
+/// within the unit; binding it to a desk outside that unit is refused like a stranger's request,
+/// and a sibling lead reaches none of it.
+#[tokio::test]
+async fn delegated_admin_authoring_lead_edits_a_definition_bound_in_their_unit_and_cannot_bind_outside()
+ {
+    use crate::application::ports::channel::ChannelWrite;
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let (units, [lead, sibling]) = led_units(&f).await;
+    let inside = crate::adapters::persistence::test_support::create_channel(
+        &f.persistence,
+        f.company,
+        ChannelWrite {
+            name: "Managed desk".into(),
+            slug: "managed-desk".into(),
+            enabled: false,
+            department_id: Some(units[0]),
+            ..ChannelWrite::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    let outside = f.channel("Root desk", "root-desk", false).await;
+    let workflow = Uuid::new_v4();
+    let version = f
+        .published(workflow, "Support", &with_params(workflow, json!({})))
+        .await
+        .to_string();
+    let bind = async |user: Uuid, channel: Uuid| {
+        let pane = f.pane(user, workflow, "bindings").await.unwrap();
+        let key = field_value(&pane, "form_key");
+        save_binding(
+            f.ui(user),
+            Path(workflow),
+            f.query(),
+            form(&[
+                ("form_key", &key),
+                ("version_id", &version),
+                ("association", &format!("channel:{channel}")),
+                ("param:reviewer", "rev-1"),
+                ("message_trigger", "direct"),
+            ]),
+        )
+        .await
+        .map(|html| html.0)
+    };
+    // The owner binds it on the lead's desk and activates it: the lead now manages it.
+    let saved = bind(f.owner, inside).await.unwrap();
+    assert!(saved.contains("Saved binding"), "{saved}");
+    let bound = f.usage(workflow).await.remove(0);
+    let active = f
+        .activity(
+            f.owner,
+            workflow,
+            bound.binding.binding.as_uuid(),
+            bound.binding.state_revision,
+            true,
+        )
+        .await
+        .unwrap();
+    assert!(active.contains("Activated binding"), "{active}");
+
+    let editor = f.pane(lead, workflow, "editor").await.unwrap();
+    assert!(editor.contains("Support"), "{editor}");
+    let pane = f.pane(lead, workflow, "bindings").await.unwrap();
+    assert!(
+        pane.contains(&format!(r#"value="channel:{inside}""#)),
+        "{pane}"
+    );
+    assert!(
+        !pane.contains(&format!(r#"value="channel:{outside}""#)),
+        "{pane}"
+    );
+    let second = bind(lead, inside).await.unwrap();
+    assert!(second.contains("Saved binding"), "{second}");
+    // U7: a desk outside the lead's units is refused as the command's not-found, which the form
+    // words exactly as it words a desk that does not exist.
+    let refused = bind(lead, outside).await.unwrap();
+    let missing = bind(lead, Uuid::new_v4()).await.unwrap();
+    let not_available = "A chosen desk, version, run-as or resource is not available";
+    assert!(refused.contains(not_available), "{refused}");
+    assert!(missing.contains(not_available), "{missing}");
+    assert!(!refused.contains("Saved binding"));
+    assert_eq!(f.usage(workflow).await.len(), 2);
+    for tab in ["editor", "versions", "bindings"] {
+        assert!(matches!(
+            f.pane(sibling, workflow, tab).await,
+            Err(AppError::NotFound(_))
+        ));
+    }
+    // The library lists what each person manages.
+    let listed = async |user: Uuid| {
+        f.engine
+            .reads()
+            .list_definitions(
+                CompanyId::new(f.company),
+                Some(crate::application::workflow::WorkflowActor::authenticated(user).unwrap()),
+                PageRequest::new(None, None).unwrap(),
+            )
+            .await
+            .unwrap()
+            .items
+            .iter()
+            .any(|summary| summary.workflow.as_uuid() == workflow)
+    };
+    assert!(listed(lead).await && listed(f.owner).await && !listed(sibling).await);
+}
+
+/// "Managed" and "Beside", each led by a fresh member: `(units, [lead, sibling])`.
+async fn led_units(f: &Fixture) -> (Vec<crate::entities::department::DepartmentId>, [Uuid; 2]) {
+    use crate::application::ports::department::DepartmentWrite;
+    let departments =
+        crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
+    let mut units = Vec::new();
+    let mut leads = Vec::new();
+    for name in ["Managed", "Beside"] {
+        let lead = crate::adapters::http::routes::workflows::tests::teammate(
+            &f.persistence,
+            f.company,
+            "member",
+        )
+        .await;
+        let principal: Uuid = sqlx::query_scalar(
+            "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+        )
+        .bind(f.company)
+        .bind(lead)
+        .fetch_one(f.persistence.pool())
+        .await
+        .unwrap();
+        let unit = departments
+            .create_department(
+                f.owner,
+                f.company,
+                DepartmentWrite {
+                    name: name.into(),
+                    slug: name.to_lowercase(),
+                    ..Default::default()
+                },
+                Some(crate::entities::transport::PrincipalId::new(principal)),
+            )
+            .await
+            .unwrap();
+        units.push(unit.id);
+        leads.push(lead);
+    }
+    (units, [leads[0], leads[1]])
+}
+
+/// Plan06 decision 2 / B1-F2: the agent pane's "Used by" card is the agent's managers'. A lead
+/// reads it for an agent placed in its unit; a root agent and a sibling's view stay not found.
+#[tokio::test]
+async fn delegated_admin_authoring_agent_usage_card_follows_the_agents_departments() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let (units, [lead, sibling]) = led_units(&f).await;
+    let placed = f.agent("Placed", "placed").await;
+    let root_agent = f.agent("Rooted", "rooted").await;
+    let principal: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2 AND kind='agent'",
+    )
+    .bind(f.company)
+    .bind(placed)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    crate::adapters::persistence::test_support::department_use_cases(&f.persistence)
+        .add_member(
+            f.owner,
+            f.company,
+            units[0],
+            crate::entities::transport::PrincipalId::new(principal),
+        )
+        .await
+        .unwrap();
+    let card = async |user: Uuid, agent: Uuid| {
+        agent_usage(f.ui(user), Path(agent), f.query())
+            .await
+            .map(|html| html.0)
+    };
+    assert!(card(lead, placed).await.is_ok());
+    assert!(card(f.owner, root_agent).await.is_ok());
+    for (user, agent) in [(lead, root_agent), (sibling, placed), (f.member, placed)] {
+        assert!(
+            matches!(card(user, agent).await, Err(AppError::NotFound(_))),
+            "{user} {agent}"
+        );
+    }
+}

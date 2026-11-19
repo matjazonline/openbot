@@ -15781,6 +15781,25 @@ RETURNS text LANGUAGE sql STABLE AS $$
     FROM public.membership_of(checked_user, checked_company) AS actor
 $$;
 
+-- The strongest role with which a person manages at least one unit: the root, or a unit they
+-- lead. Collection entry only; every object is still checked against its own unit.
+CREATE FUNCTION public.any_unit_management_role(checked_user uuid, checked_company uuid)
+RETURNS text LANGUAGE sql STABLE AS $$
+    WITH candidate AS (
+        SELECT id FROM public.departments WHERE company_id = checked_company AND is_root
+        UNION
+        SELECT holder.department_id FROM public.department_roles AS holder
+        JOIN public.principals AS principal
+          ON principal.company_id = holder.company_id AND principal.id = holder.principal_id
+        WHERE holder.company_id = checked_company AND holder.role = 'lead'
+          AND principal.user_id = checked_user
+    ), roles AS MATERIALIZED (
+        SELECT public.unit_management_role(checked_user, checked_company, candidate.id) AS role
+        FROM candidate
+    )
+    SELECT role FROM roles WHERE role IS NOT NULL ORDER BY role LIMIT 1
+$$;
+
 -- Every desk belongs to a department. Reassign or delete its desks before deleting a
 -- department. The tenant participates in the FK; ownership cannot cross a company boundary.
 ALTER TABLE ONLY public.channels

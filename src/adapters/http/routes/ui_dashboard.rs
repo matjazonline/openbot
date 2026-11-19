@@ -210,6 +210,8 @@ impl DashboardScope {
                                 crate::entities::access_level::AccessLevel::PUBLIC,
                                 |access| access.access_level,
                             ),
+                            administers_units: managed_access
+                                .is_some_and(|access| access.administers_units),
                             company,
                         }
                     }),

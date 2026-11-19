@@ -13,7 +13,7 @@ fn workspace(f: &Fixture, user: Uuid) -> Workspace {
 }
 
 #[tokio::test]
-async fn team_roles_come_from_membership_and_nonowners_get_forbidden() {
+async fn team_roles_come_from_membership_and_noninviters_are_told_nothing() {
     let Some(f) = Fixture::new().await else {
         return;
     };
@@ -25,7 +25,8 @@ async fn team_roles_come_from_membership_and_nonowners_get_forbidden() {
     .await;
     denied(
         invite_form_pane(workspace(&f, f.member.id), Path(f.company.id)).await,
-        StatusCode::FORBIDDEN,
+        // Inviting is company administration; a plain member is told nothing (Plan06 02A.4).
+        StatusCode::NOT_FOUND,
         &f.company.name,
     )
     .await;
@@ -92,8 +93,8 @@ async fn team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes
     let Some(f) = Fixture::new().await else {
         return;
     };
-    // Root admins invite members (Plan06 decision 01B.7); an admin-role invitation and every
-    // root role change stay the owner's.
+    // Root admins invite members (Plan06 decision 01B.7); every root role change stays the
+    // owner's. Refusals of people who may not do these at all are a stranger's 404 (02A.4).
     for (role, invite_role) in [
         ("member", CompanyAccessRole::Member),
         ("admin", CompanyAccessRole::Admin),
@@ -105,10 +106,47 @@ async fn team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes
             .execute(f.persistence.pool())
             .await
             .expect("fixture member role changed");
-        denied_mutations(&f, f.company.id, StatusCode::FORBIDDEN, invite_role, || {
-            workspace(&f, f.member.id)
-        })
-        .await;
+        if role == "member" {
+            denied_mutations(&f, f.company.id, StatusCode::NOT_FOUND, invite_role, || {
+                workspace(&f, f.member.id)
+            })
+            .await;
+            continue;
+        }
+        // An admin naming the admin role is refused inside its authority: inline, nothing stored.
+        let refused = create_invite(
+            workspace(&f, f.member.id),
+            Path(f.company.id),
+            Form(InviteForm {
+                access_level: None,
+                email: format!("new-admin-{}@example.test", Uuid::new_v4().simple()),
+                role: Some(CompanyAccessRole::Admin),
+            }),
+        )
+        .await
+        .expect("a business refusal renders on the form");
+        assert_eq!(refused.status(), StatusCode::OK);
+        let refused = String::from_utf8(
+            axum::body::to_bytes(refused.into_body(), 1 << 20)
+                .await
+                .unwrap()
+                .to_vec(),
+        )
+        .unwrap();
+        assert!(refused.contains("Failed to send invite"), "{refused}");
+        for response in [
+            update_member_role(
+                workspace(&f, f.member.id),
+                Path((f.company.id, f.owner.id)),
+                Form(MemberRoleForm {
+                    role: CompanyAccessRole::Member,
+                }),
+            )
+            .await,
+            remove_member(workspace(&f, f.member.id), Path((f.company.id, f.owner.id))).await,
+        ] {
+            denied(response, StatusCode::NOT_FOUND, &f.company.name).await;
+        }
     }
     let email = format!("by-admin-{}@example.test", Uuid::new_v4().simple());
     let invited = create_invite(

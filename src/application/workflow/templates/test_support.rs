@@ -106,7 +106,7 @@ impl WorkflowDraftCopies for Store {
         if !state
             .membership
             .get(&key)
-            .is_some_and(|m| m.manages_company_operations())
+            .is_some_and(|m| m.administers_company())
         {
             return Err(AppError::NotFound("workflow".into()));
         }
@@ -183,5 +183,13 @@ impl crate::application::ports::administration::AdministrationPersistence for St
             Some(CompanyMembership::Admin) => Some(ManagementRole::Admin),
             _ => None,
         })
+    }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(Vec::new())
     }
 }

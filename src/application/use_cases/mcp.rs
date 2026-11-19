@@ -187,7 +187,7 @@ impl McpUseCases {
     ) -> AppResult<crate::entities::access_level::LevelActor> {
         let access =
             super::company::readable_company(self.companies.as_ref(), user, company).await?;
-        if !access.membership.manages_company_operations() {
+        if !access.membership.administers_company() {
             return Err(AppError::NotFound("Company connection".into()));
         }
         Ok(crate::entities::access_level::LevelActor {

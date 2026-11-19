@@ -42,7 +42,7 @@ fn conversations_identify_each_run_and_its_own_reply() {
         CompanyMembership::Admin,
         CompanyMembership::Member,
     ] {
-        runs.inspectable = if membership.manages_company_operations() {
+        runs.inspectable = if membership.administers_company() {
             [first, second].into_iter().collect()
         } else {
             Default::default()
@@ -64,7 +64,7 @@ fn conversations_identify_each_run_and_its_own_reply() {
         assert!(html.contains("Older runs are not shown"));
         assert_eq!(
             html.contains("href=\"/ui/workflow-runs?"),
-            membership.manages_company_operations()
+            membership.administers_company()
         );
         for (index, expected, other) in [(1, first, second), (2, second, first)] {
             let attribution = message_run_attribution(

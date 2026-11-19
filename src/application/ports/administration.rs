@@ -47,6 +47,10 @@ pub trait AdministrationPersistence: Send + Sync {
         company: CompanyId,
         target: ManagementTarget,
     ) -> AppResult<Option<ManagementRole>>;
+
+    /// Every unit the person currently manages (the whole company for a root manager), to scope
+    /// configuration lists. Listing is not authority: each write still checks its own target.
+    async fn managed_units(&self, actor: Uuid, company: CompanyId) -> AppResult<Vec<DepartmentId>>;
 }
 
 pub async fn manages_unit(

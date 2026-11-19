@@ -67,3 +67,36 @@ async fn company_pages_and_writes_distinguish_foreign_member_and_database_failur
         .await;
     }
 }
+
+/// Owner-only company settings: a unit lead and a root admin are told nothing (Plan06 02A.4).
+#[tokio::test]
+async fn delegated_admin_routes_company_settings_hide_from_leads_and_admins() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let d = f.delegation().await;
+    for user in [&d.lead, &d.admin] {
+        denied(
+            edit_company_form(
+                State(f.companies.clone()),
+                Fixture::auth(user),
+                Path(f.company.id),
+            )
+            .await,
+            axum::http::StatusCode::NOT_FOUND,
+            &f.company.name,
+        )
+        .await;
+        denied(
+            delete_company(
+                State(f.companies.clone()),
+                Fixture::auth(user),
+                Path(f.company.id),
+            )
+            .await,
+            axum::http::StatusCode::NOT_FOUND,
+            &f.company.name,
+        )
+        .await;
+    }
+}

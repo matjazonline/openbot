@@ -23,8 +23,9 @@ impl CompanyInviteUseCases {
         company: Uuid,
     ) -> AppResult<CompanyAccess> {
         let access = readable_company(self.company_persistence.as_ref(), actor, company).await?;
+        // Not administering the company is an authority refusal: told nothing (Plan06 02A.4).
         if !level_actor(&access).manages_levels() {
-            return Err(level_error(LevelRefusal::NotAdministrator));
+            return Err(crate::use_cases::company::company_not_found());
         }
         Ok(access)
     }

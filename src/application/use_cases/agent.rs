@@ -342,12 +342,14 @@ impl AgentUseCases {
         )
     }
 
-    fn verify_company_manager(
+    /// Authoring aids every unit manager may use (Plan06 U3): the model choices (no credentials)
+    /// and the system-prompt generator. Editing model connections stays company administration.
+    fn verify_authoring(
         &self,
         user_id: Uuid,
         company_id: Uuid,
     ) -> impl std::future::Future<Output = AppResult<ManagementRole>> + Send + '_ {
-        self.verify_manager(user_id, company_id, ManagementTarget::Root)
+        self.verify_manager(user_id, company_id, ManagementTarget::AnyUnit)
     }
 
     async fn validate_model_selection(
@@ -370,7 +372,7 @@ impl AgentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.verify_authoring(user_id, company_id).await?;
         self.company_persistence
             .list_model_connections(company_id)
             .await
@@ -720,7 +722,7 @@ impl AgentUseCases {
         provider_override: Option<&str>,
         model_override: Option<&str>,
     ) -> AppResult<String> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.verify_authoring(user_id, company_id).await?;
 
         let connections = self
             .company_persistence

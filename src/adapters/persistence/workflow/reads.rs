@@ -381,6 +381,7 @@ impl WorkflowReads for PostgresPersistence {
     async fn list_definitions(
         &self,
         company: CompanyId,
+        managed_by: Option<WorkflowActor>,
         page: PageRequest,
     ) -> AppResult<Page<DefinitionSummary>> {
         let cursor: Option<(String, Uuid)> = match page.after {
@@ -399,12 +400,14 @@ impl WorkflowReads for PostgresPersistence {
         let rows = sqlx::query_as::<_, DefinitionRow>(
             "SELECT id, revision, title, archived, template_origin FROM workflow_definitions \
              WHERE company_id = $1 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id) AND ($2::text IS NULL OR (title, id) > ($2, $3)) \
+             AND ($5::uuid IS NULL OR workflow_definition_management_role($5, company_id, id) IS NOT NULL) \
              ORDER BY title, id LIMIT $4",
         )
         .bind(company.as_uuid())
         .bind(cursor.as_ref().map(|(title, _)| title.as_str()))
         .bind(cursor.as_ref().map(|(_, id)| *id))
         .bind(page.size + 1)
+        .bind(managed_by.map(|actor| actor.user_id()))
         .fetch_all(self.pool())
         .await?
         .into_iter()

@@ -49,7 +49,9 @@ pub struct ChannelSettingsList<'a> {
     /// Domain the channel addresses are built on, e.g. `mailagents.com`.
     pub app_domain_name: &'a str,
     pub channels: &'a [Channel],
-    /// The company's departments, to group the desks under.
+    /// Desks the viewer may read but not configure: listed without a settings link.
+    pub read_only: &'a std::collections::HashSet<Uuid>,
+    /// The departments the viewer manages, to group the desks under.
     pub departments: &'a [Department],
     pub selected_channel_id: Option<Uuid>,
 }
@@ -162,7 +164,12 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
         ),
-        run_counts = super::run_counts::run_counts_bar(company.id),
+        // Run counts are a company-wide read view (Plan06 U4): company administrators only.
+        run_counts = if page.user.company_membership.administers_company() {
+            super::run_counts::run_counts_bar(company.id)
+        } else {
+            String::new()
+        },
         list_html = channel_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );
@@ -192,10 +199,15 @@ pub fn channel_settings_list(list: &ChannelSettingsList<'_>, swap: FragmentSwap)
                 let entries: String = channels
                     .into_iter()
                     .map(|channel| {
+                        let address =
+                            channel.inbound_address(&list.company.slug, list.app_domain_name);
+                        if list.read_only.contains(&channel.id) {
+                            return read_only_entry(list.company.id, channel, &address);
+                        }
                         channel_settings_entry(
                             list.company.id,
                             channel,
-                            &channel.inbound_address(&list.company.slug, list.app_domain_name),
+                            &address,
                             list.selected_channel_id == Some(channel.id),
                         )
                     })
@@ -280,6 +292,27 @@ fn channel_settings_entry(
         channel_id = channel.id,
         name = escape_html_text(&channel.name),
         disabled_badge = disabled_badge(channel),
+        address = escape_html_text(address),
+    )
+}
+
+/// A desk the viewer may read but not configure: it opens the conversation, not settings.
+fn read_only_entry(company_id: Uuid, channel: &Channel, address: &EmailAddress) -> String {
+    format!(
+        r##"
+                <li>
+                    <a class="flex flex-col items-start gap-0.5" data-desk-read-only
+                        href="/ui?company_id={company_id}&amp;channel_id={channel_id}">
+                        <span class="flex w-full min-w-0 flex-wrap items-center gap-2">
+                            <span class="min-w-0 truncate">{name}</span>
+                            <span class="badge badge-ghost badge-sm shrink-0 opacity-70">Read only</span>
+                        </span>
+                        <span class="w-full truncate font-mono text-[11px] opacity-60">{address}</span>
+                    </a>
+                </li>
+        "##,
+        channel_id = channel.id,
+        name = escape_html_text(&channel.name),
         address = escape_html_text(address),
     )
 }

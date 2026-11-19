@@ -632,4 +632,12 @@ impl crate::application::ports::administration::AdministrationPersistence for Me
             _ => None,
         })
     }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(Vec::new())
+    }
 }

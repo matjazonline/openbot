@@ -72,6 +72,20 @@ impl Tree {
     }
 }
 
+/// An owner manages every listed department and their parents; a member manages none.
+fn managed_when(
+    editable: bool,
+    departments: &[Department],
+) -> std::collections::HashSet<DepartmentId> {
+    if !editable {
+        return Default::default();
+    }
+    departments
+        .iter()
+        .flat_map(|department| std::iter::once(department.id).chain(department.parent_id))
+        .collect()
+}
+
 fn section<'a>(
     tree: &'a Tree,
     departments: &'a [Department],
@@ -80,6 +94,7 @@ fn section<'a>(
     editable: bool,
     error: Option<(DepartmentForm, &'a str)>,
 ) -> String {
+    let managed = managed_when(editable, departments);
     company_departments_section(&DepartmentSection {
         company: &tree.company,
         app_domain_name: "example.com",
@@ -92,6 +107,7 @@ fn section<'a>(
         } else {
             crate::entities::company_member::CompanyMembership::Member
         },
+        managed: &managed,
         error,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
@@ -349,6 +365,7 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
         choices: &choices,
         choices_cut: true,
         membership: crate::entities::company_member::CompanyMembership::Owner,
+        managed: &managed_when(true, &all),
         error: None,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
@@ -516,6 +533,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
             company: &tree.company,
             app_domain_name: "example.com",
             channels: &channels,
+            read_only: &Default::default(),
             departments: &all,
             selected_channel_id: None,
         },
@@ -548,6 +566,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
             company: &tree.company,
             app_domain_name: "example.com",
             channels: &channels[..1],
+            read_only: &Default::default(),
             departments: &all,
             selected_channel_id: None,
         },
@@ -851,4 +870,142 @@ pub(super) fn desk_access_browser_fixtures() -> [(&'static str, String); 4] {
             desk_browser_workspace(&company, &modern_edit),
         ),
     ]
+}
+
+fn plain_view(department: &Department, members: &[DepartmentPrincipal]) -> DepartmentView {
+    DepartmentView {
+        detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
+            department: department.clone(),
+            members: members
+                .iter()
+                .map(|principal| DepartmentMember {
+                    principal_id: principal.principal_id,
+                    created_at: Utc::now(),
+                })
+                .collect(),
+            roles: Vec::new(),
+        },
+        principals: members.to_vec(),
+        desks: vec![DepartmentDesk {
+            id: Uuid::new_v4(),
+            name: "Unit desk".into(),
+            slug: "unit-desk".into(),
+            own: true,
+        }],
+    }
+}
+
+fn led_section(
+    tree: &Tree,
+    departments: &[Department],
+    view: &DepartmentView,
+    choices: &[DepartmentPrincipal],
+    managed: &std::collections::HashSet<DepartmentId>,
+) -> String {
+    company_departments_section(&DepartmentSection {
+        company: &tree.company,
+        app_domain_name: "example.com",
+        departments,
+        detail: DepartmentDetailPane::Department { view, draft: None },
+        choices,
+        choices_cut: false,
+        membership: crate::entities::company_member::CompanyMembership::Member,
+        managed,
+        error: None,
+        notice: None,
+        knowledge: DepartmentKnowledge::Documents(&[]),
+    })
+}
+
+/// Plan06 02A.2/D1 r2-8: each control follows the server rule for its own target. The lead of
+/// Sales manages Sales and Inside sales: it edits and leads Inside (its parent is Sales), manages
+/// Sales' members, but neither edits Sales nor assigns its lead (Revenue is Sales' parent).
+#[test]
+fn delegated_admin_ui_pane_offers_each_control_only_where_its_server_rule_passes() {
+    let tree = tree();
+    let all = tree.all();
+    let worker = principal(PrincipalKind::Person, "dana", "dana@example.com");
+    let choices = vec![worker.clone()];
+    let managed: std::collections::HashSet<DepartmentId> =
+        [tree.sales.id, tree.inside.id].into_iter().collect();
+    let endpoint = |department: &Department, rest: &str| {
+        format!(
+            "/ui/companies/{}/departments/{}{rest}",
+            tree.company.id, department.id
+        )
+    };
+
+    let inside = led_section(
+        &tree,
+        &all,
+        &plain_view(&tree.inside, std::slice::from_ref(&worker)),
+        &choices,
+        &managed,
+    );
+    assert!(inside.contains(r#"id="department-edit""#), "{inside}");
+    assert!(inside.contains(&endpoint(&tree.inside, "/lead")));
+    assert!(inside.contains(&endpoint(&tree.inside, "/members")));
+    assert!(inside.contains("New department"));
+    assert!(
+        inside.contains("/ui/channels?company_id="),
+        "the managed unit's desk links to settings"
+    );
+    // Destinations are managed units only; the company root is not offered to a unit lead.
+    assert!(!inside.contains(r#"<option value="">Company root</option>"#));
+    assert!(!inside.contains(&format!(r#"<option value="{}""#, tree.revenue.id.as_uuid())));
+    assert!(!inside.contains(&format!(r#"<option value="{}""#, tree.support.id.as_uuid())));
+
+    let sales = led_section(
+        &tree,
+        &all,
+        &plain_view(&tree.sales, std::slice::from_ref(&worker)),
+        &choices,
+        &managed,
+    );
+    assert!(!sales.contains(r#"id="department-edit""#), "{sales}");
+    assert!(!sales.contains(&endpoint(&tree.sales, "/lead")));
+    assert!(sales.contains(&endpoint(&tree.sales, "/members")));
+
+    let support = led_section(
+        &tree,
+        &all,
+        &plain_view(&tree.support, std::slice::from_ref(&worker)),
+        &choices,
+        &managed,
+    );
+    for absent in [
+        r#"id="department-edit""#.to_owned(),
+        endpoint(&tree.support, "/lead"),
+        endpoint(&tree.support, "/members"),
+        "/ui/channels?company_id=".to_owned(),
+    ] {
+        assert!(!support.contains(&absent), "{absent}: {support}");
+    }
+
+    // F9: a person who leads the root manages every unit, yet root membership stays the
+    // company's: no root member removal or add control, and root roles need the owner.
+    let mut root = department(tree.company.id, "Acme", "acme", None);
+    root.is_root = true;
+    let agent = principal(PrincipalKind::Agent, "Helper", "helper");
+    let with_root: Vec<Department> = all.iter().cloned().chain([root.clone()]).collect();
+    let everything: std::collections::HashSet<DepartmentId> =
+        with_root.iter().map(|department| department.id).collect();
+    let root_html = led_section(
+        &tree,
+        &with_root,
+        &plain_view(&root, &[worker.clone(), agent.clone()]),
+        &[worker, agent],
+        &everything,
+    );
+    assert!(
+        !root_html.contains(&endpoint(&root, "/members")),
+        "{root_html}"
+    );
+    assert!(!root_html.contains(&endpoint(&root, "/lead")));
+    assert!(
+        !root_html.contains("hx-delete"),
+        "no root member removal for a root lead"
+    );
 }

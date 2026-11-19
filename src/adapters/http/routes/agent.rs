@@ -330,7 +330,7 @@ async fn list_agents_page(
     Path(company_id): Path<Uuid>,
 ) -> AppResult<Html<String>> {
     let company = company_use_cases
-        .managed_company(user.id, company_id)
+        .administered_company(user.id, company_id)
         .await?
         .company;
     let agents = agent_use_cases
@@ -353,7 +353,7 @@ async fn create_agent_handler(
     Form(form): Form<AgentForm>,
 ) -> AppResult<Html<String>> {
     let company = company_use_cases
-        .managed_company(user.id, company_id)
+        .administered_company(user.id, company_id)
         .await?
         .company;
 
@@ -415,7 +415,7 @@ async fn managed_agent(
     agent_id: Uuid,
 ) -> AppResult<(crate::entities::company::Company, Agent)> {
     let company = company_use_cases
-        .managed_company(user_id, company_id)
+        .administered_company(user_id, company_id)
         .await?
         .company;
     let agent = agent_use_cases

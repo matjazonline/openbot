@@ -634,3 +634,79 @@ async fn department_ui_foreign_ids_under_the_owners_path_change_nothing() {
     assert_eq!(untouched.roles.len(), 1);
     assert_eq!(untouched.members[0].principal_id.as_uuid(), their_person);
 }
+
+/// Plan06 02A: a unit lead reaches the Departments routes and writes inside its unit; a sibling
+/// lead's write there changes nothing, and a plain member is still told nothing.
+#[tokio::test]
+async fn delegated_admin_routes_department_writes_follow_the_lead_unit() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let d = f.delegation().await;
+    let unit = d.unit.as_uuid();
+    let child = |name: &str| DepartmentFormData {
+        parent_id: Some(unit.to_string()),
+        ..form(name, &name.to_lowercase())
+    };
+    let new_pane = new_department(workspace(&f, &d.lead), Path(f.company.id))
+        .await
+        .expect("a lead opens the create form")
+        .0;
+    assert!(
+        new_pane.contains(&format!(r#"<option value="{unit}""#)),
+        "{new_pane}"
+    );
+    assert!(!new_pane.contains(r#"<option value="">Company root</option>"#));
+    let (status, _, html) = body(
+        create_department(
+            workspace(&f, &d.lead),
+            Path(f.company.id),
+            Form(child("Team")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{html}");
+    assert!(html.contains("Department created."), "{html}");
+    let (_, _, refused) = body(
+        create_department(
+            workspace(&f, &d.sibling),
+            Path(f.company.id),
+            Form(child("Other")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(!refused.contains("Department created."), "{refused}");
+    let names: Vec<String> = f
+        .departments()
+        .list_departments(f.owner.id, f.company.id)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|department| department.name)
+        .collect();
+    assert!(names.contains(&"Team".to_owned()) && !names.contains(&"Other".to_owned()));
+    let principal = person(&f, &f.member).await;
+    let (status, _, html) = body(
+        add_member(
+            workspace(&f, &d.lead),
+            Path((f.company.id, unit)),
+            Form(PrincipalFormData {
+                principal_id: Some(principal.to_string()),
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{html}");
+    denied(
+        new_department(workspace(&f, &f.member), Path(f.company.id)).await,
+        StatusCode::NOT_FOUND,
+        &f.company.name,
+    )
+    .await;
+}

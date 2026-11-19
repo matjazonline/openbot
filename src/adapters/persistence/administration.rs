@@ -68,21 +68,11 @@ pub(in crate::adapters::persistence) async fn management_role_on(
                 .await?
         }
         ManagementTarget::AnyUnit => {
-            sqlx::query_scalar(
-                "WITH candidate AS ( \
-                   SELECT id FROM departments WHERE company_id=$2 AND is_root \
-                   UNION SELECT holder.department_id FROM department_roles AS holder \
-                   JOIN principals AS principal ON principal.company_id=holder.company_id \
-                     AND principal.id=holder.principal_id \
-                   WHERE holder.company_id=$2 AND holder.role='lead' AND principal.user_id=$1 \
-                 ), roles AS MATERIALIZED ( \
-                   SELECT unit_management_role($1,$2,candidate.id) AS role FROM candidate \
-                 ) SELECT role FROM roles WHERE role IS NOT NULL ORDER BY role LIMIT 1",
-            )
-            .bind(actor)
-            .bind(company.as_uuid())
-            .fetch_optional(db)
-            .await?
+            sqlx::query_scalar("SELECT any_unit_management_role($1,$2)")
+                .bind(actor)
+                .bind(company.as_uuid())
+                .fetch_one(db)
+                .await?
         }
         ManagementTarget::Root | ManagementTarget::Unit(_) => {
             let unit = match target {
@@ -121,6 +111,18 @@ impl AdministrationPersistence for PostgresPersistence {
         tx.commit().await?;
         Ok(role)
     }
+
+    async fn managed_units(&self, actor: Uuid, company: CompanyId) -> AppResult<Vec<DepartmentId>> {
+        let units: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM departments WHERE company_id=$2 \
+             AND unit_management_role($1,$2,id) IS NOT NULL ORDER BY id",
+        )
+        .bind(actor)
+        .bind(company.as_uuid())
+        .fetch_all(self.pool())
+        .await?;
+        Ok(units.into_iter().map(DepartmentId::new).collect())
+    }
 }
 
 #[async_trait]
@@ -134,5 +136,9 @@ impl AdministrationPersistence for PostgresDepartments {
         self.persistence
             .management_role(actor, company, target)
             .await
+    }
+
+    async fn managed_units(&self, actor: Uuid, company: CompanyId) -> AppResult<Vec<DepartmentId>> {
+        self.persistence.managed_units(actor, company).await
     }
 }

@@ -7,7 +7,7 @@ pub(super) async fn workspace(
     ui: Ui,
     Query(query): Query<WorkspaceQuery>,
 ) -> AppResult<Html<String>> {
-    let frame = ui.frame(query.company_id).await?;
+    let frame = ui.unit_frame(query.company_id).await?;
     let Some(company) = frame.company.as_ref().map(|access| &access.company) else {
         return Ok(Html(frame.render(&ui.config, |_, _| String::new())));
     };
@@ -58,7 +58,7 @@ pub(super) async fn workspace(
 
 /// GET /ui/workflows/list — the next sidebar page, replacing its "Load more" row.
 pub(super) async fn list_page(ui: Ui, Query(query): Query<ListQuery>) -> AppResult<Html<String>> {
-    ui.company(query.company_id).await?;
+    ui.unit_company(query.company_id).await?;
     let (items, next) = ui.list(query.company_id, query.after).await?;
     Ok(Html(pages::workflow_list_entries(&pages::WorkflowList {
         company_id: query.company_id,
@@ -78,7 +78,7 @@ pub(super) fn new_pane_html(ui: &Ui, company: Uuid, error: Option<&str>) -> Stri
 
 /// GET /ui/workflows/new — the templates and the blank-draft form.
 pub(super) async fn new_pane(ui: Ui, Query(query): Query<CompanyQuery>) -> AppResult<Html<String>> {
-    ui.company(query.company_id).await?;
+    ui.unit_company(query.company_id).await?;
     Ok(Html(new_pane_html(&ui, query.company_id, None)))
 }
 
@@ -125,7 +125,7 @@ pub(super) async fn create_draft(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Response> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let form = FormFields::parse(&body);
     let key = crate::application::workflow::IdempotencyKey::parse(form.text("command_key"))?;
     let workflow = keyed_id("workflow.ui_draft", super::company(company), key.as_str());
@@ -171,7 +171,7 @@ pub(super) async fn copy_template(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Response> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let form = FormFields::parse(&body);
     let copied = copy_template_draft(
         &ui.engine,
@@ -209,7 +209,7 @@ pub(super) async fn pane(
     Path(workflow): Path<Uuid>,
     Query(query): Query<PaneQuery>,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     Ok(Html(
         ui.pane_html(
             company,
@@ -226,7 +226,7 @@ pub(super) async fn catalogue(
     ui: Ui,
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let agents = ui.agents.list_company_agents(ui.user, company).await?;
     let references: Vec<pages::AgentReference<'_>> = agents
         .iter()

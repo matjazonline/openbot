@@ -256,7 +256,21 @@ fn refusal(error: WorkflowError) -> Result<EditorState, WorkflowError> {
 }
 
 impl Ui {
+    /// One definition the caller manages (`workflow_definition_management_role`); any other is
+    /// not found. Every authoring pane reads its definition through here, so entering the
+    /// workspace as a unit manager never opens a definition outside the caller's units.
     async fn detail(&self, company: Uuid, workflow: Uuid) -> AppResult<DefinitionDetail> {
+        self.engine
+            .authorization()
+            .authorize(
+                super::company(company),
+                self.actor()?,
+                crate::application::workflow::RelatedAssociation::Company,
+                crate::application::workflow::WorkflowOperation::ManageDefinition(WorkflowId::new(
+                    workflow,
+                )),
+            )
+            .await?;
         self.engine
             .reads()
             .definition(super::company(company), WorkflowId::new(workflow))
@@ -277,6 +291,7 @@ impl Ui {
             .reads()
             .list_definitions(
                 super::company(company),
+                Some(self.actor()?),
                 PageRequest::new(after, Some(LIST_PAGE))?,
             )
             .await?;

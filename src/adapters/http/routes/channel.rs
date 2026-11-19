@@ -342,11 +342,11 @@ async fn list_channels_page(
     Query(query): Query<ChannelsPageQuery>,
 ) -> AppResult<Html<String>> {
     let company = company_use_cases
-        .managed_company(user.id, company_id)
+        .administered_company(user.id, company_id)
         .await?
         .company;
     let channels = channel_use_cases
-        .list_company_channels(user.id, company_id)
+        .list_managed_channels(user.id, company_id)
         .await?;
     let departments = department_use_cases
         .list_departments(user.id, company_id)
@@ -377,7 +377,7 @@ async fn create_channel_handler(
     Form(form): Form<ChannelForm>,
 ) -> AppResult<Html<String>> {
     let company = company_use_cases
-        .managed_company(user.id, company_id)
+        .administered_company(user.id, company_id)
         .await?
         .company;
     let view = ChannelListView {
@@ -444,7 +444,7 @@ impl ChannelListView<'_> {
         let company_id = self.company.id;
         let channels = self
             .channel_use_cases
-            .list_company_channels(self.user_id, company_id)
+            .list_managed_channels(self.user_id, company_id)
             .await?;
         let departments = self
             .department_use_cases
@@ -473,7 +473,7 @@ async fn managed_channel(
     channel_id: Uuid,
 ) -> AppResult<(crate::entities::company::Company, Channel)> {
     let company = company_use_cases
-        .managed_company(user_id, company_id)
+        .administered_company(user_id, company_id)
         .await?
         .company;
     let channel = channel_use_cases
@@ -748,7 +748,7 @@ async fn list_channels_json(
     Path(company_id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
     let channels = channel_use_cases
-        .list_company_channels(user.id, company_id)
+        .list_managed_channels(user.id, company_id)
         .await?;
     Ok((StatusCode::OK, Json(channels)))
 }

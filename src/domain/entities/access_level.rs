@@ -86,7 +86,7 @@ pub struct LevelActor {
 }
 impl LevelActor {
     pub fn manages_levels(self) -> bool {
-        self.membership.manages_company_operations()
+        self.membership.administers_company()
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

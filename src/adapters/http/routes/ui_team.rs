@@ -170,9 +170,14 @@ pub struct AvatarForm {
 
 /// Only validation/conflict refusals belong in a successful editable fragment.
 /// Authorization, missing rows and infrastructure failures keep their typed HTTP outcome.
+/// A refusal the form can show. Forbidden here is a business refusal inside the caller's
+/// authority (an admin naming the admin role or a current admin, a level above their own);
+/// not administering the company at all is a not-found and propagates.
 fn inline_team_mutation_error(error: AppError) -> AppResult<String> {
     match error {
-        AppError::BadRequest(_) | AppError::Conflict(_) => Ok(error.to_string()),
+        AppError::BadRequest(_) | AppError::Conflict(_) | AppError::Forbidden(_) => {
+            Ok(error.to_string())
+        }
         error => Err(error),
     }
 }
@@ -212,7 +217,8 @@ impl FromRequestParts<AppState> for Workspace {
 
 impl Workspace {
     /// The company a request is scoped to and what the caller is to it: any member may open the
-    /// team (404 for anyone else); what they may change is [`TeamView::require_owner`]'s call.
+    /// team (404 for anyone else); what they may change follows [`TeamView::role`], and every
+    /// write is rechecked by the use case.
     async fn scoped_company(&self, company_id: Uuid) -> AppResult<CompanyAccess> {
         self.company_use_cases
             .readable_company(self.user_id, company_id)
@@ -295,7 +301,7 @@ async fn invite_form_pane(
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
-    view.require_owner()?;
+    view.require_inviter()?;
 
     view.invite_form_response().await
 }
@@ -579,9 +585,9 @@ struct TeamView<'a> {
 impl TeamView<'_> {
     /// What the caller may do here.
     ///
-    /// Decided from their membership rather than by letting an unauthorized use-case call fail:
-    /// the invite calls refuse a non-owner outright, so asking them first would turn an ordinary
-    /// member's page load into an error.
+    /// Decided from their membership rather than by letting an unauthorized use-case call fail,
+    /// so an ordinary member's page load is never an error. The owner manages everything here;
+    /// a root admin manages member invitations (Plan06 decision b); the use cases enforce both.
     fn role(&self) -> TeamRole {
         if self.membership.is_owner() {
             TeamRole::Owner
@@ -592,14 +598,13 @@ impl TeamView<'_> {
         }
     }
 
-    /// The owner manages invites and members; anyone else on the team sees it and is refused.
-    fn require_owner(&self) -> AppResult<()> {
-        match self.role() {
-            TeamRole::Owner => Ok(()),
-            TeamRole::Admin | TeamRole::Member => Err(AppError::Forbidden(
-                "Only the company owner can manage invites and team members.".into(),
-            )),
+    /// The owner and root admins invite (admins: members only, enforced by the use case);
+    /// anyone else on the team is told nothing.
+    fn require_inviter(&self) -> AppResult<()> {
+        if self.role().invites() {
+            return Ok(());
         }
+        Err(crate::use_cases::company::company_not_found())
     }
 
     async fn members(&self) -> AppResult<Vec<CompanyMember>> {
@@ -747,6 +752,7 @@ impl TeamView<'_> {
             company: self.company,
             email_draft,
             role_draft,
+            role: self.role(),
             error,
         })
     }

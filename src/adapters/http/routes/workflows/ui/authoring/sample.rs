@@ -59,7 +59,7 @@ pub(super) async fn sample(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     // Form encoding can expand every byte to three characters; bound it before parsing.
     if body.len() > MAX_SAMPLE_BYTES * 3 {
         return Err(AppError::BadRequest("Sample form exceeds 768 KiB".into()).into());

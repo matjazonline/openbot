@@ -3,7 +3,9 @@
 //! caller owns or administers (`load_managed_company`), and every command authorizes again.
 use super::*;
 use crate::adapters::http::pages;
-use crate::adapters::http::routes::ui::{load_account, load_managed_company, workspace_user};
+use crate::adapters::http::routes::ui::{
+    load_account, load_administered_company, load_managed_company, workspace_user,
+};
 use crate::entities::company::{Company, CompanyAccess};
 use crate::entities::value_objects::EmailAddress;
 use crate::infra::config::AppConfig;
@@ -65,24 +67,46 @@ impl Ui {
         WorkflowActor::authenticated(self.user)
     }
 
-    /// A company the caller owns or administers; any other id is not found.
+    /// A company the caller administers (owner or root admin), for the company-wide run views
+    /// and the tool registry; any other id is not found.
     async fn company(&self, company_id: Uuid) -> AppResult<Company> {
-        match self.companies.managed_company(self.user, company_id).await {
-            Ok(access) => Ok(access.company),
-            Err(AppError::Forbidden(_)) => Err(AppError::NotFound("Company not found".into())),
-            Err(error) => Err(error),
-        }
+        Ok(self
+            .companies
+            .managed_company(self.user, company_id)
+            .await?
+            .company)
     }
 
-    /// The whole-page frame: the caller as the shell shows them, and the company picked from
-    /// those they manage (`None` when they manage none).
+    /// A company in which the caller manages at least one unit, for authoring and bindings; any
+    /// other id is not found. Each definition and binding is then checked on its own.
+    async fn unit_company(&self, company_id: Uuid) -> AppResult<Company> {
+        Ok(self
+            .companies
+            .administered_company(self.user, company_id)
+            .await?
+            .company)
+    }
+
+    /// The whole-page frame for the run views: the caller as the shell shows them, and the
+    /// company picked from those they administer (`None` when they administer none).
     async fn frame(&self, requested: Option<Uuid>) -> AppResult<Frame> {
         let account = load_account(&self.users, self.user).await?;
         // Workflow listing pages keep their empty-workspace response for an unavailable
         // scope; detail/command routes use company()'s concealed 404. Outages still propagate.
         let company = match load_managed_company(&self.companies, self.user, requested).await {
             Ok((_, company)) => company,
-            Err(AppError::Forbidden(_) | AppError::NotFound(_)) => None,
+            Err(AppError::NotFound(_)) => None,
+            Err(error) => return Err(error),
+        };
+        Ok(Frame { account, company })
+    }
+
+    /// [`Self::frame`] for the authoring library: companies in which the caller manages a unit.
+    async fn unit_frame(&self, requested: Option<Uuid>) -> AppResult<Frame> {
+        let account = load_account(&self.users, self.user).await?;
+        let company = match load_administered_company(&self.companies, self.user, requested).await {
+            Ok((_, company)) => company,
+            Err(AppError::NotFound(_)) => None,
             Err(error) => return Err(error),
         };
         Ok(Frame { account, company })
@@ -106,7 +130,7 @@ impl Frame {
         match &self.company {
             None => pages::mailbox_no_company_page(&user),
             Some(access) => {
-                let user = user.with_company_membership(access.membership);
+                let user = user.with_company_access(access);
                 page(&user, &access.company)
             }
         }

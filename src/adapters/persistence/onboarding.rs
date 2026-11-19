@@ -71,9 +71,10 @@ impl OnboardingPersistence for PostgresOnboarding {
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(company_not_found)?;
+        // Onboarding is the owner's; anyone else is told nothing (Plan06 02A.4).
         if owner != user_id || role != "owner" {
-            return Err(AppError::Forbidden(
-                "Only the company owner can onboard agents.".into(),
+            return Err(AppError::NotFound(
+                "Company not found, or you do not have permission.".into(),
             ));
         }
         Ok(Box::new(Session {

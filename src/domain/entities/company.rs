@@ -52,6 +52,9 @@ pub struct CompanyAccess {
     pub company: Company,
     pub membership: CompanyMembership,
     pub access_level: crate::entities::access_level::AccessLevel,
+    /// Whether the person manages at least one unit (`any_unit_management_role`). A rendering
+    /// hint for navigation only; every management action checks its own target.
+    pub administers_units: bool,
 }
 
 #[cfg(test)]

@@ -547,16 +547,9 @@ async fn onboarding_denials_and_invalid_selection_have_no_provider_effects() {
         let begin = PostgresOnboarding::new(f.persistence.as_ref().clone(), templates())
             .begin(user, f.company)
             .await;
-        if role == "outsider" {
-            assert!(matches!(begin, Err(AppError::NotFound(_))));
-        } else {
-            assert!(matches!(begin, Err(AppError::Forbidden(_))));
-        }
-        if role == "outsider" {
-            assert!(matches!(result, Err(AppError::NotFound(_))));
-        } else {
-            assert!(matches!(result, Err(AppError::Forbidden(_))));
-        }
+        // Everyone but the owner is told nothing (Plan06 02A.4).
+        assert!(matches!(begin, Err(AppError::NotFound(_))), "{role}");
+        assert!(matches!(result, Err(AppError::NotFound(_))), "{role}");
         assert!(matches!(
             f.service
                 .onboard(

@@ -139,7 +139,7 @@ async fn cloudroom_company_live_issuer_revocation_and_management_scope() {
     };
     assert!(matches!(
         f.cases.create_pairing(f.member, f.company, None).await,
-        Err(AppError::Forbidden(_))
+        Err(AppError::NotFound(_))
     ));
     assert!(matches!(
         f.cases.create_pairing(f.stranger, f.company, None).await,

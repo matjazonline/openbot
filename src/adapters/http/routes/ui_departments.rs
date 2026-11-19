@@ -33,10 +33,7 @@ use crate::{
         transport::PrincipalId,
     },
     infra::config::AppConfig,
-    use_cases::{
-        company::{CompanyUseCases, company_not_found},
-        department::DepartmentUseCases,
-    },
+    use_cases::{company::CompanyUseCases, department::DepartmentUseCases},
 };
 
 use super::channel::slugify;
@@ -108,7 +105,8 @@ pub(super) async fn department_section(
         config,
     } = services;
     let company_id = access.company.id;
-    let editable = access.membership.manages_company_operations();
+    let managed = departments.managed_units(user_id, company_id).await?;
+    let editable = !managed.is_empty();
     let listed = departments.visible_departments(user_id, company_id).await?;
     let (choices, choices_cut) = if editable {
         departments.principal_choices(user_id, company_id).await?
@@ -158,6 +156,7 @@ pub(super) async fn department_section(
             choices: &choices,
             choices_cut,
             membership: access.membership,
+            managed: &managed,
             error,
             notice,
             knowledge: knowledge.as_deref().map_or(
@@ -215,16 +214,12 @@ impl Workspace {
             .await
     }
 
-    /// The company, only for its owner or an admin: anyone else gets the stranger's `404`.
+    /// The company, only for someone who manages at least one of its units: anyone else gets
+    /// the stranger's `404`. Each write then checks its own department.
     async fn managed(&self, company_id: Uuid) -> AppResult<CompanyAccess> {
-        match self
-            .company_use_cases
-            .managed_company(self.user_id, company_id)
+        self.company_use_cases
+            .administered_company(self.user_id, company_id)
             .await
-        {
-            Err(AppError::Forbidden(_)) => Err(company_not_found()),
-            other => other,
-        }
     }
 
     async fn section(

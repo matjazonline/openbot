@@ -134,7 +134,7 @@ pub(super) async fn save(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let form = FormFields::parse(&body);
     let selections = pages::WorkflowSelections::from_fields(form.pairs());
     let typed = Typed {
@@ -278,7 +278,7 @@ pub(super) async fn publish(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Response> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let form = FormFields::parse(&body);
     let selections = pages::WorkflowSelections::from_fields(form.pairs());
     let (http, mcp) = selection_bodies(&selections);
@@ -366,7 +366,7 @@ pub(super) async fn archive(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Response> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let form = FormFields::parse(&body);
     let expected = form.number("expected_revision")?;
     let state = match archive_draft(&ui.engine, company, ui.actor()?, workflow, expected).await {

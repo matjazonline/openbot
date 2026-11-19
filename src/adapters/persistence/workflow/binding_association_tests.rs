@@ -212,8 +212,8 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
                         .await
                         .unwrap()
                         .unwrap();
-                    let expected = context.membership.manages_company_operations()
-                        && channel.viewer_access(context);
+                    let expected =
+                        context.membership.administers_company() && channel.viewer_access(context);
                     let mut tx = p.pool().begin().await.unwrap();
                     let result = async {
                         authority::authorize_company(&mut tx, f.target.company, actor).await?;

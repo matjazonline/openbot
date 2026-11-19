@@ -180,6 +180,45 @@ impl DepartmentUseCases {
         })
     }
 
+    /// Collection entry for unit workspaces: the person manages at least one unit.
+    async fn administering(&self, user_id: Uuid, company_id: Uuid) -> AppResult<DepartmentScope> {
+        use crate::application::ports::administration::{ManagementTarget, require_management};
+        require_management(
+            self.departments.as_ref(),
+            user_id,
+            CompanyId::new(company_id),
+            ManagementTarget::AnyUnit,
+        )
+        .await?;
+        Ok(DepartmentScope {
+            actor: WorkflowActor::authenticated(user_id)?,
+            company: CompanyId::new(company_id),
+        })
+    }
+
+    /// The departments a non-administrator may see: those they belong to or hold a role in, and
+    /// every department they manage (Plan06 02A). `None` means all of them, for a company
+    /// administrator.
+    async fn visible_set(
+        &self,
+        access: &crate::entities::company::CompanyAccess,
+        user_id: Uuid,
+    ) -> AppResult<Option<std::collections::HashSet<DepartmentId>>> {
+        if access.membership.administers_company() {
+            return Ok(None);
+        }
+        let company = CompanyId::new(access.company.id);
+        let mut seen: std::collections::HashSet<DepartmentId> = self
+            .departments
+            .list_for_user(company, user_id)
+            .await?
+            .into_iter()
+            .map(|department| department.id)
+            .collect();
+        seen.extend(self.departments.managed_units(user_id, company).await?);
+        Ok(Some(seen))
+    }
+
     async fn managed_parent(
         &self,
         user: Uuid,
@@ -324,19 +363,49 @@ impl DepartmentUseCases {
             .await
     }
 
-    /// Every department of the company, for someone who manages it.
+    /// The ids of the departments the caller manages (none for a plain member), to decide which
+    /// controls a page offers. Each write still checks its own target.
+    #[instrument(skip_all)]
+    pub async fn managed_units(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<std::collections::HashSet<DepartmentId>> {
+        readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        Ok(self
+            .departments
+            .managed_units(user_id, CompanyId::new(company_id))
+            .await?
+            .into_iter()
+            .collect())
+    }
+
+    /// The departments the caller manages, for pickers and destinations: every one for a root
+    /// manager. Each write still checks its own target.
     #[instrument(skip_all)]
     pub async fn list_departments(
         &self,
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Department>> {
-        let scope = self.managed(user_id, company_id, None).await?;
-        self.departments.list_by_company(scope.company).await
+        let scope = self.administering(user_id, company_id).await?;
+        let managed: std::collections::HashSet<DepartmentId> = self
+            .departments
+            .managed_units(user_id, scope.company)
+            .await?
+            .into_iter()
+            .collect();
+        Ok(self
+            .departments
+            .list_by_company(scope.company)
+            .await?
+            .into_iter()
+            .filter(|department| managed.contains(&department.id))
+            .collect())
     }
 
     /// The departments this member may see: all of them for an owner or admin, otherwise the ones
-    /// they belong to or hold a role in.
+    /// they belong to or hold a role in and every one they manage.
     #[instrument(skip_all)]
     pub async fn visible_departments(
         &self,
@@ -344,11 +413,17 @@ impl DepartmentUseCases {
         company_id: Uuid,
     ) -> AppResult<Vec<Department>> {
         let access = readable_company(self.companies.as_ref(), user_id, company_id).await?;
-        let company = CompanyId::new(company_id);
-        if access.membership.manages_company_operations() {
-            return self.departments.list_by_company(company).await;
-        }
-        self.departments.list_for_user(company, user_id).await
+        let all = self
+            .departments
+            .list_by_company(CompanyId::new(company_id))
+            .await?;
+        Ok(match self.visible_set(&access, user_id).await? {
+            None => all,
+            Some(seen) => all
+                .into_iter()
+                .filter(|department| seen.contains(&department.id))
+                .collect(),
+        })
     }
 
     /// One visible department with its members and role holders.
@@ -361,14 +436,13 @@ impl DepartmentUseCases {
     ) -> AppResult<DepartmentDetail> {
         let access = readable_company(self.companies.as_ref(), user_id, company_id).await?;
         let company = CompanyId::new(company_id);
-        let found = if access.membership.manages_company_operations() {
-            self.departments.get(company, department).await?
-        } else {
-            self.departments
-                .list_for_user(company, user_id)
-                .await?
-                .into_iter()
-                .find(|candidate| candidate.id == department)
+        let visible = self
+            .visible_set(&access, user_id)
+            .await?
+            .is_none_or(|seen| seen.contains(&department));
+        let found = match visible {
+            true => self.departments.get(company, department).await?,
+            false => None,
         };
         let department = found.ok_or_else(department_not_found)?;
         use crate::application::ports::department::MAX_DEPARTMENT_ROSTER_ENTRIES;
@@ -404,9 +478,9 @@ impl DepartmentUseCases {
     }
 
     /// Which department owns each desk, as this viewer may see it: every department for an owner
-    /// or admin; for anyone else the departments they belong to or lead
-    /// ([`Self::visible_departments`]) and the owners of the desks they can read
-    /// (`readable_desks`), so the department of a desk in front of them can be named.
+    /// or admin; for anyone else the departments they may see ([`Self::visible_departments`]) and
+    /// the owners of the desks they can read (`readable_desks`), so the department of a desk in
+    /// front of them can be named.
     #[instrument(skip_all)]
     pub async fn desk_departments(
         &self,
@@ -423,22 +497,15 @@ impl DepartmentUseCases {
             .await?
             .into_iter()
             .collect();
-        if access.membership.manages_company_operations() {
+        let Some(mut seen) = self.visible_set(&access, user_id).await? else {
             return Ok(DeskDepartments {
                 departments,
                 owners,
             });
-        }
+        };
         let owners: std::collections::HashMap<Uuid, DepartmentId> = owners
             .into_iter()
             .filter(|(desk, _)| readable_desks.contains(desk))
-            .collect();
-        let mut seen: std::collections::HashSet<DepartmentId> = self
-            .departments
-            .list_for_user(company, user_id)
-            .await?
-            .into_iter()
-            .map(|department| department.id)
             .collect();
         seen.extend(owners.values().copied());
         Ok(DeskDepartments {
@@ -487,7 +554,7 @@ impl DepartmentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<(Vec<DepartmentPrincipal>, bool)> {
-        let scope = self.managed(user_id, company_id, None).await?;
+        let scope = self.administering(user_id, company_id).await?;
         let mut choices = self
             .departments
             .principals(scope.company, MAX_DEPARTMENT_PRINCIPAL_CHOICES + 1)

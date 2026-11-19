@@ -202,10 +202,9 @@ pub async fn readable_company(
 
 /// Resolve a company the caller owns.
 ///
-/// Someone with no membership gets the same not-found as for a missing company. An admin or member
-/// can see the company, so for them this is a refusal (`Forbidden`, 403) rather than a pretence
-/// that it does not exist. Ownership is the `Owner` membership, which the schema keeps in step with
-/// `companies.user_id`.
+/// Anyone else, member or stranger, gets the same not-found as for a missing company (Plan06
+/// 02A.4: a management refusal tells nothing). Ownership is the `Owner` membership, which the
+/// schema keeps in step with `companies.user_id`.
 pub async fn owned_company(
     persistence: &dyn CompanyPersistence,
     user_id: Uuid,
@@ -216,12 +215,12 @@ pub async fn owned_company(
         return Ok(access.company);
     }
     warn!("User {user_id} is not the owner of company {company_id}");
-    Err(company_forbidden("Only the company owner can do this."))
+    Err(company_not_found())
 }
 
-/// Resolve a company whose operational workspaces and automation the caller may manage: its owner
-/// or one of its admins. A member can see the company and is refused (`Forbidden`); a stranger gets
-/// the same not-found as for a missing company.
+/// Resolve a company the caller administers at company level: its owner or a root admin
+/// ([`CompanyMembership::administers_company`]). Everyone else gets the same not-found as for a
+/// missing company.
 pub async fn managed_company(
     persistence: &dyn CompanyPersistence,
     user_id: Uuid,
@@ -238,18 +237,35 @@ async fn managed_company_access(
     company_id: Uuid,
 ) -> AppResult<CompanyAccess> {
     let access = readable_company(persistence, user_id, company_id).await?;
-    if access.membership.manages_company_operations() {
+    if access.membership.administers_company() {
         return Ok(access);
     }
     warn!("User {user_id} may not manage operations for company {company_id}");
-    Err(company_forbidden(
-        "Only the company owner or an admin can do this.",
-    ))
+    Err(company_not_found())
 }
 
-/// A refusal for someone who can see the company but may not do this to it.
-pub fn company_forbidden(message: &str) -> AppError {
-    AppError::Forbidden(message.into())
+/// Resolve a company in which the caller manages at least one unit: the entry to unit-owned
+/// configuration workspaces. It authorizes nothing by itself; every object is checked against
+/// its own unit. Everyone else gets the same not-found as for a missing company.
+pub async fn administered_company(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<CompanyAccess> {
+    use crate::application::ports::administration::ManagementTarget;
+    let access = readable_company(persistence, user_id, company_id).await?;
+    if persistence
+        .management_role(
+            user_id,
+            crate::domain::workflow::CompanyId::new(company_id),
+            ManagementTarget::AnyUnit,
+        )
+        .await?
+        .is_some()
+    {
+        return Ok(access);
+    }
+    Err(company_not_found())
 }
 
 pub fn company_not_found() -> AppError {
@@ -360,7 +376,48 @@ impl CompanyUseCases {
         self.persistence.list_accessible_by_user_id(user_id).await
     }
 
-    /// Companies whose operational workspaces and automation the caller may manage.
+    /// The caller's role over one management target, or not found: for pages that show a fragment
+    /// of one object to whoever manages it.
+    pub async fn require_management(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        target: crate::application::ports::administration::ManagementTarget,
+    ) -> AppResult<crate::application::ports::administration::ManagementRole> {
+        crate::application::ports::administration::require_management(
+            self.persistence.as_ref(),
+            user_id,
+            crate::domain::workflow::CompanyId::new(company_id),
+            target,
+        )
+        .await
+    }
+
+    /// The caller's access when they manage at least one of its units. See [`administered_company`].
+    pub async fn administered_company(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<CompanyAccess> {
+        administered_company(self.persistence.as_ref(), user_id, company_id).await
+    }
+
+    /// Companies in which the caller manages at least one unit, for unit workspace switchers.
+    #[instrument(skip_all)]
+    pub async fn list_administered_companies(
+        &self,
+        user_id: Uuid,
+    ) -> AppResult<Vec<CompanyAccess>> {
+        Ok(self
+            .persistence
+            .list_accessible_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .filter(|access| access.administers_units)
+            .collect())
+    }
+
+    /// Companies the caller administers at company level.
     #[instrument(skip_all)]
     pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
         Ok(self
@@ -368,7 +425,7 @@ impl CompanyUseCases {
             .list_accessible_by_user_id(user_id)
             .await?
             .into_iter()
-            .filter(|access| access.membership.manages_company_operations())
+            .filter(|access| access.membership.administers_company())
             .collect())
     }
 
@@ -627,10 +684,10 @@ mod tests {
                 .company,
             company
         );
-        // A member sees the company, so being refused is a 403, not a pretence it is not there.
+        // A member is told nothing, the same as a stranger (Plan06 02A.4).
         assert!(matches!(
             use_cases.managed_company(member, company.id).await,
-            Err(AppError::Forbidden(_))
+            Err(AppError::NotFound(_))
         ));
     }
 
@@ -646,10 +703,10 @@ mod tests {
         }
     }
 
-    /// Owner-only actions: an admin or member is refused with 403, a stranger and a missing id get
-    /// the same 404, and the write never runs for any of them.
+    /// Owner-only actions: an admin, a member, a stranger and a missing id all get the same 404
+    /// (Plan06 02A.4), and the write never runs for any of them.
     #[tokio::test]
-    async fn only_the_owner_may_update_or_delete_and_members_are_refused_not_hidden() {
+    async fn only_the_owner_may_update_or_delete_and_everyone_else_is_told_nothing() {
         let owner = Uuid::new_v4();
         let admin = Uuid::new_v4();
         let member = Uuid::new_v4();
@@ -673,11 +730,11 @@ mod tests {
                 use_cases
                     .update_company_for_user(refused, company.id, rename())
                     .await,
-                Err(AppError::Forbidden(_))
+                Err(AppError::NotFound(_))
             ));
             assert!(matches!(
                 use_cases.delete_company_for_user(refused, company.id).await,
-                Err(AppError::Forbidden(_))
+                Err(AppError::NotFound(_))
             ));
         }
         let foreign = use_cases

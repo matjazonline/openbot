@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "round": "06DA-P02-B1-R2",
+  "artifact": "2c8e4add9aa78a22a356146f998028cbe4b0c0c8e9a35b668c29f4b692eb2f3d",
+  "checks": [
+    {
+      "criteria": [
+        "B1-CHECKPOINT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-CHECKPOINT"
+      ],
+      "command": "git diff --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-CHECKPOINT"
+      ],
+      "command": "cargo clippy --all-targets --locked --offline -- -D warnings",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "4daa8d22be2e4b7ec355f2d75065c8a87a00c753cb72fea4af2ecabe5aa8e17d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-CHECKPOINT"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-sqlx-prepare-check.txt",
+          "sha256": "bbacc643ce71bb3fec22403add2aef548ff9cf7e0091e4aa76bef73910dccfdc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-CHECKPOINT"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-modules.txt",
+          "sha256": "d6ad0c89bb3649e00a905be488f1232743069fb211412f3207b781271c3d7303"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "02A"
+      ],
+      "command": "cargo test --locked --offline --lib -- delegated_admin attention adapters::http::routes::workflows adapters::http::pages ui_team company_invite",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused.txt",
+          "sha256": "5df0a145b75204def7f6a7105980e289276f2cc731e53cb1407d7010985feb53"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1"
+      ],
+      "command": "cargo test --locked --offline --lib -- dashboard operational_summary department_views",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-dashboard.txt",
+          "sha256": "eb71e5e5f938b59d3358e2501ab9bbe48906a51d8e4129809e7c44be7b27597b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-DISCOVERY"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-discovery-after.txt",
+          "sha256": "ffee9f6428cd77174a6fe11fac476938daa77d6608814c45bd426ca277e9ce74"
+        },
+        {
+          "path": "logs/B1-R2-discovery-after.txt",
+          "sha256": "a773880aec01d757c7311c1b4a93fc708176091afcb9523c790233572b4ac3c8"
+        }
+      ]
+    }
+  ]
+}

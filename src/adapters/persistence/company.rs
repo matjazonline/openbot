@@ -57,6 +57,7 @@ struct AccessibleCompanyDb {
     company: CompanyDb,
     role: String,
     access_level: i16,
+    administers_units: bool,
 }
 
 impl TryFrom<AccessibleCompanyDb> for CompanyAccess {
@@ -93,13 +94,15 @@ impl TryFrom<AccessibleCompanyDb> for CompanyAccess {
             company: db.company.into(),
             membership,
             access_level,
+            administers_units: db.administers_units,
         })
     }
 }
 
 /// The columns of [`AccessibleCompanyDb`], joined from `company` and `member`.
 const ACCESSIBLE_COMPANY_COLUMNS: &str = "company.id, company.user_id, company.name, company.slug, \
-     company.default_add_3rd_party, company.avatar_url, company.created_at, member.role, member.access_level::smallint AS access_level";
+     company.default_add_3rd_party, company.avatar_url, company.created_at, member.role, member.access_level::smallint AS access_level, \
+     any_unit_management_role($1, company.id) IS NOT NULL AS administers_units";
 
 /// How many dependent agents a rejected model-connection change names before it stops listing
 /// them. The message is for a person reading a form, not an inventory.

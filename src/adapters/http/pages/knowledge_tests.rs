@@ -25,6 +25,7 @@ fn dump_knowledge_browser_fixtures() {
         avatar_url: None,
         is_operator: false,
         company_membership: CompanyMembership::Member,
+        administers_units: CompanyMembership::Member.administers_company(),
     };
     let view = view();
     for (name, content) in [

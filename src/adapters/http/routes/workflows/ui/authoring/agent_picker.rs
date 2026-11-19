@@ -74,7 +74,7 @@ fn step_id(value: Option<&str>) -> AppResult<Option<StepId>> {
 }
 
 pub(super) async fn scope(ui: &Ui, company: Uuid, workflow: Uuid) -> AppResult<AgentCompanyScope> {
-    ui.company(company).await?;
+    ui.unit_company(company).await?;
     if ui.detail(company, workflow).await?.summary.archived {
         return Err(AppError::BadRequest(
             "An archived workflow cannot be edited".into(),

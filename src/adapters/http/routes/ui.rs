@@ -169,8 +169,8 @@ fn delivery_mode(deliver: bool) -> ReplyDelivery {
     }
 }
 
-/// A management request's company: explicit IDs use the one-row manager check (404/403).
-/// The list only fills the switcher and supplies the default when nothing is requested.
+/// A company-level administration request's company: explicit IDs use the one-row
+/// administrator check (404). The list only fills the switcher and supplies the default.
 pub(super) async fn load_managed_company(
     company_use_cases: &CompanyUseCases,
     user_id: Uuid,
@@ -183,6 +183,29 @@ pub(super) async fn load_managed_company(
     let managed = company_use_cases.list_managed_companies(user_id).await?;
     let selected = selected.or_else(|| managed.first().cloned());
     let companies = managed.into_iter().map(|access| access.company).collect();
+    Ok((companies, selected))
+}
+
+/// A unit workspace's company (desks, agents, schedules, workflows, departments): the caller
+/// manages at least one unit there. Explicit IDs use the one-row check (404); each object shown
+/// or changed is still authorized against its own unit.
+pub(super) async fn load_administered_company(
+    company_use_cases: &CompanyUseCases,
+    user_id: Uuid,
+    requested: Option<Uuid>,
+) -> AppResult<(Vec<Company>, Option<CompanyAccess>)> {
+    let selected = match requested {
+        Some(id) => Some(company_use_cases.administered_company(user_id, id).await?),
+        None => None,
+    };
+    let administered = company_use_cases
+        .list_administered_companies(user_id)
+        .await?;
+    let selected = selected.or_else(|| administered.first().cloned());
+    let companies = administered
+        .into_iter()
+        .map(|access| access.company)
+        .collect();
     Ok((companies, selected))
 }
 
@@ -309,7 +332,7 @@ async fn mailbox_page(
     let Some(access) = access else {
         return Ok(Html(pages::mailbox_no_company_page(&mailbox_user)));
     };
-    let mailbox_user = mailbox_user.with_company_membership(access.membership);
+    let mailbox_user = mailbox_user.with_company_access(&access);
     let company = access.company;
 
     let channels = channel_use_cases
@@ -1201,6 +1224,7 @@ pub(super) fn workspace_user<'a>(
         avatar_url: account.avatar_url.as_ref(),
         is_operator: crate::adapters::http::auth::caller_for(account, config).is_operator(),
         company_membership: CompanyMembership::None,
+        administers_units: false,
     }
 }
 

@@ -29,7 +29,6 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
-        company_member::CompanyMembership,
         notification::NotificationPreferences,
         user::User,
         value_objects::{AvatarUrl, EmailAddress},
@@ -217,12 +216,7 @@ async fn profile_page(
     });
     let account_email = EmailAddress::from(account.user.email.as_str());
     let workspace_user = workspace_user(&account.user, &account_email, &config)
-        .with_company_membership(
-            company
-                .as_ref()
-                .map(|access| access.membership)
-                .unwrap_or(CompanyMembership::None),
-        );
+        .with_company_option(company.as_ref());
 
     Ok(Html(pages::profile_page(&pages::ProfilePage {
         user: &workspace_user,

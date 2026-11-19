@@ -543,6 +543,14 @@ impl crate::application::ports::administration::AdministrationPersistence
             _ => None,
         })
     }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(Vec::new())
+    }
 }
 
 #[async_trait::async_trait]
@@ -557,6 +565,13 @@ impl crate::application::ports::administration::AdministrationPersistence
     ) -> crate::app_error::AppResult<
         Option<crate::application::ports::administration::ManagementRole>,
     > {
+        Err(outage())
+    }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
         Err(outage())
     }
 }

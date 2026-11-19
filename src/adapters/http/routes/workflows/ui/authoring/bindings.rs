@@ -404,7 +404,7 @@ impl Ui {
         banner: Option<BindingsBanner>,
         form: Option<BindingForm>,
     ) -> AppResult<String> {
-        let managed = self.company(company).await?;
+        let managed = self.unit_company(company).await?;
         let usage = self
             .engine
             .authoring_reads()
@@ -510,7 +510,7 @@ pub(super) async fn binding_form(
     Query(query): Query<BindingFormQuery>,
     uri: axum::http::Uri,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?;
+    let company = ui.unit_company(query.company_id).await?;
     let detail = ui.detail(company.id, workflow).await?;
     let fields = FormFields::parse(uri.query().unwrap_or_default().as_bytes());
     let typed = fields.get("version_id").is_some();
@@ -540,7 +540,7 @@ pub(super) async fn save_binding(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let fields = FormFields::parse(&body);
     let mut form = BindingForm::typed(&fields);
     let refused = |mut form: BindingForm, message: String| {
@@ -687,7 +687,7 @@ async fn set_activity(
     expected: u64,
     active: bool,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(company_id).await?.id;
+    let company = ui.unit_company(company_id).await?.id;
     ui.visible_binding(company, workflow, binding).await?;
     let banner =
         match set_binding_activity(&ui.engine, company, ui.actor()?, binding, expected, active)
@@ -780,7 +780,7 @@ pub(super) async fn channel_bindings(
     Path(channel): Path<Uuid>,
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let company_id = super::company(company);
     let mut visibility = Visibility::new(&ui.engine, company_id, ui.actor()?);
     if !visibility
@@ -800,7 +800,7 @@ pub(super) async fn binding_destination(
     Path(binding): Path<Uuid>,
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<axum::response::Redirect> {
-    ui.company(query.company_id).await?;
+    ui.unit_company(query.company_id).await?;
     let summary = ui
         .engine
         .authoring_reads()

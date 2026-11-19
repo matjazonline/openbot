@@ -451,3 +451,185 @@ mod schedules;
 
 #[path = "delegated_agent_management_tests.rs"]
 mod agents;
+
+fn ids(departments: &[Department]) -> std::collections::BTreeSet<DepartmentId> {
+    departments.iter().map(|department| department.id).collect()
+}
+
+/// Plan06 02A.2/D1 r2-3: a lead sees the departments it belongs to and every one it manages,
+/// pickers offer only managed destinations, and a plain member or sibling reaches none of it.
+#[tokio::test]
+async fn delegated_admin_lists_departments_visible_managed_and_picker_scopes() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool).await;
+    let remote = d.remote().await;
+    let cases = &d.f.use_cases;
+    let (plain, _) = teammate(d.f.pool(), d.f.company, "member").await;
+    let managed = std::collections::BTreeSet::from([d.unit.id, d.child.id, remote.id]);
+
+    let visible = ids(&cases
+        .visible_departments(d.f.member, d.f.company)
+        .await
+        .unwrap());
+    assert!(managed.is_subset(&visible), "{visible:?}");
+    assert!(!visible.contains(&d.sibling.id));
+    assert_eq!(
+        cases
+            .visible_department(d.f.member, d.f.company, remote.id)
+            .await
+            .unwrap()
+            .department
+            .id,
+        remote.id
+    );
+    hidden(
+        cases
+            .visible_department(d.f.member, d.f.company, d.sibling.id)
+            .await,
+    );
+
+    assert_eq!(
+        ids(&cases
+            .list_departments(d.f.member, d.f.company)
+            .await
+            .unwrap()),
+        managed
+    );
+    assert_eq!(
+        cases
+            .managed_units(d.f.member, d.f.company)
+            .await
+            .unwrap()
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>(),
+        managed
+    );
+    assert_eq!(
+        ids(&cases
+            .list_departments(d.sibling_lead, d.f.company)
+            .await
+            .unwrap()),
+        std::collections::BTreeSet::from([d.sibling.id])
+    );
+    let all = ids(&cases
+        .list_departments(d.f.owner, d.f.company)
+        .await
+        .unwrap());
+    assert!(
+        managed.is_subset(&all) && all.contains(&d.sibling.id) && all.len() > managed.len() + 1
+    );
+    assert!(
+        cases
+            .principal_choices(d.f.member, d.f.company)
+            .await
+            .is_ok()
+    );
+    hidden(cases.list_departments(plain, d.f.company).await);
+    hidden(cases.principal_choices(plain, d.f.company).await);
+    assert!(
+        cases
+            .managed_units(plain, d.f.company)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        !ids(&cases.visible_departments(plain, d.f.company).await.unwrap()).contains(&d.unit.id)
+    );
+}
+
+/// The unit entry gate and its rendering hint: owner, root admin and a unit lead enter the unit
+/// workspaces; a plain member does not, and neither does anyone at company-level administration
+/// unless they administer the company (Plan06 D1 r2-1).
+#[tokio::test]
+async fn delegated_admin_lists_unit_entry_gate_and_hint_follow_the_predicate() {
+    use crate::use_cases::company::CompanyUseCases;
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool.clone()).await;
+    let companies = CompanyUseCases::new(std::sync::Arc::new(PostgresPersistence::new(pool)));
+    let (plain, _) = teammate(d.f.pool(), d.f.company, "member").await;
+    for (user, units, company_level) in [
+        (d.f.owner, true, true),
+        (d.f.admin, true, true),
+        (d.f.member, true, false),
+        (plain, false, false),
+    ] {
+        let access = companies.readable_company(user, d.f.company).await.unwrap();
+        assert_eq!(access.administers_units, units, "{user}");
+        assert_eq!(
+            companies
+                .administered_company(user, d.f.company)
+                .await
+                .is_ok(),
+            units
+        );
+        assert_eq!(
+            companies.managed_company(user, d.f.company).await.is_ok(),
+            company_level
+        );
+        if !units {
+            hidden(companies.administered_company(user, d.f.company).await);
+        }
+        if !company_level {
+            hidden(companies.managed_company(user, d.f.company).await);
+        }
+        assert_eq!(
+            companies
+                .list_administered_companies(user)
+                .await
+                .unwrap()
+                .iter()
+                .any(|access| access.company.id == d.f.company),
+            units
+        );
+    }
+    hidden(
+        companies
+            .administered_company(d.f.stranger, d.f.company)
+            .await,
+    );
+
+    // U5: a person who leads the root manages every unit yet does not administer the company.
+    let (root_lead, principal) = teammate(d.f.pool(), d.f.company, "member").await;
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(d.f.company)
+            .fetch_one(d.f.pool())
+            .await
+            .unwrap();
+    d.f.use_cases
+        .assign_role(
+            d.f.owner,
+            d.f.company,
+            DepartmentId::new(root),
+            DepartmentRole::Lead,
+            principal,
+        )
+        .await
+        .unwrap();
+    assert!(
+        companies
+            .administered_company(root_lead, d.f.company)
+            .await
+            .is_ok()
+    );
+    hidden(companies.managed_company(root_lead, d.f.company).await);
+    assert_eq!(
+        ids(&d
+            .f
+            .use_cases
+            .list_departments(root_lead, d.f.company)
+            .await
+            .unwrap()),
+        ids(&d
+            .f
+            .use_cases
+            .list_departments(d.f.owner, d.f.company)
+            .await
+            .unwrap())
+    );
+}

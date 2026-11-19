@@ -18,7 +18,7 @@ use crate::{
     },
     use_cases::{
         caller::require_operator,
-        company::{CompanyPersistence, managed_company, owned_company},
+        company::{CompanyPersistence, owned_company},
     },
 };
 
@@ -176,8 +176,16 @@ impl SkillUseCases {
         }
     }
 
+    /// Any unit manager reads the company skills to choose them for an agent (Plan06 U3);
+    /// writing them stays the owner's.
     async fn authorize_read(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        managed_company(self.companies.as_ref(), user_id, company_id).await?;
+        crate::application::ports::administration::require_management(
+            self.companies.as_ref(),
+            user_id,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
+        )
+        .await?;
         Ok(())
     }
 

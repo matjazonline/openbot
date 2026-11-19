@@ -98,3 +98,27 @@ async fn onboarding_submission_key_is_required_and_denials_propagate() {
         .await;
     }
 }
+
+#[tokio::test]
+async fn delegated_admin_routes_onboarding_hides_from_leads_and_admins() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let d = f.delegation().await;
+    for user in [&d.lead, &d.admin] {
+        denied(
+            channel_step(
+                State(f.companies.clone()),
+                State(f.agents.clone()),
+                State(f.users.clone()),
+                State(f.config.clone()),
+                Fixture::auth(user),
+                Path(f.company.id),
+            )
+            .await,
+            axum::http::StatusCode::NOT_FOUND,
+            &f.company.name,
+        )
+        .await;
+    }
+}

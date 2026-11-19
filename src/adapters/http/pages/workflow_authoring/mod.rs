@@ -58,14 +58,22 @@ pub fn workflow_workspace_page(page: &WorkflowWorkspace<'_>) -> String {
             "Workflows",
             "Drafts, published versions and where they run.",
             &format!(
-                r##"<div class="flex shrink-0 gap-1"><a class="btn btn-ghost btn-xs" href="/ui/workflow-runs?company_id={company_id}&amp;view=board">Runs</a><button type="button" class="btn btn-ghost btn-xs"
-                    hx-get="/ui/workflows/tools?company_id={company_id}"
-                    hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace">Tools</button>
+                r##"<div class="flex shrink-0 gap-1">{company_links}
                 <button type="button" class="btn btn-primary btn-xs"
                     hx-get="/ui/workflows/new?company_id={company_id}"
                     hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
                     hx-push-url="/ui/workflows?company_id={company_id}&new=1">{plus} New</button></div>"##,
                 plus = icon(Icon::Plus, BUTTON_ICON),
+                // Runs and the tool registry are company-wide (Plan06 U4): administrators only.
+                company_links = if page.user.company_membership.administers_company() {
+                    format!(
+                        r##"<a class="btn btn-ghost btn-xs" href="/ui/workflow-runs?company_id={company_id}&amp;view=board">Runs</a><button type="button" class="btn btn-ghost btn-xs"
+                    hx-get="/ui/workflows/tools?company_id={company_id}"
+                    hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace">Tools</button>"##
+                    )
+                } else {
+                    String::new()
+                },
             ),
         ),
         entries = workflow_list_entries(page.list),

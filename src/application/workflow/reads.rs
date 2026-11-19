@@ -297,10 +297,12 @@ pub struct ChildCounts {
 
 #[async_trait]
 pub trait WorkflowReads: Send + Sync {
-    /// By title, then id.
+    /// By title, then id. With `managed_by`, only the definitions that person manages
+    /// (`workflow_definition_management_role`); without it, every one, for root-only readers.
     async fn list_definitions(
         &self,
         company: CompanyId,
+        managed_by: Option<super::WorkflowActor>,
         page: PageRequest,
     ) -> AppResult<Page<DefinitionSummary>>;
     async fn definition(
