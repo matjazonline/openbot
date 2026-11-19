@@ -79,6 +79,8 @@ pub struct DepartmentSection<'a> {
     /// The departments the viewer manages (Plan06): each control follows the server's rule for
     /// its target, so the pane offers nothing the viewer would be refused.
     pub managed: &'a std::collections::HashSet<DepartmentId>,
+    /// The selected department's recent administration, loaded only for its managers.
+    pub history: &'a [crate::entities::department::DepartmentAdministrationEntry],
     pub error: Option<(DepartmentForm, &'a str)>,
     pub notice: Option<&'a str>,
     pub knowledge: DepartmentKnowledge<'a>,
@@ -528,9 +530,15 @@ fn department_detail(
             {members}
             {desks}
             {knowledge}
+            {history}
             {edit}
         </div>"##,
         id = department.id,
+        history = if section.manages(department.id) {
+            history_card(section)
+        } else {
+            String::new()
+        },
         header = department_header(section, view),
         lead = lead_card(section, view),
         roles_cut = if view.detail.department.is_root && view.detail.roles_truncated {
@@ -542,6 +550,68 @@ fn department_detail(
         desks = desks_card(section, view.detail.department.id, &view.desks),
         knowledge = knowledge_card(section, department),
     )
+}
+
+/// The last administration events of the department, newest first (Plan06 02B.2), with the
+/// labels and role they were written with.
+fn history_card(section: &DepartmentSection<'_>) -> String {
+    let rows: String = section
+        .history
+        .iter()
+        .map(|entry| {
+            let actor = entry.actor.as_deref().unwrap_or("System");
+            let subject = entry
+                .subject
+                .as_deref()
+                .map(|subject| format!(": {}", escape_html_text(subject)))
+                .unwrap_or_default();
+            let role = entry
+                .role
+                .map(|role| format!(" ({})", role.as_str()))
+                .unwrap_or_default();
+            let acting = entry
+                .acting_role
+                .as_deref()
+                .map(|acting| {
+                    format!(
+                        r#" <span class="badge badge-ghost badge-sm" data-acting-role="{}">as {}</span>"#,
+                        escape_html_attr(acting),
+                        escape_html_text(&acting_role_label(section, acting))
+                    )
+                })
+                .unwrap_or_default();
+            format!(
+                r#"<li class="py-1 text-sm"><span class="font-medium">{actor}</span> {action}{subject}{role}{acting}
+                    <span class="block text-xs opacity-60">{at}</span></li>"#,
+                actor = escape_html_text(actor),
+                action = entry.action.label(),
+                at = super::format_date_time(entry.created_at),
+            )
+        })
+        .collect();
+    let list = if rows.is_empty() {
+        r#"<p class="text-sm opacity-60">No administration recorded yet.</p>"#.to_owned()
+    } else {
+        format!(r#"<ul class="divide-y divide-base-300">{rows}</ul>"#)
+    };
+    format!(
+        r#"<section id="department-history" class="card bg-base-200 p-4 space-y-2"><h3 class="font-semibold">Recent administration</h3>{list}</section>"#
+    )
+}
+
+/// `owner`, `admin` or `lead:<id>` as a reader names it: the lead of which department.
+fn acting_role_label(section: &DepartmentSection<'_>, acting: &str) -> String {
+    let Some(unit) = acting.strip_prefix("lead:") else {
+        return acting.to_owned();
+    };
+    section
+        .departments
+        .iter()
+        .find(|department| department.id.as_uuid().to_string() == unit)
+        .map_or_else(
+            || "a department lead".to_owned(),
+            |department| format!("lead of {}", department.name),
+        )
 }
 
 fn knowledge_card(section: &DepartmentSection<'_>, department: &Department) -> String {

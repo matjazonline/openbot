@@ -818,6 +818,25 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
         departments, 2,
         "the company root plus the onboarded department"
     );
+    // Plan06 02B: the owner's onboarding records the department's creation and its placement,
+    // once; the replays above recorded nothing more.
+    let history: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT event.transition_kind, event.acting_role FROM department_administration_events AS event \
+         JOIN departments AS department ON department.id = event.department_id \
+         WHERE event.company_id = $1 AND NOT department.is_root ORDER BY event.created_at, event.id",
+    )
+    .bind(f.company)
+    .fetch_all(&f.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        history,
+        [
+            ("department_created".to_owned(), Some("owner".to_owned())),
+            ("member_added".to_owned(), Some("owner".to_owned())),
+        ],
+        "{history:?}"
+    );
 
     // A department whose address another department already holds refuses the submission.
     let taken = completed(

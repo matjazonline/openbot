@@ -2,12 +2,13 @@
 use super::*;
 
 /// Create a department with its desk, and its lead when one is named (01DEP-P03-D8). The caller
-/// holds the company write lock and `actor`'s account row.
+/// holds the company write lock and `actor`'s account row, and authorized the create as `acting`.
 pub(crate) async fn create_department_on(
     tx: &mut Transaction<'_, Postgres>,
     templates: &ProvisioningDeployment,
     company: CompanyId,
     actor: WorkflowActor,
+    acting: ManagementRole,
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
 ) -> AppResult<Department> {
@@ -16,6 +17,7 @@ pub(crate) async fn create_department_on(
         templates,
         company,
         actor,
+        acting,
         DepartmentId::random(),
         write,
         lead,
@@ -25,11 +27,13 @@ pub(crate) async fn create_department_on(
 
 /// [`create_department_on`] under a caller-chosen id, for a creator that replays by id
 /// (onboarding's first department, 01DEP-P03-D4).
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn create_department_with_id_on(
     tx: &mut Transaction<'_, Postgres>,
     templates: &ProvisioningDeployment,
     company: CompanyId,
     actor: WorkflowActor,
+    acting: ManagementRole,
     id: DepartmentId,
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
@@ -43,6 +47,16 @@ pub(crate) async fn create_department_with_id_on(
         check_shape_on(tx, company, id, &write.name, &parent).await?;
     }
     let department = insert_department_on(tx, company, id, write, parent_id).await?;
+    // First, so the department's history starts with its creation; a named lead follows.
+    super::audit::record_on(
+        tx,
+        company,
+        actor,
+        acting,
+        department.id,
+        super::AdministrationEvent::Created,
+    )
+    .await?;
     if let Some(lead) = lead {
         assign_department_role_on(
             tx,

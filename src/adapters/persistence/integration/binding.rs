@@ -281,10 +281,23 @@ pub(super) async fn append_audit_event(
 ) -> AppResult<()> {
     let metadata = serde_json::to_value(binding.audit_metadata())
         .map_err(|error| AppError::Internal(error.to_string()))?;
+    // A person's write records the role with which they manage the binding's owner: the desk's
+    // department, or the agent (Plan06 02B). System writes and person addresses record none.
+    let person = match actor.actor_type {
+        crate::entities::creation::CreatorType::User => actor.actor_id,
+        crate::entities::creation::CreatorType::System => None,
+    };
     sqlx::query(
         r#"INSERT INTO binding_audit_events
-               (id, company_id, binding_id, action, reason, actor, metadata)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+               (id, company_id, binding_id, action, reason, actor, metadata, acting_role)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, CASE
+               WHEN $8::uuid IS NULL THEN NULL
+               WHEN $9::uuid IS NOT NULL THEN (SELECT unit_management_role($8, $2, desk.department_id)
+                   FROM channels AS desk WHERE desk.company_id = $2 AND desk.id = $9)
+               ELSE (SELECT agent_management_role($8, $2, agent.agent_id)
+                   FROM principals AS agent
+                   WHERE agent.company_id = $2 AND agent.id = $10 AND agent.kind = 'agent')
+           END)"#,
     )
     .bind(Uuid::new_v4())
     .bind(binding.company_id)
@@ -293,6 +306,9 @@ pub(super) async fn append_audit_event(
     .bind(stored_reason(reason))
     .bind(encoded_provenance(actor)?)
     .bind(metadata)
+    .bind(person)
+    .bind(binding.target.desk_id())
+    .bind(binding.target.principal_id().map(|principal| principal.as_uuid()))
     .execute(&mut *transaction)
     .await
     .map_err(AppError::from)?;

@@ -149,6 +149,23 @@ async fn delegated_admin_binding_service_configures_activates_and_pauses_capture
             .revision,
         paused.revision
     );
+    // Plan06 02B: configure, activate and pause each record the lead's role over the desk.
+    let roles: Vec<Option<String>> = sqlx::query_scalar(
+        "SELECT acting_role FROM workflow_binding_events WHERE company_id=$1 AND binding_id=$2 \
+         ORDER BY state_revision",
+    )
+    .bind(target.company.as_uuid())
+    .bind(target.binding.as_uuid())
+    .fetch_all(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(roles.len(), 3, "{roles:?}");
+    assert!(
+        roles.iter().all(|role| role
+            .as_deref()
+            .is_some_and(|role| role.starts_with("lead:"))),
+        "{roles:?}"
+    );
 }
 
 #[tokio::test]

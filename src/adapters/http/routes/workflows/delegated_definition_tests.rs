@@ -249,6 +249,34 @@ async fn delegated_admin_definition_unbound_crud_uses_the_recorded_creating_unit
         StatusCode::NO_CONTENT
     );
     assert_eq!(m.creating_unit(workflow).await, m.a.as_uuid());
+    // Plan06 02B: each definition event records the role its actor managed it with.
+    let roles: Vec<(Uuid, Option<String>)> = sqlx::query_as(
+        "SELECT actor_id, acting_role FROM workflow_definition_events \
+         WHERE company_id=$1 AND workflow_id=$2 ORDER BY revision, created_at",
+    )
+    .bind(m.f.company)
+    .bind(workflow)
+    .fetch_all(m.f.persistence.pool())
+    .await
+    .unwrap();
+    let by_lead: Vec<_> = roles
+        .iter()
+        .filter(|(actor, _)| *actor == m.a_actor.user_id())
+        .collect();
+    assert!(by_lead.len() >= 3, "{roles:?}");
+    assert!(
+        by_lead.iter().all(|(_, role)| role
+            .as_deref()
+            .is_some_and(|role| role.starts_with("lead:"))),
+        "{roles:?}"
+    );
+    assert!(
+        roles
+            .iter()
+            .filter(|(actor, _)| *actor != m.a_actor.user_id())
+            .all(|(_, role)| role.as_deref() == Some("owner")),
+        "{roles:?}"
+    );
 }
 
 #[tokio::test]

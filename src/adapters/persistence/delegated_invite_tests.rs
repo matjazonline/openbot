@@ -424,3 +424,80 @@ async fn delegated_admin_competing_owner_promotion_precedes_admin_invite_delete(
     forbidden(result.second);
     assert_eq!(t.role_of(invite.id).await, CompanyAccessRole::Admin);
 }
+
+/// Plan06 02B: the owner's team-page root writes land in the root department's history as the
+/// owner's, and the removal's row is written before the person's principal is retired.
+#[tokio::test]
+async fn administration_audit_team_page_root_role_and_removal_are_the_owners() {
+    use crate::use_cases::company_invite::{MemberRoleChange, RemoveCompanyMember};
+    let Some(db) = own_database().await else {
+        return;
+    };
+    let t = Team::new(db.pool.clone()).await;
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(t.company)
+            .fetch_one(t.p.pool())
+            .await
+            .unwrap();
+    let member_principal: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(t.company)
+    .bind(t.member)
+    .fetch_one(t.p.pool())
+    .await
+    .unwrap();
+    let rows = || async {
+        sqlx::query_as::<_, (String, Option<String>, Option<Uuid>, Option<String>)>(
+            "SELECT transition_kind, acting_role, principal_id, role FROM department_administration_events \
+             WHERE company_id=$1 AND department_id=$2 AND actor_kind='person' ORDER BY created_at, id",
+        )
+        .bind(t.company)
+        .bind(root)
+        .fetch_all(t.p.pool())
+        .await
+        .unwrap()
+    };
+    t.p.update_member_role(MemberRoleChange {
+        actor_id: t.owner,
+        company_id: t.company,
+        member_user_id: t.member,
+        role: CompanyAccessRole::Admin,
+    })
+    .await
+    .unwrap();
+    // Setting the role it already has changes nothing and records nothing.
+    t.p.update_member_role(MemberRoleChange {
+        actor_id: t.owner,
+        company_id: t.company,
+        member_user_id: t.member,
+        role: CompanyAccessRole::Admin,
+    })
+    .await
+    .unwrap();
+    t.p.remove_member(RemoveCompanyMember {
+        actor_id: t.owner,
+        company_id: t.company,
+        member_user_id: t.member,
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        rows().await,
+        vec![
+            (
+                "role_assigned".to_owned(),
+                Some("owner".to_owned()),
+                Some(member_principal),
+                Some("admin".to_owned())
+            ),
+            (
+                "member_removed".to_owned(),
+                Some("owner".to_owned()),
+                Some(member_principal),
+                None
+            ),
+        ]
+    );
+}

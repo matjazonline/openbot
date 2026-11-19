@@ -133,7 +133,7 @@ async fn workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_
             .await
             .is_err()
     );
-    let audits:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2")
+    let audits:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2 AND actor_kind='system'")
         .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_all(f.people.role.p().pool()).await.unwrap();
     let reviewer = reviewer_audit(&audits);
     assert_eq!(reviewer["department_id"], json!(f.people.role.department));
@@ -172,7 +172,7 @@ async fn workflow_reviewer_follow_account_retirement_clears_all_roles_and_preser
     assert!(empty.reviewers.is_empty());
     assert!(empty.refusal.is_some());
     assert_eq!(f.proposal().await, proposal);
-    let audits:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2")
+    let audits:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2 AND actor_kind='system'")
         .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_all(f.people.role.p().pool()).await.unwrap();
     reviewer_audit(&audits);
     let roles: i64 = sqlx::query_scalar(
@@ -226,7 +226,7 @@ async fn workflow_reviewer_follow_failed_final_statement_rolls_back_actual_accou
     )
     .await
     .unwrap();
-    let audit:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2")
+    let audit:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2 AND actor_kind='system'")
         .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_all(&mut *tx).await.unwrap();
     reviewer_audit(&audit);
     let revision:i64=sqlx::query_scalar("SELECT assignment_revision FROM workflow_follow_decisions WHERE company_id=$1 AND decision_id=$2")
@@ -256,7 +256,7 @@ async fn workflow_reviewer_follow_failed_final_statement_rolls_back_actual_accou
     assert_eq!(f.assignment().await, before);
     assert_eq!(f.proposal().await, proposal);
     let audit: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM department_administration_events WHERE company_id=$1",
+        "SELECT count(*) FROM department_administration_events WHERE company_id=$1 AND actor_kind='system'",
     )
     .bind(f.scope.company.as_uuid())
     .fetch_one(f.people.role.p().pool())

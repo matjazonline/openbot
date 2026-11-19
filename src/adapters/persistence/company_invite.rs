@@ -558,7 +558,31 @@ impl CompanyInvitePersistence for PostgresPersistence {
         else {
             return Ok(None);
         };
-        super::company::set_admin_on(&mut tx, company, &member, change.role).await?;
+        if super::company::set_admin_on(&mut tx, company, &member, change.role).await? {
+            let principal = member.principal;
+            super::department::record_administration_on(
+                &mut tx,
+                company,
+                crate::application::workflow::WorkflowActor::authenticated(change.actor_id)?,
+                crate::application::ports::administration::ManagementRole::Owner,
+                member.department,
+                match change.role {
+                    CompanyAccessRole::Admin => {
+                        super::department::AdministrationEvent::RoleAssigned(
+                            principal,
+                            crate::entities::department::DepartmentRole::Admin,
+                        )
+                    }
+                    CompanyAccessRole::Member => {
+                        super::department::AdministrationEvent::RoleCleared(
+                            principal,
+                            crate::entities::department::DepartmentRole::Admin,
+                        )
+                    }
+                },
+            )
+            .await?;
+        }
         Box::pin(super::workflow::refresh_member_dependents_on(
             &mut tx, company,
         ))
@@ -585,12 +609,22 @@ impl CompanyInvitePersistence for PostgresPersistence {
                 "Cannot remove company owner from the team.".into(),
             ));
         }
-        super::company::retire_member_on(
-            &mut tx,
-            crate::domain::workflow::CompanyId::new(command.company_id),
-            command.member_user_id,
-        )
-        .await?;
+        let company = crate::domain::workflow::CompanyId::new(command.company_id);
+        // Before retirement, which demotes the principal the history names: leaving the company
+        // removes the person from every department they were a member of, the root included.
+        if let Some(member) =
+            super::company::root_member_on(&mut tx, company, command.member_user_id).await?
+        {
+            super::department::record_member_departure_on(
+                &mut tx,
+                company,
+                crate::application::workflow::WorkflowActor::authenticated(command.actor_id)?,
+                crate::application::ports::administration::ManagementRole::Owner,
+                member.principal,
+            )
+            .await?;
+        }
+        super::company::retire_member_on(&mut tx, company, command.member_user_id).await?;
         tx.commit().await.map_err(authority::database)?;
         Ok(())
     }

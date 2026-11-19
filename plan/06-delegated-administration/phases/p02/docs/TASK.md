@@ -419,3 +419,105 @@ and reviewer R2 manifests, coordination r8 byte-identical to its pin, no open fi
 B1 (02A + 01A.2) ACCEPTED IN PHASE. Full suite not rerun after R2 corrections (localized); the
 final full gate in p03 is required. User authorized (2026-11-19) a local commit after each
 accepted batch for the rest of Plan06, never a push. Next: B2 (02B audit).
+
+## Batch B2 (02B audit) — implementation (gate D1/r2 items r2-5, r2-6, r2-9, r1-14)
+
+Base 1bb9c969 (B1 committed). Implementation:
+- Schema (init migration, fresh only): `valid_acting_role(text)`; `acting_role` column with that
+  CHECK on binding_audit_events, workflow_binding_events, workflow_definition_events;
+  department_administration_events extended per r2-5 (nullable subject/role for department
+  kinds, person transition kinds, actor_kind system|person, actor_principal_id/actor_label/
+  acting_role, `department_administration_event_shape` CHECK per kind, recent index). Insert
+  guard branches: person rows must snapshot a current same-company person actor (label =
+  display_label), the current department label and, for member/role kinds, the subject's
+  current kind+label; system rows keep the original guard. Deferred role-cleared check applies
+  to system rows only (carried condition). Immutability trigger unchanged.
+- Writer: `department/audit.rs::record_on` (INSERT…SELECT snapshot; one operation id per
+  transaction via tx-local `openbot.administration_operation`; refuses with Internal if actor or
+  subject is not current). `require_department_management_on`, `require_parent_management_on`,
+  `root_role_authority_on` now return the `ManagementRole` they checked; the writes record it:
+  create (in create_department_with_id_on, before its lead; onboarding passes Owner), update
+  (Updated with parent role; Moved with destination role when the parent actually changed),
+  delete (row before the delete), add/remove member (only on actual change; `write_placement_on`
+  now reports `Placed{member_added, role_assigned}`), assign/clear role (in the `_on` helpers,
+  so create-with-lead and every caller audit), root member removal (owner/admin; person row
+  before retirement), team-page update_member_role (set_admin_on now returns whether it changed;
+  RoleAssigned/Cleared admin on root as Owner) and remove_member (row before retirement), agent
+  placement (prepare: MemberAdded with its check's role; place_in_department_on: MemberAdded on
+  actual insert with the predicate's role for that unit under the same lock, RoleAssigned with
+  its role check's role). Invite acceptance (invitee's own act) records nothing.
+- Workflow events: definition events record `management_role_on(DefinitionCreation(workflow))`,
+  binding events `management::association_role_on` (new; target_on + predicate), both in the
+  write's transaction (the write does not change the target's management). binding_audit_events
+  computes the person's role over the binding's target in the INSERT (desk unit via
+  unit_management_role, agent via agent_management_role; NULL for system provenance and person
+  addresses). Desk settings updates now pass the updating person's provenance to the email
+  binding write, so update audit rows name who changed the desk (previously system).
+- Pane: entity `DepartmentAdministrationEntry`/`Action` + `DEPARTMENT_HISTORY_ENTRIES`=10; port
+  `administration_history`; use case `administration_history` (Unit management, else 404);
+  Departments pane renders "Recent administration" only for the department's managers, escaped,
+  acting role named ("lead of <department>").
+
+### B2 acceptance mapping
+| Criterion | Path/case | Decisive assertion | Test |
+| --- | --- | --- | --- |
+| 02B.1 department writes | lead create/edit/move/add/assign/clear/remove; owner delete; admin create | exactly one row per kind, ordered, acting role lead:<Sales> (move: destination), owner/admin; no row for no-op re-add or refused sibling write | administration_audit_each_write_kind_records_its_admitting_role |
+| 02B.1 immutable/forgery/cascade | UPDATE, DELETE, forged person row, company delete | immutability refusal; source guard refusal; rows gone with company | administration_audit_rows_are_immutable_and_forgery_is_refused |
+| r1-14 competing | lead add_member vs owner clear lead, both orders, real writers, own DB | write-first: member + row (lead role); revoke-first: refused, no member, no row | administration_audit_competing_role_removal_and_management_write_in_both_orders |
+| team page root writes | owner promote admin (twice), remove member | role_assigned admin + member_removed as owner; no-op records nothing | administration_audit_team_page_root_role_and_removal_are_the_owners |
+| 02B.1 existing audits record role | desk binding audit; workflow binding events; definition events | lead:<unit> on lead writes; owner on owner writes; system NULL | administration_audit_desk_binding_events_record_the_acting_role; delegated_admin_binding_service_configures_activates_and_pauses_captured_messaging (added assertions); delegated_admin_definition_unbound_crud_uses_the_recorded_creating_unit (added assertions) |
+| 02B.2 pane | manager vs outsider render | card with escaped labels, "as lead of …", system entries; none for outsider | administration_audit_pane_shows_recent_history_to_managers_only; administration_history 404 for sibling in the first test |
+| system retirement unchanged | existing retirement tests | same assertions on system rows | retirement_audit / follow retirement families |
+
+### B2 test-change inventory (no assertion dropped)
+- department_retirement_audit_tests: `events()` and the forged re-insert select only
+  `actor_kind='system'`; the fault trigger corrupts system rows only (person rows now share
+  the table; the tests' subject is the system retirement guard).
+- follow_retirement_tests: three audit reads and one rollback count filter `actor_kind='system'`.
+- delegated_definition_tests / delegated_binding_management_tests: assertions added.
+- New: delegated_administration_tests (3 tests), delegated_invite_tests (1), delegated_desk_tests
+  (1), department_ui_tests (1); WriteBarrier::DepartmentMembers.
+Focused: B2-focused-r1 (9 FAIL, retained), r2 (3 FAIL: shared-DB table lock, forged select),
+r3 15 PASS, final 1072 PASS/0 FAIL (B2-focused-final.txt). fmt/ws/clippy/sqlx/source_modules PASS.
+
+### B2 frozen artifact (06DA-P02-B2-R1)
+Base 1bb9c969 (B1 commit), digest b2c252facf79abb3066bf667a843e7e91e522cea7ac82534d3630188fa9f2dce,
+same three exclusions (logs/B2-author-freeze.snapshot.txt, 28 paths). Coordination r9
+(committed with B1; pin logs/B2-coordination-r9.md). Full lib 4877 PASS / 3 FAIL (known unrelated
+C-locale auth pair, deferred Doop assertion) / 30 ignored (B2-full.txt, fresh schema). Discovery
+vs B1-R2: +6 new, 0 removed (B2-discovery-after.txt).
+
+### B2 R1 findings and correction (R2)
+06DA-P02-B2-R1-N1: F1, F2 low actionable; F3 optional.
+- F1 FIXED: `write_placement_on` returns the holders a single-holder role was taken from
+  (`DELETE … RETURNING`); `audit::record_role_placement_on` records `role_cleared` for each, then
+  `role_assigned`, same operation and acting role; used by assign_department_role_on (so the
+  pane's lead change, create-with-lead) and place_in_department_on. Test
+  administration_audit_replacing_a_lead_records_the_replaced_holder.
+- F2 FIXED (tests): agent placement with a role (member_added once + role_assigned, lead role)
+  administration_audit_agent_placement_records_membership_once_and_its_role; root removal on the
+  pane, agent as admin and person as owner, rows before retirement
+  administration_audit_root_removal_records_every_department_left; onboarding Created/member rows
+  as owner, once across replays (assertions added to
+  agent_default_desk_onboarding_creates_and_replays_the_first_department); unmanaged placement
+  refusal with no row administration_audit_unmanaged_placement_is_refused_without_history.
+- F3 part 2 FIXED: a person leaving the company (team-page remove_member, pane root person
+  removal) records `member_removed` in every department they were a member of, root included,
+  before retirement (`audit::record_member_departure_on`); covered by the root-removal test.
+- F3 part 1 SCOPE DECISION (recorded, to report to the user): invite acceptance (root membership
+  and an invitation's admin role) records no department history row. It is the invitee's own act;
+  the invitation that carries the role is the administration (owner-only for admin-role invites,
+  decision b), and invites store no inviter to attribute it to.
+R2 frozen: base 1bb9c969, digest 802700ab809070e6ef89a5b33288e0b60579cbb53012ead62e5404211634f32f,
+same exclusions (logs/B2-R2-author-freeze.snapshot.txt), coordination r9 unchanged. Checks:
+fmt, diff --check, clippy, sqlx --check, source_modules PASS; focused 1083 PASS/0 FAIL/1 ignored
+(B2-R2-focused-final.txt, before a test-only type alias for clippy); final administration_audit +
+delegated_administration 46 PASS on the frozen source (B2-R2-final-audit.txt). Discovery +4 vs R1,
+0 removed (B2-R2-discovery-after.txt).
+
+### Root B2 acceptance — p02 complete in phase
+06DA-P02-B2-R2/N1 PASS for 802700ab809070e6ef89a5b33288e0b60579cbb53012ead62e5404211634f32f; root
+reproduced digest and files (logs/B2-root-acceptance.snapshot.txt), validated both R2 manifests,
+coordination r9 byte-identical, no open finding. B2 ACCEPTED IN PHASE; with B1, p02 (doc 02 + 01A.2)
+is accepted in phase. Committed locally per the user's standing authorization. Next: p03
+(03A docs, 03B final gate on the owned UTF-8 cluster 127.0.0.1:55407).

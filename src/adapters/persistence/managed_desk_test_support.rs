@@ -50,6 +50,7 @@ pub(crate) enum WriteBarrier {
     Agents,
     KnowledgeDocuments,
     CompanyInvites,
+    DepartmentMembers,
 }
 impl WriteBarrier {
     fn sql(&self) -> &'static str {
@@ -60,6 +61,7 @@ impl WriteBarrier {
             Self::Agents => "LOCK TABLE agents IN SHARE MODE",
             Self::KnowledgeDocuments => "LOCK TABLE knowledge_documents IN SHARE MODE",
             Self::CompanyInvites => "LOCK TABLE company_invites IN SHARE MODE",
+            Self::DepartmentMembers => "LOCK TABLE department_members IN SHARE MODE",
         }
     }
 }

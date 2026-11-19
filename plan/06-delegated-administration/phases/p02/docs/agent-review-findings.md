@@ -333,3 +333,68 @@ The JSON single-binding read gains lead access only through the per-target check
 - A root lead not being offered "add member" at root is recorded as conservative.
 
 Accepted.
+
+---
+
+## Round 06DA-P02-B2-R1 — batch review of B2 (02B audit) (note 06DA-P02-B2-R1-N1)
+
+Common context:
+- Date 2026-11-19. Reviewer Claude Opus 5.5 (`claude-opus-5-5`); effort not visible to me (assigned xhigh).
+- HEAD `1bb9c96934a6615fe8076ca4acab8a2e473d523c` (B1 committed). The batch is the working-tree delta (28 paths, including the new `department/audit.rs`).
+- Artifact `b2c252facf79abb3066bf667a843e7e91e522cea7ac82534d3630188fa9f2dce`, three exclusions. Coordination r9 `e8f43187…`.
+- Gate D1/r2 items r2-5, r2-6, r2-9 and r1-14, with carried conditions.
+
+## 06DA-P02-B2-F1 — replacing a single-holder role removes the previous holder's role without a history row
+
+- **Actionable / low / requirements (02B.1 "role … changes … write to" the history; 02 Outcome) — OPEN.**
+- **Evidence.**
+  - `write_placement_on` (`src/adapters/persistence/department.rs:~466–476`) deletes every other holder of a single-holder role (`DELETE FROM department_roles … AND principal_id <> $4`) before inserting the new one.
+  - `assign_department_role_on` (`department.rs:343–362`) then records only `RoleAssigned(new holder)`.
+  - So assigning P2 as lead of D while P1 leads it removes P1's lead role, and with it P1's management of D's subtree, and records nothing about P1.
+  - The same path runs for create-with-lead on an existing department, the pane's "Change lead", and role-bearing agent placements.
+  - Contrast `clear_department_role_on`, which records `RoleCleared`, and system retirement, which records demoted/deleted.
+- **Impact.** The department's history (and the pane's "Recent administration") cannot answer "who lost the lead role, when, by whose action". For an authority-bearing role that is the more important half of the change.
+- **Required correction.** Return the replaced holders from the single-holder DELETE (`RETURNING principal_id`) and record `RoleCleared(previous, role)` for each, in the same operation and with the same acting role, before the `RoleAssigned`. Add a replacement case (P1 → P2) to `administration_audit_each_write_kind_records_its_admitting_role`, asserting both rows and the shared `operation_id`.
+- **Instruction lesson.** When adding an audit to a write helper, audit every row the helper mutates, including implicit replacement deletes, not only the row the command names.
+
+## 06DA-P02-B2-F2 — several audited writers and two carried conditions lack decisive tests
+
+- **Actionable / low / verification (verification-contracts; carried conditions from D1-R2) — OPEN.**
+- **Evidence.** These writers record rows in code, but no test asserts their rows. The acceptance mapping and the new tests (`delegated_administration_tests`, `delegated_invite_tests`, `delegated_desk_tests`, `department_ui_tests`) cover pane create/edit/move/add/assign/clear/remove/delete, team-page role and removal, desk binding audit, workflow events, competing and immutability. Uncovered:
+  - **Agent placement.** Carried condition: a role-bearing agent placement records `role_assigned`. This lives in `place_in_department_on` and `prepare_new_agent_placement_on` (`department/placement.rs`), reached from managed agent create/copy (`company_agent.rs:105/142`), Builder (`provisioning_builder.rs:120`) and onboarding (`onboarding.rs:255`). No test asserts `MemberAdded` with the placement's acting role, the role-bearing `RoleAssigned`, or the absence of a duplicate `MemberAdded` when prepare and finalize both run.
+  - **Departments-pane root-member removal** (`department/root.rs::remove_root_member`). Carried condition: the person row is written before retirement. Only the team-page path is tested. The pane's agent removal (acting admin or owner) and person removal (row before `retire_member_on`) have no test.
+  - **Onboarding department creation** records `Created` as owner (`onboarding.rs:203`). Not asserted.
+  - The new `NotFound` refusal added to `place_in_department_on` (the predicate recomputed for the member row). It is not shown to leave existing authorized callers working; the green full suite only proves those calls don't error.
+- **Impact.** The batch's three carried conditions are satisfied only by inspection for two of them. The verification contract requires behavioural evidence for an explicit obligation.
+- **Required correction.** Add DB tests asserting the exact rows (kind, acting role, subject, role, operation grouping) for: a lead creating an agent placed as lead in their unit (MemberAdded and RoleAssigned, no duplicate), a Builder or prepare-then-finalize placement, onboarding's first department (`Created` as owner), and pane root removal of an agent (admin) and of a person (owner; the row exists and was captured with the pre-retirement subject label and kind). Add the F1 replacement case.
+
+## 06DA-P02-B2-F3 — invite acceptance and company-member removal leave some role and membership changes out of the history
+
+- **Optional suggestion / low / requirements scope — OPEN.**
+- **Invite acceptance.** `join_root_on` (via `accept_pending_invite`) adds the root membership and may grant or clear the root admin role (`set_admin_on`) with no history row. The author records this as a deliberate choice ("the invitee's own act"). The root pane therefore never shows how someone became an admin by invitation, or joined the company. The authorizing act was the invite's creation by the owner or an admin, which the invite row does not attribute.
+- **Company-member removal.** `retire_member_on` also drops the person's non-root department memberships. Only the root `member_removed` and the system role retirements are recorded, so a unit's pane does not show that a member left.
+- **Suggestion.** Either record these with the user (the 02 Outcome reads "every management write"), or store the inviter on invites and record acceptance as `member_added` / `role_assigned` attributed to the inviter's role. Otherwise record the deliberate gap in TASK as a scope decision.
+
+### 06DA-P02-B2-F1 — recheck 2026-11-19 / B2-R2 (note 06DA-P02-B2-R2-N1)
+
+**FIXED** at `802700ab809070e6ef89a5b33288e0b60579cbb53012ead62e5404211634f32f`.
+- The single-holder DELETE in `write_placement_on` now returns the replaced holders (`RETURNING principal_id` → `Placed.replaced`).
+- `audit::record_role_placement_on` records `RoleCleared(replaced, role)` for each, then `RoleAssigned`, with the same acting role and operation. Both role-placement paths use it: `assign_department_role_on`, covering the pane lead change and create-with-lead, and `place_in_department_on`.
+- The UNIQUE key is unaffected because the subjects differ.
+- `administration_audit_replacing_a_lead_records_the_replaced_holder` asserts both rows (P1 `role_cleared`, P2 `role_assigned`, lead, owner) and a shared `operation_id`. It passes in my run.
+
+### 06DA-P02-B2-F2 — recheck 2026-11-19 / B2-R2
+
+**FIXED.** New decisive tests, all passing in my run:
+- **Agent placement:** `administration_audit_agent_placement_records_membership_once_and_its_role` asserts exactly one `member_added` and one `role_assigned` (lead), both recorded with the lead's role. This covers carried condition 3 and the prepare-then-finalize no-duplicate case.
+- **Root removal:** `administration_audit_root_removal_records_every_department_left` covers pane removal of a root agent by an admin (`admin`) and of a person by the owner (`owner`) in root and a child, and asserts that the departure happened. That the person rows were written before retirement is proven by the schema: a row inserted after `retire_member_on` would carry kind 'external', which `principal_kind IN ('person','agent')` and the source guard both refuse. This covers carried condition 2.
+- **Onboarding:** assertions added to `agent_default_desk_onboarding_creates_and_replays_the_first_department` check `department_created` and `member_added` as owner, recorded once across replays.
+- **Unmanaged placement:** `administration_audit_unmanaged_placement_is_refused_without_history` covers the new refusal.
+
+Discovery R1→R2: +4, none removed.
+
+### 06DA-P02-B2-F3 — recheck 2026-11-19 / B2-R2
+
+**Part 2 FIXED.** `audit::record_member_departure_on` writes a `member_removed` row in every department the leaving person belongs to, root included, before `retire_member_on`. Both company-departure paths use it: team-page `remove_member` and pane root person removal (as owner). The root-removal test covers it.
+
+**Part 1 DISPOSITIONED** as a recorded scope decision, with the reasoning in TASK, to be reported to the user: invite acceptance writes no history row, because it is the invitee's own act, the admin-role invitation is owner-only, and invites store no inviter. Accepted. The optional suggestion is closed pending the user's confirmation.

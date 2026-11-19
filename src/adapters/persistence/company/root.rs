@@ -140,6 +140,7 @@ pub(crate) async fn join_root_on(db: &mut PgConnection, join: RootJoin) -> AppRe
     let joined = root_member_on(db, join.company, join.user)
         .await?
         .ok_or_else(|| AppError::Internal("Joined root membership is missing.".into()))?;
+    // Accepting is the invitee's own act; the invitation was the administration.
     set_admin_on(db, join.company, &joined, join.role).await?;
     Ok(joined)
 }
@@ -149,7 +150,7 @@ pub(crate) async fn set_admin_on(
     company: CompanyId,
     member: &RootMember,
     role: CompanyAccessRole,
-) -> AppResult<()> {
+) -> AppResult<bool> {
     // The owner's fact cannot be changed by an invite or an ordinary role mutation.
     let owner: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM companies AS company \
@@ -165,31 +166,24 @@ pub(crate) async fn set_admin_on(
     .fetch_one(&mut *db)
     .await?;
     if owner {
-        return Ok(());
+        return Ok(false);
     }
-    match role {
-        CompanyAccessRole::Admin => {
-            sqlx::query(
-                "INSERT INTO department_roles (company_id, department_id, principal_id, role) \
+    let changed = match role {
+        CompanyAccessRole::Admin => sqlx::query(
+            "INSERT INTO department_roles (company_id, department_id, principal_id, role) \
                  VALUES ($1, $2, $3, 'admin') ON CONFLICT DO NOTHING",
-            )
-            .bind(company.as_uuid())
-            .bind(member.department.as_uuid())
-            .bind(member.principal.as_uuid())
-            .execute(db)
-            .await?;
-        }
-        CompanyAccessRole::Member => {
-            sqlx::query(
-                "DELETE FROM department_roles WHERE company_id = $1 \
+        ),
+        CompanyAccessRole::Member => sqlx::query(
+            "DELETE FROM department_roles WHERE company_id = $1 \
                  AND department_id = $2 AND principal_id = $3 AND role = 'admin'",
-            )
-            .bind(company.as_uuid())
-            .bind(member.department.as_uuid())
-            .bind(member.principal.as_uuid())
-            .execute(db)
-            .await?;
-        }
+        ),
     }
-    Ok(())
+    .bind(company.as_uuid())
+    .bind(member.department.as_uuid())
+    .bind(member.principal.as_uuid())
+    .execute(db)
+    .await?
+    .rows_affected();
+    // Whether the admin role actually changed, for the root's administration history.
+    Ok(changed == 1)
 }

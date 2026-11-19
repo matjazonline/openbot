@@ -151,11 +151,18 @@ pub(crate) async fn update_channel_on(
     )
     .await?;
     lock_channel_on(tx, request).await?;
+    // The binding audit names who changed the desk, so its acting role is theirs (Plan06 02B).
+    let write = crate::application::ports::channel::ChannelWrite {
+        created_by: Some(crate::entities::creation::CreationProvenance::user(
+            request.actor.user_id(),
+        )),
+        ..request.write.clone()
+    };
     write_channel_settings_on(
         tx,
         request.company_id,
         request.channel_id,
-        &request.write,
+        &write,
         department,
     )
     .await?;

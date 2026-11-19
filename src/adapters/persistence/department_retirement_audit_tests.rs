@@ -59,7 +59,8 @@ impl AuditFixture {
         department.id
     }
     async fn events(&self) -> Vec<Value> {
-        sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 ORDER BY department_id,role")
+        // The system's retirement facts; Plan06 person rows share the table (02B).
+        sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND actor_kind='system' ORDER BY department_id,role")
             .bind(self.departments.company).fetch_all(self.departments.pool()).await.unwrap()
     }
     async fn demote(&self) {
@@ -259,7 +260,7 @@ async fn workflow_reviewer_follow_retirement_audit_history_survives_principal_de
     }
     let forged=sqlx::query("INSERT INTO department_administration_events(company_id,id,operation_id,principal_id,principal_kind,principal_label,department_id,department_label,role,transition_kind,actor_kind,created_at) \
         SELECT company_id,id,operation_id,principal_id,principal_kind,principal_label,department_id,department_label,role,transition_kind,actor_kind,created_at \
-        FROM department_administration_events WHERE company_id=$1 ON CONFLICT(company_id,id) DO UPDATE SET principal_label='forged'")
+        FROM department_administration_events WHERE company_id=$1 AND actor_kind='system' ON CONFLICT(company_id,id) DO UPDATE SET principal_label='forged'")
         .bind(f.departments.company).execute(f.departments.pool()).await;
     assert_eq!(refused_by(forged), "department_retirement_audit_source");
     assert_eq!(f.events().await, deleted);
@@ -268,6 +269,7 @@ async fn workflow_reviewer_follow_retirement_audit_history_survives_principal_de
 async fn install_fault(f: &AuditFixture, foreign_department: Uuid) {
     sqlx::raw_sql("CREATE TABLE retirement_audit_test_fault(field text NOT NULL,foreign_company uuid,foreign_department uuid,foreign_principal uuid); \
         CREATE FUNCTION corrupt_retirement_audit_test() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE fault retirement_audit_test_fault; BEGIN \
+        IF NEW.actor_kind<>'system' THEN RETURN NEW; END IF; \
         SELECT field,foreign_company,foreign_department,foreign_principal INTO fault FROM retirement_audit_test_fault; \
         CASE fault.field WHEN 'prefix' THEN NEW.department_label:=jsonb_set(NEW.department_label,'{prefix}','\"forged\"'); \
           WHEN 'truncation' THEN NEW.department_label:=jsonb_set(NEW.department_label,'{truncated}','true'); \

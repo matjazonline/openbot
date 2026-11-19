@@ -241,3 +241,102 @@ I read every production hunk in the 84-path delta and the new and changed tests.
 - The correction was tight, and each fix came with a discriminating test.
 - The author's caller analysis for `visible_binding` was accurate and saved verification time.
 - No new instruction candidates.
+
+## 06DA-P02-B2-R1-N1 — batch review of B2 (02B administration audit)
+
+### Identity
+
+- 2026-11-19; implement-opus-reviewed-2_4; p02/B2 whole-batch review.
+- Records: [TASK](TASK.md) "## Batch B2 (02B audit)" sections, [REVIEW](REVIEW.md), [findings](agent-review-findings.md).
+- Reviewer: Claude Opus 5.5 (`claude-opus-5-5`); effort not visible to me (assigned xhigh).
+- HEAD `1bb9c96934a6615fe8076ca4acab8a2e473d523c` (B1 committed locally, authorized). The batch is the uncommitted delta.
+- Artifact `b2c252facf79abb3066bf667a843e7e91e522cea7ac82534d3630188fa9f2dce`, exclusions `phases/p02/docs`, `phases/p01/docs`, `COORDINATION.md`. My snapshot reproduces the digest and `logs/B2-author-freeze.snapshot.txt` (28 paths).
+- Coordination r9 is byte-identical to `logs/B2-coordination-r9.md`. Against r8 it adds only the local-commit authorization (never push) and the status row.
+- Gate: D1/r2 items r2-5, r2-6, r2-9, r1-14, and the three carried conditions.
+- Rechecked at return.
+
+### Coverage (all 28 paths read)
+
+- **Schema.**
+  - `valid_acting_role`.
+  - Nullable `acting_role` on `binding_audit_events`, `workflow_binding_events` and `workflow_definition_events`.
+  - `department_administration_events` extended:
+    - nullable subject and role;
+    - person kinds;
+    - `actor_kind` system|person;
+    - actor fields;
+    - a per-kind shape CHECK;
+    - a recent index.
+  - The insert guard branches on `actor_kind`. Person rows must snapshot a current same-company person actor with the exact `display_label`, the current department label, and the subject's current kind and label. The system guard is unchanged (depth and held role).
+  - **Carried condition 1 met:** the deferred role-cleared check is limited to `actor_kind='system'`.
+  - The immutability trigger is unchanged (UPDATE refused; DELETE only after the company row is gone). The existing UNIQUE key is compatible: with a NULL subject or role, multi-row operations stay distinct.
+- **Writer** (`department/audit.rs::record_on`): INSERT…SELECT snapshot, one operation id per transaction via a transaction-local GUC (and `''` after reset is handled), and Internal if the actor or subject is not current.
+- **Acting role per path**, traced through every `departments` / `department_members` / `department_roles` writer:
+  - create (parent role; onboarding passes Owner after `begin` verified it);
+  - create-with-lead (Created, then RoleAssigned with the parent-management role, same operation);
+  - update (parent role) and move (destination role, only when the parent actually changed);
+  - delete (row before the delete, so the label snapshot is valid);
+  - add member (only on an actual insert) and remove member (no-op is NotFound);
+  - assign and clear (`root_role_authority_on`: Owner at root, parent role otherwise);
+  - pane root removal (Owner or Admin from membership; **person row before `retire_member_on` — carried condition 2 met in code**);
+  - team-page `update_member_role` (only on an actual change) and `remove_member` (row before retirement);
+  - agent placement: prepare → MemberAdded with its check's role; place → MemberAdded on an actual insert with the predicate role, and **RoleAssigned with its role-check role — carried condition 3 met in code**. Callers are company_agent, Builder and onboarding.
+  - Invite acceptance and bootstrap record nothing (F3).
+  - A root lead records `lead:<root>`; a root admin records `admin`.
+  - `follow_lead` side effects touch no department tables.
+- **Gap:** the single-holder replacement DELETE has no row (F1).
+- **Workflow events.**
+  - Definition events record `management_role_on(DefinitionCreation)` evaluated after the write in the same transaction. Saves, copies, archives and publications don't change active bindings, so management is unchanged.
+  - Binding events use `association_role_on`, which re-runs `target_on` on rows `save_binding_on` already locked via `authorize_association_on`, so there is no new lock order.
+  - Binding audit computes the role in the INSERT from the person provenance and the target, with system syncs NULL.
+  - The desk-update provenance change affects only the audit `actor` and role. `channels.created_by` and `channel_bindings.created_by` are not rewritten. The only reader, `list_binding_audit_events`, has no HTTP consumer, and no JSON output changed.
+- **Pane.** `administration_history` requires `managed(Some(D))`, otherwise 404. The card renders only for D's managers. Actor, subject and acting-role labels are escaped, and the actions and roles are static strings. A deleted department's history is unreachable, by design.
+- **Tests.**
+  - The changes to the retirement and follow tests only filter to system rows; no assertion was dropped.
+  - The competing test uses real writers in both orders on its own database.
+  - Discovery +6, none removed (author log).
+
+### Checks
+
+- **Executed by me:** `logs/06DA-P02-B2-R1-reviewer-focused.txt`, filters `administration_audit retirement delegated_admin department onboarding address_tests company_invite root_unit company_agent`: **402 PASS / 0 FAIL / 1 ignored** (403 run). It includes all six new audit tests and the retirement families. My manifest validates (1 PASS).
+- **Author evidence:** manifest 8 PASS / 2 FAIL (the retained diagnosis runs, and the full lib 4877 / 3 known unrelated / 30). Focused-final 1072 PASS. fmt, clippy, sqlx and source_modules logs inspected.
+
+### Outcome
+
+**CHANGES REQUIRED.**
+- [06DA-P02-B2-F1](agent-review-findings.md) (low): single-holder replacement is unaudited.
+- [B2-F2](agent-review-findings.md) (low): missing decisive tests for agent placement (carried condition 3), pane root removal (carried condition 2), onboarding creation, and the new placement refusal.
+- Optional: [B2-F3](agent-review-findings.md), invite acceptance and company-removal coverage.
+- Schema, guard, immutability, cascade, operation grouping, acting-role correctness, workflow-event roles, desk provenance change and pane are accepted as reviewed.
+- A recheck should cover the F1 code and test delta and the F2 tests.
+
+### Process feedback
+
+- The writer inventory from D1-R2 (F6) made completeness review tractable.
+- F1 slipped through because the audit was added at command level rather than per mutated row. Candidate instruction is in F1.
+- The carried conditions were implemented, but two had no test. The verification-contracts rule (obligations need behavioural evidence) applies as written.
+
+## 06DA-P02-B2-R2-N1 — B2 correction recheck (F1–F3)
+
+- **Identity.**
+  - 2026-11-19; implement-opus-reviewed-2_4; p02/B2 correction recheck.
+  - Records: [TASK](TASK.md) "### B2 R1 findings and correction (R2)", [REVIEW](REVIEW.md), [findings](agent-review-findings.md).
+  - Reviewer: Claude Opus 5.5 (`claude-opus-5-5`); effort not visible to me (assigned xhigh).
+  - HEAD `1bb9c969` (unchanged). Artifact `802700ab809070e6ef89a5b33288e0b60579cbb53012ead62e5404211634f32f`, same three exclusions.
+  - My snapshot reproduces the digest and `logs/B2-R2-author-freeze.snapshot.txt`. Against R1 the file list adds only `delegated_agent_construction_tests.rs` and `onboarding/tests.rs`.
+  - Coordination r9 is byte-identical to its pin. Rechecked at return.
+- **Coverage.**
+  - Read the correction code:
+    - `department.rs`: `Placed.replaced` and the DELETE … RETURNING;
+    - `audit.rs`: `record_role_placement_on` and `record_member_departure_on`;
+    - `placement.rs` and `root.rs`;
+    - `company_invite.rs` `remove_member`.
+  - Read the new and changed tests. Checked UNIQUE-key compatibility for replacement and departure rows, operation grouping, acting roles (owner/admin/lead), ordering before retirement, and the F3 part-1 scope reasoning.
+- **Checks.**
+  - **Executed by me:** `logs/06DA-P02-B2-R2-reviewer-focused.txt`, filters `administration_audit delegated_admin retirement onboarding company_invite department root_unit company_agent`: **359 PASS / 0 FAIL / 1 ignored** (360 run), including all four new tests and the extended onboarding test. My manifest validates (1 PASS).
+  - **Author evidence:** manifest 8 PASS. Focused-final 1083 PASS / 1 ignored (before a test-only type alias); final audit run 46 PASS on the frozen source. Discovery +4, none removed (verified).
+  - **Not rerun:** the R1 full lib (4877 / 3 known unrelated) was not rerun for R2. The final full gate in p03 remains.
+- **Outcome.**
+  - **PASS for B2 (02B) at `802700ab809070e6ef89a5b33288e0b60579cbb53012ead62e5404211634f32f`.** F1 and F2 FIXED; F3 part 2 FIXED and part 1 a recorded scope decision. No new findings.
+  - Batch acceptance only. p03 (docs and the final full gate on a UTF-8-locale cluster) remains. The F3 part-1 decision should reach the user as recorded.
+- **Process feedback.** Each correction is minimal, with a discriminating test. The author used the schema guard as proof of ordering, which is a good use of an existing invariant. No new instruction candidates.

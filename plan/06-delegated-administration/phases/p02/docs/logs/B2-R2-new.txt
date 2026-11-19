@@ -1,0 +1,19 @@
+
+running 14 tests
+test adapters::http::pages::tests::department_ui::administration_audit_pane_shows_recent_history_to_managers_only ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::administration_audit_desk_binding_events_record_the_acting_role ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_replacing_a_lead_records_the_replaced_holder ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_unmanaged_placement_is_refused_without_history ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_rows_are_immutable_and_forgery_is_refused ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_root_removal_records_every_department_left ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_each_write_kind_records_its_admitting_role ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::administration_audit_team_page_root_role_and_removal_are_the_owners ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::construction::administration_audit_agent_placement_records_membership_once_and_its_role ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_names_the_department_on_a_resubmission ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_competing_role_removal_and_management_write_in_both_orders ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 4900 filtered out; finished in 5.37s
+

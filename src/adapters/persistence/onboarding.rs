@@ -202,6 +202,8 @@ impl Session {
                 &self.templates,
                 company,
                 WorkflowActor::authenticated(self.user_id)?,
+                // Onboarding is the owner's; `begin` verified ownership under the company lock.
+                crate::application::ports::administration::ManagementRole::Owner,
                 department.id,
                 &department.write,
                 None,

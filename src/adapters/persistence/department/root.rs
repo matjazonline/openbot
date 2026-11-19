@@ -7,10 +7,10 @@ pub(super) async fn root_role_authority_on(
     actor: WorkflowActor,
     department: DepartmentId,
     role: DepartmentRole,
-) -> AppResult<()> {
-    use crate::application::ports::administration::{ManagementRole, ManagementTarget};
+) -> AppResult<ManagementRole> {
+    use crate::application::ports::administration::ManagementTarget;
     let current = lock_department_on(tx, company, department).await?;
-    if current.is_root {
+    let acting = if current.is_root {
         if super::super::administration::management_role_on(
             tx,
             actor.user_id(),
@@ -22,10 +22,11 @@ pub(super) async fn root_role_authority_on(
         {
             return Err(department_not_found());
         }
+        ManagementRole::Owner
     } else {
         require_department_management_on(tx, DepartmentScope { company, actor }, current.parent_id)
-            .await?;
-    }
+            .await?
+    };
     match role {
         DepartmentRole::Owner => {
             return Err(AppError::BadRequest(
@@ -40,7 +41,7 @@ pub(super) async fn root_role_authority_on(
         _ => {}
     }
 
-    Ok(())
+    Ok(acting)
 }
 
 #[derive(sqlx::FromRow)]
@@ -89,11 +90,31 @@ pub(super) async fn remove_root_member(
             "Team membership changed; retry the request.".into(),
         ));
     }
+    // The root's membership is company administration: the owner, or a root admin for agents.
+    let acting = if team.actor.membership.is_owner() {
+        ManagementRole::Owner
+    } else {
+        ManagementRole::Admin
+    };
+    let removed = AdministrationEvent::MemberRemoved(principal);
     if let Some(user) = current.user_id {
         team.require_owner()?;
+        // Before retirement, which demotes the principal these rows name: leaving the company
+        // removes the person from every department they were a member of, the root included.
+        audit::record_member_departure_on(&mut tx, scope.company, scope.actor, acting, principal)
+            .await?;
         super::super::company::retire_member_on(&mut tx, scope.company, user).await?;
     } else if current.is_agent {
         remove_department_member_on(&mut tx, scope.company, department, principal).await?;
+        audit::record_on(
+            &mut tx,
+            scope.company,
+            scope.actor,
+            acting,
+            department,
+            removed,
+        )
+        .await?;
     } else {
         return Err(AppError::NotFound(
             "That principal is not a root member.".into(),

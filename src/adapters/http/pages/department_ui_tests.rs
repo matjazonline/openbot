@@ -108,6 +108,7 @@ fn section<'a>(
             crate::entities::company_member::CompanyMembership::Member
         },
         managed: &managed,
+        history: &[],
         error,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
@@ -366,6 +367,7 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
         choices_cut: true,
         membership: crate::entities::company_member::CompanyMembership::Owner,
         managed: &managed_when(true, &all),
+        history: &[],
         error: None,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
@@ -913,6 +915,7 @@ fn led_section(
         choices_cut: false,
         membership: crate::entities::company_member::CompanyMembership::Member,
         managed,
+        history: &[],
         error: None,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
@@ -1008,4 +1011,64 @@ fn delegated_admin_ui_pane_offers_each_control_only_where_its_server_rule_passes
         !root_html.contains("hx-delete"),
         "no root member removal for a root lead"
     );
+}
+
+/// Plan06 02B.2: a department's managers see its last administration events with the role that
+/// admitted each, escaped; anyone else sees no history card.
+#[test]
+fn administration_audit_pane_shows_recent_history_to_managers_only() {
+    use crate::entities::department::{
+        DepartmentAdministrationAction, DepartmentAdministrationEntry,
+    };
+    let tree = tree();
+    let all = tree.all();
+    let history = vec![
+        DepartmentAdministrationEntry {
+            action: DepartmentAdministrationAction::MemberAdded,
+            actor: Some("Dana <lead>".into()),
+            acting_role: Some(format!("lead:{}", tree.sales.id)),
+            subject: Some("Closer <agent>".into()),
+            role: None,
+            created_at: Utc::now(),
+        },
+        DepartmentAdministrationEntry {
+            action: DepartmentAdministrationAction::Demoted,
+            actor: None,
+            acting_role: None,
+            subject: Some("Former".into()),
+            role: Some(DepartmentRole::Lead),
+            created_at: Utc::now(),
+        },
+    ];
+    let view = plain_view(&tree.inside, &[]);
+    let render = |managed: &std::collections::HashSet<DepartmentId>| {
+        company_departments_section(&DepartmentSection {
+            company: &tree.company,
+            app_domain_name: "example.com",
+            departments: &all,
+            detail: DepartmentDetailPane::Department {
+                view: &view,
+                draft: None,
+            },
+            choices: &[],
+            choices_cut: false,
+            membership: crate::entities::company_member::CompanyMembership::Member,
+            managed,
+            history: &history,
+            error: None,
+            notice: None,
+            knowledge: DepartmentKnowledge::Documents(&[]),
+        })
+    };
+    let managing: std::collections::HashSet<DepartmentId> =
+        [tree.sales.id, tree.inside.id].into_iter().collect();
+    let html = render(&managing);
+    assert!(html.contains(r#"id="department-history""#), "{html}");
+    assert!(html.contains("Dana &lt;lead&gt;") && html.contains("Closer &lt;agent&gt;"));
+    assert!(!html.contains("Dana <lead>"));
+    assert!(html.contains("as lead of Sales &lt;team&gt;"), "{html}");
+    assert!(html.contains("System") && html.contains("(lead)"));
+    assert!(html.contains(&format!(r#"data-acting-role="lead:{}""#, tree.sales.id)));
+    let outsider = render(&Default::default());
+    assert!(!outsider.contains(r#"id="department-history""#));
 }

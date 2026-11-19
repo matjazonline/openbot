@@ -633,3 +633,500 @@ async fn delegated_admin_lists_unit_entry_gate_and_hint_follow_the_predicate() {
             .unwrap())
     );
 }
+
+#[derive(Debug, PartialEq, Eq)]
+struct AuditRow {
+    kind: String,
+    acting_role: Option<String>,
+    actor_label: Option<String>,
+    subject: Option<Uuid>,
+    role: Option<String>,
+}
+
+async fn audit_rows(pool: &PgPool, company: Uuid, department: DepartmentId) -> Vec<AuditRow> {
+    type Row = (
+        String,
+        Option<String>,
+        Option<String>,
+        Option<Uuid>,
+        Option<String>,
+    );
+    let rows: Vec<Row> = sqlx::query_as(
+        "SELECT transition_kind, acting_role, actor_label, principal_id, role \
+             FROM department_administration_events WHERE company_id=$1 AND department_id=$2 \
+             ORDER BY created_at, id",
+    )
+    .bind(company)
+    .bind(department.as_uuid())
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    rows.into_iter()
+        .map(|(kind, acting_role, actor_label, subject, role)| AuditRow {
+            kind,
+            acting_role,
+            actor_label,
+            subject,
+            role,
+        })
+        .collect()
+}
+
+async fn label_of(pool: &PgPool, company: Uuid, user: Uuid) -> String {
+    sqlx::query_scalar(
+        "SELECT display_label FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(company)
+    .bind(user)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Plan06 02B: every department write a lead makes leaves exactly one history row carrying the
+/// role that admitted it — the parent's manager for the department's own lifecycle and roles, the
+/// destination's for a move, the department's for members — and nothing for a refused write.
+#[tokio::test]
+async fn administration_audit_each_write_kind_records_its_admitting_role() {
+    use crate::application::ports::channel::ChannelPersistence;
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool).await;
+    let cases = &d.f.use_cases;
+    let (company, lead) = (d.f.company, d.f.member);
+    let lead_role = format!("lead:{}", d.unit.id);
+    let lead_label = label_of(d.f.pool(), company, lead).await;
+    let (worker, worker_principal) = teammate(d.f.pool(), company, "member").await;
+    let _ = worker;
+
+    let team = cases
+        .create_department(lead, company, d.f.write("Team", Some(d.unit.id)), None)
+        .await
+        .unwrap();
+    cases
+        .update_department(
+            lead,
+            company,
+            team.id,
+            DepartmentEdit {
+                name: Some("Team renamed".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    cases
+        .update_department(
+            lead,
+            company,
+            team.id,
+            DepartmentEdit {
+                parent_id: Some(Some(d.child.id)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    cases
+        .add_member(lead, company, team.id, worker_principal)
+        .await
+        .unwrap();
+    // Adding again changes nothing and records nothing.
+    cases
+        .add_member(lead, company, team.id, worker_principal)
+        .await
+        .unwrap();
+    cases
+        .assign_role(
+            lead,
+            company,
+            team.id,
+            DepartmentRole::Lead,
+            worker_principal,
+        )
+        .await
+        .unwrap();
+    cases
+        .clear_role(
+            lead,
+            company,
+            team.id,
+            DepartmentRole::Lead,
+            worker_principal,
+        )
+        .await
+        .unwrap();
+    cases
+        .remove_member(lead, company, team.id, worker_principal)
+        .await
+        .unwrap();
+    // A sibling lead's refused write leaves no row.
+    hidden(
+        cases
+            .add_member(d.sibling_lead, company, team.id, worker_principal)
+            .await,
+    );
+
+    let expected: Vec<(&str, Option<Uuid>, Option<&str>)> = vec![
+        ("department_created", None, None),
+        ("department_updated", None, None),
+        ("department_moved", None, None),
+        ("member_added", Some(worker_principal.as_uuid()), None),
+        (
+            "role_assigned",
+            Some(worker_principal.as_uuid()),
+            Some("lead"),
+        ),
+        (
+            "role_cleared",
+            Some(worker_principal.as_uuid()),
+            Some("lead"),
+        ),
+        ("member_removed", Some(worker_principal.as_uuid()), None),
+    ];
+    let rows = audit_rows(d.f.pool(), company, team.id).await;
+    assert_eq!(
+        rows,
+        expected
+            .into_iter()
+            .map(|(kind, subject, role)| AuditRow {
+                kind: kind.into(),
+                acting_role: Some(lead_role.clone()),
+                actor_label: Some(lead_label.clone()),
+                subject,
+                role: role.map(str::to_owned),
+            })
+            .collect::<Vec<_>>()
+    );
+
+    // The owner deletes it: the row is written before the department goes, as the owner.
+    let owner = WorkflowActor::authenticated(d.f.owner).unwrap();
+    let desks: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM channels WHERE company_id=$1 AND department_id=$2")
+            .bind(company)
+            .bind(team.id.as_uuid())
+            .fetch_all(d.f.pool())
+            .await
+            .unwrap();
+    for desk in desks {
+        ChannelPersistence::delete(&d.f.persistence, owner, company, desk)
+            .await
+            .unwrap();
+    }
+    cases
+        .delete_department(d.f.owner, company, team.id)
+        .await
+        .unwrap();
+    let last = audit_rows(d.f.pool(), company, team.id)
+        .await
+        .pop()
+        .unwrap();
+    assert_eq!(last.kind, "department_deleted");
+    assert_eq!(last.acting_role.as_deref(), Some("owner"));
+    // A root admin acting is recorded as such.
+    let admin_made = cases
+        .create_department(d.f.admin, company, d.f.write("By admin", None), None)
+        .await
+        .unwrap();
+    assert_eq!(
+        audit_rows(d.f.pool(), company, admin_made.id).await[0]
+            .acting_role
+            .as_deref(),
+        Some("admin")
+    );
+    // The pane's read: newest first, for the department's managers only.
+    let history = cases
+        .administration_history(lead, company, d.unit.id)
+        .await
+        .unwrap();
+    assert!(history.len() <= crate::entities::department::DEPARTMENT_HISTORY_ENTRIES);
+    hidden(
+        cases
+            .administration_history(d.sibling_lead, company, d.unit.id)
+            .await,
+    );
+}
+
+/// Rows are append-only and must snapshot the actual actor and subject; a forged person row is
+/// refused, and company deletion still removes the history with its tenant.
+#[tokio::test]
+async fn administration_audit_rows_are_immutable_and_forgery_is_refused() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool.clone()).await;
+    let company = d.f.company;
+    let rows = audit_rows(&pool, company, d.unit.id).await;
+    assert!(
+        rows.iter().any(|row| row.kind == "role_assigned"),
+        "{rows:?}"
+    );
+    for statement in [
+        "UPDATE department_administration_events SET acting_role='owner' WHERE company_id=$1",
+        "DELETE FROM department_administration_events WHERE company_id=$1",
+    ] {
+        let error = sqlx::query(statement)
+            .bind(company)
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("department retirement history is immutable"),
+            "{error}"
+        );
+    }
+    let forged = sqlx::query(
+        "INSERT INTO department_administration_events (company_id, operation_id, department_id, \
+           department_label, transition_kind, actor_kind, actor_principal_id, actor_label, acting_role) \
+         SELECT $1, gen_random_uuid(), $2, department_audit_label('Sales'), 'department_updated', \
+           'person', principal.id, 'Someone else', 'owner' \
+         FROM principals AS principal WHERE principal.company_id=$1 AND principal.user_id=$3",
+    )
+    .bind(company)
+    .bind(d.unit.id.as_uuid())
+    .bind(d.f.owner)
+    .execute(&pool)
+    .await
+    .unwrap_err();
+    assert!(
+        forged
+            .to_string()
+            .contains("administration audit must snapshot"),
+        "{forged}"
+    );
+    sqlx::query("DELETE FROM companies WHERE id=$1")
+        .bind(company)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let left: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM department_administration_events WHERE company_id=$1",
+    )
+    .bind(company)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(left, 0);
+}
+
+/// Plan06 02B.1/r1 item 14: a lead's write racing the removal of its lead role either commits
+/// with its history row under the old role, or is refused with no row; never a write without
+/// its row or a row without its write.
+#[tokio::test]
+async fn administration_audit_competing_role_removal_and_management_write_in_both_orders() {
+    use crate::adapters::persistence::test_support::{
+        WriteBarrier, competing_writes, own_database,
+    };
+    for write_first in [true, false] {
+        // An own database: the barrier is a table lock no concurrent test may share.
+        let Some(db) = own_database().await else {
+            return;
+        };
+        let d = Delegated::on(db.pool.clone()).await;
+        let (company, lead) = (d.f.company, d.f.member);
+        let (_, worker) = teammate(d.f.pool(), company, "member").await;
+        let write = d.f.use_cases.add_member(lead, company, d.unit.id, worker);
+        let revoke = d.f.use_cases.clear_role(
+            d.f.owner,
+            company,
+            d.unit.id,
+            DepartmentRole::Lead,
+            d.f.member_principal,
+        );
+        let added = if write_first {
+            let result =
+                competing_writes(d.f.pool(), WriteBarrier::DepartmentMembers, write, revoke).await;
+            result.second.unwrap();
+            result.first
+        } else {
+            let result =
+                competing_writes(d.f.pool(), WriteBarrier::DeskGrants, revoke, write).await;
+            result.first.unwrap();
+            result.second
+        };
+        let rows = audit_rows(d.f.pool(), company, d.unit.id).await;
+        let member_rows: Vec<_> = rows
+            .iter()
+            .filter(|row| row.kind == "member_added")
+            .collect();
+        let is_member: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM department_members WHERE company_id=$1 AND department_id=$2 AND principal_id=$3)",
+        )
+        .bind(company)
+        .bind(d.unit.id.as_uuid())
+        .bind(worker.as_uuid())
+        .fetch_one(d.f.pool())
+        .await
+        .unwrap();
+        if write_first {
+            added.unwrap();
+            assert!(is_member);
+            assert_eq!(member_rows.len(), 1);
+            assert_eq!(
+                member_rows[0].acting_role.as_deref(),
+                Some(format!("lead:{}", d.unit.id).as_str())
+            );
+        } else {
+            hidden(added);
+            assert!(!is_member && member_rows.is_empty(), "{rows:?}");
+        }
+        assert!(
+            rows.iter().any(
+                |row| row.kind == "role_cleared" && row.acting_role.as_deref() == Some("owner")
+            )
+        );
+    }
+}
+
+/// B2-F1: replacing a single-holder role records the holder it was taken from, then the new one,
+/// in one operation with the same acting role.
+#[tokio::test]
+async fn administration_audit_replacing_a_lead_records_the_replaced_holder() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool).await;
+    let (_, successor) = teammate(d.f.pool(), d.f.company, "member").await;
+    d.f.use_cases
+        .assign_role(
+            d.f.owner,
+            d.f.company,
+            d.unit.id,
+            DepartmentRole::Lead,
+            successor,
+        )
+        .await
+        .unwrap();
+    type Row = (String, Option<Uuid>, Option<String>, Option<String>, Uuid);
+    let rows: Vec<Row> = sqlx::query_as(
+        "SELECT transition_kind, principal_id, role, acting_role, operation_id \
+         FROM department_administration_events WHERE company_id=$1 AND department_id=$2 \
+           AND actor_kind='person' ORDER BY created_at, id",
+    )
+    .bind(d.f.company)
+    .bind(d.unit.id.as_uuid())
+    .fetch_all(d.f.pool())
+    .await
+    .unwrap();
+    let last: Vec<_> = rows.iter().rev().take(2).rev().collect();
+    assert_eq!(
+        last.iter()
+            .map(|(kind, principal, role, acting, _)| (
+                kind.as_str(),
+                *principal,
+                role.as_deref(),
+                acting.as_deref()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "role_cleared",
+                Some(d.f.member_principal.as_uuid()),
+                Some("lead"),
+                Some("owner")
+            ),
+            (
+                "role_assigned",
+                Some(successor.as_uuid()),
+                Some("lead"),
+                Some("owner")
+            ),
+        ]
+    );
+    assert_eq!(last[0].4, last[1].4, "one operation");
+}
+
+/// B2-F2/F3: removing members from the root on the Departments pane is the root's history — an
+/// agent as a root admin, a person as the owner — and a person's departure records every
+/// department they leave, written before their principal is retired.
+#[tokio::test]
+async fn administration_audit_root_removal_records_every_department_left() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool).await;
+    let (company, cases) = (d.f.company, &d.f.use_cases);
+    let root = d.f.root_id().await;
+    let (leaver, leaver_principal) = teammate(d.f.pool(), company, "member").await;
+    let _ = leaver;
+    cases
+        .add_member(d.f.owner, company, d.child.id, leaver_principal)
+        .await
+        .unwrap();
+    cases
+        .add_member(d.f.owner, company, root, d.f.agent_principal)
+        .await
+        .unwrap();
+    cases
+        .remove_member(d.f.admin, company, root, d.f.agent_principal)
+        .await
+        .unwrap();
+    cases
+        .remove_member(d.f.owner, company, root, leaver_principal)
+        .await
+        .unwrap();
+    let rows: Vec<(Uuid, Option<Uuid>, Option<String>)> = sqlx::query_as(
+        "SELECT department_id, principal_id, acting_role FROM department_administration_events \
+         WHERE company_id=$1 AND transition_kind='member_removed' ORDER BY created_at, id",
+    )
+    .bind(company)
+    .fetch_all(d.f.pool())
+    .await
+    .unwrap();
+    assert!(rows.contains(&(
+        root.as_uuid(),
+        Some(d.f.agent_principal.as_uuid()),
+        Some("admin".to_owned())
+    )));
+    for department in [root.as_uuid(), d.child.id.as_uuid()] {
+        assert!(
+            rows.contains(&(
+                department,
+                Some(leaver_principal.as_uuid()),
+                Some("owner".to_owned())
+            )),
+            "{rows:?}"
+        );
+    }
+    let still_member: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM department_members WHERE company_id=$1 AND principal_id=$2)",
+    )
+    .bind(company)
+    .bind(leaver_principal.as_uuid())
+    .fetch_one(d.f.pool())
+    .await
+    .unwrap();
+    assert!(!still_member, "the departure itself happened");
+}
+
+/// B2-F2: a placement whose actor manages no unit there is refused, and the transaction it ran in
+/// keeps nothing.
+#[tokio::test]
+async fn administration_audit_unmanaged_placement_is_refused_without_history() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool).await;
+    let (outsider, _) = teammate(d.f.pool(), d.f.company, "member").await;
+    let before = audit_rows(d.f.pool(), d.f.company, d.sibling.id).await;
+    let mut tx = d.f.pool().begin().await.unwrap();
+    let refused = crate::adapters::persistence::department::place_in_department_on(
+        &mut tx,
+        &crate::adapters::persistence::test_support::provisioning_templates(),
+        d.company(),
+        WorkflowActor::authenticated(outsider).unwrap(),
+        d.sibling.id,
+        d.f.agent_principal,
+        None,
+    )
+    .await;
+    hidden(refused);
+    tx.rollback().await.unwrap();
+    assert_eq!(
+        audit_rows(d.f.pool(), d.f.company, d.sibling.id).await,
+        before
+    );
+}

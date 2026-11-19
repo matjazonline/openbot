@@ -386,3 +386,57 @@ async fn delegated_admin_competing_desk_crud_locks_the_actor_before_the_company(
     .unwrap();
     assert!(p.get_by_id(desk.id).await.unwrap().is_none());
 }
+
+/// Plan06 02B.1: a desk's email binding audit records the role of the person whose write made it
+/// — the lead of the desk's unit, then the owner — and a system write records none.
+#[tokio::test]
+async fn administration_audit_desk_binding_events_record_the_acting_role() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let d = Delegated::on(pool).await;
+    let uc = cases(&d);
+    let desk = uc
+        .create_channel(
+            d.f.member,
+            d.f.company,
+            write(d.unit.id, "Auditdesk"),
+            false,
+        )
+        .await
+        .unwrap();
+    ChannelPersistence::update(&d.f.persistence, edit(&d, d.f.owner, desk.id, d.unit.id))
+        .await
+        .unwrap();
+    let roles: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT event.actor->>'actor_type', event.acting_role FROM binding_audit_events AS event \
+         JOIN channel_bindings AS binding ON binding.id = event.binding_id \
+         WHERE binding.company_id = $1 AND binding.channel_id = $2 ORDER BY event.created_at, event.id",
+    )
+    .bind(d.f.company)
+    .bind(desk.id)
+    .fetch_all(d.f.pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        roles.first(),
+        Some(&("user".to_owned(), Some(format!("lead:{}", d.unit.id)))),
+        "{roles:?}"
+    );
+    assert!(
+        roles
+            .iter()
+            .all(|(kind, role)| kind == "user" && role.is_some()),
+        "{roles:?}"
+    );
+    let system: Option<String> = sqlx::query_scalar(
+        "SELECT event.acting_role FROM binding_audit_events AS event \
+         WHERE event.company_id = $1 AND event.actor->>'actor_type' = 'system' LIMIT 1",
+    )
+    .bind(d.f.company)
+    .fetch_optional(d.f.pool())
+    .await
+    .unwrap()
+    .flatten();
+    assert_eq!(system, None);
+}

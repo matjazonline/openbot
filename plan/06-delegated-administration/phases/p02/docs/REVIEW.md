@@ -56,3 +56,32 @@
 - [B1-F4](agent-review-findings.md) dispositioned; the U7 assertion is now exact.
 - **Evidence:** my run 396 PASS / 0 FAIL / 4 ignored; author manifest 8 PASS; both manifests validate. Coordination r8 matches its pin.
 - **Scope:** batch only. 02B, p03 and the final full gate remain.
+
+## 06DA-P02-B2-R1 — batch review of B2 (02B audit)
+
+- **CHANGES REQUIRED** at `b2c252facf79abb3066bf667a843e7e91e522cea7ac82534d3630188fa9f2dce`. HEAD `1bb9c969` (B1 committed) plus the working-tree delta (28 paths); three exclusions; digest and file list reproduced by me. Note [06DA-P02-B2-R1-N1](agent-review-notes.md).
+- **Coordination:** r9 `e8f43187…` (pinned; adds the local-commit authorization), no notices.
+- **Actionable:**
+  - [B2-F1](agent-review-findings.md), low: assigning a single-holder role (lead) silently deletes the previous holder's role with no `role_cleared` row.
+  - [B2-F2](agent-review-findings.md), low: no decisive tests for agent placement audit (carried: role-bearing records `role_assigned`), pane root-member removal (carried: person row before retirement), onboarding creation, or the new placement refusal.
+- **Optional:** [B2-F3](agent-review-findings.md) — invite acceptance (root membership and admin grant) and the department memberships dropped by company removal are unrecorded.
+- **Accepted as reviewed:**
+  - the extended department history schema and system/person guard split (carried condition 1);
+  - immutability and cascade;
+  - operation-id grouping;
+  - acting roles on every recorded path (move = destination, root = owner, admin, root lead);
+  - workflow definition, binding and desk-binding audit roles;
+  - the desk-update provenance change (audit only);
+  - the pane (managers only, escaped);
+  - the test filter changes.
+- **Evidence:** my run 402 PASS / 0 FAIL / 1 ignored; author full lib 4877 / 3 known unrelated / 30. Both manifests validate.
+- **Next:** A fixes F1, adds the F2 tests, re-freezes and requests a recheck.
+
+## 06DA-P02-B2-R2 — correction recheck of B2-F1..F3
+
+- **PASS for B2 (02B audit)** at `802700ab809070e6ef89a5b33288e0b60579cbb53012ead62e5404211634f32f`. HEAD `1bb9c969` plus the working tree; same three exclusions; digest and file list reproduced by me. Note [06DA-P02-B2-R2-N1](agent-review-notes.md).
+- [B2-F1](agent-review-findings.md) FIXED: a replaced single holder now gets a `role_cleared` row before the `role_assigned`, in the same operation and with the same role.
+- [B2-F2](agent-review-findings.md) FIXED: tests for agent placement (once, plus role), pane root removal (agent as admin, person as owner, rows before retirement), onboarding history, and the unmanaged placement refusal.
+- [B2-F3](agent-review-findings.md): company departure now records `member_removed` in every department. Invite acceptance staying unrecorded is a recorded scope decision to report to the user.
+- **Evidence:** my run 359 PASS / 0 FAIL / 1 ignored; author manifest 8 PASS; both manifests validate. Coordination r9 matches its pin.
+- **Scope:** batch only. p03 and the final full gate remain.

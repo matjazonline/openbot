@@ -101,6 +101,18 @@ async fn target_on(
     }
 }
 
+/// The actor's management role over `association`'s owner, read under the caller's locks, for a
+/// management event's history (Plan06 02B); `None` when the actor manages none of it.
+pub(in crate::adapters::persistence) async fn association_role_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    association: RelatedAssociation,
+) -> AppResult<Option<crate::application::ports::administration::ManagementRole>> {
+    let target = target_on(db, company, association, row_locks::RowLocks::Wait).await?;
+    super::super::administration::management_role_on(db, actor.user_id(), company, target).await
+}
+
 pub(in crate::adapters::persistence) async fn authorize_association_with_locks(
     db: &mut PgConnection,
     company: CompanyId,

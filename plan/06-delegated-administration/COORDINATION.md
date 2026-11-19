@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/06-delegated-administration/COORDINATION.md
 - Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, worktree /Users/mac02/orca/workspaces/openbot/plan06
-- Revision: 9
+- Revision: 10
 
 ## Plan-wide instructions
 
@@ -29,6 +29,8 @@
 - User decisions 2026-11-19 (cont.): (e) binding outside managed units stays a 404, no
   `binding.outside_managed_units` code; (f) reviewer stays Opus 5.5 (Fable 5.2 unavailable).
 - User 2026-11-19: commit each independently accepted batch locally on plan06; never push.
+- Scope decision 2026-11-19 (p02 B2-F3): invite acceptance records no department history row;
+  the owner-only admin invitation is the administration and invites store no inviter.
 - Plan05 Doop deferral (05SC-C001/04RU-C005) is inherited: Doop failures and
   assertions are preserved, not relabeled, and not fixed here.
 
@@ -37,8 +39,8 @@
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
 | p01 accepted in phase (B1–B4; 01A.2 removal carried to p02) | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
-| p02 B1 (02A) accepted; B2 (02B audit) implementing | Claude root/A; Opus B | same sequential worktree | phases/p02/docs/{TASK,HANDOFF}.md |
-| p03 planned | Claude root | same sequential worktree | phases/p03/docs/ when started |
+| p02 accepted in phase (B1 02A + 01A.2, B2 02B) | Claude root/A; Opus B | same sequential worktree | phases/p02/docs/{TASK,HANDOFF}.md |
+| p03 starting (03A docs, 03B final gate) | Claude root/A; Opus B | same sequential worktree | phases/p03/docs/ when started |
 
 ## Cross-phase notices
 

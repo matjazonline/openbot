@@ -153,6 +153,13 @@ pub trait DepartmentPersistence:
     >;
     /// Every department-owned desk of the company with its owner.
     async fn desk_owners(&self, company: CompanyId) -> AppResult<Vec<(Uuid, DepartmentId)>>;
+    /// The department's administration history, newest first, at most
+    /// [`DEPARTMENT_HISTORY_ENTRIES`](crate::entities::department::DEPARTMENT_HISTORY_ENTRIES).
+    async fn administration_history(
+        &self,
+        company: CompanyId,
+        department: DepartmentId,
+    ) -> AppResult<Vec<crate::entities::department::DepartmentAdministrationEntry>>;
     /// The desks this department owns, by address.
     async fn desks(
         &self,

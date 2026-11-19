@@ -42,10 +42,20 @@ async fn event(
     kind: &str,
     version: Option<VersionId>,
 ) -> AppResult<()> {
+    // The role the definition is managed with as it now stands (Plan06 02B).
+    let acting = super::super::administration::management_role_on(
+        tx,
+        actor.user_id(),
+        draft.company(),
+        crate::application::ports::administration::ManagementTarget::DefinitionCreation(
+            draft.workflow(),
+        ),
+    )
+    .await?;
     sqlx::query(
         "INSERT INTO workflow_definition_events \
-        (company_id, workflow_id, id, revision, event_kind, actor_id, version_id) \
-        VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        (company_id, workflow_id, id, revision, event_kind, actor_id, version_id, acting_role) \
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(draft.company().as_uuid())
     .bind(draft.workflow().as_uuid())
@@ -54,6 +64,7 @@ async fn event(
     .bind(kind)
     .bind(actor.user_id())
     .bind(version.map(VersionId::as_uuid))
+    .bind(acting.map(|role| role.to_string()))
     .execute(&mut **tx)
     .await?;
     Ok(())

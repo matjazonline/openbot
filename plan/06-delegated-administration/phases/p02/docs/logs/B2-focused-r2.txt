@@ -1,0 +1,46 @@
+
+running 15 tests
+test adapters::http::pages::tests::department_ui::administration_audit_pane_shows_recent_history_to_managers_only ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::administration_audit_desk_binding_events_record_the_acting_role ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_name_representation_never_blocks_valid_long_names ... ok
+test adapters::persistence::company_invite::delegated_invite_tests::administration_audit_team_page_root_role_and_removal_are_the_owners ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_requires_material_clear_only_in_its_creation_transaction ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_each_write_kind_records_its_admitting_role ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_account_retirement_clears_all_roles_and_preserves_snapshot_history ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_rejects_corrupt_actual_source_and_rolls_back ... ok
+test adapters::persistence::department::tests::delegated_administration::administration_audit_competing_role_removal_and_management_write_in_both_orders ... FAILED
+test adapters::persistence::department::tests::delegated_administration::administration_audit_rows_are_immutable_and_forgery_is_refused ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_cancels_in_one_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision ... ok
+
+failures:
+
+---- adapters::persistence::department::tests::delegated_administration::administration_audit_each_write_kind_records_its_admitting_role stdout ----
+
+thread 'adapters::persistence::department::tests::delegated_administration::administration_audit_each_write_kind_records_its_admitting_role' (34953458) panicked at src/adapters/persistence/delegated_administration_tests.rs:733:10:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("error returned from database: canceling statement due to lock timeout")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::department::tests::delegated_administration::administration_audit_competing_role_removal_and_management_write_in_both_orders stdout ----
+
+thread 'adapters::persistence::department::tests::delegated_administration::administration_audit_competing_role_removal_and_management_write_in_both_orders' (34953457) panicked at src/adapters/persistence/managed_desk_test_support.rs:43:14:
+the actual competing caller waits on this exact writer: Elapsed(())
+
+---- adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant stdout ----
+
+thread 'adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant' (34953462) panicked at src/adapters/persistence/department_retirement_audit_tests.rs:265:5:
+assertion `left == right` failed
+  left: "department_administration_audit_source"
+ right: "department_retirement_audit_source"
+
+
+failures:
+    adapters::persistence::department::tests::delegated_administration::administration_audit_competing_role_removal_and_management_write_in_both_orders
+    adapters::persistence::department::tests::delegated_administration::administration_audit_each_write_kind_records_its_admitting_role
+    adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant
+
+test result: FAILED. 12 passed; 3 failed; 0 ignored; 0 measured; 4895 filtered out; finished in 6.64s
+

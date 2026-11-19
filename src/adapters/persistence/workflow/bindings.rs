@@ -85,9 +85,12 @@ pub(super) async fn save_binding_on(
     if matches!(change, Change::Configuration) {
         insert_configuration(tx, command).await?;
     }
-    sqlx::query("INSERT INTO workflow_binding_events (company_id, binding_id, state_revision, configuration_revision, event_kind, actor_id) VALUES ($1, $2, $3, $4, $5, $6)")
+    let acting =
+        management::association_role_on(tx, company, command.actor(), state.association).await?;
+    sqlx::query("INSERT INTO workflow_binding_events (company_id, binding_id, state_revision, configuration_revision, event_kind, actor_id, acting_role) VALUES ($1, $2, $3, $4, $5, $6, $7)")
         .bind(company.as_uuid()).bind(configuration.id().as_uuid()).bind(revision(state.revision.get())?)
         .bind(revision(configuration.revision().get())?).bind(change.event()).bind(command.actor().user_id())
+        .bind(acting.map(|role| role.to_string()))
         .execute(&mut **tx).await.map_err(write_error)?;
     Ok(())
 }

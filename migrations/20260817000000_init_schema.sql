@@ -876,6 +876,13 @@ $$;
 -- Name: valid_creation_provenance(jsonb); Type: FUNCTION; Schema: public; Owner: -
 --
 
+-- The role with which a person made a management write (Plan06 02B): the company owner, a root
+-- admin, or the lead of the named department (the unit, or an ancestor, whose management admitted it).
+CREATE FUNCTION public.valid_acting_role(role text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE STRICT
+    RETURN role IN ('owner', 'admin')
+        OR role ~ '^lead:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+
 CREATE FUNCTION public.valid_creation_provenance(provenance jsonb) RETURNS boolean
     LANGUAGE sql IMMUTABLE
     RETURN ((jsonb_typeof(provenance) = 'object'::text) AND ((provenance - ARRAY['actor_type'::text, 'actor_id'::text, 'actor_name'::text]) = '{}'::jsonb) AND (jsonb_typeof((provenance -> 'actor_type'::text)) = 'string'::text) AND ((provenance ->> 'actor_type'::text) = ANY (ARRAY['user'::text, 'system'::text])) AND (jsonb_typeof((provenance -> 'actor_name'::text)) = 'string'::text) AND (btrim((provenance ->> 'actor_name'::text)) <> ''::text) AND CASE (provenance ->> 'actor_type'::text) WHEN 'system'::text THEN ((provenance ? 'actor_id'::text) AND ((provenance -> 'actor_id'::text) = 'null'::jsonb)) WHEN 'user'::text THEN ((jsonb_typeof((provenance -> 'actor_id'::text)) = 'string'::text) AND ((provenance ->> 'actor_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text)) ELSE false END);
@@ -3639,6 +3646,8 @@ CREATE TABLE public.binding_audit_events (
     actor jsonb NOT NULL,
     metadata jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- The person's management role over the binding's target when the write was theirs (02B).
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     CONSTRAINT binding_audit_events_action_check CHECK ((action = ANY (ARRAY['linked'::text, 'endpoint_changed'::text, 'enabled'::text, 'paused'::text, 'disabled'::text, 'drift_detected'::text, 'unlinked'::text]))),
     CONSTRAINT binding_audit_events_actor_check CHECK (public.valid_creation_provenance(actor)),
     CONSTRAINT binding_audit_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND ((metadata -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((metadata -> 'transport'::text)) = 'string'::text) AND (octet_length((metadata)::text) <= 4096))),
@@ -5180,6 +5189,9 @@ CREATE TABLE public.workflow_binding_events (
     event_kind text NOT NULL,
     actor_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- The actor's management role over the binding's association (Plan06 02B); NULL for a
+    -- system write.
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     CONSTRAINT workflow_binding_events_configuration_revision_check CHECK ((configuration_revision > 0)),
     CONSTRAINT workflow_binding_events_event_kind_check CHECK ((event_kind = ANY (ARRAY['configured'::text, 'activated'::text, 'deactivated'::text]))),
     CONSTRAINT workflow_binding_events_state_revision_check CHECK ((state_revision > 0))
@@ -5405,6 +5417,8 @@ CREATE TABLE public.workflow_definition_events (
     actor_id uuid NOT NULL,
     version_id uuid,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- The actor's management role over the definition (Plan06 02B); NULL for a system write.
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     CONSTRAINT workflow_definition_events_check CHECK (((event_kind = 'published'::text) = (version_id IS NOT NULL))),
     CONSTRAINT workflow_definition_events_event_kind_check CHECK ((event_kind = ANY (ARRAY['copied'::text, 'saved'::text, 'archived'::text, 'published'::text]))),
     CONSTRAINT workflow_definition_events_revision_check CHECK ((revision > 0))
@@ -17191,6 +17205,8 @@ CREATE TRIGGER workflow_reviewer_receipt_immutable BEFORE UPDATE OR DELETE ON pu
     FOR EACH ROW EXECUTE FUNCTION public.workflow_follow_fact_immutable();
 
 -- Historical retirement facts do not hold live principals or departments in existence (D2/r2).
+-- Plan06 02B: the same history records each person's administration of a department, with the
+-- role that admitted it, so one table answers "what happened to this department".
 CREATE FUNCTION public.department_audit_label(name text) RETURNS jsonb LANGUAGE sql IMMUTABLE STRICT AS $$
     SELECT jsonb_build_object('prefix',left(name,128),'truncated',char_length(left(name,129))>128)
 $$;
@@ -17198,20 +17214,65 @@ CREATE TABLE public.department_administration_events (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     operation_id uuid NOT NULL,
-    principal_id uuid NOT NULL,
-    principal_kind text NOT NULL CHECK (principal_kind IN ('person','agent')),
-    principal_label text NOT NULL CHECK (octet_length(principal_label)<=255),
+    -- The member or role holder the event is about; none for a department's own lifecycle.
+    principal_id uuid,
+    principal_kind text CHECK (principal_kind IN ('person','agent')),
+    principal_label text CHECK (octet_length(principal_label)<=255),
     department_id uuid NOT NULL,
     department_label jsonb NOT NULL CHECK (octet_length(department_label::text)<=1024),
-    role text NOT NULL CHECK (role IN ('lead','reviewer','owner','admin')),
-    transition_kind text NOT NULL CHECK (transition_kind IN ('demoted','deleted')),
-    actor_kind text NOT NULL DEFAULT 'system' CHECK (actor_kind='system'),
+    role text CHECK (role IN ('lead','reviewer','owner','admin')),
+    transition_kind text NOT NULL CHECK (transition_kind IN ('demoted','deleted',
+        'department_created','department_updated','department_moved','department_deleted',
+        'member_added','member_removed','role_assigned','role_cleared')),
+    actor_kind text NOT NULL DEFAULT 'system' CHECK (actor_kind IN ('system','person')),
+    -- A person's write: who, as they were labelled then, and the role that admitted it.
+    actor_principal_id uuid,
+    actor_label text CHECK (octet_length(actor_label)<=255),
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY(company_id,id),
-    UNIQUE(company_id,operation_id,principal_id,department_id,role)
+    UNIQUE(company_id,operation_id,principal_id,department_id,role),
+    CONSTRAINT department_administration_event_shape CHECK (CASE
+        WHEN actor_kind='system' THEN transition_kind IN ('demoted','deleted')
+            AND principal_id IS NOT NULL AND principal_kind IS NOT NULL
+            AND principal_label IS NOT NULL AND role IS NOT NULL
+            AND actor_principal_id IS NULL AND actor_label IS NULL AND acting_role IS NULL
+        WHEN transition_kind IN ('department_created','department_updated','department_moved',
+                'department_deleted') THEN
+            principal_id IS NULL AND principal_kind IS NULL AND principal_label IS NULL
+            AND role IS NULL
+        WHEN transition_kind IN ('member_added','member_removed') THEN
+            principal_id IS NOT NULL AND principal_kind IS NOT NULL
+            AND principal_label IS NOT NULL AND role IS NULL
+        WHEN transition_kind IN ('role_assigned','role_cleared') THEN
+            principal_id IS NOT NULL AND principal_kind IS NOT NULL
+            AND principal_label IS NOT NULL AND role IS NOT NULL
+        ELSE false END
+        AND (actor_kind='system' OR (actor_principal_id IS NOT NULL AND actor_label IS NOT NULL
+            AND acting_role IS NOT NULL)))
 );
+CREATE INDEX department_administration_events_recent_idx
+    ON public.department_administration_events (company_id, department_id, created_at DESC, id DESC);
 CREATE FUNCTION public.guard_department_retirement_audit() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    IF NEW.actor_kind='person' THEN
+        -- A person's write snapshots its current same-company actor, department and subject.
+        IF octet_length(to_jsonb(NEW)::text)>4096 OR NOT EXISTS (
+            SELECT 1 FROM public.principals AS actor
+            JOIN public.departments AS department
+              ON department.company_id=NEW.company_id AND department.id=NEW.department_id
+            WHERE actor.company_id=NEW.company_id AND actor.id=NEW.actor_principal_id
+              AND actor.kind='person' AND actor.display_label=NEW.actor_label
+              AND NEW.department_label=public.department_audit_label(department.name))
+          OR (NEW.principal_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM public.principals AS subject
+            WHERE subject.company_id=NEW.company_id AND subject.id=NEW.principal_id
+              AND subject.kind=NEW.principal_kind AND subject.display_label=NEW.principal_label)) THEN
+            RAISE EXCEPTION 'administration audit must snapshot its actual same-company actor, department and subject'
+                USING ERRCODE='23514',CONSTRAINT='department_administration_audit_source';
+        END IF;
+        RETURN NEW;
+    END IF;
     -- Only the installed principal boundary produces these observations; no late company/account lock.
     IF pg_trigger_depth()<2 OR octet_length(to_jsonb(NEW)::text)>4096 OR NOT EXISTS (
         SELECT 1 FROM public.department_roles AS holder
@@ -17238,7 +17299,8 @@ CREATE TRIGGER department_retirement_audit_immutable BEFORE UPDATE OR DELETE ON 
     FOR EACH ROW EXECUTE FUNCTION public.department_retirement_audit_immutable();
 CREATE FUNCTION public.check_department_retirement_role_cleared() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) AND EXISTS (
+    -- Only a system retirement promises the role is gone; a person's role_assigned keeps it.
+    IF NEW.actor_kind='system' AND EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) AND EXISTS (
         SELECT 1 FROM public.department_roles WHERE company_id=NEW.company_id AND department_id=NEW.department_id
           AND principal_id=NEW.principal_id AND role=NEW.role) THEN
         RAISE EXCEPTION 'retirement audit requires material role clearing in its insertion transaction'

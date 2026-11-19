@@ -121,6 +121,14 @@ pub(super) async fn department_section(
         ),
         _ => None,
     };
+    let history = match &view {
+        Some(view) if managed.contains(&view.detail.department.id) => {
+            departments
+                .administration_history(user_id, company_id, view.detail.department.id)
+                .await?
+        }
+        _ => Vec::new(),
+    };
     let detail = match (&selection, &view) {
         (DepartmentSelection::Create(draft), _) if editable => DepartmentDetailPane::Create(draft),
         (DepartmentSelection::Department { draft, .. }, Some(view)) => {
@@ -157,6 +165,7 @@ pub(super) async fn department_section(
             choices_cut,
             membership: access.membership,
             managed: &managed,
+            history: &history,
             error,
             notice,
             knowledge: knowledge.as_deref().map_or(

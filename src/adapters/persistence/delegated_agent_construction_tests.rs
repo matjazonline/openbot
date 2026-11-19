@@ -81,3 +81,47 @@ async fn delegated_admin_agent_creation_rolls_back_early_membership_and_publicat
             .all(|agent| agent.slug.as_str() != "rollback-target")
     );
 }
+
+/// B2-F2: a lead's placed agent records its membership once — prepare and finalize both write it —
+/// and its role, each with the lead's role over the unit.
+#[tokio::test]
+async fn administration_audit_agent_placement_records_membership_once_and_its_role() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let created = m
+        .cases
+        .create_agent(
+            m.actor().user_id(),
+            m.d.f.company,
+            write("placed-reviewer"),
+            Some(AgentPlacement {
+                department: m.d.child.id,
+                role: Some(DepartmentRole::Reviewer),
+            }),
+        )
+        .await
+        .unwrap();
+    let rows: Vec<(String, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT transition_kind, role, acting_role FROM department_administration_events \
+         WHERE company_id=$1 AND department_id=$2 AND principal_id=$3 ORDER BY created_at, id",
+    )
+    .bind(m.d.f.company)
+    .bind(m.d.child.id.as_uuid())
+    .bind(created.principal_id.as_uuid())
+    .fetch_all(m.p().pool())
+    .await
+    .unwrap();
+    let lead = Some(format!("lead:{}", m.d.unit.id));
+    assert_eq!(
+        rows,
+        vec![
+            ("member_added".to_owned(), None, lead.clone()),
+            (
+                "role_assigned".to_owned(),
+                Some("reviewer".to_owned()),
+                lead
+            ),
+        ]
+    );
+}

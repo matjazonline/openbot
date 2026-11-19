@@ -546,6 +546,21 @@ impl DepartmentUseCases {
         })
     }
 
+    /// The department's recent administration history (Plan06 02B.2), for its managers only:
+    /// anyone else is told the department is not found.
+    #[instrument(skip_all)]
+    pub async fn administration_history(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        department: DepartmentId,
+    ) -> AppResult<Vec<crate::entities::department::DepartmentAdministrationEntry>> {
+        let scope = self.managed(user_id, company_id, Some(department)).await?;
+        self.departments
+            .administration_history(scope.company, department)
+            .await
+    }
+
     /// The people and agents a manager may add as members or make lead, agents first; at most
     /// [`MAX_DEPARTMENT_PRINCIPAL_CHOICES`], and whether the company has more.
     #[instrument(skip_all)]

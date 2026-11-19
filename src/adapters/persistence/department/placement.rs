@@ -15,10 +15,38 @@ pub(crate) async fn place_in_department_on(
     principal: PrincipalId,
     role: Option<DepartmentRole>,
 ) -> AppResult<()> {
-    if let Some(role) = role {
-        root_role_authority_on(tx, company, actor, department, role).await?;
+    let role_authority = match role {
+        Some(role) => Some(root_role_authority_on(tx, company, actor, department, role).await?),
+        None => None,
+    };
+    let placed = write_placement_on(tx, company, department, principal, true, role).await?;
+    if placed.member_added {
+        // The caller authorized this placement; the history names the role the actor manages
+        // the department with, read under the same company lock.
+        let acting = super::super::administration::management_role_on(
+            tx,
+            actor.user_id(),
+            company,
+            crate::application::ports::administration::ManagementTarget::Unit(department),
+        )
+        .await?
+        .ok_or_else(department_not_found)?;
+        audit::record_on(
+            tx,
+            company,
+            actor,
+            acting,
+            department,
+            AdministrationEvent::MemberAdded(principal),
+        )
+        .await?;
     }
-    write_placement_on(tx, company, department, principal, true, role).await?;
+    if let (Some(role), Some(acting)) = (role, role_authority) {
+        audit::record_role_placement_on(
+            tx, company, actor, acting, department, role, principal, &placed,
+        )
+        .await?;
+    }
     if let Some(role) = role {
         follow_lead_on(
             tx,
@@ -43,14 +71,27 @@ pub(crate) async fn prepare_new_agent_placement_on(
     principal: PrincipalId,
     placement: crate::use_cases::agent::AgentPlacement,
 ) -> AppResult<()> {
-    require_department_management_on(tx, scope, Some(placement.department)).await?;
+    let acting = require_department_management_on(tx, scope, Some(placement.department)).await?;
     if let Some(role) = placement.role {
         root_role_authority_on(tx, scope.company, scope.actor, placement.department, role).await?;
     }
     lock_department_on(tx, scope.company, placement.department).await?;
     check_principal_on(tx, scope.company, principal).await?;
-    department_member_insert(scope.company, placement.department, principal)
+    let added = department_member_insert(scope.company, placement.department, principal)
         .execute(&mut **tx)
+        .await?
+        .rows_affected()
+        == 1;
+    if added {
+        audit::record_on(
+            tx,
+            scope.company,
+            scope.actor,
+            acting,
+            placement.department,
+            AdministrationEvent::MemberAdded(principal),
+        )
         .await?;
+    }
     Ok(())
 }

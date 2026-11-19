@@ -29,6 +29,7 @@ use crate::adapters::persistence::workflow::provisioning::{
     provision_department_desk_on,
 };
 use crate::app_error::{AppError, AppResult};
+use crate::application::ports::administration::ManagementRole;
 use crate::application::ports::department::{
     DepartmentEdit, DepartmentPersistence, DepartmentScope, DepartmentWrite,
 };
@@ -45,6 +46,10 @@ use crate::entities::value_objects::DepartmentSlug;
 use crate::use_cases::company::company_not_found;
 use crate::use_cases::department::department_not_found;
 
+mod audit;
+pub(crate) use audit::{
+    AdministrationEvent, record_member_departure_on, record_on as record_administration_on,
+};
 mod placement;
 pub(crate) use placement::{place_in_department_on, prepare_new_agent_placement_on};
 mod lifecycle;
@@ -54,11 +59,13 @@ pub(crate) use lifecycle::{
 };
 use root::root_role_authority_on;
 
+/// The role with which the actor manages `unit` (the root when `None`), under the caller's
+/// company lock; not found otherwise. Writes record it in their administration history.
 async fn require_department_management_on(
     tx: &mut Transaction<'_, Postgres>,
     scope: DepartmentScope,
     unit: Option<DepartmentId>,
-) -> AppResult<()> {
+) -> AppResult<ManagementRole> {
     use crate::application::ports::administration::ManagementTarget;
     super::administration::management_role_on(
         tx,
@@ -67,17 +74,19 @@ async fn require_department_management_on(
         unit.map_or(ManagementTarget::Root, ManagementTarget::Unit),
     )
     .await?
-    .ok_or_else(department_not_found)?;
-    Ok(())
+    .ok_or_else(department_not_found)
 }
 
+/// The role with which the actor manages `unit`'s parent (the root itself for the root), and the
+/// department as locked.
 async fn require_parent_management_on(
     tx: &mut Transaction<'_, Postgres>,
     scope: DepartmentScope,
     unit: DepartmentId,
-) -> AppResult<()> {
+) -> AppResult<(ManagementRole, Department)> {
     let current = lock_department_on(tx, scope.company, unit).await?;
-    require_department_management_on(tx, scope, current.parent_id).await
+    let role = require_department_management_on(tx, scope, current.parent_id).await?;
+    Ok((role, current))
 }
 
 /// A principal named as the department pages show it: an agent by its current name and handle, a
@@ -340,8 +349,12 @@ pub(crate) async fn assign_department_role_on(
     role: DepartmentRole,
     principal: PrincipalId,
 ) -> AppResult<()> {
-    root_role_authority_on(tx, company, actor, department, role).await?;
-    write_placement_on(tx, company, department, principal, false, Some(role)).await?;
+    let acting = root_role_authority_on(tx, company, actor, department, role).await?;
+    let placed = write_placement_on(tx, company, department, principal, false, Some(role)).await?;
+    audit::record_role_placement_on(
+        tx, company, actor, acting, department, role, principal, &placed,
+    )
+    .await?;
     follow_lead_on(
         tx,
         templates,
@@ -398,6 +411,15 @@ fn department_member_insert(
         .bind(principal.as_uuid())
 }
 
+/// What a placement write actually changed, for the administration history.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Placed {
+    member_added: bool,
+    role_assigned: bool,
+    /// The holders a single-holder role was taken from to make room.
+    replaced: Vec<PrincipalId>,
+}
+
 async fn write_placement_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
@@ -405,7 +427,7 @@ async fn write_placement_on(
     principal: PrincipalId,
     member: bool,
     role: Option<DepartmentRole>,
-) -> AppResult<()> {
+) -> AppResult<Placed> {
     lock_department_on(tx, company, department).await?;
     // The holder a single-holder role replaces loses a row: lock them with the new one, first.
     let mut involved: Vec<Uuid> = match role.filter(|role| role.is_single_holder()) {
@@ -427,28 +449,34 @@ async fn write_placement_on(
     involved.dedup();
     lock_principals_on(tx, company, &involved).await?;
     check_principal_on(tx, company, principal).await?;
+    let mut placed = Placed::default();
     if member {
-        department_member_insert(company, department, principal)
+        placed.member_added = department_member_insert(company, department, principal)
             .execute(&mut **tx)
-            .await?;
+            .await?
+            .rows_affected()
+            == 1;
     }
     let Some(role) = role else {
         super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
-        return sync_department_grants_on(tx, company, &[department]).await;
+        sync_department_grants_on(tx, company, &[department]).await?;
+        return Ok(placed);
     };
     if role.is_single_holder() {
-        sqlx::query(
+        let replaced: Vec<Uuid> = sqlx::query_scalar(
             "DELETE FROM department_roles \
-              WHERE company_id = $1 AND department_id = $2 AND role = $3 AND principal_id <> $4",
+              WHERE company_id = $1 AND department_id = $2 AND role = $3 AND principal_id <> $4 \
+              RETURNING principal_id",
         )
         .bind(company.as_uuid())
         .bind(department.as_uuid())
         .bind(role.as_str())
         .bind(principal.as_uuid())
-        .execute(&mut **tx)
+        .fetch_all(&mut **tx)
         .await?;
+        placed.replaced = replaced.into_iter().map(PrincipalId::new).collect();
     }
-    sqlx::query(
+    placed.role_assigned = sqlx::query(
         "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
          VALUES ($1, $2, $3, $4) \
          ON CONFLICT (department_id, role, principal_id) DO NOTHING",
@@ -458,11 +486,14 @@ async fn write_placement_on(
     .bind(role.as_str())
     .bind(principal.as_uuid())
     .execute(&mut **tx)
-    .await?;
+    .await?
+    .rows_affected()
+        == 1;
     super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
     // The reach contains the department itself, so one sync covers the membership too.
     let reach = role_reach_on(tx, company, department).await?;
-    sync_department_grants_on(tx, company, &reach).await
+    sync_department_grants_on(tx, company, &reach).await?;
+    Ok(placed)
 }
 
 /// Take the role from `principal`. The caller holds the company write lock.
@@ -475,7 +506,7 @@ pub(crate) async fn clear_department_role_on(
     role: DepartmentRole,
     principal: PrincipalId,
 ) -> AppResult<()> {
-    root_role_authority_on(tx, company, actor, department, role).await?;
+    let acting = root_role_authority_on(tx, company, actor, department, role).await?;
     lock_department_on(tx, company, department).await?;
     lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let cleared = sqlx::query(
@@ -494,6 +525,15 @@ pub(crate) async fn clear_department_role_on(
             "That principal does not hold the {role} role in this department."
         )));
     }
+    audit::record_on(
+        tx,
+        company,
+        actor,
+        acting,
+        department,
+        AdministrationEvent::RoleCleared(principal, role),
+    )
+    .await?;
     super::workflow::role_binding::check_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let reach = role_reach_on(tx, company, department).await?;
     sync_department_grants_on(tx, company, &reach).await?;
@@ -508,7 +548,7 @@ pub(crate) async fn add_department_member_on(
     company: CompanyId,
     department: DepartmentId,
     principal: PrincipalId,
-) -> AppResult<()> {
+) -> AppResult<Placed> {
     write_placement_on(tx, company, department, principal, true, None).await
 }
 
@@ -607,12 +647,13 @@ impl DepartmentPersistence for PostgresDepartments {
         lead: Option<PrincipalId>,
     ) -> AppResult<Department> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
-        require_department_management_on(&mut tx, scope, write.parent_id).await?;
+        let acting = require_department_management_on(&mut tx, scope, write.parent_id).await?;
         let department = create_department_on(
             &mut tx,
             &self.templates,
             scope.company,
             scope.actor,
+            acting,
             &write,
             lead,
         )
@@ -628,18 +669,47 @@ impl DepartmentPersistence for PostgresDepartments {
         edit: DepartmentEdit,
     ) -> AppResult<Department> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
-        require_parent_management_on(&mut tx, scope, department).await?;
-        if let Some(parent) = edit.parent_id {
-            require_department_management_on(&mut tx, scope, parent).await?;
-        }
+        let (mut acting, current) =
+            require_parent_management_on(&mut tx, scope, department).await?;
+        let destination = match edit.parent_id {
+            Some(parent) => Some(require_department_management_on(&mut tx, scope, parent).await?),
+            None => None,
+        };
         let department = update_department_on(&mut tx, scope.company, department, &edit).await?;
+        // A move is admitted by its destination's manager, so it records that role.
+        let event = match destination {
+            Some(role) if department.parent_id != current.parent_id => {
+                acting = role;
+                AdministrationEvent::Moved
+            }
+            _ => AdministrationEvent::Updated,
+        };
+        audit::record_on(
+            &mut tx,
+            scope.company,
+            scope.actor,
+            acting,
+            department.id,
+            event,
+        )
+        .await?;
         tx.commit().await?;
         Ok(department)
     }
 
     async fn delete(&self, scope: DepartmentScope, department: DepartmentId) -> AppResult<()> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
-        require_parent_management_on(&mut tx, scope, department).await?;
+        let (acting, _) = require_parent_management_on(&mut tx, scope, department).await?;
+        // Before the delete: the row snapshots the department's label while it still exists.
+        audit::record_on(
+            &mut tx,
+            scope.company,
+            scope.actor,
+            acting,
+            department,
+            AdministrationEvent::Deleted,
+        )
+        .await?;
         delete_department_on(&mut tx, scope.company, department).await?;
         tx.commit().await.map_err(lifecycle::delete_error)?;
         Ok(())
@@ -696,8 +766,20 @@ impl DepartmentPersistence for PostgresDepartments {
         principal: PrincipalId,
     ) -> AppResult<()> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
-        require_department_management_on(&mut tx, scope, Some(department)).await?;
-        add_department_member_on(&mut tx, scope.company, department, principal).await?;
+        let acting = require_department_management_on(&mut tx, scope, Some(department)).await?;
+        let placed =
+            add_department_member_on(&mut tx, scope.company, department, principal).await?;
+        if placed.member_added {
+            audit::record_on(
+                &mut tx,
+                scope.company,
+                scope.actor,
+                acting,
+                department,
+                AdministrationEvent::MemberAdded(principal),
+            )
+            .await?;
+        }
         tx.commit().await?;
         Ok(())
     }
@@ -718,8 +800,17 @@ impl DepartmentPersistence for PostgresDepartments {
             return root::remove_root_member(&self.persistence, scope, department, principal).await;
         }
         let mut tx = begin_department_write(&self.persistence, scope).await?;
-        require_department_management_on(&mut tx, scope, Some(department)).await?;
+        let acting = require_department_management_on(&mut tx, scope, Some(department)).await?;
         remove_department_member_on(&mut tx, scope.company, department, principal).await?;
+        audit::record_on(
+            &mut tx,
+            scope.company,
+            scope.actor,
+            acting,
+            department,
+            AdministrationEvent::MemberRemoved(principal),
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -940,6 +1031,52 @@ impl DepartmentPersistence for PostgresDepartments {
             .into_iter()
             .map(|(desk, department)| (desk, DepartmentId::new(department)))
             .collect())
+    }
+
+    async fn administration_history(
+        &self,
+        company: CompanyId,
+        department: DepartmentId,
+    ) -> AppResult<Vec<crate::entities::department::DepartmentAdministrationEntry>> {
+        use crate::entities::department::{
+            DEPARTMENT_HISTORY_ENTRIES, DepartmentAdministrationAction,
+            DepartmentAdministrationEntry,
+        };
+        type Row = (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            DateTime<Utc>,
+        );
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT transition_kind, actor_label, acting_role, principal_label, role, created_at \
+             FROM department_administration_events \
+             WHERE company_id = $1 AND department_id = $2 \
+             ORDER BY created_at DESC, id DESC LIMIT $3",
+        )
+        .bind(company.as_uuid())
+        .bind(department.as_uuid())
+        .bind(DEPARTMENT_HISTORY_ENTRIES as i64)
+        .fetch_all(&self.persistence.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(kind, actor, acting_role, subject, role, created_at)| {
+                Ok(DepartmentAdministrationEntry {
+                    action: DepartmentAdministrationAction::from_str(&kind)
+                        .map_err(AppError::Internal)?,
+                    actor,
+                    acting_role,
+                    subject,
+                    role: role
+                        .map(|role| DepartmentRole::from_str(&role))
+                        .transpose()
+                        .map_err(|error| AppError::Internal(error.to_string()))?,
+                    created_at,
+                })
+            })
+            .collect()
     }
 
     async fn desks(
