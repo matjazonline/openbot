@@ -43,9 +43,10 @@ only behavior the code has.
 | Docs, startup plan paths and graph refresh | Done |
 
 Unavailable locally, not passed: Docker image gates, memory gates needing the pinned onnxruntime
-1.24.4 (its release is gone upstream), the plugin package's Node 24.21.0 pin, and Doop (deferred).
+1.24.4 (its release is gone upstream), and Doop (deferred).
 Failed in the `scripts/check.sh` run and passed only on rerun: the browser protocols (one test
-hung; cause not established) and the transport boundary and attribution service gates (missing
-`rg` and Python 3.11). `phases/p03/docs/TASK.md` records every gate.
+hung; cause not established), the transport boundary and attribution service gates (missing
+`rg` and Python 3.11), and the plugin package (rerun under the pinned Node 24.21.0).
+`phases/p03/docs/TASK.md` records every gate.
 
 Do not declare the implementation complete while a required check is unavailable.

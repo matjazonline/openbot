@@ -1,0 +1,214 @@
+# Plugin gates under the pinned runtime, 2026-11-20T07:03:36Z, HEAD bca40c21
+# node v24.21.0 (/private/tmp/claude-501/-Users-mac02-orca-workspaces-openbot-plan06/b36d9dc4-495e-4131-9804-05ebcc381915/scratchpad/node-v24.21.0-dl/node-v24.21.0-darwin-arm64/bin/node), npm 11.19.0; official nodejs.org darwin-arm64 tarball, SHA-256 checked against SHASUMS256.txt
+## npm ci (plugin)
+npm warn deprecated prebuild-install@7.1.3: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
+
+added 55 packages, and audited 56 packages in 2s
+
+11 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+exit=0
+## build
+
+> bb-plugin-openbot-local@0.2.0 build
+> node scripts/build.mjs
+
+built 1 plugin entry
+exit=0
+## check_plugin (typecheck, test, test:guards)
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+
+> bb-plugin-openbot-local@0.2.0 test
+> node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs
+
+built 1 plugin entry
+built 18 test entries
+✔ bundle transport uses trusted TLS and live identity with exact maximum streaming bytes (97.673625ms)
+✔ bundle transport refuses redirects, revoked authority, corrupt digests and oversized declared bodies (38.302375ms)
+✔ bundle body cancellation closes the active request and joins promptly (28.67ms)
+✔ real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls (1184.472875ms)
+✔ authorization rejection stops reconnect attempts and never enters the SDK (6.712375ms)
+✔ shutdown during a stalled TLS handshake joins network and dispatcher within the host drain (14.482958ms)
+✔ real WSS rejects stale_identity before journal receipt or SDK entry (25.886334ms)
+✔ real WSS rejects changed_digest before journal receipt or SDK entry (27.599667ms)
+✔ real WSS rejects binary before journal receipt or SDK entry (27.309ms)
+✔ real WSS rejects unknown_field before journal receipt or SDK entry (27.632542ms)
+✔ public plugin service reload joins SDK work before storage closes and settings changes stop admission (313.145291ms)
+✔ configuration refuses non-origin URL http:// (0.5815ms)
+✔ configuration refuses non-origin URL https:// (0.069333ms)
+✔ configuration refuses non-origin URL https://path (0.057958ms)
+✔ configuration refuses non-origin URL https:// (0.055084ms)
+✔ configuration refuses non-origin URL https:// (0.059875ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (0.757917ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (12.012625ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.4225ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (17.097375ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (2.766625ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (17.927125ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (6.732667ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (4.011125ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (18.69225ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (33.627458ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (1908.920292ms)
+✔ real process interruption at enrollment before-pending recovers the same durable claim (126.77475ms)
+✔ real process interruption at enrollment pending recovers the same durable claim (102.351625ms)
+✔ real process interruption at enrollment server-commit recovers the same durable claim (100.729167ms)
+✔ real process interruption at enrollment receipt recovers the same durable claim (178.254667ms)
+✔ real process interruption at enrollment journal recovers the same durable claim (94.774083ms)
+✔ real process interruption at enrollment paired recovers the same durable claim (88.859458ms)
+✔ real process interruption at enrollment cleaned recovers the same durable claim (86.093ms)
+✔ changed origin never receives a saved pending credential or pairing claim (2.745625ms)
+✔ complete initial pairing 400 clears rejected input and explicit replacement starts a fresh attempt (4.344042ms)
+✔ complete initial pairing 401 clears rejected input and explicit replacement starts a fresh attempt (4.103416ms)
+✔ complete initial pairing 403 clears rejected input and explicit replacement starts a fresh attempt (4.050666ms)
+✔ complete initial pairing 404 clears rejected input and explicit replacement starts a fresh attempt (4.240208ms)
+✔ transport retains original pending secrets and ignores replacement input until outcome is resolved (3.443583ms)
+✔ incomplete_rejection retains original pending secrets and ignores replacement input until outcome is resolved (3.870708ms)
+✔ actual process interruption during definitive rejection cleaned cannot enroll stale input as a new identity (82.383125ms)
+✔ actual process interruption during definitive rejection rejected cannot enroll stale input as a new identity (82.091708ms)
+✔ a complete rejection cannot clear a Pending record or secret input once its journal is initialized (2.915708ms)
+✔ real competing connector processes exclude each other and OS releases graceful and killed owners (450.438958ms)
+✔ native MCP arguments bound hostile objects before cloning or durable intent and preserve valid Unicode (3.320125ms)
+✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (34.964792ms)
+✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (6.301625ms)
+✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (7.243041ms)
+✔ record and byte bounds refuse before a second admission while saved identity remains recoverable (11.438917ms)
+✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (9.410417ms)
+✔ MCP native preflight refuses an older core before any provider mutation; instructions-only still launch (115.686708ms)
+✔ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (35.350709ms)
+✔ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (16311.992916ms)
+✔ native abort cancels the immutable invocation even when the admission response was lost (56.967458ms)
+✔ only a proven first-attempt admission rejection retires after restart; ambiguous errors retain the intent (607.084416ms)
+✔ a positively received first rejection is durable even if native cancellation races its response cleanup (20.088667ms)
+✔ unknown outcome survives a physical plugin journal restart; status from B resolves A without another admission (28.256875ms)
+✔ MCP HTTPS transport refuses oversized replies, redirects, invalid metadata and an individual request deadline (76.417917ms)
+✔ native immutable cache preserves namespaced YAML, exact assets, modes and tree hashes, and checks server authority on every hit (159.166542ms)
+✔ native cache bytes refuses without reconstructing a mapped bundle (54.354084ms)
+✔ native cache mode refuses without reconstructing a mapped bundle (43.564208ms)
+✔ native cache symlink refuses without reconstructing a mapped bundle (42.951ms)
+✔ native cache missing refuses without reconstructing a mapped bundle (44.337583ms)
+✔ native cache capacity refuses before writes and the download/materialization slot is bounded (7.006459ms)
+✔ configured spawn holds before positive mapping, durably binds its receipt, then rechecks and supplies full required configuration (37.697875ms)
+✔ configured lost spawn receipt never recovers authority from editable metadata or repeats a spawn (33.65925ms)
+✔ native cache cancellation joins owned writes without publishing a partial bundle (3.026583ms)
+✔ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (40.009583ms)
+✔ native cache abort during materialization removes its owned temporary directory before returning (13.170583ms)
+✔ native cache inventory rejects unexpected bytes in another bundle before admitting new materialization (25.174833ms)
+✔ native handoff rejects case-colliding directory components before writes and preserves identical repeated parents (23.815416ms)
+✔ MCP contracts retain exact schema bytes and reject substituted binding/source identities before cache writes (25.1975ms)
+✔ create sends explicit full native permissions (20.868334ms)
+✔ send sends explicit full native permissions (5.427792ms)
+✔ create sends explicit auto native permissions (5.610125ms)
+✔ send sends explicit auto native permissions (7.423875ms)
+✔ create sends explicit accept_edits native permissions (5.834166ms)
+✔ send sends explicit accept_edits native permissions (13.583584ms)
+✔ unsupported full access at provider refuses before native intent (24.621792ms)
+✔ unsupported full access at server refuses before native intent (20.232375ms)
+✔ unsupported full access at host refuses before native intent (10.569584ms)
+✔ unsupported full access at manual refuses before native intent (5.903292ms)
+✔ catalog advertises only permission modes allowed by provider and both ceilings (6.96925ms)
+✔ permission policy has no implicit default or legacy permission decoder (0.137584ms)
+✔ native idle admission preserves prompt order, queue identity and separate originating turns (32.932041ms)
+✔ native human admission preserves prompt order, queue identity and separate originating turns (13.139792ms)
+✔ native openbot admission preserves prompt order, queue identity and separate originating turns (32.542334ms)
+✔ native queue idle_to_busy race is decided at admission without steering or a second SDK call (28.118625ms)
+✔ native queue busy_to_idle race is decided at admission without steering or a second SDK call (6.45525ms)
+✔ accepted native queue work survives lost SDK response and replay with one mutation and original order (8.3445ms)
+✔ bounded mapping traversal passes a retained oldest page and wraps after reclaiming full history (367.82ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (4096) (5975.957542ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (205) (8817.88725ms)
+✔ same-point journal restore retains mapping while SQL-only history rollback cannot reconstruct it at an equal cursor (33.60675ms)
+✔ terminal receipts remain for90days after ACK and old compacted effects cannot enter the SDK again (9.179125ms)
+✔ uncertainty and pending local references survive compaction and only unchanged confirmed mappings retire (6.365958ms)
+✔ 64MiB outbox pressure coalesces progress and preserves its reserved unacknowledged terminal summary (59.611291ms)
+✔ real WSS retirement requires current nonce and unchanged binding after server confirmation (74.718917ms)
+✔ real WSS mapping retirement rejects a stale connection before deleting local ownership (62.105083ms)
+✔ full mapping history pauses new creates while existing native work completes and ACKs drain (676.846167ms)
+✔ lost read-only deliveries reconcile without poisoning native admission (22.743958ms)
+✔ native startup error before turn acceptance stays uncertain across restart without resubmission (9.986375ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (25.150375ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (10.912167ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (5.140375ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (6.69075ms)
+✔ persistent missing native thread coalesces evidence and retains effect capacity (29.225666ms)
+✔ resolved matching permission updates running without item event across journal reopen (7.73525ms)
+✔ preflight model refusal is durable before any SDK mutation (5.507083ms)
+✔ preflight provider refusal is durable before any SDK mutation (6.549042ms)
+✔ preflight project refusal is durable before any SDK mutation (3.357875ms)
+✔ preflight expired refusal is durable before any SDK mutation (17.191958ms)
+✔ preflight gate refusal is durable before any SDK mutation (7.095709ms)
+✔ preflight foreign refusal is durable before any SDK mutation (3.946334ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (47.710125ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (8.238ms)
+✔ matching terminal output stays within UTF8 bound and unknown usage remains null (29.801333ms)
+✔ ambiguous duplicate matching requests cannot attribute a human or second turn (2.778416ms)
+✔ compacted sparse native replay survives restart and uses completed snapshots (4.878958ms)
+✔ sparse native replay never invents missing request correlation (3.349958ms)
+✔ sparse native replay never invents missing acceptance correlation (3.015417ms)
+✔ prunable partial or started text cannot become final output without a completed snapshot (17.422833ms)
+✔ startup paired selectedProjects change prevents connector and native admission (20.456459ms)
+✔ startup paired openbotOrigin change prevents connector and native admission (4.513583ms)
+✔ startup paired enrollment change prevents connector and native admission (5.531541ms)
+✔ startup enrolling selectedProjects change prevents connector and native admission (18.248458ms)
+✔ startup enrolling openbotOrigin change prevents connector and native admission (12.084084ms)
+✔ startup enrolling enrollment change prevents connector and native admission (2.781958ms)
+✔ legitimate internal Pending to Paired secret writes do not cancel connector startup (4.373209ms)
+✔ profile ownership excludes competing processes and refuses unsafe directory/symlink (78.591917ms)
+✔ supervisor observes failure, stops siblings and joins real children (35.387334ms)
+✔ shutdown escalates a child which ignores TERM and joins it within the fixed drain (5040.270375ms)
+ℹ tests 133
+ℹ suites 0
+ℹ pass 133
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17411.472958
+
+> bb-plugin-openbot-local@0.2.0 test:guards
+> node --test compatibility/check-source.test.mjs scripts/install-local.test.mjs
+
+✔ bundled public SDK declarations match the pinned source and all approved patches (3.549292ms)
+✔ multiple source patches validate all inputs before mutation and accept partial preparation (627.97825ms)
+✔ source verification rejects changed tracked GUI source before any build, from any cwd (182.906875ms)
+✔ prepared source accepts only the exact approved patch and rejects tampering (742.294375ms)
+✔ cohesive source patch adds absent inputs and refuses partial or unsafe preparation (764.810167ms)
+✔ pinned compatibility extension retains 75 percent source capacity headroom (0.364708ms)
+✔ options require separate absolute directories and distinct unprivileged ports (2.378417ms)
+✔ preflight reports every missing or mismatched prerequisite together (0.109209ms)
+✔ the plugin directory must be absent or empty because Cloudroom runs it in place (1.209125ms)
+✔ the archive must match its own integrity file and any trusted copy (1.522459ms)
+✔ Cloudroom CLI calls address only the installed profile (0.13325ms)
+✔ readiness follows the wrapper status lines (89.709375ms)
+✔ shell quoting keeps printed commands copyable (0.210333ms)
+✔ the command line refuses bad options before running anything (37.224875ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2368.015166
+check_plugin exit=0
+## check_plugin_package (package, extract, ci --omit=dev)
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs /private/tmp/claude-501/-Users-mac02-orca-workspaces-openbot-plan06/***/scratchpad/plugin-pinned-work/plugin
+
+built 1 plugin entry
+built 1 plugin entry
+{"filename":"bb-plugin-openbot-local-0.2.0.tgz","sha256":"5cdb500a915d6c36a6c51791816f6553e00e80faf4eb71b9b74dc436c36ac10d"}
+
+added 5 packages, and audited 6 packages in 1s
+
+2 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+check_plugin_package exit=0

@@ -17,8 +17,12 @@
 - Authorizations: local commit after each independently accepted batch; never push.
 - Review: R1 F1 (docs, fixed) and F2 (records, applied); B PASS 06DA-P03-B1-R2 at
   f8bfaccd7dadb06a774f1bde3dffd5001be0b3fb5246f67f9804df5d73f2d160; root accepted; committed locally.
-- State: Plan06 p01–p03 accepted in phase, not pushed, not declared complete (unavailable gates
-  and the deferred Doop assertion; see TASK gate record). Coordination r11.
-- Next (needs the user): run the unavailable gates where they exist (Docker; a reachable
-  onnxruntime 1.24.4 or a manifest update; Node 24.21.0; Linux CI), decide Doop separately, and
-  authorize any push/merge.
+- State: Plan06 p01–p03 accepted in phase and integrated: pushed to origin/main 2026-11-20 at the
+  user's request (fast-forward be1b504b..bca40c21, no force), with these record updates pushed
+  after it. Not declared complete (unavailable gates and the deferred Doop assertion; see TASK
+  gate record and Post-acceptance). Coordination r12.
+- Plugin package gate: PASS under official Node v24.21.0/npm 11.19.0 in the session scratchpad
+  (logs/final-plugin-pinned-node.txt); the installed Node 26.13.1 and 24.22.3 cannot run it.
+- Next (needs the user): run the remaining unavailable gates where they exist (Docker; a
+  reachable onnxruntime 1.24.4 or a manifest update; Linux CI), check the CI run on main, and
+  decide Doop separately.

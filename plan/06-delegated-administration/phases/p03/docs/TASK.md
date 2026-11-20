@@ -88,8 +88,8 @@ cluster, CI comparison, unavailable gates recorded as unavailable, graph refresh
 | Gate | check.sh | Disposition / follow-up evidence |
 | --- | --- | --- |
 | Runner test coverage | PASS | |
-| Local-agent plugin tests and guards | PASS | |
-| Reproducible plugin package and runtime install | FAIL 1s | **Unavailable**: package.mjs asserts pinned Node v24.21.0; only 24.22.3 installed. Plan06 changes nothing under integrations/ or services/ (git diff 174c83b3..HEAD empty there). |
+| Local-agent plugin tests and guards | PASS | Also PASS under pinned Node v24.21.0 on 2026-11-20 (Post-acceptance). |
+| Reproducible plugin package and runtime install | FAIL 1s | **Unavailable** in this run: package.mjs asserts pinned Node v24.21.0; only 24.22.3 installed. Plan06 changes nothing under integrations/ or services/ (git diff 174c83b3..HEAD empty there). Rerun 2026-11-20 under the pinned runtime: **PASS** (Post-acceptance). |
 | Generated CSS is current | PASS | |
 | Frontend protocols | PASS | |
 | Deployment script tests | PASS | |
@@ -130,8 +130,9 @@ cluster, CI comparison, unavailable gates recorded as unavailable, graph refresh
   /opt/homebrew/bin/python3.13; script scratchpad/env-rerun.sh.
 - Verification status: every plan-required item (03B.4) has evidence. The DB suite and stack budget
   are red only on the pre-existing deferred Doop assertion. Unavailable, not passed: 3 Docker image
-  gates, 4 memory gates needing onnxruntime 1.24.4, plugin package (Node pin), Linux
-  network-isolation scope. Whole-suite/CI green is **not** claimed.
+  gates, 4 memory gates needing onnxruntime 1.24.4, Linux network-isolation scope. The plugin
+  package (Node pin) passed afterwards under the pinned runtime (Post-acceptance). Whole-suite/CI
+  green is **not** claimed.
 
 ## B1-R1 corrections (for recheck 06DA-P03-B1-R2)
 - 06DA-P03-B1-F1 (low, actionable), each item checked against code before editing:
@@ -176,3 +177,22 @@ cluster, CI comparison, unavailable gates recorded as unavailable, graph refresh
 - Status: accepted in phase; committed locally (no push). Plan06 implementation is accepted in all
   three phases but NOT declared complete: required checks unavailable locally and the deferred
   Doop assertion remains red (see gate record).
+
+## Post-acceptance (2026-11-20)
+- Push: at the user's request ("push to main"), `git push origin plan06:main` fast-forwarded
+  origin/main be1b504b..bca40c21 (no force; branch plan06 itself not pushed). trail check before
+  the push: the same 3 init-schema keyword matches explained in bca40c21's message, nothing new.
+  Status: **integrated** on origin/main. CI result not observed here (`gh` not installed).
+- Plugin gates under the pinned runtime: official nodejs.org node-v24.21.0-darwin-arm64.tar.gz,
+  SHA-256 checked against its SHASUMS256.txt, extracted into the session scratchpad (nothing
+  installed); bundled npm 11.19.0 matches `packageManager`. With it first on PATH: plugin
+  `npm ci`, build, check_plugin (typecheck; test 133 passed; test:guards 14 passed) and
+  check_plugin_package (package.mjs pin asserts, build twice with identical bytes, sha256
+  5cdb500a…c10d, extract, `npm ci --omit=dev`): all **PASS**; tracked files unchanged
+  (logs/final-plugin-pinned-node.txt). The default Node 26.13.1/npm 11.20.0 and Homebrew
+  node@24 24.22.3 cannot run the package gate: package.mjs requires exactly v24.21.0 and
+  npm@11.19.0.
+- These record updates and the 03 completion-record line are status and evidence only, written
+  after B's PASS; they were not re-reviewed by B.
+- Still unavailable, not passed: 3 Docker image gates, 4 memory gates (onnxruntime 1.24.4),
+  Linux network-isolation scope; deferred Doop failures stay red. Plan06 is NOT declared complete.
