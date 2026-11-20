@@ -23,8 +23,9 @@
   gate record and Post-acceptance).
 - Plugin package gate: PASS under official Node v24.21.0/npm 11.19.0 in the session scratchpad
   (logs/final-plugin-pinned-node.txt); the installed Node 26.13.1 and 24.22.3 cannot run it.
-- ONNX Runtime: 1.24.4 re-pinned to Microsoft's NuGet package (16696d6d, local, not pushed; the
-  GitHub repository is gone). The 4 memory gates and the knowledge model check now PASS (TASK
-  Post-acceptance, logs/final-ort-repin-*.txt). Coordination r13.
-- Next (needs the user): push authorization for the pin and these records; run the Docker image
-  gates and Linux scope where they exist (CI); check the CI run on main; decide Doop separately.
+- ONNX Runtime: 1.24.4 re-pinned to Microsoft's NuGet package (16696d6d; the GitHub repository
+  is gone), pushed with record commit 5bf6a669 at the user's request (fast-forward
+  46c53d01..5bf6a669, no force). The 4 memory gates and the knowledge model check now PASS (TASK
+  Post-acceptance, logs/final-ort-repin-*.txt). Coordination r14.
+- Next (needs the user): run the Docker image gates and Linux scope where they exist (CI), check
+  the CI run on main, and decide Doop separately. The next plan proceeds in its own records.

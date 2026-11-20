@@ -195,7 +195,8 @@ cluster, CI comparison, unavailable gates recorded as unavailable, graph refresh
 - These record updates and the 03 completion-record line are status and evidence only, written
   after B's PASS; they were not re-reviewed by B.
 - ONNX Runtime pin (user request "update the onnxruntime pin to a release that exists"; commit
-  16696d6d, local): github.com/microsoft/onnxruntime itself answers 404 (API and web; other
+  16696d6d; pushed with 5bf6a669 at the user's request, fast-forward 46c53d01..5bf6a669, no
+  force): github.com/microsoft/onnxruntime itself answers 404 (API and web; other
   repositories 200), so no GitHub release exists at any version. Kept 1.24.4 and moved both
   identical manifests to Microsoft's Microsoft.ML.OnnxRuntime 1.24.4 NuGet package (one zip for all
   three platforms, 125194303 B, sha256 4b978d50…). Linux x64/aarch64 libraries are byte-identical

@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/06-delegated-administration/COORDINATION.md
 - Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, worktree /Users/mac02/orca/workspaces/openbot/plan06
-- Revision: 13
+- Revision: 14
 
 ## Plan-wide instructions
 
@@ -31,8 +31,9 @@
 - User 2026-11-19: commit each independently accepted batch locally on plan06; never push.
 - User 2026-11-20: push to main. Done as a fast-forward of origin/main be1b504b..bca40c21 (no
   force), then this record update was pushed the same way.
-- User 2026-11-20: update the onnxruntime pin to a release that exists. Done locally (16696d6d):
-  1.24.4 from Microsoft's NuGet package, as the GitHub repository is gone; not pushed.
+- User 2026-11-20: update the onnxruntime pin to a release that exists. Done (16696d6d): 1.24.4
+  from Microsoft's NuGet package, as the GitHub repository is gone. At the user's request pushed
+  with its record commit 5bf6a669 (fast-forward 46c53d01..5bf6a669, no force).
 - Scope decision 2026-11-19 (p02 B2-F3): invite acceptance records no department history row;
   the owner-only admin invitation is the administration and invites store no inviter.
 - Plan05 Doop deferral (05SC-C001/04RU-C005) is inherited: Doop failures and
@@ -44,7 +45,7 @@
 | --- | --- | --- | --- |
 | p01 accepted in phase (B1–B4; 01A.2 removal carried to p02) | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
 | p02 accepted in phase (B1 02A + 01A.2, B2 02B) | Claude root/A; Opus B | same sequential worktree | phases/p02/docs/{TASK,HANDOFF}.md |
-| p03 accepted in phase (B1 03A docs + 03B final gate; B PASS 06DA-P03-B1-R2 at f8bfaccd…); integrated on origin/main (bca40c21, 2026-11-20). Plugin package gate passed later under pinned Node 24.21.0; memory gates passed after the ONNX Runtime NuGet pin (16696d6d, local). Plan06 not declared complete: required gates unavailable locally (Docker images, Linux isolation scope) and the deferred Doop assertion stays red | Claude root/A; Opus B | same sequential worktree | phases/p03/docs/{TASK,HANDOFF,REVIEW}.md |
+| p03 accepted in phase (B1 03A docs + 03B final gate; B PASS 06DA-P03-B1-R2 at f8bfaccd…); integrated on origin/main (bca40c21, 2026-11-20). Plugin package gate passed later under pinned Node 24.21.0; memory gates passed after the ONNX Runtime NuGet pin (16696d6d; on origin/main at 5bf6a669). Plan06 not declared complete: required gates unavailable locally (Docker images, Linux isolation scope) and the deferred Doop assertion stays red | Claude root/A; Opus B | same sequential worktree | phases/p03/docs/{TASK,HANDOFF,REVIEW}.md |
 
 ## Cross-phase notices
 
