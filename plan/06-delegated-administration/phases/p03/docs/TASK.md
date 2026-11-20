@@ -111,11 +111,11 @@ cluster, CI comparison, unavailable gates recorded as unavailable, graph refresh
 | Stack budget | FAIL 2101s | Suite at 2048 KiB: 4883 passed, 1 failed (same Doop assertion); no "has overflowed its stack"; script: "tests failed for a reason unrelated to the stack budget". Budget signal clean; gate red only on the deferral. |
 | Lease budget | PASS | |
 | Knowledge / Memory / Attribution production image | FAIL ×3 | **Unavailable**: no Docker daemon (/var/run/docker.sock absent). |
-| Memory model preparation | FAIL 47s | **Unavailable upstream**: manifest pins onnxruntime v1.24.4 archives; all three URLs 404 and GitHub has no release tag v1.24.4 (API 404). SHA-256 pinned, so no substitute. Plan05's final run failed this gate too. |
-| Memory extracted service suite | FAIL 5s | Tool gap `tomllib` (python3 3.9). Rerun with Python 3.13.18: formatting, poisoned-parent boundary, fetch, offline compile, clippy, owner-role migrations, SQLx, manifest pass; stops at "Model artifacts" (runtime/libonnxruntime.1.24.4.dylib, LICENSE, ThirdPartyNotices missing) → **unavailable** (same upstream 404). |
+| Memory model preparation | FAIL 47s | **Unavailable upstream**: manifest pins onnxruntime v1.24.4 archives; all three URLs 404 and GitHub has no release tag v1.24.4 (API 404). SHA-256 pinned, so no substitute. Plan05's final run failed this gate too. After the pin moved to NuGet (16696d6d): **PASS** (Post-acceptance). |
+| Memory extracted service suite | FAIL 5s | Tool gap `tomllib` (python3 3.9). Rerun with Python 3.13.18: formatting, poisoned-parent boundary, fetch, offline compile, clippy, owner-role migrations, SQLx, manifest pass; stops at "Model artifacts" (runtime/libonnxruntime.1.24.4.dylib, LICENSE, ThirdPartyNotices missing) → **unavailable** (same upstream 404). After the pin moved to NuGet (16696d6d): **PASS** (Post-acceptance). |
 | Memory backup and restore | PASS | (pgvector installed during the run) |
-| Memory standalone journey | FAIL 6s | Tool gap `tomllib`; rerun with 3.13 stops at "embedding model is unavailable" → **unavailable** (same artifact). |
-| OpenBot and memory integration | FAIL 27s | **Unavailable**: embedding model runtime missing (same artifact). |
+| Memory standalone journey | FAIL 6s | Tool gap `tomllib`; rerun with 3.13 stops at "embedding model is unavailable" → **unavailable** (same artifact). After the pin moved to NuGet (16696d6d): **PASS** (Post-acceptance). |
+| OpenBot and memory integration | FAIL 27s | **Unavailable**: embedding model runtime missing (same artifact). After the pin moved to NuGet (16696d6d): **PASS** (Post-acceptance). |
 | Attribution extracted service and contracts | FAIL 31s | Tool gap `tomllib`; rerun with Python 3.13: **PASS 51s** (logs/final-env-rerun.txt). |
 | Attribution browser integration | PASS | |
 | Managed Doop service and private integration | FAIL 379s | **Deferred** (05SC-C001/04RU-C005, not relabelled): Doop's own suite 2 of 303 files / 1 of 2728 tests failed (tests/privateMediaStorage.test.ts; tests/privatePdfRendering.test.ts "renders real private images and an embedded font on both PDF pages…"). |
@@ -130,9 +130,9 @@ cluster, CI comparison, unavailable gates recorded as unavailable, graph refresh
   /opt/homebrew/bin/python3.13; script scratchpad/env-rerun.sh.
 - Verification status: every plan-required item (03B.4) has evidence. The DB suite and stack budget
   are red only on the pre-existing deferred Doop assertion. Unavailable, not passed: 3 Docker image
-  gates, 4 memory gates needing onnxruntime 1.24.4, Linux network-isolation scope. The plugin
-  package (Node pin) passed afterwards under the pinned runtime (Post-acceptance). Whole-suite/CI
-  green is **not** claimed.
+  gates, Linux network-isolation scope. Passed afterwards (Post-acceptance): the plugin package
+  under the pinned Node runtime, and the 4 memory gates once the ONNX Runtime pin moved to NuGet.
+  Whole-suite/CI green is **not** claimed.
 
 ## B1-R1 corrections (for recheck 06DA-P03-B1-R2)
 - 06DA-P03-B1-F1 (low, actionable), each item checked against code before editing:
@@ -194,5 +194,25 @@ cluster, CI comparison, unavailable gates recorded as unavailable, graph refresh
   npm@11.19.0.
 - These record updates and the 03 completion-record line are status and evidence only, written
   after B's PASS; they were not re-reviewed by B.
-- Still unavailable, not passed: 3 Docker image gates, 4 memory gates (onnxruntime 1.24.4),
-  Linux network-isolation scope; deferred Doop failures stay red. Plan06 is NOT declared complete.
+- ONNX Runtime pin (user request "update the onnxruntime pin to a release that exists"; commit
+  16696d6d, local): github.com/microsoft/onnxruntime itself answers 404 (API and web; other
+  repositories 200), so no GitHub release exists at any version. Kept 1.24.4 and moved both
+  identical manifests to Microsoft's Microsoft.ML.OnnxRuntime 1.24.4 NuGet package (one zip for all
+  three platforms, 125194303 B, sha256 4b978d50…). Linux x64/aarch64 libraries are byte-identical
+  to the previous pins; LICENSE/ThirdPartyNotices differ only by CRLF; the macOS dylib differs and
+  was re-pinned. Extracted paths unchanged. Both preparers read zip; the tar link check has no zip
+  counterpart (members are stored bytes, checksummed) — a mutation confirmed it guarded nothing,
+  and the symlink fixture stays as a never-followed check. Outside Plan06's scope and not reviewed
+  by B.
+- Checks for the pin (logs/final-ort-repin-gates.txt, logs/final-ort-repin-focused.txt), on
+  @55407 with the toolshim Python 3.13: knowledge preparation osx-arm64 (package downloaded) and
+  linux-x64/linux-aarch64 (extract and verify) PASS; `knowledge model-check` PASS (native load,
+  384-d, norm 1.0000, retrieval 16/16, exact-first 3/3, 8192-chunk corpus, peak RSS 1.75 GiB);
+  memory model preparation PASS; memory extracted service suite PASS (178 passed, 2 ignored by
+  design, incl. memory_search_real_model_retrieval_acceptance); memory backup and restore PASS;
+  memory standalone journey PASS (13 steps, stand-in provider); OpenBot and memory integration PASS
+  (7 live tests); knowledge-model-prepare.py 2 tests, deploy.sh and the main-app embedding
+  artifact unit test PASS; integration docs PASS; trail check clean.
+- Still unavailable, not passed: 3 Docker image gates (their builds now fetch from api.nuget.org,
+  unexercised here) and the Linux network-isolation scope; deferred Doop failures stay red. Plan06
+  is NOT declared complete.

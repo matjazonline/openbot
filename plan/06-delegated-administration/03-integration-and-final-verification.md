@@ -42,11 +42,11 @@ only behavior the code has.
 | Stack and lease budgets | Lease passed; stack: no overflow at 2048 KiB, red only on the same Doop assertion |
 | Docs, startup plan paths and graph refresh | Done |
 
-Unavailable locally, not passed: Docker image gates, memory gates needing the pinned onnxruntime
-1.24.4 (its release is gone upstream), and Doop (deferred).
+Unavailable locally, not passed: Docker image gates and Doop (deferred).
 Failed in the `scripts/check.sh` run and passed only on rerun: the browser protocols (one test
 hung; cause not established), the transport boundary and attribution service gates (missing
-`rg` and Python 3.11), and the plugin package (rerun under the pinned Node 24.21.0).
+`rg` and Python 3.11), the plugin package (rerun under the pinned Node 24.21.0), and the memory
+gates (rerun once the ONNX Runtime 1.24.4 pin moved from the deleted GitHub repository to NuGet).
 `phases/p03/docs/TASK.md` records every gate.
 
 Do not declare the implementation complete while a required check is unavailable.

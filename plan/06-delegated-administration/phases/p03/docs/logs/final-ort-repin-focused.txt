@@ -1,0 +1,38 @@
+# Focused checks for the ONNX Runtime NuGet pin (16696d6d), 2026-11-20T07:26:39Z
+## memory prepare-model.py --check-manifest/--download/--verify
+# 2026-11-20T07:16:26Z memory prepare-model.py with NuGet 1.24.4 manifest
+## --check-manifest
+manifest ok: intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384
+exit=0 0s
+## --download
+exit=0 12s
+## --verify
+exit=0 0s
+## runtime files
+total 69904
+-rw-r--r--@ 1 mac02  staff  35451632 Nov 20 08:16 libonnxruntime.1.24.4.dylib
+-rw-r--r--@ 1 mac02  staff      1094 Nov 20 08:16 LICENSE
+-rw-r--r--@ 1 mac02  staff    331175 Nov 20 08:16 ThirdPartyNotices.txt
+0db33e160224e480c17932799d1dfaea59853b8e722b57bf61932c87e03586f0  services/memory/assets/model/runtime/libonnxruntime.1.24.4.dylib
+c250d6278f0b47a6439fb7592b08b58a55eb9f535aa49a1db63211c3f982b674  services/memory/assets/model/runtime/LICENSE
+fb0af774b4d7cffc5b9d046f2aaeade2f37df2f80abf8033c95dfffcc77a8866  services/memory/assets/model/runtime/ThirdPartyNotices.txt
+## python3 scripts/tests/knowledge-model-prepare.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.008s
+
+OK
+exit=0
+## scripts/tests/deploy.sh
+deployment model-stage/non-root/missing-model gate assertions passed
+deploy script tests passed
+## cargo test --lib adapters::embedding (main app, manifest compiled in)
+test adapters::embedding::artifacts::tests::knowledge_model_artifacts_fail_on_missing_modified_wrong_size_or_symlink_files ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4913 filtered out; finished in 0.00s
+## NuGet 1.24.4 vs previous GitHub pins (sha256 of package members)
+linux-arm64 libonnxruntime.so 52b2a0e7… = pinned; providers_shared 3b6be288… = pinned
+linux-x64 libonnxruntime.so d132535d… = pinned; providers_shared 086ec1d5… = pinned
+osx-arm64 libonnxruntime.dylib 0db33e16… (35451632 B) != previous 872533f1… (35418600 B): new pin
+LICENSE c250d627… (1094 B, CRLF); CR-stripped = previous 2f07c727… (1073 B)
+ThirdPartyNotices.txt fb0af774… (331175 B, CRLF); CR-stripped = previous 0e07b95f… (325054 B)
+github.com/microsoft/onnxruntime and api.github.com/repos/microsoft/onnxruntime: HTTP 404 on 2026-11-20 (api.github.com/repos/microsoft/vscode: 200)

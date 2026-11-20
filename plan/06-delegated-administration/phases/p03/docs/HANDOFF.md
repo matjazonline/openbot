@@ -20,9 +20,11 @@
 - State: Plan06 p01–p03 accepted in phase and integrated: pushed to origin/main 2026-11-20 at the
   user's request (fast-forward be1b504b..bca40c21, no force), with these record updates pushed
   after it. Not declared complete (unavailable gates and the deferred Doop assertion; see TASK
-  gate record and Post-acceptance). Coordination r12.
+  gate record and Post-acceptance).
 - Plugin package gate: PASS under official Node v24.21.0/npm 11.19.0 in the session scratchpad
   (logs/final-plugin-pinned-node.txt); the installed Node 26.13.1 and 24.22.3 cannot run it.
-- Next (needs the user): run the remaining unavailable gates where they exist (Docker; a
-  reachable onnxruntime 1.24.4 or a manifest update; Linux CI), check the CI run on main, and
-  decide Doop separately.
+- ONNX Runtime: 1.24.4 re-pinned to Microsoft's NuGet package (16696d6d, local, not pushed; the
+  GitHub repository is gone). The 4 memory gates and the knowledge model check now PASS (TASK
+  Post-acceptance, logs/final-ort-repin-*.txt). Coordination r13.
+- Next (needs the user): push authorization for the pin and these records; run the Docker image
+  gates and Linux scope where they exist (CI); check the CI run on main; decide Doop separately.
