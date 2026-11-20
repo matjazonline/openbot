@@ -4,8 +4,9 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed, 2026-11-16. Ninth and last in the numbered organization sequence, after
-[08-goals](../08-goals/README.md). This is an implementation plan; rooms are not implemented by
+Status: proposed, 2026-11-16. Ninth and last of the plans that reshape the organization model,
+after [08-goals](../08-goals/README.md); [10-blueprints](../10-blueprints/README.md) follows and
+adds no structure. This is an implementation plan; rooms are not implemented by
 these documents. The product request is shared rooms with people and agents, using mentions to
 address participants. The detailed defaults below are planning choices, not previously confirmed
 user decisions.
