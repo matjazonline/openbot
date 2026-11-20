@@ -46,10 +46,11 @@ If this fails, `fly deploy` will fail the same way.
 ## Local knowledge model and memory
 
 The image includes the FP32 `intfloat/multilingual-e5-small` model at revision
-`614241f622f53c4eeff9890bdc4f31cfecc418b3` and ONNX Runtime 1.24.4. The build-only
-`scripts/prepare-knowledge-model.py` checks exact sizes/SHA256 values from
-`assets/knowledge/model-manifest.json`, safely extracts the selected runtime, and retains MIT
-licenses and third-party notices. Rust dependencies and touched base images are pinned. The final
+`614241f622f53c4eeff9890bdc4f31cfecc418b3` and ONNX Runtime 1.24.4 from Microsoft's
+`Microsoft.ML.OnnxRuntime` NuGet package, so image builds download from `huggingface.co` and
+`api.nuget.org`. The build-only `scripts/prepare-knowledge-model.py` checks exact sizes/SHA256
+values from `assets/knowledge/model-manifest.json`, safely extracts the selected runtime, and
+retains MIT licenses and third-party notices. Rust dependencies and touched base images are pinned. The final
 image runs as `mailagents`; model files remain root-owned and readable.
 
 For local serving on Linux x86_64/aarch64 or macOS arm64:

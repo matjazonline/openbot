@@ -6,7 +6,7 @@ assets/model/. Serving validates local files and never downloads.
   --verify           check assets/model against the manifest (sizes and SHA-256)
   --download         fetch missing files over HTTPS and verify them (build network only)
 """
-import hashlib, json, pathlib, platform, sys, tarfile, tempfile, urllib.request
+import hashlib, json, pathlib, platform, sys, tempfile, urllib.request, zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "assets" / "model-manifest.json"
@@ -64,17 +64,15 @@ def download(data):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes((ROOT / "assets" / "bundled" / artifact["path"]).read_bytes())
     with tempfile.TemporaryDirectory() as tmp:
-        archive = pathlib.Path(tmp) / "runtime.tgz"
+        archive = pathlib.Path(tmp) / "runtime.zip"
         urllib.request.urlretrieve(runtime["archive_url"], archive)
         if digest(archive) != runtime["archive_sha256"]:
             sys.exit("ONNX Runtime archive digest mismatch")
-        with tarfile.open(archive) as tar:
-            members = {m.name.split("/", 1)[-1]: m for m in tar.getmembers()}
+        with zipfile.ZipFile(archive) as bundle:
             for artifact in runtime["files"]:
-                source = tar.extractfile(members[artifact["archive_path"]])
                 path = TARGET / artifact["path"]
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(source.read())
+                path.write_bytes(bundle.read(artifact["archive_path"]))
 
 
 def main():
