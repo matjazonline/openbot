@@ -77,6 +77,7 @@ impl Fixture {
             .create_company(
                 self.f.owner.id,
                 self.f.company.id,
+                None,
                 crate::use_cases::skill::SkillWrite {
                     files: None,
                     slug: name.into(),

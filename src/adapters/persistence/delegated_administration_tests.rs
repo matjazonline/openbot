@@ -452,6 +452,9 @@ mod schedules;
 #[path = "delegated_agent_management_tests.rs"]
 mod agents;
 
+#[path = "unit_resources_tests.rs"]
+mod unit_resources;
+
 fn ids(departments: &[Department]) -> std::collections::BTreeSet<DepartmentId> {
     departments.iter().map(|department| department.id).collect()
 }

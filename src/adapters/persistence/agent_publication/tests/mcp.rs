@@ -55,9 +55,13 @@ async fn source_at(f: &Fixture, endpoint: &str) -> McpSource {
     let mut definition = connection_write(&operation);
     definition.endpoint = endpoint.to_string().try_into().unwrap();
     let connection =
-        f.p.create_mcp_connection(f.scope.company.as_uuid(), definition)
-            .await
-            .unwrap();
+        f.p.create_mcp_connection(
+            f.scope.company.as_uuid(),
+            f.p.test_root_unit(f.scope.company.as_uuid()).await,
+            definition,
+        )
+        .await
+        .unwrap();
     let version =
         f.p.register_mcp_operation(
             f.scope.company,
@@ -131,6 +135,7 @@ async fn autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_
     changed.discovered_tools[0].input_schema = json!({"type":"object","properties":{"other":{"type":"integer"}},"additionalProperties":false});
     f.p.update_mcp_connection(
         f.scope.company.as_uuid(),
+        f.p.test_root_unit(f.scope.company.as_uuid()).await,
         source.connection.id,
         source.connection.revision,
         changed,
@@ -171,6 +176,7 @@ async fn autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are
     changed.tool_grants.clear();
     f.p.update_mcp_connection(
         f.scope.company.as_uuid(),
+        f.p.test_root_unit(f.scope.company.as_uuid()).await,
         source.connection.id,
         source.connection.revision,
         changed,
@@ -273,6 +279,7 @@ async fn autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_gr
     removed.tool_grants.clear();
     f.p.update_mcp_connection(
         f.scope.company.as_uuid(),
+        f.p.test_root_unit(f.scope.company.as_uuid()).await,
         source.connection.id,
         source.connection.revision,
         removed,

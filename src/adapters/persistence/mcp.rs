@@ -16,6 +16,7 @@ struct ConnectionRow {
     access_level: i16,
     company_id: Uuid,
     id: Uuid,
+    unit_id: Option<Uuid>,
     slug: String,
     endpoint_url: String,
     enabled: bool,
@@ -27,7 +28,7 @@ struct ConnectionRow {
     secret_set: bool,
     tool_grants: Vec<String>,
 }
-const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, connection.access_level::smallint AS access_level, connection.slug,
+const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, connection.unit_id, connection.access_level::smallint AS access_level, connection.slug,
     connection.endpoint_url, connection.enabled, connection.auth_type,
     CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision,
     connection.credential_revision, connection.discovery_json,
@@ -86,6 +87,7 @@ impl ConnectionRow {
                 .map_err(|_| invalid("Invalid connection access level"))?,
             company_id: row.company_id,
             id: row.id,
+            unit_id: row.unit_id,
             slug: write.slug,
             endpoint: write.endpoint,
             enabled: write.enabled,
@@ -120,6 +122,32 @@ fn read_catalog(
 
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
+}
+fn not_found() -> AppError {
+    AppError::NotFound("MCP connection not found".into())
+}
+/// The person locks of company authority, then management of the connection's unit (Plan07).
+pub(super) async fn authorize_connection_on(
+    db: &mut PgConnection,
+    company: crate::domain::workflow::CompanyId,
+    actor: crate::application::workflow::WorkflowActor,
+    id: Uuid,
+) -> AppResult<(
+    crate::entities::access_level::LevelActor,
+    CompanyMcpConnection,
+)> {
+    let level = super::unit_resources::authorize_resource_on(
+        db,
+        actor,
+        company,
+        crate::application::ports::unit_resources::UnitResourceKind::McpConnection,
+        id,
+    )
+    .await?;
+    let connection = connection_on(db, company.as_uuid(), id)
+        .await?
+        .ok_or_else(not_found)?;
+    Ok((level, connection))
 }
 fn conflict() -> AppError {
     AppError::Conflict("MCP configuration changed or is unavailable; reload before saving".into())
@@ -210,21 +238,17 @@ impl McpPersistence for PostgresPersistence {
         &self,
         command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<CompanyMcpConnection> {
-        use crate::entities::access_level::{LevelTarget, may_assign_level};
+        use crate::entities::access_level::may_assign_connection_level;
         let mut tx = super::workflow::http::begin_http(self).await?;
-        let actor =
-            super::workflow::authority::authorize_company(&mut tx, command.company, command.actor)
+        let (actor, old) =
+            authorize_connection_on(&mut tx, command.company, command.actor, command.connection)
                 .await?;
-        let old = get_connection(&mut tx, command.company.as_uuid(), command.connection).await?;
         if old.revision != command.expected_revision {
             return Err(conflict());
         }
-        may_assign_level(
-            actor,
-            LevelTarget::Assignable(old.access_level),
-            command.access_level,
-        )
-        .map_err(|e| invalid(&e.to_string()))?;
+        // The unit's manager sets it within their own level; above it is a 403 (Plan06 F10).
+        may_assign_connection_level(actor, old.access_level, command.access_level)
+            .map_err(|e| AppError::Forbidden(e.to_string()))?;
         sqlx::query("UPDATE company_mcp_connections SET access_level=$3::smallint,revision=revision+1 WHERE company_id=$1 AND id=$2 AND deleted_at IS NULL")
             .bind(command.company.as_uuid()).bind(command.connection).bind(command.access_level.as_i16()).execute(&mut *tx).await?;
         let result = get_connection(&mut tx, command.company.as_uuid(), command.connection).await?;
@@ -232,9 +256,13 @@ impl McpPersistence for PostgresPersistence {
         Ok(result)
     }
 
-    async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>> {
-        let rows = sqlx::query_as::<_, ConnectionRow>(&format!("{CONNECTION_SELECT} WHERE connection.company_id = $1 AND connection.deleted_at IS NULL ORDER BY connection.slug LIMIT 65"))
-            .bind(company_id).fetch_all(&self.pool).await?;
+    async fn list_mcp_connections(
+        &self,
+        company_id: Uuid,
+        units: &[Uuid],
+    ) -> AppResult<Vec<CompanyMcpConnection>> {
+        let rows = sqlx::query_as::<_, ConnectionRow>(&format!("{CONNECTION_SELECT} WHERE connection.company_id = $1 AND connection.deleted_at IS NULL AND connection.unit_id = ANY($2) ORDER BY connection.slug LIMIT 65"))
+            .bind(company_id).bind(units).fetch_all(&self.pool).await?;
         if rows.len() > MAX_MCP_CONNECTIONS {
             return Err(invalid("Stored MCP catalog exceeds 64 definitions"));
         }
@@ -243,6 +271,7 @@ impl McpPersistence for PostgresPersistence {
     async fn create_mcp_connection(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection> {
         write.validate()?;
@@ -259,9 +288,10 @@ impl McpPersistence for PostgresPersistence {
             ));
         }
         let id = Uuid::new_v4();
-        sqlx::query("INSERT INTO company_mcp_connections (company_id, id, slug, endpoint_url, enabled, auth_type, discovery_json) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+        sqlx::query("INSERT INTO company_mcp_connections (company_id, id, slug, endpoint_url, enabled, auth_type, discovery_json, unit_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
             .bind(company_id).bind(id).bind(write.slug.as_str()).bind(write.endpoint.as_str())
-            .bind(write.enabled).bind(write.auth.as_str()).bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?).execute(&mut *tx).await?;
+            .bind(write.enabled).bind(write.auth.as_str()).bind(serde_json::to_value(&write.discovered_tools).map_err(|_| invalid("Invalid discovery"))?)
+            .bind(unit_id).execute(&mut *tx).await?;
         replace_grants(&mut tx, company_id, id, &write.tool_grants).await?;
         let result = get_connection(&mut tx, company_id, id).await?;
         tx.commit().await?;
@@ -270,26 +300,57 @@ impl McpPersistence for PostgresPersistence {
     async fn update_mcp_connection(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         id: Uuid,
         expected_revision: i64,
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection> {
         let mut tx = self.pool.begin().await?;
         lock_company(&mut tx, company_id).await?;
-        let result = Box::pin(update_on(&mut tx, company_id, id, expected_revision, write)).await?;
+        let result = Box::pin(update_on(
+            &mut tx,
+            company_id,
+            unit_id,
+            id,
+            expected_revision,
+            write,
+        ))
+        .await?;
         tx.commit().await?;
         Ok(result)
+    }
+    async fn move_mcp_connection(
+        &self,
+        actor: Uuid,
+        company_id: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        let mut tx = self.pool.begin().await?;
+        let moved = super::unit_resources::move_resource_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(actor)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::application::ports::unit_resources::UnitResourceKind::McpConnection,
+            id,
+            crate::entities::department::DepartmentId::new(target),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(moved)
     }
     async fn delete_mcp_connection(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         id: Uuid,
         expected_revision: i64,
     ) -> AppResult<()> {
         let mut tx = self.pool.begin().await?;
         lock_company(&mut tx, company_id).await?;
-        let changed = sqlx::query("UPDATE company_mcp_connections SET deleted_at = CURRENT_TIMESTAMP, enabled = false, revision = revision + 1, credential_revision = credential_revision + 1 WHERE company_id = $1 AND id = $2 AND revision = $3 AND deleted_at IS NULL")
-            .bind(company_id).bind(id).bind(expected_revision).execute(&mut *tx).await?.rows_affected();
+        // A deleted connection releases its unit, so it never pins a department (Plan07).
+        let changed = sqlx::query("UPDATE company_mcp_connections SET deleted_at = CURRENT_TIMESTAMP, enabled = false, unit_id = NULL, revision = revision + 1, credential_revision = credential_revision + 1 WHERE company_id = $1 AND id = $2 AND revision = $3 AND unit_id = $4 AND deleted_at IS NULL")
+            .bind(company_id).bind(id).bind(expected_revision).bind(unit_id).execute(&mut *tx).await?.rows_affected();
         if changed != 1 {
             return Err(conflict());
         }
@@ -318,6 +379,7 @@ impl McpCredentialPersistence for PostgresPersistence {
     async fn replace_mcp_token(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         id: Uuid,
         expected_revision: i64,
         token: Option<SecretString>,
@@ -334,6 +396,9 @@ impl McpCredentialPersistence for PostgresPersistence {
         let mut tx = self.pool.begin().await?;
         lock_company(&mut tx, company_id).await?;
         let connection = get_connection(&mut tx, company_id, id).await?;
+        if connection.unit_id != Some(unit_id) {
+            return Err(not_found());
+        }
         if connection.revision != expected_revision {
             return Err(conflict());
         }
@@ -395,12 +460,17 @@ impl McpCredentialPersistence for PostgresPersistence {
 async fn update_on(
     tx: &mut Transaction<'_, Postgres>,
     company_id: Uuid,
+    unit_id: Uuid,
     id: Uuid,
     expected_revision: i64,
     write: McpConnectionWrite,
 ) -> AppResult<CompanyMcpConnection> {
     write.validate()?;
     let old = get_connection(tx, company_id, id).await?;
+    // The company lock excludes a concurrent move, so the unit authorized is still the owner.
+    if old.unit_id != Some(unit_id) {
+        return Err(not_found());
+    }
     if matches!(write.auth, McpAuth::Integration(_)) && write.auth != old.auth {
         return Err(invalid("Confirm an integration binding through its owner"));
     }

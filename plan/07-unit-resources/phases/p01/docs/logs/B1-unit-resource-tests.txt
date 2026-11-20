@@ -1,0 +1,18 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 41s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 5 tests
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_authority_each_write_follows_the_resource_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_move_lists_the_agents_whose_active_revision_uses_a_skill ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_schema_delete_names_what_to_move_and_teardown_keeps_working ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_move_needs_both_units_and_changes_only_the_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_schema_keys_checks_and_default_unit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4914 filtered out; finished in 3.70s
+

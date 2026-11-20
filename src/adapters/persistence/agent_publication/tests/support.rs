@@ -101,6 +101,7 @@ impl Fixture {
             .p
             .create_company(
                 self.scope.company.as_uuid(),
+                self.p.test_root_unit(self.scope.company.as_uuid()).await,
                 SkillWrite {
                     files: None,
                     slug: format!("skill-{}", Uuid::new_v4().simple()),

@@ -136,6 +136,25 @@ pub fn may_assign_level(
     Ok(())
 }
 
+/// A connection's access level (Plan07): whoever manages the connection's unit may set it within
+/// their own level, the owner without bound. Unit management is the caller's check.
+pub fn may_assign_connection_level(
+    actor: LevelActor,
+    current: AccessLevel,
+    requested: AccessLevel,
+) -> Result<(), LevelRefusal> {
+    if actor.membership.is_owner() {
+        return Ok(());
+    }
+    if current > actor.access_level {
+        return Err(LevelRefusal::TargetAboveActor);
+    }
+    if requested > actor.access_level {
+        return Err(LevelRefusal::RequestedAboveActor);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "access_level_tests.rs"]
 mod tests;

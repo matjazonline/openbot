@@ -37,6 +37,14 @@ impl std::fmt::Display for ManagementRole {
     }
 }
 
+/// A unit this person manages, named for a unit picker (Plan07).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagedUnit {
+    pub id: DepartmentId,
+    pub name: String,
+    pub is_root: bool,
+}
+
 /// Configuration authority is independent of desk and conversation visibility.
 /// Every adapter must state its current-person lookup; errors are never refusals.
 #[async_trait]
@@ -51,6 +59,21 @@ pub trait AdministrationPersistence: Send + Sync {
     /// Every unit the person currently manages (the whole company for a root manager), to scope
     /// configuration lists. Listing is not authority: each write still checks its own target.
     async fn managed_units(&self, actor: Uuid, company: CompanyId) -> AppResult<Vec<DepartmentId>>;
+
+    /// [`Self::managed_units`] with names, root first, for a unit picker.
+    async fn managed_unit_choices(
+        &self,
+        actor: Uuid,
+        company: CompanyId,
+    ) -> AppResult<Vec<ManagedUnit>>;
+
+    /// The unit a new skill or connection gets when its creator names none (Plan07): the root for
+    /// a root manager, else the one department they lead, else none.
+    async fn default_resource_unit(
+        &self,
+        actor: Uuid,
+        company: CompanyId,
+    ) -> AppResult<Option<DepartmentId>>;
 }
 
 pub async fn manages_unit(
@@ -63,6 +86,26 @@ pub async fn manages_unit(
         .management_role(actor, company, ManagementTarget::Unit(unit))
         .await?
         .is_some())
+}
+
+/// The unit a new skill or connection is created in (Plan07): the one named, else the creator's
+/// default, and the creator must manage it. Someone who manages no unit gets the usual 404.
+pub async fn resource_creation_unit(
+    persistence: &dyn AdministrationPersistence,
+    actor: Uuid,
+    company: CompanyId,
+    requested: Option<DepartmentId>,
+) -> AppResult<DepartmentId> {
+    require_management(persistence, actor, company, ManagementTarget::AnyUnit).await?;
+    let unit = match requested {
+        Some(unit) => unit,
+        None => persistence
+            .default_resource_unit(actor, company)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("Choose a unit for this resource.".into()))?,
+    };
+    require_management(persistence, actor, company, ManagementTarget::Unit(unit)).await?;
+    Ok(unit)
 }
 
 pub async fn require_management(

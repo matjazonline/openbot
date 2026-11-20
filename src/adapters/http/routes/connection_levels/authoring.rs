@@ -15,6 +15,9 @@ use serde_json::Value;
 #[serde(deny_unknown_fields)]
 pub(super) struct Create {
     origin: HttpOrigin,
+    /// The owning unit (Plan07); absent, the creator's default unit.
+    #[serde(default)]
+    unit_id: Option<Uuid>,
 }
 pub(super) async fn create(
     State(s): State<ConnectionServices>,
@@ -28,6 +31,9 @@ pub(super) async fn create(
             .create_http(
                 CompanyId::new(company),
                 WorkflowActor::authenticated(user.id)?,
+                draft
+                    .unit_id
+                    .map(crate::entities::department::DepartmentId::new),
                 HttpConnectionWrite {
                     origin: draft.origin,
                     bearer: false,

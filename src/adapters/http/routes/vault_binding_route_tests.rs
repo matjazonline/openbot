@@ -74,6 +74,7 @@ impl Fixture {
             .create_http(
                 CompanyId::new(company),
                 WorkflowActor::authenticated(user).unwrap(),
+                None,
                 HttpConnectionWrite {
                     origin: HttpOrigin::parse("https://api.example.test").unwrap(),
                     bearer: false,

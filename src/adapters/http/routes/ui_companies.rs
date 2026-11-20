@@ -299,8 +299,12 @@ impl Workspace {
         }))
     }
 
-    async fn skills_pane(&self, company: &Company, editable: bool) -> AppResult<String> {
-        let counts = self.counts(company.id, editable).await?;
+    /// The Skills tab: `editable` is skill configuration (any unit manager, Plan07); the company
+    /// summary and its links stay the owner's, as on the Settings tab.
+    async fn skills_pane(&self, access: &CompanyAccess, editable: bool) -> AppResult<String> {
+        let company = &access.company;
+        let owner = access.membership.is_owner();
+        let counts = self.counts(company.id, owner).await?;
         let empty = SkillPage::default();
         let page = if editable {
             self.skill_use_cases
@@ -316,6 +320,13 @@ impl Workspace {
         } else {
             empty
         };
+        let (units, default_unit) = if editable {
+            self.skill_use_cases
+                .unit_choices(self.user_id, company.id)
+                .await?
+        } else {
+            (Vec::new(), None)
+        };
         let skills = pages::company_skills_section(&pages::SkillSection {
             company_id: Some(company.id),
             skills: &page.items,
@@ -325,6 +336,8 @@ impl Workspace {
             error: None,
             notice: None,
             editable,
+            units: &units,
+            default_unit,
         });
         Ok(pages::company_edit_pane(&pages::CompanyEditPane {
             company,
@@ -333,7 +346,7 @@ impl Workspace {
             counts,
             draft: None,
             error: None,
-            editable,
+            editable: owner,
             resend_api_section: "",
             body: pages::CompanyPaneBody::Skills(&skills),
         }))
@@ -493,8 +506,12 @@ async fn companies_page(
                 .await?
         }
         Some(selected) if tab == CompanyTab::Skills => {
-            let editable = selected.membership.is_owner();
-            workspace.skills_pane(&selected.company, editable).await?
+            // Skills belong to units; whoever manages one configures its skills (Plan07).
+            let editable = workspace
+                .skill_use_cases
+                .manages_skills(workspace.user_id, selected.company.id)
+                .await?;
+            workspace.skills_pane(selected, editable).await?
         }
         Some(selected) => {
             let editable = selected.membership.is_owner();
@@ -970,6 +987,10 @@ impl Workspace {
             .await
     }
 }
+
+#[cfg(test)]
+#[path = "ui_company_skills_tests.rs"]
+mod skills_tests;
 
 #[cfg(test)]
 mod tests {

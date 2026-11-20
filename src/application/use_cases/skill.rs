@@ -16,10 +16,7 @@ use crate::{
         user::Caller,
         value_objects::SkillSlug,
     },
-    use_cases::{
-        caller::require_operator,
-        company::{CompanyPersistence, owned_company},
-    },
+    use_cases::{caller::require_operator, company::CompanyPersistence},
 };
 
 pub const MAX_SKILL_PAGE_SIZE: u16 = 100;
@@ -53,6 +50,7 @@ impl SkillWrite {
         let candidate = Skill {
             id: Uuid::nil(),
             company_id: None,
+            unit_id: None,
             slug,
             name: self.name.clone(),
             description: self.description.clone(),
@@ -114,32 +112,62 @@ impl SkillPage {
 
 #[async_trait]
 pub trait SkillManagementPersistence: Send + Sync {
-    async fn create_company(&self, company_id: Uuid, write: SkillWrite) -> AppResult<Skill>;
+    async fn create_company(
+        &self,
+        company_id: Uuid,
+        unit_id: Uuid,
+        write: SkillWrite,
+    ) -> AppResult<Skill>;
     async fn create_library(&self, write: SkillWrite) -> AppResult<Skill>;
     async fn copy_library_to_company(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         skill_id: Uuid,
         created_by: CreationProvenance,
     ) -> AppResult<Skill>;
     async fn get_company(&self, company_id: Uuid, skill_id: Uuid) -> AppResult<Option<Skill>>;
     async fn get_library(&self, skill_id: Uuid) -> AppResult<Option<Skill>>;
+    /// Company skills owned by one of `units`.
     async fn list_company_page(
+        &self,
+        company_id: Uuid,
+        units: &[Uuid],
+        page: SkillPageRequest,
+    ) -> AppResult<SkillPage>;
+    async fn count_company(&self, company_id: Uuid, units: &[Uuid]) -> AppResult<u64>;
+    /// Every company skill, for choosing an agent's skills (not for configuring them).
+    async fn list_authoring_page(
         &self,
         company_id: Uuid,
         page: SkillPageRequest,
     ) -> AppResult<SkillPage>;
-    async fn count_company(&self, company_id: Uuid) -> AppResult<u64>;
     async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage>;
+    /// Writes apply only while the skill is still owned by `unit_id`, the unit whose manager was
+    /// authorized; after a concurrent move they find nothing.
     async fn update_company(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         skill_id: Uuid,
         write: SkillWrite,
     ) -> AppResult<Skill>;
     async fn update_library(&self, skill_id: Uuid, write: SkillWrite) -> AppResult<Skill>;
-    async fn delete_company(&self, company_id: Uuid, skill_id: Uuid) -> AppResult<()>;
+    async fn delete_company(
+        &self,
+        company_id: Uuid,
+        unit_id: Uuid,
+        skill_id: Uuid,
+    ) -> AppResult<()>;
     async fn delete_library(&self, skill_id: Uuid) -> AppResult<()>;
+    /// Move a company skill to another unit; the actor must manage both (Plan07 01B.4).
+    async fn move_company(
+        &self,
+        actor: Uuid,
+        company_id: Uuid,
+        skill_id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource>;
 }
 
 #[derive(Debug, Clone)]
@@ -155,6 +183,10 @@ pub trait AgentCapabilityReader: Send + Sync {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<Option<StoredAgentCapabilities>>;
+}
+
+fn skill_not_found() -> AppError {
+    AppError::NotFound("Skill not found in this company.".into())
 }
 
 pub struct SkillUseCases {
@@ -176,9 +208,9 @@ impl SkillUseCases {
         }
     }
 
-    /// Any unit manager reads the company skills to choose them for an agent (Plan06 U3);
-    /// writing them stays the owner's.
-    async fn authorize_read(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+    /// A skill belongs to a unit, and whoever manages that unit configures it (Plan07, user
+    /// decision a). Entry needs some unit; each skill is then checked against its own unit.
+    pub async fn verify_skill_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
         crate::application::ports::administration::require_management(
             self.companies.as_ref(),
             user_id,
@@ -189,13 +221,68 @@ impl SkillUseCases {
         Ok(())
     }
 
-    async fn authorize_write(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        owned_company(self.companies.as_ref(), user_id, company_id).await?;
-        Ok(())
+    /// Whether this person configures any unit's skills: the Skills tab is editable for them.
+    pub async fn manages_skills(&self, user_id: Uuid, company_id: Uuid) -> AppResult<bool> {
+        match self.verify_skill_manager(user_id, company_id).await {
+            Ok(()) => Ok(true),
+            Err(AppError::NotFound(_)) => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
-    pub async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        self.authorize_write(user_id, company_id).await
+    /// The units whose skills this person configures.
+    async fn managed_units(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Vec<Uuid>> {
+        self.verify_skill_manager(user_id, company_id).await?;
+        Ok(self
+            .companies
+            .managed_units(user_id, crate::domain::workflow::CompanyId::new(company_id))
+            .await?
+            .into_iter()
+            .map(|unit| unit.as_uuid())
+            .collect())
+    }
+
+    /// The company skill and its unit, when this person manages that unit; otherwise the same
+    /// not-found as a skill of another company.
+    async fn managed_skill(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        skill_id: Uuid,
+    ) -> AppResult<Option<(Skill, Uuid)>> {
+        self.verify_skill_manager(user_id, company_id).await?;
+        let Some(skill) = self.persistence.get_company(company_id, skill_id).await? else {
+            return Ok(None);
+        };
+        let unit = skill
+            .unit_id
+            .ok_or_else(|| AppError::Internal("A company skill has no unit".into()))?;
+        let managed = crate::application::ports::administration::manages_unit(
+            self.companies.as_ref(),
+            user_id,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::entities::department::DepartmentId::new(unit),
+        )
+        .await?;
+        Ok(managed.then_some((skill, unit)))
+    }
+
+    async fn creation_unit(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit: Option<Uuid>,
+    ) -> AppResult<Uuid> {
+        Ok(
+            crate::application::ports::administration::resource_creation_unit(
+                self.companies.as_ref(),
+                user_id,
+                crate::domain::workflow::CompanyId::new(company_id),
+                unit.map(crate::entities::department::DepartmentId::new),
+            )
+            .await?
+            .as_uuid(),
+        )
     }
 
     pub fn verify_library_operator(&self, caller: &Caller) -> AppResult<()> {
@@ -246,12 +333,15 @@ impl SkillUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        unit: Option<Uuid>,
         mut write: SkillWrite,
     ) -> AppResult<Skill> {
-        self.authorize_write(user_id, company_id).await?;
+        let unit = self.creation_unit(user_id, company_id, unit).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
-        self.persistence.create_company(company_id, write).await
+        self.persistence
+            .create_company(company_id, unit, write)
+            .await
     }
 
     #[instrument(skip_all, fields(%user_id, %company_id, %skill_id))]
@@ -261,8 +351,10 @@ impl SkillUseCases {
         company_id: Uuid,
         skill_id: Uuid,
     ) -> AppResult<Option<Skill>> {
-        self.authorize_read(user_id, company_id).await?;
-        self.persistence.get_company(company_id, skill_id).await
+        Ok(self
+            .managed_skill(user_id, company_id, skill_id)
+            .await?
+            .map(|(skill, _)| skill))
     }
 
     #[instrument(skip_all, fields(%user_id, %company_id))]
@@ -272,15 +364,29 @@ impl SkillUseCases {
         company_id: Uuid,
         page: SkillPageRequest,
     ) -> AppResult<SkillPage> {
-        self.authorize_read(user_id, company_id).await?;
+        let units = self.managed_units(user_id, company_id).await?;
         self.persistence
-            .list_company_page(company_id, page.validate()?)
+            .list_company_page(company_id, &units, page.validate()?)
+            .await
+    }
+
+    /// The skills offered when choosing an agent's skills: any unit manager may read them
+    /// (Plan06 U3), unlike the configuration list, which shows only managed units' skills.
+    pub async fn list_authoring_page(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        page: SkillPageRequest,
+    ) -> AppResult<SkillPage> {
+        self.verify_skill_manager(user_id, company_id).await?;
+        self.persistence
+            .list_authoring_page(company_id, page.validate()?)
             .await
     }
 
     pub async fn count_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<u64> {
-        self.authorize_read(user_id, company_id).await?;
-        self.persistence.count_company(company_id).await
+        let units = self.managed_units(user_id, company_id).await?;
+        self.persistence.count_company(company_id, &units).await
     }
 
     #[instrument(skip_all, fields(%user_id, %company_id, %skill_id))]
@@ -291,11 +397,51 @@ impl SkillUseCases {
         skill_id: Uuid,
         mut write: SkillWrite,
     ) -> AppResult<Skill> {
-        self.authorize_write(user_id, company_id).await?;
+        let (_, unit) = self
+            .managed_skill(user_id, company_id, skill_id)
+            .await?
+            .ok_or_else(skill_not_found)?;
         write.created_by = None;
         write.normalize()?;
         self.persistence
-            .update_company(company_id, skill_id, write)
+            .update_company(company_id, unit, skill_id, write)
+            .await
+    }
+
+    /// The units this person may put a skill in, and the one a new skill gets by default.
+    pub async fn unit_choices(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<(
+        Vec<crate::application::ports::administration::ManagedUnit>,
+        Option<Uuid>,
+    )> {
+        self.verify_skill_manager(user_id, company_id).await?;
+        let company = crate::domain::workflow::CompanyId::new(company_id);
+        let units = self
+            .companies
+            .managed_unit_choices(user_id, company)
+            .await?;
+        let default = self
+            .companies
+            .default_resource_unit(user_id, company)
+            .await?
+            .map(|unit| unit.as_uuid());
+        Ok((units, default))
+    }
+
+    #[instrument(skip_all, fields(%user_id, %company_id, %skill_id))]
+    pub async fn move_company(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        skill_id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        self.verify_skill_manager(user_id, company_id).await?;
+        self.persistence
+            .move_company(user_id, company_id, skill_id, target)
             .await
     }
 
@@ -306,8 +452,13 @@ impl SkillUseCases {
         company_id: Uuid,
         skill_id: Uuid,
     ) -> AppResult<()> {
-        self.authorize_write(user_id, company_id).await?;
-        self.persistence.delete_company(company_id, skill_id).await
+        let (_, unit) = self
+            .managed_skill(user_id, company_id, skill_id)
+            .await?
+            .ok_or_else(skill_not_found)?;
+        self.persistence
+            .delete_company(company_id, unit, skill_id)
+            .await
     }
 
     /// Insert a company-owned copy of a global library skill.
@@ -316,11 +467,17 @@ impl SkillUseCases {
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        unit: Option<Uuid>,
         skill_id: Uuid,
     ) -> AppResult<Skill> {
-        self.authorize_write(user_id, company_id).await?;
+        let unit = self.creation_unit(user_id, company_id, unit).await?;
         self.persistence
-            .copy_library_to_company(company_id, skill_id, CreationProvenance::user(user_id))
+            .copy_library_to_company(
+                company_id,
+                unit,
+                skill_id,
+                CreationProvenance::user(user_id),
+            )
             .await
     }
 
@@ -481,6 +638,7 @@ mod tests {
     fn skill() -> Skill {
         let now = Utc::now();
         Skill {
+            unit_id: None,
             files: Vec::new(),
             id: Uuid::new_v4(),
             company_id: Some(Uuid::new_v4()),

@@ -91,6 +91,7 @@ async fn copy(p: &PostgresPersistence, request: &CopyRequest) -> Skill {
     } else {
         p.copy_library_to_company(
             request.company,
+            p.test_root_unit(request.company).await,
             request.source.id,
             CreationProvenance::system(),
         )
@@ -110,7 +111,7 @@ async fn skill_bundle_competing_editor_and_both_copy_paths_keep_one_revision_dur
         let mut blocker = database.pool.begin().await.unwrap();
         insert_skill(
             &mut *blocker,
-            Some(request.company),
+            Some((request.company, p.test_root_unit(request.company).await)),
             &skill_write("coherent-copy"),
         )
         .await

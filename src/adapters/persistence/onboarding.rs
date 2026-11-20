@@ -216,9 +216,13 @@ impl Session {
     /// One agent through company-agent creation, with its default desk (01DEP-P03-D4).
     async fn insert(&mut self, mut prepared: PreparedAgent) -> AppResult<()> {
         if let Some(library_id) = prepared.library_id {
+            // Onboarding agents are unplaced, so their copied skills are the root's.
+            let root =
+                super::company::root_on(&mut self.tx, CompanyId::new(self.company_id)).await?;
             prepare_library_agent_on(
                 &mut self.tx,
                 self.company_id,
+                root.as_uuid(),
                 library_id,
                 &mut prepared.write,
             )

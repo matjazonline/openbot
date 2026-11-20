@@ -9,7 +9,7 @@ use crate::application::{
 };
 use crate::entities::mcp::{CompanyMcpConnection, McpAuth, McpEndpoint};
 use crate::use_cases::{
-    company::{CompanyPersistence, CompanyUseCases, CompanyWrite},
+    company::{CompanyPersistence, CompanyWrite},
     mcp::{McpConnectionWrite, McpPersistence, McpUseCases},
     user::UserPersistence,
 };
@@ -92,6 +92,7 @@ async fn connections(
         .create_http(
             CompanyId::new(company),
             WorkflowActor::authenticated(owner).unwrap(),
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://example.test").unwrap(),
                 bearer: false,
@@ -102,6 +103,7 @@ async fn connections(
     let mcp = p
         .create_mcp_connection(
             company,
+            p.test_root_unit(company).await,
             McpConnectionWrite {
                 slug: "server".into(),
                 endpoint: "https://example.test/mcp".to_string().try_into().unwrap(),
@@ -129,7 +131,6 @@ impl Fixture {
         let shared = Arc::new(p.clone());
         let s = ConnectionServices {
             workflow: crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).services(),
-            company_use_cases: Arc::new(CompanyUseCases::new(shared.clone())),
             mcp_use_cases: Arc::new(McpUseCases::new(
                 shared.clone(),
                 shared.clone(),
@@ -433,7 +434,7 @@ fn knowledge_run_level_connection_payloads_are_strict_bounded_and_forms_keep_pro
             .command(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4())
             .is_err()
     );
-    let actor = LevelActor {
+    let actor = crate::entities::access_level::LevelActor {
         membership: crate::entities::company_member::CompanyMembership::Admin,
         access_level: AccessLevel::L3,
     };
@@ -471,10 +472,8 @@ async fn knowledge_run_level_race_live_admin_demotion_precedes_connection_level_
     let writer = tokio::spawn(async move { p.set_http_level(command).await });
     tokio::task::yield_now().await;
     demotion.commit().await.unwrap();
-    assert!(matches!(
-        writer.await.unwrap(),
-        Err(AppError::BadRequest(_))
-    ));
+    // A level above the actor's own is a refusal inside their authority: 403 (Plan07, Plan06 F10).
+    assert!(matches!(writer.await.unwrap(), Err(AppError::Forbidden(_))));
     let current =
         f.p.list_http(
             CompanyId::new(f.company),

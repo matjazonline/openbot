@@ -41,6 +41,10 @@ where
             "/api/companies/{company}/mcp-connections/{id}/refresh",
             post(refresh),
         )
+        .route(
+            "/api/companies/{company}/mcp-connections/{id}/move",
+            post(move_connection),
+        )
         .layer(DefaultBodyLimit::max(128 * 1024))
 }
 #[derive(Clone, Deserialize)]
@@ -53,6 +57,9 @@ pub struct Definition {
     pub auth: Authentication,
     #[serde(default)]
     pub tool_grants: Vec<Grant>,
+    /// The unit of a new connection (Plan07); absent, the creator's default unit.
+    #[serde(default)]
+    pub unit_id: Option<Uuid>,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -154,7 +161,8 @@ async fn create(
     Ok((
         StatusCode::CREATED,
         Json(projection(
-            &s.create(user.id, company, body.write(None)).await?,
+            &s.create(user.id, company, body.unit_id, body.write(None))
+                .await?,
         )),
     ))
 }
@@ -231,3 +239,16 @@ mod api_tests;
 #[cfg(test)]
 #[path = "mcp_schema_tests.rs"]
 mod schema_tests;
+
+/// Move a connection to another unit the person manages (Plan07 01B.4).
+async fn move_connection(
+    State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, id)): Path<(Uuid, Uuid)>,
+    Json(target): Json<crate::adapters::http::routes::unit_resources::UnitTarget>,
+) -> AppResult<Json<serde_json::Value>> {
+    let moved = s.move_to(user.id, company, id, target.unit_id).await?;
+    Ok(Json(
+        crate::adapters::http::routes::unit_resources::moved_json(&moved),
+    ))
+}

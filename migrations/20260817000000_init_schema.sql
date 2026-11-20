@@ -3797,6 +3797,9 @@ CREATE TABLE public.company_mcp_connections (
     credential_revision bigint DEFAULT 1 NOT NULL,
     discovery_json jsonb DEFAULT '[]'::jsonb NOT NULL,
     deleted_at timestamp with time zone,
+    -- The owning unit (Plan07). A deleted connection releases it, so it never pins a department.
+    unit_id uuid,
+    CONSTRAINT company_mcp_connections_unit_check CHECK (((deleted_at IS NULL) = (unit_id IS NOT NULL))),
     CONSTRAINT company_mcp_connections_auth_type_check CHECK ((auth_type = ANY (ARRAY['none'::text, 'bearer'::text]))),
     CONSTRAINT company_mcp_connections_deleted_check CHECK (deleted_at IS NULL OR NOT enabled),
     CONSTRAINT company_mcp_connections_credential_revision_check CHECK ((credential_revision > 0)),
@@ -4489,6 +4492,8 @@ $$;
 CREATE TABLE public.skills (
     id uuid NOT NULL,
     company_id uuid,
+    -- The owning unit of a company skill; library skills (no company) have none (Plan07).
+    unit_id uuid,
     slug public.citext NOT NULL,
     name text NOT NULL,
     description text NOT NULL,
@@ -4504,7 +4509,8 @@ CREATE TABLE public.skills (
     CONSTRAINT skills_description_bounded CHECK (((btrim(description) <> ''::text) AND (char_length(description) <= 500))),
     CONSTRAINT skills_instructions_bounded CHECK (((btrim(instructions) <> ''::text) AND (octet_length(instructions) <= 16384))),
     CONSTRAINT skills_name_bounded CHECK (((btrim(name) <> ''::text) AND (char_length(name) <= 120))),
-    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
+    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
+    CONSTRAINT skills_unit_check CHECK (((company_id IS NULL) = (unit_id IS NULL)))
 );
 
 
@@ -5552,6 +5558,8 @@ CREATE TABLE public.workflow_http_connections (
     bearer boolean NOT NULL,
     revision bigint DEFAULT 1 NOT NULL,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    -- The owning unit (Plan07).
+    unit_id uuid NOT NULL,
     CONSTRAINT workflow_http_connections_origin_check CHECK (((octet_length(origin) >= 8) AND (octet_length(origin) <= 2048))),
     CONSTRAINT workflow_http_connections_revision_check CHECK ((revision > 0))
 );
@@ -15823,6 +15831,41 @@ ALTER TABLE ONLY public.knowledge_documents
     ADD CONSTRAINT knowledge_documents_unit_fk FOREIGN KEY (company_id, unit_id)
         REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
 CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id);
+
+-- Skills and connections belong to a unit (Plan07): move them before deleting the department.
+-- Library skills and deleted MCP connections have no unit, which the composite key skips.
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.company_mcp_connections
+    ADD CONSTRAINT company_mcp_connections_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.workflow_http_connections
+    ADD CONSTRAINT workflow_http_connections_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX skills_unit_idx ON public.skills USING btree (company_id, unit_id);
+CREATE INDEX company_mcp_connections_unit_idx ON public.company_mcp_connections USING btree (company_id, unit_id);
+CREATE INDEX workflow_http_connections_unit_idx ON public.workflow_http_connections USING btree (company_id, unit_id);
+
+-- The unit a new skill or connection gets when its creator names none: the root for a root
+-- manager, else the one department they lead, else NULL (the creator must choose).
+CREATE FUNCTION public.resource_default_unit(checked_user uuid, checked_company uuid)
+    RETURNS uuid LANGUAGE sql STABLE AS $$
+    WITH led AS (
+        SELECT DISTINCT holder.department_id FROM public.principals AS principal
+        JOIN public.department_roles AS holder
+            ON holder.company_id=principal.company_id AND holder.principal_id=principal.id
+           AND holder.role='lead'
+        WHERE principal.company_id=checked_company AND principal.user_id=checked_user
+            AND principal.kind='person'
+        LIMIT 2
+    )
+    SELECT CASE
+        WHEN public.unit_management_role(checked_user,checked_company,NULL) IS NOT NULL
+            THEN (SELECT id FROM public.departments WHERE company_id=checked_company AND is_root)
+        WHEN (SELECT count(*) FROM led)=1 THEN (SELECT department_id FROM led)
+    END
+$$;
 
 -- Why `checked_department` may not sit under `proposed_parent`, or NULL when it may: 'cycle' when
 -- the parent is the department itself or one of its descendants; 'depth' when the department's

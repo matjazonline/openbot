@@ -90,6 +90,8 @@ async fn vault_binding_same_private_account_has_separate_http_and_mcp_grants() {
     let mcp = p
         .create_mcp_connection(
             setup.fixture.target.company.as_uuid(),
+            p.test_root_unit(setup.fixture.target.company.as_uuid())
+                .await,
             McpConnectionWrite {
                 slug: "vault-mcp".into(),
                 endpoint: McpEndpoint::try_from("https://mcp.example.test/rpc".to_string())
@@ -131,7 +133,7 @@ async fn vault_binding_same_private_account_has_separate_http_and_mcp_grants() {
     assert_ne!(http.id, other.id);
     assert_eq!(other.account, http.account);
     let current = p
-        .list_mcp_connections(mcp.company_id)
+        .list_mcp_connections(mcp.company_id, &p.test_all_units(mcp.company_id).await)
         .await
         .unwrap()
         .remove(0);
@@ -392,6 +394,7 @@ async fn vault_binding_company_teardown_preserves_other_real_company_grants_and_
         .create_http(
             CompanyId::new(company),
             setup.fixture.target.actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://other.example.test").unwrap(),
                 bearer: false,
@@ -443,4 +446,88 @@ async fn vault_binding_company_teardown_preserves_other_real_company_grants_and_
             .credential_source,
         CredentialSource::Integration(_)
     ));
+}
+
+/// Plan07 decision a: proposing, inspecting and confirming a Vault binding configure the
+/// connection, so they need its unit, including the proposer's at confirmation time.
+#[tokio::test]
+async fn unit_resource_authority_vault_binding_needs_the_connection_unit() {
+    let setup = Box::pin(setup("https://api.example.test", Entrance::Http)).await;
+    let p = &setup.fixture.persistence;
+    let company = setup.fixture.target.company;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    let unit = crate::entities::department::DepartmentId::new;
+    p.move_http(
+        company,
+        setup.fixture.target.actor,
+        setup.connection.id,
+        unit(billing),
+    )
+    .await
+    .unwrap();
+    let sibling = p.test_unit_lead(company.as_uuid(), support).await;
+    let lead = p.test_unit_lead(company.as_uuid(), billing).await;
+    let user = member(&setup).await;
+    let (vault, account) = account(&setup, user, "personal", "sentinel-private").await;
+    let host = PostgresIntegrationBindings {
+        persistence: p.clone(),
+        vault: vault.clone(),
+    };
+    let command = || ProposeBinding {
+        company: company.as_uuid(),
+        connection: setup.connection.id,
+        kind: BindingKind::Http,
+        app: integration::AppId::parse("static-bearer").unwrap(),
+        expected_revision: setup.connection.revision,
+    };
+    let target = crate::application::use_cases::integration_binding::BindingTarget {
+        company: company.as_uuid(),
+        connection: setup.connection.id,
+        kind: BindingKind::Http,
+    };
+    assert!(matches!(
+        host.propose(sibling, command()).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        host.source_info(sibling, target).await,
+        Err(AppError::NotFound(_))
+    ));
+    host.source_info(lead, target).await.unwrap();
+    let proposal = host.propose(lead, command()).await.unwrap();
+    // The connection leaves the proposer's unit before the account owner confirms.
+    p.move_http(
+        company,
+        setup.fixture.target.actor,
+        setup.connection.id,
+        unit(support),
+    )
+    .await
+    .unwrap();
+    assert!(
+        host.confirm(
+            owner(user),
+            proposal.id,
+            account.id,
+            account.authorization_revision
+        )
+        .await
+        .is_err()
+    );
+    let current = p
+        .list_http(company, setup.fixture.target.actor)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|connection| connection.id == setup.connection.id)
+        .unwrap();
+    assert!(
+        matches!(
+            current.credential_source,
+            crate::domain::integrations::authority::CredentialSource::None
+                | crate::domain::integrations::authority::CredentialSource::ConnectionBearer
+        ),
+        "no integration was bound"
+    );
 }

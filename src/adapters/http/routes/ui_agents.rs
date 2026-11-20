@@ -549,7 +549,7 @@ impl AgentSettingsView<'_> {
     async fn skills(&self) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
         Ok(self
             .skill_use_cases
-            .list_company_page(
+            .list_authoring_page(
                 self.user_id,
                 self.company.id,
                 SkillPageRequest {

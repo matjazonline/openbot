@@ -409,14 +409,26 @@ async fn workflow_mcp_refusals_and_protection_are_terminal_without_network() {
                 } else {
                     write.tool_grants.clear();
                 }
-                p.update_mcp_connection(company.as_uuid(), current.id, current.revision, write)
-                    .await
-                    .unwrap();
+                p.update_mcp_connection(
+                    company.as_uuid(),
+                    p.test_root_unit(company.as_uuid()).await,
+                    current.id,
+                    current.revision,
+                    write,
+                )
+                .await
+                .unwrap();
             }
             "token" => {
-                p.replace_mcp_token(company.as_uuid(), current.id, current.revision, None)
-                    .await
-                    .unwrap();
+                p.replace_mcp_token(
+                    company.as_uuid(),
+                    p.test_root_unit(company.as_uuid()).await,
+                    current.id,
+                    current.revision,
+                    None,
+                )
+                .await
+                .unwrap();
             }
             "operation" => {
                 p.revoke_mcp_operation(

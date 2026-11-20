@@ -192,4 +192,21 @@ impl crate::application::ports::administration::AdministrationPersistence for St
         // This double models no departments.
         Ok(Vec::new())
     }
+    async fn managed_unit_choices(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::application::ports::administration::ManagedUnit>>
+    {
+        // This double models no departments.
+        Ok(Vec::new())
+    }
+    async fn default_resource_unit(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Option<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(None)
+    }
 }

@@ -129,6 +129,7 @@ pub(in crate::adapters::persistence::workflow::tests) async fn configured(
         .create_http(
             company,
             actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse(origin).unwrap(),
                 bearer: true,

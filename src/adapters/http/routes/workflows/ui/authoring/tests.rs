@@ -486,8 +486,8 @@ async fn the_catalogue_lists_memory_steps_only_when_the_memory_service_is_config
 async fn approved_rows(f: &Fixture, slug: &str, tools: &[String]) -> Uuid {
     let connection = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO company_mcp_connections(company_id, id, slug, endpoint_url, enabled, auth_type) \
-         VALUES ($1, $2, $3, 'https://mcp.example.test/rpc/super-secret-token', true, 'none')",
+        "INSERT INTO company_mcp_connections(company_id, id, slug, endpoint_url, enabled, auth_type, unit_id) \
+         VALUES ($1, $2, $3, 'https://mcp.example.test/rpc/super-secret-token', true, 'none', (SELECT id FROM departments WHERE company_id=$1 AND is_root))",
     )
     .bind(f.company)
     .bind(connection)
@@ -543,6 +543,7 @@ async fn reviewed_connection_at(f: &Fixture, endpoint: &str) -> Uuid {
     let connection = McpPersistence::create_mcp_connection(
         &f.persistence,
         f.company,
+        f.persistence.test_root_unit(f.company).await,
         McpConnectionWrite {
             slug: "tickets-server".into(),
             endpoint: endpoint.to_string().try_into().unwrap(),

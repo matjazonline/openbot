@@ -26,6 +26,24 @@ where
             "/api/companies/{company_id}/skills/{skill_id}",
             get(company_get).put(company_update).delete(company_delete),
         )
+        .route(
+            "/api/companies/{company_id}/skills/{skill_id}/move",
+            post(company_move),
+        )
+}
+
+async fn company_move(
+    State(skills): State<Arc<SkillUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, id)): Path<(Uuid, Uuid)>,
+    Json(target): Json<crate::adapters::http::routes::unit_resources::UnitTarget>,
+) -> AppResult<Json<serde_json::Value>> {
+    let moved = skills
+        .move_company(user.id, company, id, target.unit_id)
+        .await?;
+    Ok(Json(
+        crate::adapters::http::routes::unit_resources::moved_json(&moved),
+    ))
 }
 
 async fn company_list(
@@ -61,11 +79,12 @@ async fn company_create(
     Path(company): Path<Uuid>,
     Json(payload): Json<SkillPayload>,
 ) -> AppResult<(StatusCode, Json<Skill>)> {
+    let unit = payload.unit_id;
     Ok((
         StatusCode::CREATED,
         Json(
             skills
-                .create_company(user.id, company, payload.into())
+                .create_company(user.id, company, unit, payload.into())
                 .await?,
         ),
     ))

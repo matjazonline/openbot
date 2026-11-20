@@ -14,6 +14,14 @@ pub enum BindingKind {
     Mcp,
 }
 impl BindingKind {
+    /// The unit-owned resource a binding configures (Plan07).
+    pub fn unit_resource(self) -> crate::application::ports::unit_resources::UnitResourceKind {
+        use crate::application::ports::unit_resources::UnitResourceKind;
+        match self {
+            Self::Http => UnitResourceKind::HttpConnection,
+            Self::Mcp => UnitResourceKind::McpConnection,
+        }
+    }
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Http => "http",

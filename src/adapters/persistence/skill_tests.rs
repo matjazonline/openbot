@@ -81,7 +81,11 @@ async fn a_company_skill_round_trips() {
     let persistence = PostgresPersistence::new(pool);
     let company_id = company(&persistence, "roundtrip").await;
     let created = persistence
-        .create_company(company_id, skill_write("invoice-review"))
+        .create_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill_write("invoice-review"),
+        )
         .await
         .unwrap();
     let loaded = persistence
@@ -105,7 +109,12 @@ async fn copying_a_library_skill_produces_a_company_owned_row_and_preserves_the_
         .await
         .unwrap();
     let copied = persistence
-        .copy_library_to_company(company_id, source.id, CreationProvenance::system())
+        .copy_library_to_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            source.id,
+            CreationProvenance::system(),
+        )
         .await
         .unwrap();
     assert_eq!(copied.company_id, Some(company_id));
@@ -130,10 +139,18 @@ async fn two_competing_library_skill_copies_receive_distinct_slugs() {
     .await
     .unwrap();
 
-    let first =
-        persistence.copy_library_to_company(company_id, source.id, CreationProvenance::system());
-    let second =
-        persistence.copy_library_to_company(company_id, source.id, CreationProvenance::system());
+    let first = persistence.copy_library_to_company(
+        company_id,
+        persistence.test_root_unit(company_id).await,
+        source.id,
+        CreationProvenance::system(),
+    );
+    let second = persistence.copy_library_to_company(
+        company_id,
+        persistence.test_root_unit(company_id).await,
+        source.id,
+        CreationProvenance::system(),
+    );
     let (first, second) = tokio::join!(first, second);
     let first = first.unwrap();
     let second = second.unwrap();
@@ -151,7 +168,11 @@ async fn another_companys_skill_is_not_readable_updatable_or_deletable() {
     let owner = company(&persistence, "owner").await;
     let intruder = company(&persistence, "intruder").await;
     let skill = persistence
-        .create_company(owner, skill_write("private-skill"))
+        .create_company(
+            owner,
+            persistence.test_root_unit(owner).await,
+            skill_write("private-skill"),
+        )
         .await
         .unwrap();
 
@@ -164,13 +185,22 @@ async fn another_companys_skill_is_not_readable_updatable_or_deletable() {
     );
     assert!(
         persistence
-            .update_company(intruder, skill.id, skill_write("stolen"))
+            .update_company(
+                intruder,
+                persistence.test_root_unit(intruder).await,
+                skill.id,
+                skill_write("stolen")
+            )
             .await
             .is_err()
     );
     assert!(
         persistence
-            .delete_company(intruder, skill.id)
+            .delete_company(
+                intruder,
+                persistence.test_root_unit(intruder).await,
+                skill.id
+            )
             .await
             .is_err()
     );
@@ -192,11 +222,19 @@ async fn capability_selection_is_scoped_and_updates_atomically() {
     let company_id = company(&persistence, "atomic").await;
     let other_company_id = company(&persistence, "atomic-other").await;
     let skill = persistence
-        .create_company(company_id, skill_write("owned-skill"))
+        .create_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill_write("owned-skill"),
+        )
         .await
         .unwrap();
     let foreign = persistence
-        .create_company(other_company_id, skill_write("foreign-skill"))
+        .create_company(
+            other_company_id,
+            persistence.test_root_unit(other_company_id).await,
+            skill_write("foreign-skill"),
+        )
         .await
         .unwrap();
     let agent = AgentPersistence::create(&persistence, company_id, agent_write("atomic-agent"))
@@ -239,11 +277,19 @@ async fn a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relatio
     let persistence = Arc::new(PostgresPersistence::new(pool));
     let company_id = company(&persistence, "snapshot-version").await;
     let first = persistence
-        .create_company(company_id, skill_write("snapshot-first"))
+        .create_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill_write("snapshot-first"),
+        )
         .await
         .unwrap();
     let second = persistence
-        .create_company(company_id, skill_write("snapshot-second"))
+        .create_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill_write("snapshot-second"),
+        )
         .await
         .unwrap();
     let agent = AgentPersistence::create(
@@ -315,7 +361,11 @@ async fn deleting_either_side_cascades_a_company_agent_skill_selection() {
     let persistence = PostgresPersistence::new(pool.clone());
     let company_id = company(&persistence, "cascade").await;
     let skill = persistence
-        .create_company(company_id, skill_write("cascade-skill"))
+        .create_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill_write("cascade-skill"),
+        )
         .await
         .unwrap();
     let mut write = agent_write("cascade-agent");
@@ -344,7 +394,11 @@ async fn deleting_either_side_cascades_a_company_agent_skill_selection() {
         .await
         .unwrap();
     persistence
-        .delete_company(company_id, skill.id)
+        .delete_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill.id,
+        )
         .await
         .unwrap();
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM agent_skills WHERE skill_id = $1")
@@ -402,9 +456,14 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
     let company_id = company(&persistence, "agent-copy").await;
     let bundled = bundled_skill_write();
     // Force the shared indirect-copy path to choose a new native identity.
-    SkillManagementPersistence::create_company(&persistence, company_id, bundled.clone())
-        .await
-        .unwrap();
+    SkillManagementPersistence::create_company(
+        &persistence,
+        company_id,
+        persistence.test_root_unit(company_id).await,
+        bundled.clone(),
+    )
+    .await
+    .unwrap();
     let source_skill = SkillManagementPersistence::create_library(&persistence, bundled)
         .await
         .unwrap();
@@ -487,7 +546,11 @@ async fn database_bounds_skill_positions() {
     let persistence = PostgresPersistence::new(pool.clone());
     let company_id = company(&persistence, "bounds").await;
     let skill = persistence
-        .create_company(company_id, skill_write("bounded-skill"))
+        .create_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill_write("bounded-skill"),
+        )
         .await
         .unwrap();
     let agent = AgentPersistence::create(&persistence, company_id, agent_write("bounded-agent"))
@@ -512,7 +575,11 @@ async fn database_scope_trigger_refuses_live_cross_library_skill_links() {
     let persistence = PostgresPersistence::new(pool.clone());
     let company_id = company(&persistence, "scope-trigger").await;
     let company_skill = persistence
-        .create_company(company_id, skill_write("company-only"))
+        .create_company(
+            company_id,
+            persistence.test_root_unit(company_id).await,
+            skill_write("company-only"),
+        )
         .await
         .unwrap();
     let library_skill = SkillManagementPersistence::create_library(
@@ -566,8 +633,8 @@ async fn a_stored_skill_the_domain_refuses_is_a_contextual_conversion_error() {
     let company_id = company(&persistence, "malformed").await;
     let id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO skills (id, company_id, slug, name, description, instructions, created_by) \
-         VALUES ($1, $2, 'malformed', 'Malformed', 'Malformed row.', $3, $4)",
+        "INSERT INTO skills (id, company_id, slug, name, description, instructions, created_by, unit_id) \
+         VALUES ($1, $2, 'malformed', 'Malformed', 'Malformed row.', $3, $4, (SELECT id FROM departments WHERE company_id=$2 AND is_root))",
     )
     .bind(id)
     .bind(company_id)

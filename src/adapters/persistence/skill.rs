@@ -16,16 +16,18 @@ use crate::{
 };
 
 pub(crate) const SKILL_COLUMNS: &str = "\
-    skill.id, skill.company_id, skill.slug::text AS slug, skill.name, skill.description, \
-    skill.instructions, skill.created_by, skill.created_at, skill.updated_at, skill.files";
+    skill.id, skill.company_id, skill.unit_id, skill.slug::text AS slug, skill.name, \
+    skill.description, skill.instructions, skill.created_by, skill.created_at, skill.updated_at, \
+    skill.files";
 
-const SKILL_SUMMARY_COLUMNS: &str = "skill.id, skill.company_id, skill.slug::text AS slug, \
+const SKILL_SUMMARY_COLUMNS: &str = "skill.id, skill.company_id, skill.unit_id, skill.slug::text AS slug, \
     skill.name, skill.description, skill.updated_at, jsonb_array_length(skill.files) AS file_count";
 
 #[derive(sqlx::FromRow)]
 struct SkillSummaryDb {
     id: Uuid,
     company_id: Option<Uuid>,
+    unit_id: Option<Uuid>,
     slug: String,
     name: String,
     description: String,
@@ -39,6 +41,7 @@ impl TryFrom<SkillSummaryDb> for SkillSummary {
         let summary = Self {
             id: row.id,
             company_id: row.company_id,
+            unit_id: row.unit_id,
             slug: SkillSlug::parse(&row.slug).map_err(|_| invalid())?,
             name: row.name,
             description: row.description,
@@ -54,6 +57,7 @@ impl TryFrom<SkillSummaryDb> for SkillSummary {
 pub(crate) struct SkillDb {
     id: Uuid,
     company_id: Option<Uuid>,
+    unit_id: Option<Uuid>,
     slug: String,
     name: String,
     description: String,
@@ -79,6 +83,7 @@ impl TryFrom<SkillDb> for Skill {
         let skill = Skill {
             id,
             company_id: row.company_id,
+            unit_id: row.unit_id,
             slug: SkillSlug::parse(&row.slug)
                 .map_err(|error| AppError::Internal(format!("Invalid skill {id} slug: {error}")))?,
             name: row.name,
@@ -141,7 +146,7 @@ fn delete_error(error: sqlx::Error) -> AppError {
 
 async fn insert_skill<'e, E>(
     executor: E,
-    company_id: Option<Uuid>,
+    owner: Option<(Uuid, Uuid)>,
     write: &SkillWrite,
 ) -> AppResult<Skill>
 where
@@ -152,12 +157,12 @@ where
     let created_by = encode_provenance(&validated)?;
     let row = sqlx::query_as::<_, SkillDb>(&format!(
         "INSERT INTO skills AS skill \
-             (id, company_id, slug, name, description, instructions, created_by, required_tools, files) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, '{{}}'::text[]), $9) \
+             (id, company_id, unit_id, slug, name, description, instructions, created_by, required_tools, files) \
+         VALUES ($1, $2, $10, $3, $4, $5, $6, $7, COALESCE($8, '{{}}'::text[]), $9) \
          RETURNING {SKILL_COLUMNS}"
     ))
     .bind(Uuid::new_v4())
-    .bind(company_id)
+    .bind(owner.map(|(company, _)| company))
     .bind(&validated.slug)
     .bind(&validated.name)
     .bind(&validated.description)
@@ -171,6 +176,7 @@ where
     }))
     .bind(serde_json::to_value(validated.files.as_deref().unwrap_or_default())
         .map_err(|_| AppError::BadRequest("Invalid skill assets".into()))?)
+    .bind(owner.map(|(_, unit)| unit))
     .fetch_one(executor)
     .await
     .map_err(write_error)?;
@@ -190,6 +196,7 @@ fn copied_slug(original: &str, suffix: u8) -> String {
 pub(crate) async fn copy_library_skill_on(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
+    unit_id: Uuid,
     skill_id: Uuid,
     created_by: &CreationProvenance,
 ) -> AppResult<Skill> {
@@ -221,8 +228,8 @@ pub(crate) async fn copy_library_skill_on(
         }
         let row = sqlx::query_as::<_, SkillDb>(&format!(
             "INSERT INTO skills AS skill \
-                 (id, company_id, slug, name, description, instructions, created_by, required_tools, files) \
-             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9 \
+                 (id, company_id, unit_id, slug, name, description, instructions, created_by, required_tools, files) \
+             SELECT $1, $2, $11, $3, $4, $5, $6, $7, $8, $9 \
              FROM skills AS source WHERE source.id = $10 AND source.company_id IS NULL \
              ON CONFLICT (company_id, slug) DO NOTHING \
              RETURNING {SKILL_COLUMNS}"
@@ -237,6 +244,7 @@ pub(crate) async fn copy_library_skill_on(
         .bind(&captured.required_tools)
         .bind(sqlx::types::Json(&source.files))
         .bind(skill_id)
+        .bind(unit_id)
         .fetch_optional(&mut **transaction)
         .await
         .map_err(write_error)?;
@@ -252,8 +260,13 @@ pub(crate) async fn copy_library_skill_on(
 
 #[async_trait]
 impl SkillManagementPersistence for PostgresPersistence {
-    async fn create_company(&self, company_id: Uuid, write: SkillWrite) -> AppResult<Skill> {
-        insert_skill(&self.pool, Some(company_id), &write).await
+    async fn create_company(
+        &self,
+        company_id: Uuid,
+        unit_id: Uuid,
+        write: SkillWrite,
+    ) -> AppResult<Skill> {
+        insert_skill(&self.pool, Some((company_id, unit_id)), &write).await
     }
 
     async fn create_library(&self, write: SkillWrite) -> AppResult<Skill> {
@@ -263,12 +276,14 @@ impl SkillManagementPersistence for PostgresPersistence {
     async fn copy_library_to_company(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         skill_id: Uuid,
         created_by: CreationProvenance,
     ) -> AppResult<Skill> {
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let skill =
-            copy_library_skill_on(&mut transaction, company_id, skill_id, &created_by).await?;
+            copy_library_skill_on(&mut transaction, company_id, unit_id, skill_id, &created_by)
+                .await?;
         transaction.commit().await.map_err(AppError::from)?;
         Ok(skill)
     }
@@ -298,16 +313,31 @@ impl SkillManagementPersistence for PostgresPersistence {
         row.map(TryInto::try_into).transpose()
     }
 
+    async fn list_authoring_page(
+        &self,
+        company_id: Uuid,
+        page: SkillPageRequest,
+    ) -> AppResult<SkillPage> {
+        let units: Vec<Uuid> =
+            sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1")
+                .bind(company_id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(AppError::from)?;
+        self.list_company_page(company_id, &units, page).await
+    }
+
     async fn list_company_page(
         &self,
         company_id: Uuid,
+        units: &[Uuid],
         page: SkillPageRequest,
     ) -> AppResult<SkillPage> {
         let before_at = page.before.map(|cursor| cursor.updated_at);
         let before_id = page.before.map(|cursor| cursor.id);
         let rows = sqlx::query_as::<_, SkillSummaryDb>(&format!(
             "SELECT {SKILL_SUMMARY_COLUMNS} FROM skills AS skill \
-             WHERE skill.company_id = $1 \
+             WHERE skill.company_id = $1 AND skill.unit_id = ANY($5) \
                AND ($2::timestamptz IS NULL OR (skill.updated_at, skill.id) < ($2, $3)) \
              ORDER BY skill.updated_at DESC, skill.id DESC LIMIT $4"
         ))
@@ -315,6 +345,7 @@ impl SkillManagementPersistence for PostgresPersistence {
         .bind(before_at)
         .bind(before_id)
         .bind(i64::from(page.limit) + 1)
+        .bind(units)
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
@@ -325,13 +356,15 @@ impl SkillManagementPersistence for PostgresPersistence {
         Ok(SkillPage::from_probe(skills, page.limit))
     }
 
-    async fn count_company(&self, company_id: Uuid) -> AppResult<u64> {
-        let count =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM skills WHERE company_id = $1")
-                .bind(company_id)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(AppError::from)?;
+    async fn count_company(&self, company_id: Uuid, units: &[Uuid]) -> AppResult<u64> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM skills WHERE company_id = $1 AND unit_id = ANY($2)",
+        )
+        .bind(company_id)
+        .bind(units)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
         u64::try_from(count)
             .map_err(|_| AppError::Internal("A company skill count was negative.".into()))
     }
@@ -361,29 +394,59 @@ impl SkillManagementPersistence for PostgresPersistence {
     async fn update_company(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         skill_id: Uuid,
         write: SkillWrite,
     ) -> AppResult<Skill> {
-        update_skill(&self.pool, Some(company_id), skill_id, &write).await
+        update_skill(&self.pool, Some((company_id, unit_id)), skill_id, &write).await
     }
 
     async fn update_library(&self, skill_id: Uuid, write: SkillWrite) -> AppResult<Skill> {
         update_skill(&self.pool, None, skill_id, &write).await
     }
 
-    async fn delete_company(&self, company_id: Uuid, skill_id: Uuid) -> AppResult<()> {
-        let result = sqlx::query("DELETE FROM skills WHERE company_id = $1 AND id = $2")
-            .bind(company_id)
-            .bind(skill_id)
-            .execute(&self.pool)
-            .await
-            .map_err(delete_error)?;
+    async fn delete_company(
+        &self,
+        company_id: Uuid,
+        unit_id: Uuid,
+        skill_id: Uuid,
+    ) -> AppResult<()> {
+        // The unit is the one whose manager was authorized; a concurrent move leaves nothing.
+        let result =
+            sqlx::query("DELETE FROM skills WHERE company_id = $1 AND id = $2 AND unit_id = $3")
+                .bind(company_id)
+                .bind(skill_id)
+                .bind(unit_id)
+                .execute(&self.pool)
+                .await
+                .map_err(delete_error)?;
         if result.rows_affected() == 0 {
             return Err(AppError::NotFound(
                 "Skill not found in this company.".into(),
             ));
         }
         Ok(())
+    }
+
+    async fn move_company(
+        &self,
+        actor: Uuid,
+        company_id: Uuid,
+        skill_id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        let mut tx = self.pool.begin().await?;
+        let moved = super::unit_resources::move_resource_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(actor)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::application::ports::unit_resources::UnitResourceKind::Skill,
+            skill_id,
+            crate::entities::department::DepartmentId::new(target),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(moved)
     }
 
     async fn delete_library(&self, skill_id: Uuid) -> AppResult<()> {
@@ -401,7 +464,7 @@ impl SkillManagementPersistence for PostgresPersistence {
 
 async fn update_skill<'e, E>(
     executor: E,
-    company_id: Option<Uuid>,
+    owner: Option<(Uuid, Uuid)>,
     skill_id: Uuid,
     write: &SkillWrite,
 ) -> AppResult<Skill>
@@ -415,6 +478,7 @@ where
              instructions = $4, required_tools = COALESCE($7, skill.required_tools), \
              files = COALESCE($8, skill.files), updated_at = CURRENT_TIMESTAMP \
          WHERE skill.id = $5 AND skill.company_id IS NOT DISTINCT FROM $6 \
+           AND skill.unit_id IS NOT DISTINCT FROM $9 \
          RETURNING {SKILL_COLUMNS}"
     ))
     .bind(&validated.slug)
@@ -422,7 +486,7 @@ where
     .bind(&validated.description)
     .bind(&validated.instructions)
     .bind(skill_id)
-    .bind(company_id)
+    .bind(owner.map(|(company, _)| company))
     .bind(validated.required_tools.as_ref().map(|names| {
         names
             .iter()
@@ -437,6 +501,7 @@ where
             .transpose()
             .map_err(|_| AppError::BadRequest("Invalid skill assets".into()))?,
     )
+    .bind(owner.map(|(_, unit)| unit))
     .fetch_optional(executor)
     .await
     .map_err(write_error)?

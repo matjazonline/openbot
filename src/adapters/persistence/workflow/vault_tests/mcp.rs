@@ -174,6 +174,7 @@ async fn vault_binding_mcp_definition_edits_preserve_the_confirmed_source_and_re
     let saved = p
         .update_mcp_connection(
             current.company_id,
+            p.test_root_unit(current.company_id).await,
             current.id,
             current.revision,
             definition.clone(),
@@ -191,9 +192,15 @@ async fn vault_binding_mcp_definition_edits_preserve_the_confirmed_source_and_re
         _ => panic!("integration source"),
     };
     assert!(
-        p.update_mcp_connection(saved.company_id, saved.id, saved.revision, forged)
-            .await
-            .is_err()
+        p.update_mcp_connection(
+            saved.company_id,
+            p.test_root_unit(saved.company_id).await,
+            saved.id,
+            saved.revision,
+            forged
+        )
+        .await
+        .is_err()
     );
     assert!(f.setup.server.log().is_empty());
 }

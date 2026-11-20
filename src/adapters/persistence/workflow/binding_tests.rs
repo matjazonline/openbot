@@ -147,7 +147,14 @@ impl BindingFixture {
         let connection = self
             .fixture
             .persistence
-            .create_mcp_connection(self.target.company.as_uuid(), mcp_write(slot))
+            .create_mcp_connection(
+                self.target.company.as_uuid(),
+                self.fixture
+                    .persistence
+                    .test_root_unit(self.target.company.as_uuid())
+                    .await,
+                mcp_write(slot),
+            )
             .await
             .unwrap();
         self.resources.insert(
@@ -381,9 +388,15 @@ async fn workflow_binding_sql_mcp_revocation_readiness_and_contract_scope() {
     assert!(status.supported_contracts.is_empty());
     let mut write = mcp_write("service");
     write.auth = McpAuth::Bearer;
-    p.update_mcp_connection(f.target.company.as_uuid(), id, 1, write)
-        .await
-        .unwrap();
+    p.update_mcp_connection(
+        f.target.company.as_uuid(),
+        p.test_root_unit(f.target.company.as_uuid()).await,
+        id,
+        1,
+        write,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         p.inspect(f.target.company, f.target.actor, RuntimeResourceId::new(id))
             .await
@@ -448,7 +461,11 @@ async fn workflow_binding_sql_changed_configuration_roundtrips_without_mutating_
     let mut write = mcp_write("service");
     write.slug = "replacement".into();
     let replacement = p
-        .create_mcp_connection(f.target.company.as_uuid(), write)
+        .create_mcp_connection(
+            f.target.company.as_uuid(),
+            p.test_root_unit(f.target.company.as_uuid()).await,
+            write,
+        )
         .await
         .unwrap();
     let mut request = f.request(Some(active.revision));
@@ -493,4 +510,64 @@ async fn workflow_binding_sql_changed_configuration_roundtrips_without_mutating_
         active.configuration.resources()[&ResourceName::parse("service").unwrap()].as_uuid(),
         old_resource
     );
+}
+
+/// Plan07 01B.4: a move names active bindings whose current configuration maps a slot to the
+/// connection, not those that mapped it in an earlier configuration.
+#[tokio::test]
+async fn unit_resource_move_lists_active_bindings_of_the_current_configuration() {
+    let mut f = BindingFixture::new(json!([{"slot":"service","kind":"mcp"}])).await;
+    let old_resource = f.mcp().await;
+    let configured = f.service().configure(f.request(None)).await.unwrap();
+    let active = f
+        .service()
+        .activate(SetBindingActivity {
+            target: f.target,
+            expected: configured.revision,
+        })
+        .await
+        .unwrap();
+    let p = &f.fixture.persistence;
+    let company = f.target.company.as_uuid();
+    let owner = f.target.actor.user_id();
+    let billing = p.test_unit(company, "billing").await;
+    let moved = p
+        .move_mcp_connection(owner, company, old_resource, billing)
+        .await
+        .unwrap();
+    assert_eq!(
+        moved
+            .uses
+            .iter()
+            .map(|used| (used.kind, used.id))
+            .collect::<Vec<_>>(),
+        vec![(
+            crate::application::ports::unit_resources::ResourceUseKind::Binding,
+            f.target.binding.as_uuid()
+        )]
+    );
+    // Reconfigured onto another connection, the binding no longer uses the old one.
+    let mut write = mcp_write("service");
+    write.slug = "replacement".into();
+    let replacement = p
+        .create_mcp_connection(company, p.test_root_unit(company).await, write)
+        .await
+        .unwrap();
+    let mut request = f.request(Some(active.revision));
+    request.resources.insert(
+        ResourceName::parse("service").unwrap(),
+        RuntimeResourceId::new(replacement.id),
+    );
+    f.service().configure(request).await.unwrap();
+    let root = p.test_root_unit(company).await;
+    let moved = p
+        .move_mcp_connection(owner, company, old_resource, root)
+        .await
+        .unwrap();
+    assert!(moved.uses.is_empty() && moved.more_uses == 0, "{moved:?}");
+    let moved = p
+        .move_mcp_connection(owner, company, replacement.id, billing)
+        .await
+        .unwrap();
+    assert_eq!(moved.uses.len(), 1);
 }

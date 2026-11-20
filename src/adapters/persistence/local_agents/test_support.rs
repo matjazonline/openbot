@@ -257,6 +257,7 @@ pub(crate) async fn native_mcp_binding(
     let connection = p
         .create_mcp_connection(
             tenant,
+            p.test_root_unit(tenant).await,
             McpConnectionWrite {
                 slug: "native-crm".into(),
                 endpoint: endpoint.to_owned().try_into().unwrap(),

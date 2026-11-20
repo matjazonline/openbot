@@ -189,7 +189,8 @@ impl action_dispatch::SqlActionAuthority for McpActionAuthority {
     }
 }
 
-/// Registration and revocation lock the company (authorize_company), then the connection.
+/// Registration and revocation lock the company and person, require managing the connection's
+/// unit (Plan07), then lock the connection.
 async fn edit_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
@@ -197,7 +198,14 @@ async fn edit_on(
     id: Uuid,
     catalog_revision: i64,
 ) -> AppResult<CompanyMcpConnection> {
-    authority::authorize_company(tx, company, actor).await?;
+    crate::adapters::persistence::unit_resources::authorize_resource_on(
+        tx,
+        actor,
+        company,
+        crate::application::ports::unit_resources::UnitResourceKind::McpConnection,
+        id,
+    )
+    .await?;
     sqlx::query("SELECT id FROM company_mcp_connections WHERE company_id=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE")
         .bind(company.as_uuid()).bind(id).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
     let connection = crate::adapters::persistence::mcp::connection_on(tx, company.as_uuid(), id)

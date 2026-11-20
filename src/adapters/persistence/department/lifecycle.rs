@@ -238,6 +238,28 @@ async fn guard_department_delete_on(
             current.name
         )));
     }
+    // Skills and connections belong to a unit (Plan07); the foreign keys enforce this and the
+    // message names what to move first.
+    let (owned, total) = crate::adapters::persistence::unit_resources::owned_resources_on(
+        tx,
+        company.as_uuid(),
+        department.as_uuid(),
+        10,
+    )
+    .await?;
+    if total > 0 {
+        let more = total - owned.len() as i64;
+        let more = if more > 0 {
+            format!(" (and {more} more)")
+        } else {
+            String::new()
+        };
+        return Err(AppError::Conflict(format!(
+            "Department '{}' still owns skills or connections: {}{more}. Move them first.",
+            current.name,
+            owned.join(", "),
+        )));
+    }
     let owns_definitions: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM workflow_definitions WHERE company_id=$1 AND managing_department_id=$2)",
     ).bind(company.as_uuid()).bind(department.as_uuid()).fetch_one(&mut **tx).await?;

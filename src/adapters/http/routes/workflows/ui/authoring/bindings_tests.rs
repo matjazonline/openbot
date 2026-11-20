@@ -577,8 +577,8 @@ async fn a_resource_that_is_not_ready_is_refused_as_such_on_create_configure_and
     let (unready, ready) = (Uuid::new_v4(), Uuid::new_v4());
     for id in [unready, ready] {
         sqlx::query(
-            "INSERT INTO workflow_http_connections (company_id, id, origin, enabled, bearer) \
-             VALUES ($1, $2, $3, true, true)",
+            "INSERT INTO workflow_http_connections (company_id, id, origin, enabled, bearer, unit_id) \
+             VALUES ($1, $2, $3, true, true, (SELECT id FROM departments WHERE company_id=$1 AND is_root))",
         )
         .bind(f.company)
         .bind(id)

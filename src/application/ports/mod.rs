@@ -6,3 +6,4 @@ pub mod department;
 pub mod integration;
 pub mod participant;
 pub mod thread;
+pub mod unit_resources;

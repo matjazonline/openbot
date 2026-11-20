@@ -74,6 +74,10 @@ where
                 .delete(delete_company_skill),
         )
         .route(
+            "/ui/companies/{company_id}/skills/{skill_id}/move",
+            post(move_company_skill),
+        )
+        .route(
             "/ui/skill-library",
             get(library_workspace).post(create_library_skill),
         )
@@ -176,17 +180,31 @@ struct SkillForm {
     description: String,
     #[serde(default)]
     instructions: String,
+    /// The unit of a new company skill (Plan07); ignored on update, which keeps the unit.
+    #[serde(default)]
+    unit_id: Option<String>,
+}
+
+/// An optional unit id from a form; an empty value means none was chosen.
+pub(super) fn form_unit(value: Option<&str>) -> AppResult<Option<Uuid>> {
+    value
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            Uuid::parse_str(value).map_err(|_| AppError::BadRequest("Choose a unit.".into()))
+        })
+        .transpose()
 }
 
 impl SkillForm {
-    fn into_draft(self, id: Option<Uuid>) -> pages::SkillDraft {
-        pages::SkillDraft {
+    fn into_draft(self, id: Option<Uuid>) -> AppResult<pages::SkillDraft> {
+        Ok(pages::SkillDraft {
+            unit_id: form_unit(self.unit_id.as_deref())?,
             id,
             slug: self.slug,
             name: self.name,
             description: self.description,
             instructions: self.instructions,
-        }
+        })
     }
 }
 
@@ -214,6 +232,7 @@ async fn company_page(
     let page = skills
         .list_company_page(user_id, company_id, page_request(query)?)
         .await?;
+    let (units, default_unit) = skills.unit_choices(user_id, company_id).await?;
     let base = format!("/ui/companies?company_id={company_id}&tab=skills");
     let (previous, next) = page_urls(&base, query, &page);
     Ok(pages::company_skills_section(&pages::SkillSection {
@@ -225,6 +244,8 @@ async fn company_page(
         error,
         notice,
         editable: true,
+        units: &units,
+        default_unit,
     }))
 }
 
@@ -249,6 +270,8 @@ async fn library_page(
         error,
         notice,
         editable: true,
+        units: &[],
+        default_unit: None,
     }))
 }
 
@@ -258,7 +281,7 @@ async fn company_section(
     Path(company_id): Path<Uuid>,
     Query(query): Query<PageQuery>,
 ) -> AppResult<Html<String>> {
-    skills.verify_company_owner(user.id, company_id).await?;
+    skills.verify_skill_manager(user.id, company_id).await?;
     Ok(Html(
         company_page(&skills, user.id, company_id, &query, None, None, None).await?,
     ))
@@ -269,7 +292,6 @@ async fn company_skill(
     user: AuthenticatedUser,
     Path((company_id, skill_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
-    skills.verify_company_owner(user.id, company_id).await?;
     let skill = skills
         .get_company(user.id, company_id, skill_id)
         .await?
@@ -320,11 +342,15 @@ async fn save_company(
     skill_id: Option<Uuid>,
     form: SkillForm,
 ) -> AppResult<Response> {
-    let draft = form.into_draft(skill_id);
+    let draft = form.into_draft(skill_id)?;
     let write = write_from_draft(&draft);
     let saved = match skill_id {
         Some(id) => skills.update_company(user_id, company_id, id, write).await,
-        None => skills.create_company(user_id, company_id, write).await,
+        None => {
+            skills
+                .create_company(user_id, company_id, draft.unit_id, write)
+                .await
+        }
     };
     match saved {
         Ok(_) => Ok(Html(
@@ -380,6 +406,43 @@ async fn delete_company_skill(
 #[derive(Deserialize)]
 struct LibraryPick {
     skill_id: Uuid,
+    #[serde(default)]
+    unit_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct UnitPick {
+    unit_id: Uuid,
+}
+
+/// Move a company skill to another unit the person manages (Plan07 01B.4).
+async fn move_company_skill(
+    State(skills): State<Arc<SkillUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, skill_id)): Path<(Uuid, Uuid)>,
+    Form(pick): Form<UnitPick>,
+) -> AppResult<Html<String>> {
+    let moved = skills
+        .move_company(user.id, company_id, skill_id, pick.unit_id)
+        .await?;
+    let skill = skills
+        .get_company(user.id, company_id, skill_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Skill not found in this company.".into()))?;
+    let draft = pages::SkillDraft::stored(&skill);
+    let notice = pages::moved_notice(&moved);
+    Ok(Html(
+        company_page(
+            &skills,
+            user.id,
+            company_id,
+            &PageQuery::default(),
+            Some(&draft),
+            None,
+            Some(&notice),
+        )
+        .await?,
+    ))
 }
 
 async fn copy_company_skill(
@@ -389,7 +452,12 @@ async fn copy_company_skill(
     Form(pick): Form<LibraryPick>,
 ) -> AppResult<Html<String>> {
     skills
-        .create_skill_from_library(user.id, company_id, pick.skill_id)
+        .create_skill_from_library(
+            user.id,
+            company_id,
+            form_unit(pick.unit_id.as_deref())?,
+            pick.skill_id,
+        )
         .await?;
     Ok(Html(
         company_page(
@@ -410,16 +478,21 @@ async fn company_library_browser(
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<Html<String>> {
-    // This owner-scoped read deliberately uses the company list first as the authorization check;
-    // the global projection itself carries no operator-only edit controls.
-    skills.verify_company_owner(user.id, company_id).await?;
+    // The unit choices are the authorization check (any unit manager); the global projection
+    // itself carries no operator-only edit controls.
+    let (units, default_unit) = skills.unit_choices(user.id, company_id).await?;
     let page = skills
         .list_library_page(SkillPageRequest {
             before: None,
             limit: MAX_SKILL_PAGE_SIZE,
         })
         .await?;
-    Ok(Html(pages::library_skill_browser(company_id, &page.items)))
+    Ok(Html(pages::library_skill_browser(
+        company_id,
+        &page.items,
+        &units,
+        default_unit,
+    )))
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -429,6 +502,9 @@ struct SkillPayload {
     description: String,
     instructions: String,
     files: Option<Vec<crate::entities::skill_bundle::SkillFile>>,
+    /// The unit of a new company skill (Plan07); updates keep the skill's unit.
+    #[serde(default)]
+    unit_id: Option<Uuid>,
 }
 
 impl From<SkillPayload> for SkillWrite {
@@ -602,7 +678,7 @@ async fn save_library(
     skill_id: Option<Uuid>,
     form: SkillForm,
 ) -> AppResult<Response> {
-    let draft = form.into_draft(skill_id);
+    let draft = form.into_draft(skill_id)?;
     let write = write_from_draft(&draft);
     let saved = match skill_id {
         Some(id) => skills.update_library(caller, id, write).await,
@@ -664,6 +740,7 @@ mod tests {
     #[test]
     fn the_body_limit_admits_the_largest_valid_skill_as_json() {
         let payload = SkillPayload {
+            unit_id: None,
             slug: "s".repeat(120),
             name: "\u{1}".repeat(120),
             description: "\u{1}".repeat(500),
@@ -690,6 +767,7 @@ mod tests {
             })
             .collect();
         let payload = SkillPayload {
+            unit_id: None,
             slug: "s".repeat(120),
             name: "\u{1}".repeat(120),
             description: "\u{1}".repeat(500),

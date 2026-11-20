@@ -49,7 +49,10 @@ async fn integrated_source() -> (Source, PostgresVault, ConnectedAccount, Uuid) 
         .await
         .unwrap();
     let connection = p
-        .list_mcp_connections(local.scope.company.as_uuid())
+        .list_mcp_connections(
+            local.scope.company.as_uuid(),
+            &p.test_all_units(local.scope.company.as_uuid()).await,
+        )
         .await
         .unwrap()
         .remove(0);

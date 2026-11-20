@@ -40,6 +40,10 @@ pub fn router() -> Router<AppState> {
             "/ui/companies/{company}/mcp-connections/{id}/delete",
             axum::routing::post(delete),
         )
+        .route(
+            "/ui/companies/{company}/mcp-connections/{id}/move",
+            axum::routing::post(move_connection),
+        )
         .layer(DefaultBodyLimit::max(128 * 1024))
 }
 fn write(
@@ -94,10 +98,16 @@ async fn catalog(
     Path(company): Path<Uuid>,
 ) -> AppResult<Html<String>> {
     let connections = s.list(user.id, company).await?;
+    let (units, default_unit) = s.unit_choices(user.id, company).await?;
     Ok(Html(mcp::shell(
         "MCP servers",
         company,
-        &mcp::catalog(company, &connections, &DefinitionDraft::default()),
+        &mcp::catalog(
+            company,
+            &connections,
+            &DefinitionDraft::default(),
+            &crate::adapters::http::pages::unit_picker(&units, default_unit),
+        ),
         None,
     )))
 }
@@ -111,6 +121,13 @@ async fn detail_page(
 ) -> AppResult<Html<String>> {
     let current = s.get(user, company, id).await?;
     let actor = s.level_actor(user, company).await?;
+    let (units, _) = s.unit_choices(user, company).await?;
+    let unit_move = crate::adapters::http::pages::unit_move_form(
+        &format!("/ui/companies/{company}/mcp-connections/{id}/move"),
+        None,
+        &units,
+        current.unit_id,
+    );
     let classification = super::super::pages::connection_levels::level_form(
         &format!("/ui/companies/{company}/mcp-connections/{id}/access-level"),
         current.revision,
@@ -122,12 +139,13 @@ async fn detail_page(
         "MCP server",
         company,
         &format!(
-            "{}{}",
+            "{}{}{}",
             mcp::detail(
                 company,
                 &current,
                 draft.unwrap_or(&DefinitionDraft::stored(&current)),
             ),
+            unit_move,
             classification
         ),
         message,
@@ -148,7 +166,11 @@ async fn create(
 ) -> AppResult<Response> {
     // Authorize even a malformed draft before rendering any company data.
     let connections = s.list(user.id, company).await?;
-    let result = async { s.create(user.id, company, write(&draft, None)?).await }.await;
+    let result = async {
+        let unit = super::skill_library::form_unit(draft.unit_id.as_deref())?;
+        s.create(user.id, company, unit, write(&draft, None)?).await
+    }
+    .await;
     match result {
         Ok(c) => Ok(
             Redirect::to(&format!("/ui/companies/{company}/mcp-connections/{}", c.id))
@@ -157,7 +179,17 @@ async fn create(
         Err(e) => Ok(Html(mcp::shell(
             "MCP servers",
             company,
-            &mcp::catalog(company, &connections, &draft),
+            &mcp::catalog(
+                company,
+                &connections,
+                &draft,
+                &crate::adapters::http::pages::unit_picker(
+                    &s.unit_choices(user.id, company).await?.0,
+                    super::skill_library::form_unit(draft.unit_id.as_deref())
+                        .ok()
+                        .flatten(),
+                ),
+            ),
             Some(&feedback(&e)),
         ))
         .into_response()),
@@ -260,4 +292,20 @@ async fn delete(
                 .into_response(),
         ),
     }
+}
+
+#[derive(serde::Deserialize)]
+struct UnitPick {
+    unit_id: Uuid,
+}
+/// Move a connection to another unit the person manages (Plan07 01B.4).
+async fn move_connection(
+    State(s): State<std::sync::Arc<crate::use_cases::mcp::McpUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, id)): Path<(Uuid, Uuid)>,
+    Form(pick): Form<UnitPick>,
+) -> AppResult<Html<String>> {
+    let moved = s.move_to(user.id, company, id, pick.unit_id).await?;
+    let notice = crate::adapters::http::pages::moved_notice(&moved);
+    detail_page(&s, user.id, company, id, None, Some(&notice)).await
 }

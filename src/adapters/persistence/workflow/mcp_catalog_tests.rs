@@ -24,17 +24,28 @@ async fn workflow_mcp_registration_competes_with_grant_removal_refresh_and_delet
         let revoke = async {
             barrier.wait().await;
             if change == "delete" {
-                p.delete_mcp_connection(current.company_id, current.id, current.revision)
-                    .await
+                p.delete_mcp_connection(
+                    current.company_id,
+                    p.test_root_unit(current.company_id).await,
+                    current.id,
+                    current.revision,
+                )
+                .await
             } else {
                 let mut write = connection_write(&setup.server.url);
                 write.tool_grants.clear();
                 if change == "refresh" {
                     write.discovered_tools.clear();
                 }
-                p.update_mcp_connection(current.company_id, current.id, current.revision, write)
-                    .await
-                    .map(|_| ())
+                p.update_mcp_connection(
+                    current.company_id,
+                    p.test_root_unit(current.company_id).await,
+                    current.id,
+                    current.revision,
+                    write,
+                )
+                .await
+                .map(|_| ())
             }
         };
         let (registered, revoked) = tokio::join!(register, revoke);
@@ -126,7 +137,13 @@ async fn workflow_mcp_operation_cas_cascades_and_tenant_constraints() {
     let mut ungranted = connection_write(&setup.server.url);
     ungranted.tool_grants.clear();
     let after = p
-        .update_mcp_connection(company.as_uuid(), current.id, current.revision, ungranted)
+        .update_mcp_connection(
+            company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
+            current.id,
+            current.revision,
+            ungranted,
+        )
         .await
         .unwrap();
     let approvals = || async {
@@ -147,6 +164,7 @@ async fn workflow_mcp_operation_cas_cascades_and_tenant_constraints() {
     let regranted = p
         .update_mcp_connection(
             company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
             current.id,
             after.revision,
             connection_write(&setup.server.url),
@@ -189,9 +207,14 @@ async fn workflow_mcp_operation_cas_cascades_and_tenant_constraints() {
     assert!(inserted.is_err());
     tx.rollback().await.unwrap();
     // Soft delete removes the approvals with the connection.
-    p.delete_mcp_connection(company.as_uuid(), current.id, regranted.revision)
-        .await
-        .unwrap();
+    p.delete_mcp_connection(
+        company.as_uuid(),
+        p.test_root_unit(company.as_uuid()).await,
+        current.id,
+        regranted.revision,
+    )
+    .await
+    .unwrap();
     assert_eq!(approvals().await, 0);
 }
 
@@ -203,6 +226,7 @@ async fn workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources() {
     let foreign = p
         .create_mcp_connection(
             other.target.company.as_uuid(),
+            p.test_root_unit(other.target.company.as_uuid()).await,
             connection_write(&setup.server.url),
         )
         .await
@@ -237,4 +261,39 @@ async fn workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources() {
             .await;
         assert!(configured.is_err());
     }
+}
+
+/// Plan07 decision a: reviewing and registering an MCP operation is the connection unit's
+/// manager's; a move changes neither the catalog revision nor the approval version.
+#[tokio::test]
+async fn unit_resource_authority_mcp_operation_register_needs_the_connection_unit() {
+    let setup = Box::pin(mcp_setup(Call::Json)).await;
+    let p = &setup.fixture.persistence;
+    let company = setup.company();
+    let current = setup.current().await;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    p.move_mcp_connection(
+        setup.actor().user_id(),
+        company.as_uuid(),
+        current.id,
+        billing,
+    )
+    .await
+    .unwrap();
+    let sibling =
+        WorkflowActor::authenticated(p.test_unit_lead(company.as_uuid(), support).await).unwrap();
+    let lead =
+        WorkflowActor::authenticated(p.test_unit_lead(company.as_uuid(), billing).await).unwrap();
+    let write = || McpOperationWrite {
+        connection: current.id,
+        catalog_revision: current.revision,
+        expected_version: Some(setup.operation),
+        operation: operation(company),
+    };
+    let refused = p.register_mcp_operation(company, sibling, write()).await;
+    assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
+    p.register_mcp_operation(company, lead, write())
+        .await
+        .unwrap();
 }

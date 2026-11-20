@@ -64,7 +64,10 @@ async fn setup() -> (McpSetup, PostgresVault, ConnectedAccount) {
     };
     let current =
         s.f.persistence
-            .list_mcp_connections(s.f.company)
+            .list_mcp_connections(
+                s.f.company,
+                &s.f.persistence.test_all_units(s.f.company).await,
+            )
             .await
             .unwrap()
             .remove(0);

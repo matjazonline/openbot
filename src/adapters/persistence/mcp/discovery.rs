@@ -4,10 +4,8 @@ use crate::{
     adapters::{
         integrations::owner::owner_for_user,
         persistence::{
-            integration_bindings::users_on,
-            integration_connect_authority::browser_deadline_on,
-            integrations::PostgresVault,
-            workflow::{authority::authorize_company, integration_authority::mcp_snapshot},
+            integration_bindings::users_on, integration_connect_authority::browser_deadline_on,
+            integrations::PostgresVault, workflow::integration_authority::mcp_snapshot,
         },
     },
     application::{integrations::*, workflow::WorkflowActor},
@@ -66,10 +64,12 @@ struct HostConfigurationAuthority {
 impl HostConfigurationAuthority {
     async fn identity(&self, tx: &mut Transaction<'_, Postgres>) -> AppResult<()> {
         users_on(tx, vec![self.user]).await?;
-        authorize_company(
+        // Discovery configures the connection, so it is its unit manager's (Plan07).
+        super::authorize_connection_on(
             tx,
             CompanyId::new(self.expected.company_id),
             WorkflowActor::authenticated(self.user)?,
+            self.expected.id,
         )
         .await?;
         if self.owner.browser.is_some() {
@@ -142,9 +142,11 @@ impl HostConfigurationAuthority {
             let new = tools.iter().find(|t| &t.name == *name);
             matches!((old, new), (Some(a), Some(b)) if a.input_schema == b.input_schema && a.output_schema == b.output_schema)
         }).cloned().collect();
+        let unit = current.unit_id.ok_or_else(denied)?;
         let result = update_on(
             &mut tx,
             current.company_id,
+            unit,
             current.id,
             current.revision,
             McpConnectionWrite {

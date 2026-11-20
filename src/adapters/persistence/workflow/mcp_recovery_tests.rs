@@ -261,6 +261,7 @@ async fn workflow_mcp_revocation_and_rotation_racing_dispatch_never_call() {
     let current = setup.current().await;
     p.replace_mcp_token(
         setup.company().as_uuid(),
+        p.test_root_unit(setup.company().as_uuid()).await,
         current.id,
         current.revision,
         Some(SecretString::from("rotated-mcp-secret")),

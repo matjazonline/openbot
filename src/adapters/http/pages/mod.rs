@@ -72,6 +72,7 @@ mod skeleton;
 mod team_levels;
 mod team_settings;
 mod thread_activity;
+mod unit_resources;
 mod workflow_authoring;
 mod workflow_decision;
 mod workflow_escalation;
@@ -113,6 +114,7 @@ pub(crate) use skeleton::{
 pub use team_levels::*;
 pub use team_settings::*;
 pub use thread_activity::*;
+pub use unit_resources::*;
 pub use workflow_authoring::*;
 pub use workflow_decision::*;
 pub use workflow_escalation::*;

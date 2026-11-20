@@ -607,10 +607,12 @@ pub(super) async fn write_channel_settings_on(
 
 /// Copy a library definition into the company inside `tx`: its global skills become tenant-owned
 /// copies the agent is attached to, and its portable builtin grants come with it. Its model is
-/// resolved by company-agent creation, like every company agent's (01DEP-P03-D3).
+/// resolved by company-agent creation, like every company agent's (01DEP-P03-D3). The copied
+/// skills belong to `unit`, the new agent's placement or the root (Plan07).
 pub(crate) async fn prepare_library_agent_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
+    unit: Uuid,
     library_agent_id: Uuid,
     agent: &mut AgentWrite,
 ) -> AppResult<()> {
@@ -641,7 +643,8 @@ pub(crate) async fn prepare_library_agent_on(
         .unwrap_or_else(CreationProvenance::system);
     let mut copied_skill_ids = Vec::with_capacity(source_skill_ids.len());
     for source_skill_id in source_skill_ids {
-        let copied = copy_library_skill_on(tx, company_id, source_skill_id, &created_by).await?;
+        let copied =
+            copy_library_skill_on(tx, company_id, unit, source_skill_id, &created_by).await?;
         copied_skill_ids.push(copied.id);
     }
     agent.skill_ids = copied_skill_ids;

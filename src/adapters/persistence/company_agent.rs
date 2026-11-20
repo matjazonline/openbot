@@ -288,8 +288,18 @@ impl CompanyAgentService {
         )
         .await?;
         if let Some(library_agent_id) = library_agent_id {
-            prepare_library_agent_on(&mut tx, company.as_uuid(), library_agent_id, &mut write)
-                .await?;
+            let unit = match placement {
+                Some(placement) => placement.department,
+                None => super::company::root_on(&mut tx, company).await?,
+            };
+            prepare_library_agent_on(
+                &mut tx,
+                company.as_uuid(),
+                unit.as_uuid(),
+                library_agent_id,
+                &mut write,
+            )
+            .await?;
         }
         let id = Uuid::new_v4();
         let created = Box::pin(create_company_agent_on(

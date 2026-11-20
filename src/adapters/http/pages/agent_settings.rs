@@ -1080,6 +1080,7 @@ mod capability_tests {
 
     fn skill(company_id: Option<Uuid>, name: &str) -> SkillSummary {
         Skill {
+            unit_id: None,
             files: Vec::new(),
             id: Uuid::new_v4(),
             company_id,

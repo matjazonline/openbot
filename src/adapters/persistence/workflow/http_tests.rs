@@ -372,6 +372,7 @@ async fn workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed(
         .create_http(
             foreign.target.company,
             foreign.target.actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://example.test").unwrap(),
                 bearer: true,
@@ -390,6 +391,7 @@ async fn workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed(
         p.create_http(
             setup.fixture.target.company,
             foreign.target.actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://example.test").unwrap(),
                 bearer: false
@@ -516,3 +518,47 @@ mod knowledge_http_tests;
 
 #[path = "vault_tests/mod.rs"]
 mod vault_tests;
+
+/// Plan07 decision a: registering and revoking an operation is the connection unit's manager's.
+#[tokio::test]
+async fn unit_resource_authority_http_operation_register_needs_the_connection_unit() {
+    let setup = Box::pin(setup("http://127.0.0.1:1", Entrance::Http)).await;
+    let p = &setup.fixture.persistence;
+    let company = setup.fixture.target.company;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    p.move_http(
+        company,
+        setup.fixture.target.actor,
+        setup.connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    let sibling =
+        WorkflowActor::authenticated(p.test_unit_lead(company.as_uuid(), support).await).unwrap();
+    let lead =
+        WorkflowActor::authenticated(p.test_unit_lead(company.as_uuid(), billing).await).unwrap();
+    let refused = p
+        .register_http_operation(
+            company,
+            sibling,
+            setup.connection.id,
+            setup.connection.revision,
+            operation(company, "billing.lookup"),
+        )
+        .await;
+    assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
+    // The move left the revision alone, so the unit's lead registers against it.
+    let registered = p
+        .register_http_operation(
+            company,
+            lead,
+            setup.connection.id,
+            setup.connection.revision,
+            operation(company, "billing.lookup"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(registered.unit_id, billing);
+}

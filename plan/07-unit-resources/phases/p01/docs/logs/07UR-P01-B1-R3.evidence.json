@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "round": "07UR-P01-B1-R3",
+  "artifact": "2849d92a62feef47d12e7f73961195e804ef247edbe9801adb55770106493b42",
+  "checks": [
+    {
+      "criteria": [
+        "F1",
+        "F6",
+        "F3"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_resource connection_level ui_companies ui_mcp access_level mcp_api http_connection",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases), Node 24.22.3 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-focused.txt",
+          "sha256": "22b40d3ede3872ab008bffff2273903382d87f3125d5be3aa797f46a3a880c0d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-levels"
+      ],
+      "command": "cargo test --locked --offline --lib -- knowledge_http knowledge_mcp knowledge_e2e_mcp local_agent_mcp_history native_mcp_native ui_agents skill department",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases), Node 24.22.3 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-levels-broad.txt",
+          "sha256": "b4bd833b4fb5df00d14c5cd1192ac88038ba33b0f031d2b3968318cc7d419227"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-clippy.txt",
+          "sha256": "450b195b19a65fb22419d4d5dc9571bce841c3e2c2c78feed5ccf2fb023ec2d5"
+        }
+      ]
+    }
+  ]
+}

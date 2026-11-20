@@ -198,9 +198,15 @@ async fn change_authority(f: &Fixture, server: &McpServer, binding: &McpBinding,
         Refusal::ConnectionGrant => {
             let mut write = connection_write(&server.url);
             write.tool_grants.clear();
-            p.update_mcp_connection(company.as_uuid(), current.id, current.revision, write)
-                .await
-                .unwrap();
+            p.update_mcp_connection(
+                company.as_uuid(),
+                p.test_root_unit(company.as_uuid()).await,
+                current.id,
+                current.revision,
+                write,
+            )
+            .await
+            .unwrap();
         }
         Refusal::ReviewedPolicy => {
             let mut reviewed = operation(company);

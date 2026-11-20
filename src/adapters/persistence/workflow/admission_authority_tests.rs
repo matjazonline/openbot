@@ -189,13 +189,17 @@ async fn workflow_admit_sql_deactivated_replay_uses_saved_resources_not_current_
     );
     let p = f.persistence();
     let old = p
-        .list_mcp_connections(f.binding.target.company.as_uuid())
+        .list_mcp_connections(
+            f.binding.target.company.as_uuid(),
+            &p.test_all_units(f.binding.target.company.as_uuid()).await,
+        )
         .await
         .unwrap()
         .remove(0);
     let replacement = p
         .create_mcp_connection(
             f.binding.target.company.as_uuid(),
+            p.test_root_unit(f.binding.target.company.as_uuid()).await,
             crate::application::use_cases::mcp::McpConnectionWrite {
                 slug: "replacement".into(),
                 endpoint: old.endpoint,

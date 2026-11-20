@@ -198,6 +198,9 @@ pub(super) async fn add_skill(f: &AdmissionFixture) -> crate::entities::skill::S
     f.persistence()
         .create_company(
             f.binding.target.company.as_uuid(),
+            f.persistence()
+                .test_root_unit(f.binding.target.company.as_uuid())
+                .await,
             SkillWrite {
                 files: None,
                 slug: format!("skill-{}", Uuid::new_v4().simple()),
@@ -224,7 +227,7 @@ pub(super) async fn attach_run(
 }
 
 pub(super) async fn native_http(f: &AdmissionFixture, connection: Uuid) {
-    sqlx::query("INSERT INTO workflow_http_connections(company_id,id,origin,bearer) VALUES($1,$2,'https://fixture.test',false)")
+    sqlx::query("INSERT INTO workflow_http_connections(company_id,id,origin,bearer,unit_id) VALUES($1,$2,'https://fixture.test',false,(SELECT id FROM departments WHERE company_id=$1 AND is_root))")
         .bind(f.binding.target.company.as_uuid()).bind(connection).execute(f.persistence().pool()).await.unwrap();
     sqlx::query("INSERT INTO workflow_http_operations(company_id,connection_id,name,snapshot,approval_required) VALUES($1,$2,'lookup',$3,false)")
         .bind(f.binding.target.company.as_uuid()).bind(connection).bind(operation_snapshot(f)).execute(f.persistence().pool()).await.unwrap();
@@ -238,7 +241,7 @@ pub(super) async fn native_mcp(f: &AdmissionFixture, connection: Uuid) -> Uuid {
         input_schema: json!({"type":"object"}),
         output_schema: Some(json!({"type":"object"})),
     }];
-    sqlx::query("INSERT INTO company_mcp_connections(company_id,id,slug,endpoint_url,enabled,auth_type,discovery_json) VALUES($1,$2,'crm','https://fixture.test/rpc',true,'none',$3)")
+    sqlx::query("INSERT INTO company_mcp_connections(company_id,id,slug,endpoint_url,enabled,auth_type,discovery_json,unit_id) VALUES($1,$2,'crm','https://fixture.test/rpc',true,'none',$3,(SELECT id FROM departments WHERE company_id=$1 AND is_root))")
         .bind(f.binding.target.company.as_uuid()).bind(connection).bind(serde_json::to_value(discovery).unwrap()).execute(f.persistence().pool()).await.unwrap();
     sqlx::query("INSERT INTO company_mcp_tool_grants(company_id,connection_id,tool_name) VALUES($1,$2,'lookup')")
         .bind(f.binding.target.company.as_uuid()).bind(connection).execute(f.persistence().pool()).await.unwrap();

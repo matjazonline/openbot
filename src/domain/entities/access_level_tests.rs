@@ -92,3 +92,41 @@ fn access_level_assignment_owner_fixed_and_nonadministrators_refused() {
         );
     }
 }
+
+#[test]
+fn access_level_connection_assignment_is_bounded_by_the_unit_managers_own_level() {
+    let lead = LevelActor {
+        membership: crate::entities::company_member::CompanyMembership::Member,
+        access_level: AccessLevel::L3,
+    };
+    let level = |value: i16| AccessLevel::try_from(value).unwrap();
+    assert_eq!(
+        may_assign_connection_level(lead, level(2), level(3)),
+        Ok(())
+    );
+    assert_eq!(
+        may_assign_connection_level(lead, level(3), level(0)),
+        Ok(())
+    );
+    assert_eq!(
+        may_assign_connection_level(lead, level(2), level(4)),
+        Err(LevelRefusal::RequestedAboveActor)
+    );
+    assert_eq!(
+        may_assign_connection_level(lead, level(5), level(1)),
+        Err(LevelRefusal::TargetAboveActor)
+    );
+    // Team levels keep their administrator rule for the same person.
+    assert_eq!(
+        may_assign_level(lead, LevelTarget::Assignable(level(2)), level(3)),
+        Err(LevelRefusal::NotAdministrator)
+    );
+    let owner = LevelActor {
+        membership: crate::entities::company_member::CompanyMembership::Owner,
+        access_level: AccessLevel::L9,
+    };
+    assert_eq!(
+        may_assign_connection_level(owner, level(9), level(9)),
+        Ok(())
+    );
+}

@@ -5,7 +5,7 @@ use crate::{
     application::workflow::connection_level::ConnectionLevelCommand,
     application::workflow::{WorkflowActor, http::HttpConnection},
     domain::workflow::CompanyId,
-    entities::access_level::{AccessLevel, LevelActor},
+    entities::access_level::AccessLevel,
 };
 use axum::{
     Json, Router,
@@ -20,14 +20,12 @@ use uuid::Uuid;
 #[derive(Clone)]
 struct ConnectionServices {
     workflow: std::sync::Arc<crate::infra::workflow::WorkflowServices>,
-    company_use_cases: std::sync::Arc<crate::use_cases::company::CompanyUseCases>,
     mcp_use_cases: std::sync::Arc<crate::use_cases::mcp::McpUseCases>,
 }
 impl axum::extract::FromRef<AppState> for ConnectionServices {
     fn from_ref(state: &AppState) -> Self {
         Self {
             workflow: state.workflow.clone(),
-            company_use_cases: state.company_use_cases.clone(),
             mcp_use_cases: state.mcp_use_cases.clone(),
         }
     }
@@ -54,6 +52,10 @@ pub(super) fn router() -> Router<AppState> {
             put(http_set),
         )
         .route(
+            "/api/companies/{company}/http-connections/{id}/move",
+            post(http_move),
+        )
+        .route(
             "/api/companies/{company}/mcp-connections/{id}/access-level",
             put(mcp_set),
         )
@@ -68,6 +70,10 @@ pub(super) fn router() -> Router<AppState> {
         .route(
             "/ui/companies/{company}/http-connections/{id}/access-level",
             post(http_save),
+        )
+        .route(
+            "/ui/companies/{company}/http-connections/{id}/move",
+            post(http_move_form),
         )
         .route(
             "/ui/companies/{company}/mcp-connections/{id}/access-level",
@@ -105,7 +111,11 @@ fn missing() -> AppError {
 fn feedback(result: AppResult<()>) -> String {
     match result {
         Ok(()) => "Access level saved.".into(),
-        Err(AppError::BadRequest(message) | AppError::Conflict(message)) => message,
+        Err(
+            AppError::BadRequest(message)
+            | AppError::Conflict(message)
+            | AppError::Forbidden(message),
+        ) => message,
         Err(_) => "Connection could not be updated. Reload and try again.".into(),
     }
 }
@@ -191,29 +201,85 @@ async fn http_detail(
     user: AuthenticatedUser,
     Path(ConnectionPath { company, id }): Path<ConnectionPath>,
 ) -> AppResult<Html<String>> {
-    let access = s
-        .company_use_cases
-        .managed_company(user.id, company)
-        .await?;
-    let actor = LevelActor {
-        membership: access.membership,
-        access_level: access.access_level,
-    };
+    http_detail_page(&s, user.id, company, id, None, None).await
+}
+/// The connection's level form and unit (Plan07), for whoever manages its unit.
+async fn http_detail_page(
+    s: &ConnectionServices,
+    user: Uuid,
+    company: Uuid,
+    id: Uuid,
+    requested: Option<i16>,
+    message: Option<&str>,
+) -> AppResult<Html<String>> {
     let rows = s
         .workflow
         .http_connections()
-        .list_http(
-            CompanyId::new(company),
-            WorkflowActor::authenticated(user.id)?,
-        )
+        .list_http(CompanyId::new(company), WorkflowActor::authenticated(user)?)
         .await?;
     let current = rows.into_iter().find(|c| c.id == id).ok_or_else(missing)?;
+    // MCP and HTTP connections share the level ceiling and the unit choices.
+    let actor = s.mcp_use_cases.level_actor(user, company).await?;
+    let (units, _) = s.mcp_use_cases.unit_choices(user, company).await?;
+    let unit_move = pages::unit_move_form(
+        &format!("/ui/companies/{company}/http-connections/{id}/move"),
+        None,
+        &units,
+        Some(current.unit_id),
+    );
     Ok(Html(pages::mcp::shell(
         "HTTP connection",
         company,
-        &pages::connection_levels::http_detail(&current, actor, None),
-        None,
+        &format!(
+            "{}{unit_move}",
+            pages::connection_levels::http_detail(&current, actor, requested)
+        ),
+        message,
     )))
+}
+#[derive(Deserialize)]
+struct UnitPick {
+    unit_id: Uuid,
+}
+/// Move a connection to another unit the person manages (Plan07 01B.4).
+async fn http_move(
+    State(s): State<ConnectionServices>,
+    user: AuthenticatedUser,
+    Path(ConnectionPath { company, id }): Path<ConnectionPath>,
+    Json(target): Json<crate::adapters::http::routes::unit_resources::UnitTarget>,
+) -> AppResult<Json<serde_json::Value>> {
+    let moved = s
+        .workflow
+        .http_connections()
+        .move_http(
+            CompanyId::new(company),
+            WorkflowActor::authenticated(user.id)?,
+            id,
+            crate::entities::department::DepartmentId::new(target.unit_id),
+        )
+        .await?;
+    Ok(Json(
+        crate::adapters::http::routes::unit_resources::moved_json(&moved),
+    ))
+}
+async fn http_move_form(
+    State(s): State<ConnectionServices>,
+    user: AuthenticatedUser,
+    Path(ConnectionPath { company, id }): Path<ConnectionPath>,
+    Form(pick): Form<UnitPick>,
+) -> AppResult<Html<String>> {
+    let moved = s
+        .workflow
+        .http_connections()
+        .move_http(
+            CompanyId::new(company),
+            WorkflowActor::authenticated(user.id)?,
+            id,
+            crate::entities::department::DepartmentId::new(pick.unit_id),
+        )
+        .await?;
+    let notice = pages::moved_notice(&moved);
+    http_detail_page(&s, user.id, company, id, None, Some(&notice)).await
 }
 async fn http_save(
     State(s): State<ConnectionServices>,
@@ -242,29 +308,15 @@ async fn http_save(
     }
     .await;
     let message = feedback(result);
-    let access = s
-        .company_use_cases
-        .managed_company(user.id, company)
-        .await?;
-    let actor = LevelActor {
-        membership: access.membership,
-        access_level: access.access_level,
-    };
-    let rows = s
-        .workflow
-        .http_connections()
-        .list_http(
-            CompanyId::new(company),
-            WorkflowActor::authenticated(user.id)?,
-        )
-        .await?;
-    let current = rows.into_iter().find(|c| c.id == id).ok_or_else(missing)?;
-    Ok(Html(pages::mcp::shell(
-        "HTTP connection",
+    http_detail_page(
+        &s,
+        user.id,
         company,
-        &pages::connection_levels::http_detail(&current, actor, Some(draft.access_level)),
+        id,
+        Some(draft.access_level),
         Some(&message),
-    )))
+    )
+    .await
 }
 async fn mcp_save(
     State(s): State<ConnectionServices>,
@@ -290,8 +342,15 @@ async fn mcp_save(
         actor,
         Some(draft.access_level),
     );
+    let (units, _) = s.mcp_use_cases.unit_choices(user.id, company).await?;
+    let unit_move = pages::unit_move_form(
+        &format!("/ui/companies/{company}/mcp-connections/{id}/move"),
+        None,
+        &units,
+        current.unit_id,
+    );
     let body = format!(
-        "{}{}",
+        "{}{unit_move}{}",
         pages::mcp::detail(
             company,
             &current,

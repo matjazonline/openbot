@@ -55,6 +55,8 @@ impl<'de> Deserialize<'de> for HttpOrigin {
 pub struct HttpConnection {
     pub company: CompanyId,
     pub id: Uuid,
+    /// The owning unit (Plan07).
+    pub unit_id: Uuid,
     pub origin: HttpOrigin,
     pub enabled: bool,
     pub credential_source: crate::domain::integrations::authority::CredentialSource,
@@ -120,12 +122,22 @@ pub trait HttpConnections: Send + Sync {
         &self,
         command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<HttpConnection>;
+    /// `unit` absent: the creator's default unit (Plan07); the creator must manage it.
     async fn create_http(
         &self,
         company: CompanyId,
         actor: WorkflowActor,
+        unit: Option<crate::entities::department::DepartmentId>,
         write: HttpConnectionWrite,
     ) -> AppResult<HttpConnection>;
+    /// Move a connection to another unit; the actor must manage both (Plan07 01B.4).
+    async fn move_http(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+        id: Uuid,
+        target: crate::entities::department::DepartmentId,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource>;
     async fn set_http_enabled(
         &self,
         company: CompanyId,

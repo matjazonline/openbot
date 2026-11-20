@@ -130,6 +130,7 @@ async fn delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_
     let skill = SkillManagementPersistence::create_company(
         m.p(),
         m.d.f.company,
+        m.p().test_root_unit(m.d.f.company).await,
         SkillWrite {
             slug: "accuracy".into(),
             name: "Accuracy".into(),
@@ -468,4 +469,258 @@ async fn share_with_unit(m: &ManagedAgents, principal: PrincipalId) {
         .add_member(m.d.f.owner, m.d.f.company, m.d.unit.id, principal)
         .await
         .unwrap();
+}
+
+/// Plan07 01B.4: a move names the agents whose active revision uses the skill.
+#[tokio::test]
+async fn unit_resource_move_lists_the_agents_whose_active_revision_uses_a_skill() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let created = m.create("unit-skill-user", m.d.unit.id).await;
+    let initial = m
+        .p()
+        .active_agent_revision(m.scope(m.actor(), created.agent.id))
+        .await
+        .unwrap()
+        .unwrap();
+    let skill = SkillManagementPersistence::create_company(
+        m.p(),
+        m.d.f.company,
+        m.d.unit.id.as_uuid(),
+        SkillWrite {
+            slug: "sales-policy".into(),
+            name: "Sales policy".into(),
+            description: "Quote the price list".into(),
+            instructions: "Quote only the current price list.".into(),
+            files: None,
+            required_tools: None,
+            created_by: None,
+        },
+    )
+    .await
+    .unwrap();
+    let mut command = m.changes(m.actor(), created.agent.id).await;
+    command.write.skill_ids = vec![skill.id];
+    let updated = m
+        .cases
+        .update_agent(
+            m.actor().user_id(),
+            m.d.f.company,
+            CompanyAgentUpdate {
+                agent: command.scope.agent,
+                expected_revision: command.expected_revision,
+                write: command.write,
+                tools: None,
+            },
+        )
+        .await
+        .unwrap();
+    m.p()
+        .publish_agent(PublishAgent {
+            scope: m.scope(m.actor(), created.agent.id),
+            expected_draft_revision: updated.draft_revision,
+            expected_active_revision: Some(initial.id),
+            key: AgentPublicationKey::parse("unit-skill-publish").unwrap(),
+        })
+        .await
+        .unwrap();
+    let moved = SkillManagementPersistence::move_company(
+        m.p(),
+        m.d.f.owner,
+        m.d.f.company,
+        skill.id,
+        m.d.child.id.as_uuid(),
+    )
+    .await
+    .unwrap();
+    assert_eq!((moved.from, moved.to), (m.d.unit.id, m.d.child.id));
+    assert_eq!(moved.more_uses, 0);
+    assert_eq!(
+        moved
+            .uses
+            .iter()
+            .map(|used| (used.kind, used.id, used.name.as_str()))
+            .collect::<Vec<_>>(),
+        vec![(
+            crate::application::ports::unit_resources::ResourceUseKind::Agent,
+            created.agent.id,
+            "unit-skill-user"
+        )]
+    );
+}
+
+/// Plan07: a library agent's skills are copied into the new agent's placement unit, or the root
+/// when it has none.
+#[tokio::test]
+async fn unit_resource_library_agent_copies_skills_into_its_placement_or_the_root() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let library_skill = SkillManagementPersistence::create_library(
+        m.p(),
+        SkillWrite {
+            slug: "portable-policy".into(),
+            name: "Portable policy".into(),
+            description: "Shared guidance".into(),
+            instructions: "Follow the shared guidance.".into(),
+            files: None,
+            required_tools: None,
+            created_by: None,
+        },
+    )
+    .await
+    .unwrap();
+    let mut library_write = write("portable-skilled");
+    library_write.skill_ids = vec![library_skill.id];
+    let library = AgentPersistence::create_library(m.p(), library_write)
+        .await
+        .unwrap();
+    let skill_units = |agent: Uuid| {
+        let pool = m.d.f.pool().clone();
+        async move {
+            sqlx::query_scalar::<_, Option<Uuid>>(
+                "SELECT skill.unit_id FROM agent_skills AS link JOIN skills AS skill \
+                 ON skill.id = link.skill_id WHERE link.agent_id = $1",
+            )
+            .bind(agent)
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let placed = m
+        .cases
+        .create_agent_from_library(
+            m.actor().user_id(),
+            m.d.f.company,
+            library.id,
+            Some(AgentPlacement {
+                department: m.d.unit.id,
+                role: None,
+            }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        skill_units(placed.agent.id).await,
+        vec![Some(m.d.unit.id.as_uuid())]
+    );
+    // The owner's own default is the root, so placing into Sales shows the placement decides.
+    let mut owner_placed_write = write("portable-owner-placed");
+    owner_placed_write.skill_ids = vec![library_skill.id];
+    let owner_placed_library = AgentPersistence::create_library(m.p(), owner_placed_write)
+        .await
+        .unwrap();
+    let owner_placed = m
+        .cases
+        .create_agent_from_library(
+            m.d.f.owner,
+            m.d.f.company,
+            owner_placed_library.id,
+            Some(AgentPlacement {
+                department: m.d.unit.id,
+                role: None,
+            }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        skill_units(owner_placed.agent.id).await,
+        vec![Some(m.d.unit.id.as_uuid())]
+    );
+    let mut unplaced_write = write("portable-unplaced");
+    unplaced_write.skill_ids = vec![library_skill.id];
+    let unplaced_library = AgentPersistence::create_library(m.p(), unplaced_write)
+        .await
+        .unwrap();
+    let unplaced = m
+        .cases
+        .create_agent_from_library(m.d.f.owner, m.d.f.company, unplaced_library.id, None)
+        .await
+        .unwrap();
+    let root = m.p().test_root_unit(m.d.f.company).await;
+    assert_eq!(skill_units(unplaced.agent.id).await, vec![Some(root)]);
+}
+
+/// B1-F5: uses in units the mover does not manage are counted, not named.
+#[tokio::test]
+async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let owner = WorkflowActor::authenticated(m.d.f.owner).unwrap();
+    let created = m
+        .cases
+        .create_agent(
+            m.d.f.owner,
+            m.d.f.company,
+            write("support-agent"),
+            Some(AgentPlacement {
+                department: m.d.sibling.id,
+                role: None,
+            }),
+        )
+        .await
+        .unwrap();
+    let initial = m
+        .p()
+        .active_agent_revision(m.scope(owner, created.agent.id))
+        .await
+        .unwrap()
+        .unwrap();
+    let skill = SkillManagementPersistence::create_company(
+        m.p(),
+        m.d.f.company,
+        m.d.unit.id.as_uuid(),
+        SkillWrite {
+            slug: "shared-sales-policy".into(),
+            name: "Shared sales policy".into(),
+            description: "Quote the price list".into(),
+            instructions: "Quote only the current price list.".into(),
+            files: None,
+            required_tools: None,
+            created_by: None,
+        },
+    )
+    .await
+    .unwrap();
+    let mut command = m.changes(owner, created.agent.id).await;
+    command.write.skill_ids = vec![skill.id];
+    let updated = m
+        .cases
+        .update_agent(
+            m.d.f.owner,
+            m.d.f.company,
+            CompanyAgentUpdate {
+                agent: command.scope.agent,
+                expected_revision: command.expected_revision,
+                write: command.write,
+                tools: None,
+            },
+        )
+        .await
+        .unwrap();
+    m.p()
+        .publish_agent(PublishAgent {
+            scope: m.scope(owner, created.agent.id),
+            expected_draft_revision: updated.draft_revision,
+            expected_active_revision: Some(initial.id),
+            key: AgentPublicationKey::parse("support-publish").unwrap(),
+        })
+        .await
+        .unwrap();
+    // The Sales lead moves their skill down to Field; the Support agent using it is theirs to
+    // know about only as a count.
+    let moved = SkillManagementPersistence::move_company(
+        m.p(),
+        m.actor().user_id(),
+        m.d.f.company,
+        skill.id,
+        m.d.child.id.as_uuid(),
+    )
+    .await
+    .unwrap();
+    assert!(moved.uses.is_empty(), "{moved:?}");
+    assert_eq!(moved.more_uses, 1);
 }

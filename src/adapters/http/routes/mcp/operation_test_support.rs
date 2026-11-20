@@ -251,6 +251,7 @@ pub(super) async fn connection(
         .create(
             user,
             company,
+            None,
             crate::use_cases::mcp::McpConnectionWrite {
                 slug: "doop".into(),
                 endpoint: "https://doop.fixture.test/mcp"

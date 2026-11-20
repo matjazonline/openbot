@@ -68,6 +68,7 @@ pub(super) async fn register_company(
         .create(
             actor,
             owned.id,
+            None,
             McpConnectionWrite {
                 slug: "doop".to_owned().into(),
                 endpoint: endpoint.clone(),

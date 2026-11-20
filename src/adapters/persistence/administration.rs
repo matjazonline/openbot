@@ -7,7 +7,7 @@ use super::{PostgresPersistence, department::PostgresDepartments};
 use crate::{
     app_error::{AppError, AppResult},
     application::ports::administration::{
-        AdministrationPersistence, ManagementRole, ManagementTarget,
+        AdministrationPersistence, ManagedUnit, ManagementRole, ManagementTarget,
     },
     domain::workflow::CompanyId,
     entities::department::DepartmentId,
@@ -123,6 +123,42 @@ impl AdministrationPersistence for PostgresPersistence {
         .await?;
         Ok(units.into_iter().map(DepartmentId::new).collect())
     }
+
+    async fn managed_unit_choices(
+        &self,
+        actor: Uuid,
+        company: CompanyId,
+    ) -> AppResult<Vec<ManagedUnit>> {
+        let rows: Vec<(Uuid, String, bool)> = sqlx::query_as(
+            "SELECT id, name, is_root FROM departments WHERE company_id=$2 \
+             AND unit_management_role($1,$2,id) IS NOT NULL ORDER BY is_root DESC, name, id",
+        )
+        .bind(actor)
+        .bind(company.as_uuid())
+        .fetch_all(self.pool())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, name, is_root)| ManagedUnit {
+                id: DepartmentId::new(id),
+                name,
+                is_root,
+            })
+            .collect())
+    }
+
+    async fn default_resource_unit(
+        &self,
+        actor: Uuid,
+        company: CompanyId,
+    ) -> AppResult<Option<DepartmentId>> {
+        let unit: Option<Uuid> = sqlx::query_scalar("SELECT resource_default_unit($1,$2)")
+            .bind(actor)
+            .bind(company.as_uuid())
+            .fetch_one(self.pool())
+            .await?;
+        Ok(unit.map(DepartmentId::new))
+    }
 }
 
 #[async_trait]
@@ -140,5 +176,21 @@ impl AdministrationPersistence for PostgresDepartments {
 
     async fn managed_units(&self, actor: Uuid, company: CompanyId) -> AppResult<Vec<DepartmentId>> {
         self.persistence.managed_units(actor, company).await
+    }
+
+    async fn managed_unit_choices(
+        &self,
+        actor: Uuid,
+        company: CompanyId,
+    ) -> AppResult<Vec<ManagedUnit>> {
+        self.persistence.managed_unit_choices(actor, company).await
+    }
+
+    async fn default_resource_unit(
+        &self,
+        actor: Uuid,
+        company: CompanyId,
+    ) -> AppResult<Option<DepartmentId>> {
+        self.persistence.default_resource_unit(actor, company).await
     }
 }

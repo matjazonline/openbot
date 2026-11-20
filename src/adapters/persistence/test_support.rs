@@ -928,6 +928,72 @@ pub(crate) fn thread_use_cases(
     )
 }
 
+/// Fixtures that do not care which unit owns a skill or connection put it in the root (Plan07).
+impl super::PostgresPersistence {
+    pub(crate) async fn test_root_unit(&self, company: uuid::Uuid) -> uuid::Uuid {
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(company)
+            .fetch_one(self.pool())
+            .await
+            .expect("every company has a root department")
+    }
+
+    /// A child of the root with no desk, for fixtures that need a non-root unit (Plan07).
+    pub(crate) async fn test_unit(&self, company: uuid::Uuid, slug: &str) -> uuid::Uuid {
+        sqlx::query_scalar(
+            "INSERT INTO departments (id, company_id, parent_id, name, slug, created_by) \
+             VALUES (gen_random_uuid(), $1, (SELECT id FROM departments WHERE company_id=$1 \
+             AND is_root), $2, $2, '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}') \
+             RETURNING id",
+        )
+        .bind(company)
+        .bind(slug)
+        .fetch_one(self.pool())
+        .await
+        .expect("a fixture unit")
+    }
+
+    /// A new person who is a root member and the lead of `unit`.
+    pub(crate) async fn test_unit_lead(&self, company: uuid::Uuid, unit: uuid::Uuid) -> uuid::Uuid {
+        let user = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'hash')")
+            .bind(user)
+            .bind(format!("lead-{}", user.simple()))
+            .bind(format!("lead-{}@example.test", user.simple()))
+            .execute(self.pool())
+            .await
+            .expect("a fixture user");
+        let principal = insert_root_member(
+            self.pool(),
+            crate::domain::workflow::CompanyId::new(company),
+            user,
+            crate::entities::company_member::CompanyAccessRole::Member,
+            crate::entities::access_level::AccessLevel::PUBLIC,
+        )
+        .await;
+        sqlx::query(
+            "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
+             VALUES ($1, $2, 'lead', $3)",
+        )
+        .bind(company)
+        .bind(unit)
+        .bind(principal.as_uuid())
+        .execute(self.pool())
+        .await
+        .expect("a fixture lead");
+        user
+    }
+
+    /// Every unit of the company, for listing all its resources.
+    pub(crate) async fn test_all_units(&self, company: uuid::Uuid) -> Vec<uuid::Uuid> {
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 ORDER BY id")
+            .bind(company)
+            .fetch_all(self.pool())
+            .await
+            .expect("departments are readable")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

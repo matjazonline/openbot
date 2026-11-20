@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "round": "07UR-P01-B1-R1",
+  "artifact": "2c55a5762e07d9e7f2a7d6aaf9a7fffe06571ab1351f8c666a97f9a8a3dad81a",
+  "checks": [
+    {
+      "criteria": [
+        "01A.1-schema"
+      ],
+      "command": "psql -X -q -v ON_ERROR_STOP=1 -f migrations/20260817000000_init_schema.sql",
+      "fixture": "fresh openbot_p07_schema @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-schema-apply.txt",
+          "sha256": "95b13c2d6491159e5f81f79e329632ff6581ca5ec7ca50644cfbbbd4f39ac52c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "01A.1-schema",
+        "01A.1-default",
+        "D2-authority",
+        "01A.3-delete",
+        "01B.4-move",
+        "F5",
+        "F6",
+        "F7",
+        "teardown"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_resource",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-unit-resource-tests.txt",
+          "sha256": "14e0894f425849d240c4201c603c84922580a9b7b1e04ad79f8585c2169be8a9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-existing"
+      ],
+      "command": "cargo test --locked --offline --lib -- skill department connection_level mcp http_connection integration_binding vault",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-existing.txt",
+          "sha256": "38cf2745067357cfa89f33176af0fb69e63d59611cf1ff5b49eb842dcc57f142"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-broad"
+      ],
+      "command": "cargo test --locked --offline --lib",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases), Node 26.13.1 default",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-lib-suite-summary.txt",
+          "sha256": "c583be04e5374b4b67faef7ed9e3d4479c55e020cf1ece34d422b4cfeb6ac855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-broad"
+      ],
+      "command": "cargo test --locked --offline --lib -- cloudroom_e2e cloudroom_lifecycle_real_server_plugin_retention doop_agent_current_preparation_reaches_ready_before_model_io",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases), Node 24.22.3 on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-lib-rerun-node24.txt",
+          "sha256": "b2a0b5df8cbae70dc2597950fea823f627ae919608339887c21568ec328b3f04"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-clippy.txt",
+          "sha256": "827218d7f33815bd499975ac19a1200b381c55dc351498341e5d9214cd261ac8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sqlx-metadata"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh migrated openbot_p07_sqlx @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-check.txt",
+          "sha256": "357cbe4433b3d6bac33784de4ff815a65d958df57584f6d67cf8f30d28043c46"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-after-fix"
+      ],
+      "command": "cargo test --locked --offline --lib -- connection_level unit_resource mcp_api ui_mcp",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-after-fix.txt",
+          "sha256": "7ab12b03005e962af1d5996f40b1df4f3afe15e4fc18d06dbcdd0ee9cdff9bd5"
+        }
+      ]
+    }
+  ]
+}

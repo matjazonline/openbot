@@ -28,7 +28,10 @@ async fn skill_bundle_persistence_create_update_preserve_and_scope_round_trip() 
     let foreign = company(&p, "bundle-foreign").await;
     let initial = directory("research");
     let expected = initial.files.clone().unwrap();
-    let created = p.create_company(owner, initial.clone()).await.unwrap();
+    let created = p
+        .create_company(owner, p.test_root_unit(owner).await, initial.clone())
+        .await
+        .unwrap();
     let read = p.get_company(owner, created.id).await.unwrap().unwrap();
     assert_eq!(read.instructions, initial.instructions);
     assert_eq!(read.files, expected);
@@ -36,7 +39,12 @@ async fn skill_bundle_persistence_create_update_preserve_and_scope_round_trip() 
     update.instructions.push_str("Edit two.\n");
     update.files = Some(assets(b"print('two')\n", false));
     let updated = p
-        .update_company(owner, created.id, update.clone())
+        .update_company(
+            owner,
+            p.test_root_unit(owner).await,
+            created.id,
+            update.clone(),
+        )
         .await
         .unwrap();
     assert_eq!(updated.files, update.files.clone().unwrap());
@@ -44,20 +52,32 @@ async fn skill_bundle_persistence_create_update_preserve_and_scope_round_trip() 
     let mut metadata_only = update.clone();
     metadata_only.files = None;
     metadata_only.name = "Edited metadata".into();
-    p.update_company(owner, created.id, metadata_only)
-        .await
-        .unwrap();
+    p.update_company(
+        owner,
+        p.test_root_unit(owner).await,
+        created.id,
+        metadata_only,
+    )
+    .await
+    .unwrap();
     let current = p.get_company(owner, created.id).await.unwrap().unwrap();
     assert_eq!(current.files, updated.files);
     assert_eq!(current.instructions, update.instructions);
     assert!(p.get_company(foreign, created.id).await.unwrap().is_none());
     assert!(
-        p.update_company(foreign, created.id, initial)
-            .await
-            .is_err()
+        p.update_company(
+            foreign,
+            p.test_root_unit(foreign).await,
+            created.id,
+            initial
+        )
+        .await
+        .is_err()
     );
     update.files = Some(vec![]);
-    p.update_company(owner, created.id, update).await.unwrap();
+    p.update_company(owner, p.test_root_unit(owner).await, created.id, update)
+        .await
+        .unwrap();
     assert!(
         p.get_company(owner, created.id)
             .await
@@ -82,11 +102,21 @@ async fn skill_bundle_library_copy_renames_only_new_identity_and_keeps_assets_in
     .await
     .unwrap();
     let first = p
-        .copy_library_to_company(company, source.id, CreationProvenance::system())
+        .copy_library_to_company(
+            company,
+            p.test_root_unit(company).await,
+            source.id,
+            CreationProvenance::system(),
+        )
         .await
         .unwrap();
     let second = p
-        .copy_library_to_company(company, source.id, CreationProvenance::system())
+        .copy_library_to_company(
+            company,
+            p.test_root_unit(company).await,
+            source.id,
+            CreationProvenance::system(),
+        )
         .await
         .unwrap();
     assert_eq!(first.instructions, source.instructions);
@@ -108,7 +138,9 @@ async fn skill_bundle_library_copy_renames_only_new_identity_and_keeps_assets_in
     assert_eq!(second.files, source.files);
     let mut changed = directory(second.slug.as_str());
     changed.files = Some(assets(b"print('copy changed')", false));
-    p.update_company(company, second.id, changed).await.unwrap();
+    p.update_company(company, p.test_root_unit(company).await, second.id, changed)
+        .await
+        .unwrap();
     let unchanged = p.get_library(source.id).await.unwrap().unwrap();
     assert_eq!(unchanged.instructions, source.instructions);
     assert_eq!(unchanged.files, source.files);
@@ -130,7 +162,11 @@ async fn skill_bundle_database_constraints_match_the_domain_and_refuse_direct_in
     let p = PostgresPersistence::new(pool.clone());
     let company = company(&p, "bundle-constraints").await;
     let skill = p
-        .create_company(company, skill_write("bundle"))
+        .create_company(
+            company,
+            p.test_root_unit(company).await,
+            skill_write("bundle"),
+        )
         .await
         .unwrap();
     let valid = json!({"path":"scripts/run.py","content_base64":"AP/+DQo=","executable":true});

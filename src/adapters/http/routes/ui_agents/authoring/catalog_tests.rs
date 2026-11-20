@@ -14,6 +14,7 @@ async fn autonomous_agent_authoring_catalog_connection_pages_are_scoped_bounded_
                 .create_http(
                     f.scope().company,
                     f.scope().actor,
+                    None,
                     HttpConnectionWrite {
                         origin: HttpOrigin::parse("http://127.0.0.1:9").unwrap(),
                         bearer: false,

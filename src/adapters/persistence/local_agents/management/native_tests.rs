@@ -20,6 +20,7 @@ impl NativeSetup {
             s.f.persistence
                 .create_company(
                     s.f.company,
+                    s.f.persistence.test_root_unit(s.f.company).await,
                     SkillWrite {
                         slug: "native-skill".into(),
                         name: "Native".into(),

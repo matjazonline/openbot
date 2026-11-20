@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 fn connection(origin: &str) -> HttpConnection {
     HttpConnection {
+        unit_id: uuid::Uuid::nil(),
         access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         company: CompanyId::new(Uuid::new_v4()),
         id: Uuid::new_v4(),

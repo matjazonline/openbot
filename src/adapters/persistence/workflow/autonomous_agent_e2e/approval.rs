@@ -27,6 +27,7 @@ async fn publish_after_park(
         .unwrap();
     p.update_company(
         scope.company.as_uuid(),
+        p.test_root_unit(scope.company.as_uuid()).await,
         skill.id,
         SkillWrite {
             files: None,
