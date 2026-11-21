@@ -32,6 +32,13 @@ pub(super) async fn connections(
         }
     });
     query.push_bind(scope.company.as_uuid());
+    // Only connections in the agent's own reach are offered (Plan07 decision d, 01B.1).
+    query
+        .push(" AND agent_reaches(")
+        .push_bind(scope.company.as_uuid())
+        .push(",")
+        .push_bind(scope.agent.as_uuid())
+        .push(",unit_id)");
     if let Some(after) = after {
         query.push(" AND id>").push_bind(after);
     }
@@ -98,11 +105,14 @@ pub(super) async fn http(
     let id = request
         .connection
         .ok_or_else(|| AppError::BadRequest("Choose a company HTTP connection".into()))?;
+    // A connection outside the agent's own reach is not offered (Plan07 decision d, 01B.1).
     let enabled: bool = sqlx::query_scalar(
-        "SELECT enabled FROM workflow_http_connections WHERE company_id=$1 AND id=$2",
+        "SELECT enabled FROM workflow_http_connections WHERE company_id=$1 AND id=$2 \
+         AND agent_reaches($1,$3,unit_id)",
     )
     .bind(request.scope.company.as_uuid())
     .bind(id)
+    .bind(request.scope.agent.as_uuid())
     .fetch_optional(&mut *db)
     .await?
     .ok_or_else(|| AppError::NotFound("HTTP connection".into()))?;
@@ -149,6 +159,16 @@ pub(super) async fn mcp(
         super::super::mcp::publication_connection_on(db, request.scope.company.as_uuid(), id)
             .await?
             .ok_or_else(|| AppError::NotFound("MCP connection".into()))?;
+    // A connection outside the agent's own reach is not offered (Plan07 decision d, 01B.1).
+    let reached: bool = sqlx::query_scalar("SELECT COALESCE(agent_reaches($1,$2,$3),false)")
+        .bind(request.scope.company.as_uuid())
+        .bind(request.scope.agent.as_uuid())
+        .bind(connection.unit_id)
+        .fetch_one(&mut *db)
+        .await?;
+    if !reached {
+        return Err(AppError::NotFound("MCP connection".into()));
+    }
     let rows = operations(db, request, id).await?;
     let more = rows.len() > AGENT_CATALOG_PAGE;
     let mut items = Vec::with_capacity(rows.len().min(AGENT_CATALOG_PAGE));

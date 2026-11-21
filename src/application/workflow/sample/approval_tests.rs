@@ -72,6 +72,7 @@ fn autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_a
         vec![],
     );
     let tool = ResolvedAgentTool {
+        unit_id: Some(uuid::Uuid::nil()),
         binding: AgentToolBinding {
             id: AgentBindingId::new(Uuid::from_u128(501)),
             alias: AgentToolAlias::parse("crm.write").unwrap(),
@@ -105,6 +106,7 @@ fn autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_
         .unwrap();
     let pin = snapshot.workflow.as_ref().unwrap();
     let tool = ResolvedAgentTool {
+        unit_id: None,
         binding: AgentToolBinding {
             id: AgentBindingId::new(Uuid::from_u128(502)),
             alias: AgentToolAlias::parse("memory.child").unwrap(),

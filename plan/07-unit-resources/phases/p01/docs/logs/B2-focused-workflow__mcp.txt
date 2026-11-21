@@ -1,0 +1,15 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 3 tests
+test application::workflow::mcp::tests::workflow_mcp_error_envelope_classification ... ok
+test application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas ... ok
+test application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4941 filtered out; finished in 0.01s
+

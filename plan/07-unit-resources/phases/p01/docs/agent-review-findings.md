@@ -521,3 +521,240 @@ plan/07-unit-resources/phases/p01/docs, plan/07-unit-resources/COORDINATION.md);
   several checks share an error type.
 - **Resolution history:** 2026-11-20 open.
   2026-11-20 recheck 07UR-P01-B1-R3: **fixed.** New `may_assign_connection_level` (domain/entities/access_level.rs:139-156: owner unbounded; otherwise current and requested at most the actor's own level, no admin gate) is used by `set_mcp_level` (after `authorize_connection_on`) and `set_http_level` (after `lock_edit_on`), refusing with `AppError::Forbidden` (403); the level form uses the same rule; team levels keep `may_assign_level`. Tests discriminate: the Sales lead at level 2 sets MCP and HTTP levels to 2 (accepted) and is refused `Forbidden` at 3 (unit_resources_tests.rs:841-881), plus the domain test `access_level_connection_assignment_is_bounded_by_the_unit_managers_own_level`; the existing demotion race now expects 403. Re-run by B, passed.
+
+## 07UR-P01-B2-F1 — The company-wide unslotted HTTP support check defeats "ambiguity is judged within reach" (G1 r2 F2)
+
+- **Context:** 2026-11-20; workflow implement-opus-reviewed-2_4; records [TASK.md](TASK.md),
+  [REVIEW.md](REVIEW.md); batch B2, batch review, round 07UR-P01-B2-R1; reviewer Claude Fable
+  (claude-fable-5-2, medium per coordination r5); phase 07UR-P01; worktree
+  /Users/mac02/orca/workspaces/openbot/plan06 (branch plan07); HEAD aa22b1b0 + working tree,
+  digest f228e7fe9f45aaeb23cdc98d10d8c70681394eb5d87df9aaf066d9c8b7e73167.
+- **Classification:** actionable defect; medium; correctness / gated decision not delivered
+  (implementation, not the gate: the gate required reach "at binding save, admission and every
+  runtime resolution").
+- **Evidence:** `authority::supported_publication` calls `http::registered_on(..,
+  ConnectionReach::Company)` (workflow/authority.rs:174-190) and `registered_on` still requires
+  exactly one owner for an unslotted tool (`ids.len() != 1` → NotFound, workflow/http.rs:64-67).
+  `supported_publication` runs, before any reach-aware check, on every path that matters:
+  `bindings::verify_selection` (bindings.rs:168) ← binding save (bindings.rs:74), admission
+  `verify_current` (admission.rs:323), channel reply configuration (channel_reply.rs:313);
+  admission replay (admission_replay.rs:100); publication (definitions.rs:233). So once a sibling
+  unit registers an identical unslotted operation, the other unit's publication, binding save,
+  every admission and every idempotent replay fail with NotFound — the opposite of the gated
+  outcome ("a sibling's identical operation neither substitutes ... nor makes in-reach routing
+  ambiguous"; mapping row "F2 runtime: in-reach routing unaffected") and a cross-unit
+  interference that decision (a) now lets a sibling lead cause. TASK calls the Company check "an
+  existence check always followed by the reach-aware readiness check"; it is not existence-only
+  for unslotted tools. The only test,
+  `unit_resource_selection_unslotted_http_resolution_is_judged_within_reach`, calls
+  `registered_on` directly and itself asserts `ConnectionReach::Company` → NotFound in the
+  two-sibling state; no binding save, admission or runtime caller is exercised in that state.
+  Not reproduced by execution (the reviewer may not add tests); established by reading the call
+  chain above.
+- **Required:** make the support check not fail on company-wide multiplicity (existence only, or
+  pass the reach), and add a test that saves a binding and admits a run on a Billing desk while
+  Support owns the identical unslotted operation, plus the replay.
+- **Instruction lesson:** observation — a direct call of the changed helper was mapped to a
+  criterion about its callers. Candidate (verification-contracts): when a helper gains a mode
+  parameter, the criterion's test must enter through a production caller for each mode the
+  callers use.
+- **Resolution history:** 2026-11-20 open.
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): **fixed.** `ConnectionReach::Company` is existence-only (`!anywhere &&` guard, workflow/http.rs); no caller routes on its result; `From(reach)` keeps the single-owner rule. `unit_resource_selection_desk_routes_an_unslotted_operation_within_its_reach` enters through binding save, admission, replay and the runtime call on a Billing desk while Support owns the identical operation; passes in the reviewer run.
+
+## 07UR-P01-B2-F2 — Native and local-agent consumers do not treat `ResourceOutsideUnit` as the definite refusal it is
+
+- **Context:** as 07UR-P01-B2-F1 (round 07UR-P01-B2-R1, same digest).
+- **Classification:** actionable defect; medium; correctness / recovery. Related to the optional
+  gate note 07UR-P01-G1-F15 ("refused as well, as for other authority losses there today").
+- **Evidence:** `native::selected_with_locks_on` (local_agents/native.rs:106-119) now returns the
+  new variant. Its existing authority losses are deliberately mapped to `Forbidden`
+  (native.rs:101-104) because the consumers settle only on NotFound/Forbidden/Conflict:
+  - `protocol/commands.rs:284-292` (`prepare`): any other error is returned, and `pending`
+    (commands.rs:241-245) propagates it with `?`. A queued Create/Send whose agent lost reach
+    after it was queued therefore is not cancelled; it makes `pending` fail for the whole machine
+    on every poll (candidates are ordered, so later commands of other sessions are not delivered)
+    until that operation's deadline.
+  - `application/local_agents/workflow/mod.rs:163-169`: a workflow local-agent step refused at
+    capture/preparation (shared.rs:53, workflow/local_agents/preparation.rs:129) becomes
+    `local_agent.storage_unavailable`, Retryable, instead of `local_agent.refused`, Terminal.
+  - `workflow/local_agents/continuation.rs:50-81`: the parked wait's authority recheck
+    (`current_authority_on` → `lock_current_with_locks` → `validate_frozen_with_locks_on`,
+    workflow/local_agents/mod.rs:228) returns the error instead of `refused_on`, so the wait
+    commit fails on each attempt rather than settling.
+  - `workflow/native_mcp/live.rs:162` → `actions/failure.rs:172-175`: an in-flight native MCP
+    run's action becomes `*.unresolved`, Retryable.
+  - Author's "to confirm" item: the maintenance sweep is keyed on SQL `native_mcp_run_live`
+    (native_mcp/maintenance.rs:13-17), which B2 does not change and which does not see reach, so
+    it retires such a call only at its deadline/turn end; meanwhile the machine's Status, Cancel
+    and CancelInvocation are refused with 400 (protocol/mcp.rs:21-29 → `mcp_authority_on` →
+    bundles.rs → `selected_with_locks_on`). No test covers any of these;
+    `unit_resource_selection_native_session_and_mcp_call_refuse_a_moved_connection` covers only a
+    new call and a new session.
+  Established by inspection; not executed.
+- **Required:** give these consumers the definite-refusal treatment (e.g. map the variant as the
+  revocation refusals are mapped for post-capture uses, or add it to each classifier), and test a
+  queued command and a workflow local-agent step after a reach loss; state the intended
+  Status/Cancel behavior for an in-flight call.
+- **Instruction lesson:** observation — the contract-impact row for the new error listed
+  producers and four consumers; catch-all arms (`Err(_)`, `error => Err(error)`) hid the rest
+  from the compiler. Candidate (verification-contracts, contract impact): for a new error
+  variant, list every classifier that names sibling variants (grep the variants it should behave
+  like), not only exhaustive matches.
+- **Resolution history:** 2026-11-20 open.
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): **fixed.** `selected_with_locks_on` maps a post-capture reach loss to `NotFound`, which `prepare`, the continuation, and action failure classification settle definitely; the application classifier also names the variant; session capture keeps the code. Tests: queued command cancelled with the poll Ok; workflow step `local_agent.refused` Terminal; in-session native MCP call NotFound. Continuation and Status/Cancel (404 until the call's deadline) are by inspection, as TASK states.
+
+## 07UR-P01-B2-F3 — Author-facing HTML surfaces do not render the new refusals
+
+- **Context:** as 07UR-P01-B2-F1 (round 07UR-P01-B2-R1, same digest).
+- **Classification:** actionable defect; medium; integration / equivalent surfaces (01B.2 "naming
+  the step and resource" reaches the author only as a JSON body).
+- **Evidence:** each form handler renders named variants and returns anything else as the
+  request's error, which `AppError::into_response` turns into 400 JSON
+  (http/app_error_impl.rs:40-44): binding save/activate `binding_refusal`
+  (routes/workflows/ui/authoring/bindings.rs:187-201, BadRequest/WorkflowRole/NotFound only);
+  editor validate/publish `refusal` (authoring/mod.rs:236-255) and editor.rs:207; sample approval
+  (authoring/sample.rs:89-96); agent preview/publish forms `editable_failure`
+  (routes/ui_agents/authoring.rs:94-101); agent create form (routes/agent.rs:391-395); run
+  controls `refusal` (workflows/ui/runs/controls.rs:14-26). `ResourceOutsideUnit` is named in
+  none (grep: only app_error_impl, agent_publication/commands, unit_resources, resources,
+  message_admission, inbound_event_worker). No route-level test exists for any of the three codes.
+- **Required:** render the refusal's message in these panes (the binding form already does so for
+  `WorkflowRole`), with a route-level test for at least binding save and agent publish.
+- **Instruction lesson:** same candidate as 07UR-P01-B2-F2; B1-F1/B1-F6 already recorded that
+  persistence-level tests do not cover the route layer.
+- **Resolution history:** 2026-11-20 open.
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): **fixed.** All seven handlers name the variant; route tests for binding save and agent publish pass.
+
+## 07UR-P01-B2-F4 — Decisive cases promised by the acceptance mapping are missing; the mapping still lists planned names
+
+- **Context:** as 07UR-P01-B2-F1 (round 07UR-P01-B2-R1, same digest).
+- **Classification:** actionable defect; medium; verification.
+- **Evidence (criterion → what exists):**
+  - D9a closure ("root bundle, child bundle and agent-tool workflow each using an out-of-reach
+    connection", `unit_resource_selection_admission_workflow_*`): no such test; only the root
+    bundle's slot on a company-wide binding
+    (`unit_resource_selection_binding_and_admission_refuse_a_slot_connection_out_of_reach`).
+    agent_manifest/capture.rs:41-52 (`reach: self.context_department_id`) is unexercised with an
+    out-of-reach connection.
+  - Run reach from a desk: every workflow-level binding/admission test uses
+    `RelatedAssociation::Company` (reach None → root). No test saves or admits on a desk in a
+    department, so neither "a unit's connection is usable on that unit's desk and below", nor the
+    sibling refusal, nor "moved up becomes selectable below" (doc 01 focused checks) is shown for
+    workflow-level connections; `check_connection_unit_on` and `association_reach_on` never run
+    with a department.
+  - F2 runtime ("in-reach connection disabled mid-run", "routing unaffected"): only direct
+    `registered_on` calls; `run_reach_on` and both http_runtime callers are never run with a
+    non-root reach (see also 07UR-P01-B2-F1).
+  - Refusal settling: `unit_resource_selection_refusal_settles_a_schedule_occurrence` writes the
+    literal through `record_refusal` (proves the CHECK only); the message side is the `classify`
+    unit assertion. No schedule or message admission is refused through production with an
+    out-of-reach resource. Stand-in limits are not named in TASK.
+  - Offers "an agent in two departments sees the union": offers test uses a one-unit agent (the
+    union is shown only at admission, same SQL function). D10 competing covers the skill lock
+    only, not the connection `FOR SHARE` path.
+  - TASK's two acceptance-mapping tables still carry planned glob names and no status; actual
+    names are only in the prose "B2 checks".
+- **Required:** add the closure, desk-reach (positive, sibling, moved-up) and runtime cases; route
+  one refusal through schedule or message admission; update the mapping with actual names,
+  status and stand-in limits.
+- **Instruction lesson:** verification-contracts already requires this; no new instruction.
+- **Resolution history:** 2026-11-20 open.
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): **fixed.** Child-bundle and agent-tool closure tests, two desk tests (positive, sibling, moved up, runtime), production schedule refusal added; TASK "Acceptance mapping (actual, B2)" lists actual names and stand-in limits (message intent through production, Status/Cancel, reconciliation, connection race: not exercised, stated). Note: an out-of-reach unslotted operation refuses as NotFound (`unavailable`), not with the code; the closure tests assert only `is_err` after an in-reach baseline.
+
+## 07UR-P01-B2-F5 — A unit lead still cannot use the unit's connection on the unit's desk (root management required at slot inspection and action time)
+
+- **Context:** as 07UR-P01-B2-F1 (round 07UR-P01-B2-R1, same digest). Answers TASK "To confirm
+  in review"; noted for B2 in 07UR-P01-B1-R1/R3.
+- **Classification:** actionable (fix or an explicit agreed disposition); medium; requirements /
+  integration. Pre-existing code, not introduced by B2; B2 makes it reachable by offering it.
+- **Evidence:** README intended behavior: a unit's connection is "usable by procedures running on
+  desks of that unit and its descendants"; decision (a) lets the unit's lead configure it; Plan06
+  lets a lead bind on their desks with themselves as run-as (only the owner may choose another,
+  bindings.rs:231-244). But `ConfiguredBinding::check_readiness(run_as, ..)`
+  (application/workflow/lifecycle/bindings.rs:59-61, 103-105) calls `ResourceDirectory::inspect`,
+  which requires Root management (`authorize_company`, workflow/resources.rs:37,
+  authority.rs:61-68), and action time repeats it for the run actor (`http_for_action`
+  workflow/http.rs:525; MCP workflow/mcp.rs:365). So a Billing lead offered Billing's connection
+  by B2's `binding_options(company, author)` cannot save a slot binding with it (NotFound), and a
+  lead-run desk using an in-reach unslotted HTTP tool is admitted and then fails `http.rejected`
+  at the action. Only root managers as run-as can use unit connections. Inspection only.
+- **Required:** either authorize these by management of the connection's unit / the desk, or
+  record the limitation as an explicit disposition (user decision or a named later phase) in TASK
+  and the plan; do not leave it implicit.
+- **Instruction lesson:** hypothesis — a "who may configure" decision was implemented without
+  tracing "who may then use it" through the run actor. Candidate (plan-level): an authority
+  widening names the run-time authority checks on the same resource and their disposition.
+- **Resolution history:** 2026-11-20 open.
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): **fixed under user decision (e)** (coordination r6). `resources::authorize_use_on` (unit managers for HTTP/MCP connections, root for everything else) replaces root management at `ResourceDirectory::inspect` (binding readiness and application action authorization), `http_for_action`, `mcp_use` (non-native branch) and reconciliation `lock_resource`. No other action path requires root management for a connection; the reconciliation command entry and run controls remain root-only (run administration, not connection use). Desk slot test: a Billing lead binds, is admitted and the action runs; root-owned connection refused for the lead. Consequences recorded as 07UR-P01-B2-F9.
+
+## 07UR-P01-B2-F6 — Agent `tool_options` and draft tool choices are not limited to the agent's reach
+
+- **Context:** as 07UR-P01-B2-F1 (round 07UR-P01-B2-R1, same digest).
+- **Classification:** actionable defect; low; requirements (01B.1 names `tool_options`).
+- **Evidence:** only `connections` gained `agent_reaches` (agent_authoring/catalog.rs:35-41).
+  `catalog::http`/`mcp` list a named connection's operations and schemas for any connection id in
+  the company (catalog.rs:95-108 and the MCP twin), and `choices::current_source`
+  (agent_authoring/choices.rs:56-90) accepts an out-of-reach connection into the draft. An agent
+  manager who has a sibling connection's id reads its operation contracts; publication then
+  refuses. No test.
+- **Required:** apply the reach predicate to the tool page and the draft choice (not found when
+  out of reach), with a sibling case.
+- **Instruction lesson:** none beyond 07UR-P01-G1-F8's (enumerate lookups by id/name, not only
+  lists).
+- **Resolution history:** 2026-11-20 open.
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): **fixed.** Tool pages and new draft choices require `agent_reaches`; offers test extended.
+
+## 07UR-P01-B2-F7 — Workflow publication refusal does not name the step; the JSON body differs from D8
+
+- **Context:** as 07UR-P01-B2-F1 (round 07UR-P01-B2-R1, same digest).
+- **Classification:** actionable (change or recorded disposition); low; requirements.
+- **Evidence:** 01B.2: refuse "naming the step and resource"; G1 D8: "reported as a diagnostic
+  naming the step and tool", JSON `{code, error, kind, resource}`. Implemented: an `AppError`
+  whose name is "<connection> for tool <tool> (slot <slot>)" / "<origin> for operation <op>"
+  (mcp_publication.rs:61-72, http_publication.rs:61-73), no step; JSON `{code, error, resource,
+  name}` without `kind` (app_error_impl.rs:40-44). TASK records "capture-time error, not a step
+  diagnostic" without saying the criterion's step is dropped.
+- **Required:** name the step(s) using the tool, or record the deviation from 01B.2/D8 explicitly
+  with its reason; align or re-state the JSON shape.
+- **Instruction lesson:** none supported.
+- **Resolution history:** 2026-11-20 open.
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): **fixed.** Refusal names literal-selected steps (`steps_using`; expression-chosen steps not named, recorded); JSON carries `kind`.
+
+## 07UR-P01-B2-F8 — Smaller observations (optional)
+
+- **Context:** as 07UR-P01-B2-F1 (round 07UR-P01-B2-R1, same digest).
+- **Classification:** optional suggestions; low.
+- **Evidence:** (1) channel reply settings save (`channel_reply.rs:288-333`, a configuration
+  write) refuses with stage Admission, i.e. code `admission.resource_outside_unit`; Binding
+  describes it better. (2) Binding slot offers use "reach of any unit the author manages" rather
+  than D7's association chain (recorded by the author; a superset, save checks the desk).
+  (3) `check_definition_reach_on` falls back to the author's creating department when the
+  definition row is absent; with `managing_department_id NOT NULL` the fallback is used only
+  before the first save. (4) Admission's agent check reads units without row locks (D10 said FOR
+  SHARE at admission); harmless since an admitted run is not stopped by a later move, but the
+  decision text and code differ.
+- **Resolution history:** 2026-11-20 open (optional).
+  2026-11-21 recheck 07UR-P01-B2-R2 (digest 9179c26d…ae9b): item 1 adopted (Binding stage); items 2–4 dispositioned by the author in TASK; accepted, non-blocking.
+
+## 07UR-P01-B2-F9 — Consequences of decision (e) worth the user's eye (optional)
+
+- **Context:** 2026-11-21; workflow implement-opus-reviewed-2_4; [TASK.md](TASK.md),
+  [REVIEW.md](REVIEW.md); batch B2, correction recheck, round 07UR-P01-B2-R2; reviewer Claude
+  Fable (claude-fable-5-2, medium); phase 07UR-P01; worktree
+  /Users/mac02/orca/workspaces/openbot/plan06; HEAD aa22b1b0 + working tree, digest
+  9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b; coordination r6.
+- **Classification:** optional observation; low; requirements interaction. The implementation
+  follows decision (e) as written; nothing here blocks acceptance.
+- **Evidence:** (1) Use requires managing the connection's unit, so a connection moved up to the
+  root ("sharing is moving up", README decision 1) is usable on a Billing desk only when the run
+  actor manages the root; a Billing lead's run cannot use it (asserted by the desk slot test).
+  (2) Offers still list ancestors' connections to a lead (`binding_options`, editor options)
+  that the lead cannot bind; the save answers the generic not-available message. (3) An agent's
+  own HTTP/MCP tool calls also pass `http_for_action`/`mcp_use`, so an admitted agent whose tool
+  connection is in the agent's reach (decision d) still fails at the action when the desk's run
+  actor does not manage that connection's unit; admission does not check this. (4) The
+  reconciliation command entry is root-only, so the unit rule in `lock_resource` is reachable
+  only by root managers.
+- **Suggested:** confirm (1) and (3) are intended, or narrow offers / add an admission-time actor
+  check in a later phase; record the answer in the plan.
+- **Resolution history:** 2026-11-21 open (optional).

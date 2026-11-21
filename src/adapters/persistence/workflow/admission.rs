@@ -71,7 +71,18 @@ impl WorkflowAdmission for PostgresPersistence {
             return Ok(AdmissionResult::Stale);
         }
         authorize_token_reviewers(&mut tx, command).await?;
-        resources::check_readiness(&mut tx, command.binding().as_ref().into()).await?;
+        let reach =
+            resources::association_reach_on(&mut tx, command.company_id(), command.association())
+                .await?;
+        resources::check_readiness(
+            &mut tx,
+            resources::ReadinessSelection::of(
+                command.binding().as_ref(),
+                reach,
+                crate::app_error::UnitCheckStage::Admission,
+            ),
+        )
+        .await?;
         if let Err(error) = admission_write::create(&mut tx, command, &source).await {
             if let AppError::WorkflowRole(refusal) = &error {
                 if !admission_refusal::record_on(&mut tx, command, &source, refusal).await? {

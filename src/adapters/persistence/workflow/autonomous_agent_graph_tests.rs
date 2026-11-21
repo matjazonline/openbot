@@ -418,3 +418,123 @@ async fn autonomous_agent_admission_node_limit_covers_the_complete_dynamic_unive
         "all256 declared agents plus the root workflow exceed the limit, despite one runtime selector"
     );
 }
+
+/// Plan07 D9a (B2-F4): an agent's workflow tool whose bundle uses an unslotted operation is
+/// checked against the run's reach, not the agent's: with the connection moved into Billing and
+/// the agent placed there (its own tool stays in its reach), the company-wide run is refused.
+#[tokio::test]
+async fn unit_resource_selection_admission_workflow_agent_tool_bundle_out_of_reach_is_refused() {
+    let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
+    let p = &setup.fixture.persistence;
+    let company = setup.fixture.target.company;
+    let child_fixture = Fixture {
+        _db: setup.fixture._db.clone(),
+        persistence: p.clone(),
+        target: DefinitionTarget {
+            workflow: WorkflowId::new(Uuid::new_v4()),
+            ..setup.fixture.target
+        },
+    };
+    let mut source: Value =
+        serde_json::from_str(&registry::example("tool.call").unwrap().source).unwrap();
+    source["workflow_id"] = json!(child_fixture.target.workflow.to_string());
+    source["steps"]["start"]["with"] = json!({"tool":{"literal":"registered.request"},
+        "arguments":{"literal":{"method":"POST","path":"/messages","body":{"message":"hello"}}}});
+    let service = DefinitionService::new(
+        Preflight,
+        p.clone(),
+        WorkflowSourceDecoder,
+        http_directory(p, &setup.connection),
+    );
+    let mut draft = child_fixture.save(None);
+    draft.content.source = source.to_string();
+    service.save(draft).await.unwrap();
+    let mut publication = child_fixture.publish();
+    publication.version = VersionId::new(Uuid::new_v4());
+    publication.key =
+        IdempotencyKey::parse(format!("graph:{}", publication.version.as_uuid())).unwrap();
+    service.publish(publication.clone()).await.unwrap();
+    let child = GraphWorkflow {
+        workflow: child_fixture.target.workflow,
+        version: publication.version,
+        binding: BindingTarget {
+            company,
+            actor: setup.fixture.target.actor,
+            binding: WorkflowBindingId::new(Uuid::new_v4()),
+        },
+    };
+    let scope = AgentPublicationScope {
+        company,
+        actor: setup.fixture.target.actor,
+        agent: AgentId::new(setup.agent),
+    };
+    let original = AgentPublications::active_agent_revision(p, scope)
+        .await
+        .unwrap()
+        .unwrap();
+    let mut bindings: Vec<_> = original
+        .definition
+        .tools
+        .iter()
+        .map(|tool| tool.binding.clone())
+        .collect();
+    bindings.push(register_child(&setup, &child, "lookup_child").await);
+    AgentPersistence::update(
+        p,
+        setup.agent,
+        AgentWrite {
+            name: "Assistant".into(),
+            slug: "assistant".into(),
+            provider: Some(SCRIPTED_PROVIDER.into()),
+            model: Some(SCRIPTED_MODEL.into()),
+            tool_bindings: Some(bindings),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    setup.fixture.publish_agent(setup.agent).await;
+    let root = root_graph(&setup).await;
+    assert!(matches!(
+        admit_graph(&setup, &root, "agent-tool-in-reach")
+            .await
+            .unwrap(),
+        AdmissionResult::Created(_)
+    ));
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    sqlx::query(
+        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
+         SELECT $1, $2, 'lead', id FROM principals WHERE company_id=$1 AND agent_id=$3 \
+         AND kind='agent'",
+    )
+    .bind(company.as_uuid())
+    .bind(billing)
+    .bind(setup.agent)
+    .execute(p.pool())
+    .await
+    .unwrap();
+    p.move_http(
+        company,
+        setup.fixture.target.actor,
+        setup.connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    let runs: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
+        .bind(company.as_uuid())
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    assert!(
+        admit_graph(&setup, &root, "agent-tool-out-of-reach")
+            .await
+            .is_err()
+    );
+    let after: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
+        .bind(company.as_uuid())
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    assert_eq!(after, runs, "refused before any run row");
+}

@@ -1,8 +1,10 @@
 use super::*;
 
+/// `agent`'s own reach bounds which connections a new choice may name (Plan07 decision d).
 pub(super) async fn resolve(
     db: &mut PgConnection,
     company: Uuid,
+    agent: Uuid,
     previous: &[AgentToolBinding],
     assignments: &[AgentToolAssignment],
 ) -> AppResult<Vec<AgentToolBinding>> {
@@ -33,7 +35,7 @@ pub(super) async fn resolve(
             result.push(binding.clone());
             continue;
         }
-        let source = current_source(db, company, &assignment.choice).await?;
+        let source = current_source(db, company, agent, &assignment.choice).await?;
         if matches!(&source,AgentBindingSource::Builtin {tool} if tool.is_provisioning()) {
             return Err(AppError::BadRequest("Builder provisioning capabilities may only be kept or removed; they cannot be added".into()));
         }
@@ -50,6 +52,7 @@ pub(super) async fn resolve(
 async fn current_source(
     db: &mut PgConnection,
     company: Uuid,
+    agent: Uuid,
     choice: &AgentToolChoice,
 ) -> AppResult<AgentBindingSource> {
     let source = match choice {
@@ -58,8 +61,8 @@ async fn current_source(
             connection,
             operation,
         } => {
-            let available: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_http_connections AS connection JOIN workflow_http_operations AS operation ON operation.company_id=connection.company_id AND operation.connection_id=connection.id WHERE connection.company_id=$1 AND connection.id=$2 AND connection.enabled AND operation.name=$3 AND operation.revoked_at IS NULL)")
-                .bind(company).bind(connection).bind(operation.as_str()).fetch_one(&mut *db).await?;
+            let available: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_http_connections AS connection JOIN workflow_http_operations AS operation ON operation.company_id=connection.company_id AND operation.connection_id=connection.id WHERE connection.company_id=$1 AND connection.id=$2 AND connection.enabled AND operation.name=$3 AND operation.revoked_at IS NULL AND agent_reaches($1,$4,connection.unit_id))")
+                .bind(company).bind(connection).bind(operation.as_str()).bind(agent).fetch_one(&mut *db).await?;
             if !available {
                 return Err(unavailable("HTTP operation"));
             }
@@ -74,8 +77,8 @@ async fn current_source(
             reviewed_version,
             remote_name,
         } => {
-            let available: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM company_mcp_connections AS connection JOIN workflow_mcp_operations AS operation ON operation.company_id=connection.company_id AND operation.connection_id=connection.id JOIN company_mcp_tool_grants AS grant_row ON grant_row.company_id=operation.company_id AND grant_row.connection_id=operation.connection_id AND grant_row.tool_name=$5 AND grant_row.revoked_at IS NULL WHERE connection.company_id=$1 AND connection.id=$2 AND connection.enabled AND connection.deleted_at IS NULL AND operation.name=$3 AND operation.version=$4 AND operation.revoked_at IS NULL AND operation.snapshot->'contract'->>'name'=$5)")
-                .bind(company).bind(connection).bind(operation.as_str()).bind(reviewed_version).bind(remote_name.as_str()).fetch_one(&mut *db).await?;
+            let available: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM company_mcp_connections AS connection JOIN workflow_mcp_operations AS operation ON operation.company_id=connection.company_id AND operation.connection_id=connection.id JOIN company_mcp_tool_grants AS grant_row ON grant_row.company_id=operation.company_id AND grant_row.connection_id=operation.connection_id AND grant_row.tool_name=$5 AND grant_row.revoked_at IS NULL WHERE connection.company_id=$1 AND connection.id=$2 AND connection.enabled AND connection.deleted_at IS NULL AND operation.name=$3 AND operation.version=$4 AND operation.revoked_at IS NULL AND operation.snapshot->'contract'->>'name'=$5 AND agent_reaches($1,$6,connection.unit_id))")
+                .bind(company).bind(connection).bind(operation.as_str()).bind(reviewed_version).bind(remote_name.as_str()).bind(agent).fetch_one(&mut *db).await?;
             if !available {
                 return Err(unavailable("Reviewed MCP operation"));
             }

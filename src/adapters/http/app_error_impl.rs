@@ -11,6 +11,7 @@ impl IntoResponse for AppError {
         let error_kind = match &self {
             AppError::WorkflowRole(_) => "workflow_role",
             AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
+            AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
             AppError::KnowledgeRelease { .. } => "knowledge_release",
             AppError::Execution(_) => "execution",
             AppError::Database(_) => "database",
@@ -35,6 +36,11 @@ impl IntoResponse for AppError {
             AppError::WorkflowRole(refusal) => (
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({"code":refusal.kind.code(),"error":refusal.to_string(),"step":refusal.step,"role":refusal.role})),
+            ).into_response(),
+            AppError::ResourceOutsideUnit(refusal) => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"code":refusal.code(),"error":refusal.to_string(),
+                    "kind":refusal.kind.code(),"resource":refusal.resource,"name":refusal.name})),
             ).into_response(),
             AppError::KnowledgeTrigger { .. } => (
                 StatusCode::BAD_REQUEST,

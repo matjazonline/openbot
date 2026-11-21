@@ -15847,6 +15847,44 @@ CREATE INDEX skills_unit_idx ON public.skills USING btree (company_id, unit_id);
 CREATE INDEX company_mcp_connections_unit_idx ON public.company_mcp_connections USING btree (company_id, unit_id);
 CREATE INDEX workflow_http_connections_unit_idx ON public.workflow_http_connections USING btree (company_id, unit_id);
 
+-- Whether `unit` is `start` or one of its ancestors (Plan07): a skill or connection is in reach of
+-- the desks, definitions and agents in its unit and below it. Bounded like the tree (8 levels).
+CREATE FUNCTION public.unit_reaches(checked_company uuid, start uuid, unit uuid)
+    RETURNS boolean LANGUAGE sql STABLE AS $$
+    WITH RECURSIVE chain(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1 FROM public.departments AS department
+        WHERE department.company_id = checked_company AND department.id = start
+        UNION ALL
+        SELECT department.id, department.parent_id, chain.depth + 1 FROM chain
+        JOIN public.departments AS department
+            ON department.company_id = checked_company AND department.id = chain.parent_id
+        WHERE chain.depth < 8
+    )
+    SELECT EXISTS (SELECT 1 FROM chain WHERE chain.id = unit)
+$$;
+
+-- An agent's own reach (Plan07 decision d): any unit it is placed in (member or role) and their
+-- ancestors; the root alone when it has no placement.
+CREATE FUNCTION public.agent_reaches(checked_company uuid, checked_agent uuid, unit uuid)
+    RETURNS boolean LANGUAGE sql STABLE AS $$
+    WITH target AS (
+        SELECT id FROM public.principals
+        WHERE company_id = checked_company AND agent_id = checked_agent AND kind = 'agent'
+    ), placements AS (
+        SELECT member.department_id FROM public.department_members AS member
+        JOIN target ON target.id = member.principal_id WHERE member.company_id = checked_company
+        UNION SELECT holder.department_id FROM public.department_roles AS holder
+        JOIN target ON target.id = holder.principal_id WHERE holder.company_id = checked_company
+    ), starts AS (
+        SELECT department_id FROM placements
+        UNION ALL SELECT id FROM public.departments
+        WHERE company_id = checked_company AND is_root AND NOT EXISTS (SELECT 1 FROM placements)
+    )
+    SELECT EXISTS (
+        SELECT 1 FROM starts WHERE public.unit_reaches(checked_company, starts.department_id, unit)
+    )
+$$;
+
 -- The unit a new skill or connection gets when its creator names none: the root for a root
 -- manager, else the one department they lead, else NULL (the creator must choose).
 CREATE FUNCTION public.resource_default_unit(checked_user uuid, checked_company uuid)
@@ -16498,7 +16536,8 @@ ALTER TABLE public.schedule_runs ADD COLUMN role_refusal jsonb,
         AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
 ALTER TABLE public.schedule_runs DROP CONSTRAINT schedule_runs_refusal_check,
     ADD CONSTRAINT schedule_runs_refusal_check CHECK ((refusal IS NULL
-        OR refusal IN ('unavailable','input_rejected','key_conflict')
+        OR refusal IN ('unavailable','input_rejected','key_conflict',
+            'admission.resource_outside_unit')
         OR (role_refusal IS NOT NULL AND public.valid_workflow_role_refusal(role_refusal)
             AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
 

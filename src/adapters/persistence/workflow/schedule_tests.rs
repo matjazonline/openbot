@@ -1615,3 +1615,83 @@ async fn channel_path_fk_schedules_of_both_binding_kinds_leave_with_channel_and_
         assert_eq!(schedule_rows(&s).await, 0);
     }
 }
+
+/// Plan07 D8: a scheduled run refused because a resource left its reach settles with that code,
+/// which the schedule refusal CHECK admits.
+#[tokio::test]
+async fn unit_resource_selection_refusal_settles_a_schedule_occurrence() {
+    let s = Schedules::new().await;
+    let schedule = s.schedule("Hourly").await;
+    s.due(schedule.id).await;
+    let worker = ScheduleWorkerId(Uuid::new_v4());
+    let lease = Utc::now() + chrono::Duration::minutes(1);
+    let claimed = s.p().claim_due(worker, lease, 10).await.unwrap();
+    let claim = OccurrenceClaim {
+        company: s.fixture.target.company,
+        occurrence: claimed[0].id,
+        worker,
+        generation: claimed[0].materialization_generation,
+    };
+    assert!(
+        s.p()
+            .record_refusal(claim, "admission.resource_outside_unit", None)
+            .await
+            .unwrap()
+    );
+    let (_, status, _, refusal, _) = s.occurrences(schedule.id).await[0].clone();
+    assert_eq!(
+        (status.as_str(), refusal.as_deref()),
+        ("failed", Some("admission.resource_outside_unit"))
+    );
+}
+
+/// Plan07 D8 through production (B2-F4): a scheduled run whose binding's MCP slot connection
+/// moved out of the company-wide binding's reach is refused by the real admission with
+/// `admission.resource_outside_unit`; the occurrence fails with that code and has no run.
+#[tokio::test]
+async fn unit_resource_selection_refusal_of_a_scheduled_run_settles_its_occurrence() {
+    let mut f =
+        super::binding_tests::BindingFixture::new(json!([{"slot":"service","kind":"mcp"}])).await;
+    let connection = f.mcp().await;
+    let configured = f.service().configure(f.request(None)).await.unwrap();
+    f.service()
+        .activate(SetBindingActivity {
+            target: f.target,
+            expected: configured.revision,
+        })
+        .await
+        .unwrap();
+    let binding = f.target.binding.as_uuid();
+    let fixture = f.fixture;
+    let channel = channel(&fixture, "reports").await;
+    let use_cases = schedule_use_cases(&fixture.persistence);
+    let s = Schedules {
+        fixture,
+        channel,
+        binding,
+        use_cases,
+    };
+    let schedule = s.schedule("Hourly").await;
+    let billing = s.p().test_unit(s.company(), "billing").await;
+    crate::application::use_cases::mcp::McpPersistence::move_mcp_connection(
+        s.p(),
+        s.owner(),
+        s.company(),
+        connection,
+        billing,
+    )
+    .await
+    .unwrap();
+    s.due(schedule.id).await;
+    let materializer = s.materializer(admission(s.p()));
+    assert_eq!(
+        s.drain(&materializer).await,
+        vec![Materialized::Refused("admission.resource_outside_unit")]
+    );
+    let (occurrence, status, run, refusal, _) = s.occurrences(schedule.id).await[0].clone();
+    assert_eq!(
+        (status.as_str(), run, refusal.as_deref()),
+        ("failed", None, Some("admission.resource_outside_unit"))
+    );
+    assert!(s.runs_for(occurrence).await.is_empty());
+}

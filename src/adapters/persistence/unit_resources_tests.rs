@@ -964,15 +964,28 @@ async fn unit_resource_skills_tab_and_agent_authoring_reads() {
         ids.sort();
         ids
     };
+    // B2 (decision d): a new agent of the Sales lead can be placed in Sales or below, so its
+    // offers are what reaches from there: Sales and the root, not the sibling Support.
+    let mut reachable = vec![root.id, sales.id];
+    reachable.sort();
+    assert_eq!(
+        ids(cases
+            .list_authoring_page(d.f.member, company, None, page())
+            .await
+            .unwrap()
+            .items),
+        reachable
+    );
     let mut every = vec![root.id, support.id, sales.id];
     every.sort();
     assert_eq!(
         ids(cases
-            .list_authoring_page(d.f.member, company, page())
+            .list_authoring_page(d.f.owner, company, None, page())
             .await
             .unwrap()
             .items),
-        every
+        every,
+        "the owner can place an agent anywhere"
     );
     assert_eq!(
         ids(cases
@@ -984,7 +997,7 @@ async fn unit_resource_skills_tab_and_agent_authoring_reads() {
     );
     refused(
         cases
-            .list_authoring_page(d.f.stranger, company, page())
+            .list_authoring_page(d.f.stranger, company, None, page())
             .await,
     );
 }

@@ -265,3 +265,106 @@ pub(crate) async fn owned_resources_on(
     let total = rows.first().map_or(0, |row| row.1);
     Ok((rows.into_iter().map(|row| row.0).collect(), total))
 }
+
+/// Every connection tool and skill of an agent must belong to a unit in the agent's own reach
+/// (Plan07 decision d): one of its current placements or an ancestor, the root when it has none.
+/// Reads the resources' current units, so a move since publication is seen; a deleted
+/// connection (no unit) is left to the existing revocation refusals.
+pub(crate) async fn check_agent_reach_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    agent: Uuid,
+    tools: &[crate::application::agent::ResolvedAgentTool],
+    skills: &[crate::application::agent::ResolvedAgentSkill],
+    stage: crate::app_error::UnitCheckStage,
+) -> AppResult<()> {
+    use crate::entities::agent_capability::AgentBindingSource;
+    let mut resources = Vec::new();
+    for tool in tools {
+        match &tool.binding.source {
+            AgentBindingSource::Http { connection, .. } => resources.push((
+                UnitResourceKind::HttpConnection,
+                *connection,
+                tool.binding.alias.as_str().to_owned(),
+            )),
+            AgentBindingSource::Mcp { connection, .. } => resources.push((
+                UnitResourceKind::McpConnection,
+                *connection,
+                tool.binding.alias.as_str().to_owned(),
+            )),
+            _ => {}
+        }
+    }
+    for assigned in skills {
+        resources.push((
+            UnitResourceKind::Skill,
+            assigned.skill.skill_id,
+            assigned.skill.name.as_str().to_owned(),
+        ));
+    }
+    for (kind, id, name) in resources {
+        let table = match kind {
+            UnitResourceKind::Skill => "skills",
+            UnitResourceKind::McpConnection => "company_mcp_connections",
+            UnitResourceKind::HttpConnection => "workflow_http_connections",
+        };
+        let reached: Option<Option<bool>> = sqlx::query_scalar(&format!(
+            "SELECT CASE WHEN unit_id IS NULL THEN NULL ELSE agent_reaches($1,$3,unit_id) END \
+             FROM {table} WHERE company_id=$1 AND id=$2"
+        ))
+        .bind(company.as_uuid())
+        .bind(id)
+        .bind(agent)
+        .fetch_optional(&mut *db)
+        .await?;
+        if reached.flatten() == Some(false) {
+            return Err(AppError::ResourceOutsideUnit(
+                crate::app_error::ResourceOutsideUnit {
+                    stage,
+                    kind,
+                    resource: id,
+                    name,
+                },
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// A workflow publication may select only connections in reach of its definition's managing
+/// department, or of the author's creating department before it exists (Plan07 01B.2).
+pub(crate) async fn check_definition_reach_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    reach: crate::application::workflow::reads::PublicationReach,
+    kind: UnitResourceKind,
+    id: Uuid,
+    unit: Option<Uuid>,
+    name: String,
+) -> AppResult<()> {
+    let Some(unit) = unit else {
+        return Ok(());
+    };
+    let reached: bool = sqlx::query_scalar(
+        "SELECT unit_reaches($1, COALESCE((SELECT managing_department_id FROM \
+         workflow_definitions WHERE company_id=$1 AND id=$2), \
+         workflow_creating_department($3,$1)), $4)",
+    )
+    .bind(company.as_uuid())
+    .bind(reach.workflow.as_uuid())
+    .bind(reach.author)
+    .bind(unit)
+    .fetch_one(&mut *db)
+    .await?;
+    if reached {
+        return Ok(());
+    }
+    Err(AppError::ResourceOutsideUnit(
+        crate::app_error::ResourceOutsideUnit {
+            stage: crate::app_error::UnitCheckStage::Publication,
+            kind,
+            resource: id,
+            name,
+        },
+    ))
+}

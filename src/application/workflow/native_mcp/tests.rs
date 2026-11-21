@@ -17,6 +17,7 @@ fn identity() -> NativeBrokerIdentity {
 
 fn tool(approval_required: bool) -> ResolvedAgentTool {
     ResolvedAgentTool {
+        unit_id: Some(uuid::Uuid::nil()),
         binding: AgentToolBinding {
             id: AgentBindingId::new(Uuid::new_v4()),
             alias: AgentToolAlias::parse("lookup").unwrap(),

@@ -30,11 +30,28 @@ pub(super) use publication_owner::capture_on as capture_publication_on;
 #[path = "http_runtime.rs"]
 pub(super) mod runtime;
 
+/// Which HTTP connections may own an unslotted operation (Plan07 G1 r2 F2).
+#[derive(Debug, Clone, Copy)]
+pub(super) enum ConnectionReach {
+    /// Existence anywhere in the company: the support check every binding save, admission and
+    /// replay runs before its reach-aware readiness check. Several units may own the operation;
+    /// which one a run uses is decided within its reach (G1 r2 F2), so this mode never routes.
+    Company,
+    /// Connections in reach of this base department (the root when `None`); ambiguity is judged
+    /// among them only, so another unit's identical operation neither stands in nor collides.
+    From(Option<crate::entities::department::DepartmentId>),
+}
+
 pub(super) async fn registered_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     wanted: &publication::ToolSnapshot,
+    reach: ConnectionReach,
 ) -> AppResult<Uuid> {
+    let (anywhere, start) = match reach {
+        ConnectionReach::Company => (true, None),
+        ConnectionReach::From(start) => (false, start.map(|unit| unit.as_uuid())),
+    };
     let mut normalized = wanted.clone();
     normalized.contract.connection = None;
     HttpOperation {
@@ -43,10 +60,11 @@ pub(super) async fn registered_on(
     }
     .validate(company)?;
     let snapshot = serde_json::to_value(normalized).map_err(|_| invalid())?;
-    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) ORDER BY operation.connection_id LIMIT 2")
-        .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).fetch_all(&mut **tx).await?;
-    // A tool without a binding must have exactly one owner; ambiguous routing fails closed.
-    if ids.is_empty() || (wanted.contract.connection.is_none() && ids.len() != 1) {
+    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) AND ($4 OR unit_reaches($1, COALESCE($5, (SELECT id FROM departments WHERE company_id=$1 AND is_root)), connection.unit_id)) ORDER BY operation.connection_id LIMIT 2")
+        .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).bind(anywhere).bind(start).fetch_all(&mut **tx).await?;
+    // A tool without a binding must have exactly one owner in reach; ambiguous routing fails
+    // closed. Company-wide existence does not route, so multiplicity there is not ambiguity.
+    if ids.is_empty() || (!anywhere && wanted.contract.connection.is_none() && ids.len() != 1) {
         return Err(missing());
     }
     Ok(ids[0])
@@ -506,10 +524,11 @@ impl PostgresPersistence {
         let company = request.scope.company;
         let id = http_target(&request.target)?;
         let mut tx = begin_http(self).await?;
-        authority::authorize_company(
+        super::resources::authorize_use_on(
             &mut tx,
             company,
             WorkflowActor::authenticated(request.context.actor)?,
+            id,
         )
         .await?;
         live_run_on(&mut tx, request).await?;

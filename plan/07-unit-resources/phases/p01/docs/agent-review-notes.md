@@ -350,3 +350,137 @@
 
 - Three B1 rounds; the second exposed a defect missed in R1 (B1-F6, follow-up recorded on R1).
   Both late defects sat behind tests that asserted at the wrong layer or on a shared error class.
+
+## 07UR-P01-B2-R1 (2026-11-20, batch review of B2)
+
+### Identity
+
+- Round 07UR-P01-B2-R1; workflow implement-opus-reviewed-2_4; batch B2 (G1 D6–D11 with r2/r3),
+  batch review. Records [TASK.md](TASK.md), [REVIEW.md](REVIEW.md). Reviewer Claude Fable
+  (claude-fable-5-2; Fable/medium per coordination r5), a new reviewer for this phase (earlier
+  rounds: Opus 5.5). Phase 07UR-P01; worktree /Users/mac02/orca/workspaces/openbot/plan06,
+  branch plan07; phase start cc545881, review base and HEAD
+  aa22b1b08d0c9d394f5f19ad1bf85e42f83d00f2 (B1), B2 = working tree. Digest
+  f228e7fe9f45aaeb23cdc98d10d8c70681394eb5d87df9aaf066d9c8b7e73167 (exclusions
+  plan/07-unit-resources/phases/p01/docs, plan/07-unit-resources/COORDINATION.md) confirmed
+  before and after the review. Gate G1 r1/r2/r3 (PASS 07UR-P01-G1-R3).
+- Coordination: plan/07-unit-resources/COORDINATION.md revision 5, no cross-phase notices;
+  decisions (a), (b), (d) applied; rechecked unchanged before returning.
+- Evidence: author manifest logs/07UR-P01-B2-R1.evidence.json validated against the digest
+  (9 PASS, 3 FAIL; declared results inspected, see below). Reviewer run
+  logs/B2-R1-reviewer-unit-resource.txt (sha256 9b32feed…3390): `cargo test --locked --offline
+  --lib -- unit_resource message_admission` on fresh migrated openbot_p07_b2r_1 (+ `_test`) at
+  127.0.0.1:55407, Node 24, SQLX_OFFLINE=true — 31 passed, 0 failed; both databases dropped.
+
+### Coverage and evidence
+
+- Requirements read from README (decisions 1, 2, 6, 7; "What does not change"), doc 01 (01B and
+  focused checks), coordination decisions, AGENTS.md; G1 r1–r3 text in TASK.
+- Read the whole non-test B2 diff (migration; application errors, definition, skill use case,
+  reads, classify, inbound worker; persistence capture/tools, unit_resources reach checks,
+  resources/readiness, http/registered_on, runtime, admission, replay, manifest closure, channel
+  reply, publication captures, sample capture, provisioning, binding selection, authoring reads,
+  skill list, native) and every new test. Traced callers beyond the diff: `supported_publication`
+  and `verify_selection`; run scope capture/copy (`run_scopes`, `workflow_target_departments`,
+  `scopes::run_scopes`) against `association_reach_on`/`run_reach_on`; agent publication entry
+  points (publish, preview, `publish_initial_on`, creation order vs placement); every caller of
+  `native::selected_with_locks_on` and their error classifiers; UI handlers that render
+  refusals; SQL readers of agent revision content.
+- Established by inspection: base read set = association chain (root when empty) and
+  `run_reach_on` reads the same start; agent-origin HTTP tool calls do not use run reach;
+  ModelOnly exposes neither tools nor skills (`AgentSelection::tools/skills`); agent revision
+  comparison (`check_source_with_locks_on`) ignores the captured unit, so a move up does not
+  revoke; new-agent placement precedes its first publication; capture is the single constructor
+  of the two changed formats; SQL readers address fields, so D11 needs no version bump; the
+  competing test uses two real transactions ordered by the skill row lock in both orders; no
+  test was removed (two B1 tests adapted, reasons recorded in TASK).
+- Tested (reviewer re-run): the 29 `unit_resource` tests and the classify assertion pass.
+  Inspected, not re-run: author's local_agents, autonomous_agent, agent_publication,
+  provisioning, clippy, sqlx prepare, schema apply logs; the agent_history FAIL is the inherited
+  Doop 8-vs-7 deferral; the vault-group FAIL has a baseline on aa22b1b0
+  (logs/B2-vault-group-B1-baseline.txt) — confirmed unrelated failures, recorded separately, not
+  findings.
+- Not executed / gaps: the defects in F1, F2, F3 and F5 are established by reading call chains,
+  not reproduced (the reviewer may not add tests). Reviewed lightly: test-fixture updates in
+  application tests (unit_id added), the UI templates for pickers, sample-capture runtime.
+- Mapping check: TASK "Acceptance mapping additions (r2)" and "Acceptance mapping (planned)"
+  compared row by row with the actual tests; mismatches are 07UR-P01-B2-F4 (and F1 for the F2
+  row). Contract-impact rows compared with callers; omissions are F1 (support check), F2
+  (native classifiers), F3 (UI consumers), F6 (tool page).
+
+### Outcome
+
+- **Changes required** for B2 at digest f228e7fe…. Findings in
+  [agent-review-findings.md](agent-review-findings.md): actionable 07UR-P01-B2-F1 (medium),
+  F2 (medium), F3 (medium), F4 (medium), F5 (medium, fix or explicit disposition), F6 (low),
+  F7 (low); optional F8.
+- Author's "to confirm" items: the maintenance sweep is unchanged and does not see reach, so it
+  retires an in-flight native call only at its deadline or turn end, with Status/Cancel refused
+  meanwhile (in F2); run-time action authority and `ResourceDirectory::inspect` requiring root
+  management is F5.
+- A recheck should cover the F1–F3 code paths and their new tests, the F4 additions with logs,
+  the F5 disposition, F6/F7, and re-run unit_resource, binding, http_tests, local_agents and the
+  touched UI route tests; capture, agent reach, offers and formats can be reused if unchanged.
+
+### Process and instruction feedback
+
+- The batch (≈1.8k lines, 58 files) was reviewable in one pass; the defects were outside the
+  diff, in unchanged callers and classifiers of changed contracts.
+- Gate vs implementation: F1 and F2 are implementation departures from gated text (r2 F2; G1-F15
+  note); F5 is a requirement gap no gate decided; F7 is an unrecorded deviation from D8.
+- Author records: the "B2 implementation" prose was accurate and its "to confirm" list useful;
+  the contract-impact table was not updated for the new error variant's consumers and the
+  acceptance mapping kept planned names. Candidate instructions are in F1 and F2 (enter a
+  criterion's test through a production caller per mode; for a new error variant, enumerate
+  classifiers that name its sibling variants). No change to repository instructions is otherwise
+  supported.
+
+## 07UR-P01-B2-R2 (2026-11-21, correction recheck of B2)
+
+### Identity
+
+- Round 07UR-P01-B2-R2; workflow implement-opus-reviewed-2_4; recheck of 07UR-P01-B2-F1–F8.
+  Reviewer Claude Fable (claude-fable-5-2, medium); same worktree/branch; HEAD aa22b1b0, B2 =
+  working tree. Digest 9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b (same
+  exclusions) confirmed before and after. Coordination revision 6 (new user decision (e) on
+  B2-F5), no notices; rechecked before returning.
+- Evidence: author manifest logs/07UR-P01-B2-R2.evidence.json validated (4 PASS, 2 FAIL).
+  Reviewer run logs/B2-R2-reviewer-focused.txt (sha256 6ecfad921cbbd799168fee5d571279b1e6343817efb92e6d3af0b021ff9584c5): `cargo test --locked --offline
+  --lib -- unit_resource message_admission binding_tests http_tests::http mcp_api reconcil` on
+  fresh migrated openbot_p07_b2r2r_1 (+ `_test`) at 127.0.0.1:55407, Node 24,
+  SQLX_OFFLINE=true — 428 passed, 0 failed, including all 38 `unit_resource` tests; databases
+  dropped.
+
+### Coverage and evidence
+
+- Read the correction delta in every production file the author listed and the new tests'
+  decisive assertions; checked each finding by ID (resolution histories in the findings log).
+- Decision (e) contract: traced `authorize_use_on` and every remaining `authorize_company`
+  caller under workflow persistence, the HTTP/MCP `lock_current` implementations,
+  `action_authority` load, `mcp_use` native branch and application action authorization
+  (`actions/authorization.rs` → `inspect`). No action path still requires root management for
+  an HTTP/MCP connection; messaging and JEV keep it; non-connection ids fall back to root.
+- Tested: reviewer run above. Inspected, not re-run: author's focused run (630 passed, 1 failed =
+  the vault log-capture test with the aa22b1b0 baseline), clippy, sqlx check, schema apply. The
+  author's full lib run (4921 passed, 2 failed: inherited Doop deferral; a vault membership test
+  broken by a since-reverted test-helper change) predates the helper revert and the F8(1) stage
+  change; after them only the focused filters were rerun — the production delta since is the
+  one-line stage change, covered by the channel_reply filter. The phase's full gate is p03.
+- By inspection only (as TASK states): wait continuation settling, Status/Cancel after a reach
+  loss, reconciliation `lock_resource`, message-intent refusal through production.
+
+### Outcome
+
+- **PASS for B2 at digest 9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b**
+  (coordination revision 6; G1 r3; decisions (a), (b), (d), (e)). F1–F7 fixed; F8 item 1
+  adopted, 2–4 dispositioned. New optional 07UR-P01-B2-F9 (consequences of decision (e)).
+- Relied on: R1 full inspection of the B2 diff for unchanged parts (capture, agent reach,
+  offers, formats, classify, schema); R2 inspection of each correction; the reviewer runs of R1
+  (31) and R2 (428).
+
+### Process and instruction feedback
+
+- One correction round closed seven findings; the author's per-finding table with test names and
+  the stand-in column made the recheck direct. The user decision on F5 was taken rather than
+  deferred, which removed the largest open question. No instruction change supported beyond the
+  candidates already recorded in B2-F1/F2.

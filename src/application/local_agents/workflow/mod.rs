@@ -164,7 +164,8 @@ impl<P: LocalAgentWorkflow> WorkflowHandler for LocalAgentHandler<P> {
                 AppError::NotFound(_)
                 | AppError::Forbidden(_)
                 | AppError::BadRequest(_)
-                | AppError::Conflict(_),
+                | AppError::Conflict(_)
+                | AppError::ResourceOutsideUnit(_),
             ) => failure("local_agent.refused", FailureClass::Terminal).into(),
             Err(_) => failure("local_agent.storage_unavailable", FailureClass::Retryable).into(),
         }

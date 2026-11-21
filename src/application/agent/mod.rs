@@ -60,6 +60,8 @@ pub struct ModelSettings {
 #[serde(deny_unknown_fields)]
 pub struct SkillSnapshot {
     pub company_id: CompanyId,
+    /// The skill's unit when this revision was published (Plan07).
+    pub unit_id: uuid::Uuid,
     /// Trusted library identity for revocation checks; never model input.
     pub skill_id: uuid::Uuid,
     pub name: TypeName,

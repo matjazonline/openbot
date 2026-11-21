@@ -72,7 +72,16 @@ pub(super) async fn save_binding_on(
     }
     if !matches!(change, Change::Deactivate) {
         verify_selection(tx, configuration).await?;
-        resources::check_readiness(tx, configuration.as_ref().into()).await?;
+        let reach = resources::association_reach_on(tx, company, state.association).await?;
+        resources::check_readiness(
+            tx,
+            resources::ReadinessSelection::of(
+                configuration.as_ref(),
+                reach,
+                crate::app_error::UnitCheckStage::Binding,
+            ),
+        )
+        .await?;
         check_run_as(tx, command, current.as_ref()).await?;
         if state.active && configuration.message_trigger().is_some() {
             check_message_binding_cap(tx, command).await?;

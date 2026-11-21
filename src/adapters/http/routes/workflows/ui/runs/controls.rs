@@ -19,6 +19,9 @@ fn refusal(error: &WorkflowError) -> Option<String> {
         WorkflowError::App(AppError::BadRequest(message)) => {
             Some(format!("Nothing was done: {message}."))
         }
+        WorkflowError::App(AppError::ResourceOutsideUnit(refusal)) => {
+            Some(format!("Nothing was done: {refusal}."))
+        }
         WorkflowError::Diagnostic(diagnostic) => {
             Some(format!("Nothing was done: {}.", diagnostic.message))
         }

@@ -40,6 +40,7 @@ impl SkillHistory {
         value.skills.push(ResolvedAgentSkill {
             assignment_id: AgentSkillAssignmentId::new(assignment),
             skill: SkillSnapshot {
+                unit_id: uuid::Uuid::nil(),
                 description: "Skill instructions".into(),
                 files: Vec::new(),
                 company_id: f.binding.target.company,

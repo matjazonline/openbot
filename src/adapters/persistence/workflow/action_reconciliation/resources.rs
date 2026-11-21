@@ -56,8 +56,9 @@ impl SqlReconciliationResources for CompanyReconciliationResources {
             }
             ResourceRoute::Connection(resource) => {
                 let company = frozen.action.scope().company;
-                // Company before the connection, the order dispatch and connection edits take.
-                authority::authorize_company(tx, company, actor).await?;
+                // Company before the connection, the order dispatch and connection edits take;
+                // a connection's use belongs to its unit's managers (Plan07 decision e).
+                super::super::resources::authorize_use_on(tx, company, actor, resource).await?;
                 super::super::resources::inspect_on(tx, company, RuntimeResourceId::new(resource))
                     .await?
                     .ok_or_else(missing)

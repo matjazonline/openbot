@@ -316,15 +316,36 @@ impl SkillManagementPersistence for PostgresPersistence {
     async fn list_authoring_page(
         &self,
         company_id: Uuid,
+        author: Uuid,
+        agent: Option<Uuid>,
         page: SkillPageRequest,
     ) -> AppResult<SkillPage> {
-        let units: Vec<Uuid> =
-            sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1")
-                .bind(company_id)
-                .fetch_all(&self.pool)
-                .await
-                .map_err(AppError::from)?;
-        self.list_company_page(company_id, &units, page).await
+        let before_at = page.before.map(|cursor| cursor.updated_at);
+        let before_id = page.before.map(|cursor| cursor.id);
+        let rows = sqlx::query_as::<_, SkillSummaryDb>(&format!(
+            "SELECT {SKILL_SUMMARY_COLUMNS} FROM skills AS skill \
+             WHERE skill.company_id = $1 \
+               AND CASE WHEN $6::uuid IS NOT NULL THEN agent_reaches($1, $6, skill.unit_id) \
+                   ELSE EXISTS (SELECT 1 FROM departments AS unit WHERE unit.company_id = $1 \
+                       AND unit_management_role($5, $1, unit.id) IS NOT NULL \
+                       AND unit_reaches($1, unit.id, skill.unit_id)) END \
+               AND ($2::timestamptz IS NULL OR (skill.updated_at, skill.id) < ($2, $3)) \
+             ORDER BY skill.updated_at DESC, skill.id DESC LIMIT $4"
+        ))
+        .bind(company_id)
+        .bind(before_at)
+        .bind(before_id)
+        .bind(i64::from(page.limit) + 1)
+        .bind(author)
+        .bind(agent)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        let skills = rows
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<AppResult<Vec<_>>>()?;
+        Ok(SkillPage::from_probe(skills, page.limit))
     }
 
     async fn list_company_page(

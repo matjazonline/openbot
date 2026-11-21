@@ -74,6 +74,7 @@ pub(super) fn definition(
                     _ => panic!("Storage revision fixture expects an explicitly trusted built-in"),
                 };
                 ResolvedAgentTool {
+                    unit_id: None,
                     binding,
                     input_schema: snapshot.contract.input_schema,
                     output_schema: snapshot.contract.output_schema,

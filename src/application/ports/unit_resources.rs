@@ -11,6 +11,17 @@ pub enum UnitResourceKind {
     HttpConnection,
 }
 
+impl UnitResourceKind {
+    /// The wire name refusals carry (Plan07 G1 D8).
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Skill => "skill",
+            Self::McpConnection => "mcp",
+            Self::HttpConnection => "http",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceUseKind {
     /// An agent whose active revision uses the resource.

@@ -11,6 +11,10 @@ pub enum AppError {
         content: crate::entities::access_level::AccessLevel,
         ceiling: crate::entities::access_level::AccessLevel,
     },
+    /// A skill or connection outside the reach of the agent, definition, desk or run that would
+    /// use it (Plan07). A definite refusal: retrying the same command refuses again.
+    #[error("{0}")]
+    ResourceOutsideUnit(ResourceOutsideUnit),
     #[error("The destination cannot receive this run's content")]
     KnowledgeRelease {
         content: crate::entities::access_level::AccessLevel,
@@ -154,6 +158,54 @@ impl WorkflowGuardViolation {
 impl std::fmt::Display for WorkflowGuardViolation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.guard(), self.message)
+    }
+}
+
+/// Where a unit-owned resource was found out of reach (Plan07 G1 D8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnitCheckStage {
+    /// Publishing an agent or workflow that selects it.
+    Publication,
+    /// Saving a binding that maps a slot to it or resolves it.
+    Binding,
+    /// Admitting a run, including native sessions and native MCP calls.
+    Admission,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceOutsideUnit {
+    pub stage: UnitCheckStage,
+    pub kind: crate::application::ports::unit_resources::UnitResourceKind,
+    pub resource: uuid::Uuid,
+    /// A name a person can act on: the tool alias, skill slug or connection, and where it was
+    /// required (a step, for workflow publication).
+    pub name: String,
+}
+
+impl ResourceOutsideUnit {
+    pub fn code(&self) -> &'static str {
+        match self.stage {
+            UnitCheckStage::Publication => "publication.resource_outside_unit",
+            UnitCheckStage::Binding => "binding.resource_outside_unit",
+            UnitCheckStage::Admission => "admission.resource_outside_unit",
+        }
+    }
+}
+
+impl std::fmt::Display for ResourceOutsideUnit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::application::ports::unit_resources::UnitResourceKind;
+        let kind = match self.kind {
+            UnitResourceKind::Skill => "Skill",
+            UnitResourceKind::McpConnection => "MCP connection",
+            UnitResourceKind::HttpConnection => "HTTP connection",
+        };
+        write!(
+            f,
+            "{kind} {} belongs to a department outside the reach of what uses it; move it up or \
+             choose another",
+            self.name
+        )
     }
 }
 

@@ -99,7 +99,17 @@ async fn replay(
     .await?;
     authority::supported_publication(tx, configuration.bundle(), workflow_tools::ToolCheck::Run)
         .await?;
-    resources::check_readiness(tx, configuration.as_ref().into()).await?;
+    let reach =
+        resources::association_reach_on(tx, command.company_id(), command.association()).await?;
+    resources::check_readiness(
+        tx,
+        resources::ReadinessSelection::of(
+            configuration.as_ref(),
+            reach,
+            crate::app_error::UnitCheckStage::Admission,
+        ),
+    )
+    .await?;
     Ok(AdmissionResult::Replayed(RunId::new(run)))
 }
 

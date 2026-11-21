@@ -105,6 +105,7 @@ async fn autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignm
     value.skills = vec![ResolvedAgentSkill {
         assignment_id: AgentSkillAssignmentId::new(assigned[0]),
         skill: SkillSnapshot {
+            unit_id: uuid::Uuid::nil(),
             description: "Skill instructions".into(),
             files: Vec::new(),
             company_id: f.binding.target.company,

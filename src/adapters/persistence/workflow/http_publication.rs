@@ -25,7 +25,18 @@ impl PublicationDirectory for HttpPublicationDirectory {
         let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
         management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
             .await?;
-        let tools = capture_on(&mut tx, draft.company(), &self.selections).await?;
+        let reach = crate::application::workflow::reads::PublicationReach {
+            workflow: draft.workflow(),
+            author: actor.user_id(),
+        };
+        let tools = capture_on(
+            &mut tx,
+            draft.company(),
+            reach,
+            draft.source(),
+            &self.selections,
+        )
+        .await?;
         tx.commit().await?;
         Ok(PublicationDependencies {
             snapshots: publication::DependencySnapshots {
@@ -40,6 +51,8 @@ impl PublicationDirectory for HttpPublicationDirectory {
 pub(in crate::adapters::persistence::workflow) async fn capture_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
+    reach: crate::application::workflow::reads::PublicationReach,
+    source: &str,
     selections: &[HttpPublicationSelection],
 ) -> AppResult<Vec<publication::ToolSnapshot>> {
     if selections.len() > 256 {
@@ -53,6 +66,25 @@ pub(in crate::adapters::persistence::workflow) async fn capture_on(
         if !connection.enabled || (connection.uses_owned_bearer() && !connection.secret_set) {
             return Err(missing());
         }
+        crate::adapters::persistence::unit_resources::check_definition_reach_on(
+            tx,
+            company,
+            reach,
+            crate::application::ports::unit_resources::UnitResourceKind::HttpConnection,
+            connection.id,
+            Some(connection.unit_id),
+            format!(
+                "{} for operation {}{}",
+                connection.origin.as_str(),
+                selection.operation,
+                super::super::resources::steps_using(
+                    source,
+                    selection.slot.as_ref().map(|slot| slot.as_str()),
+                    selection.operation.as_str(),
+                )
+            ),
+        )
+        .await?;
         let snapshot: Value = sqlx::query_scalar("SELECT snapshot FROM workflow_http_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3")
                 .bind(company.as_uuid()).bind(connection.id).bind(selection.operation.as_str()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
         let mut tool: publication::ToolSnapshot =

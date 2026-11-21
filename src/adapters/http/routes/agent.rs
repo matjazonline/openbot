@@ -388,9 +388,11 @@ async fn create_agent_handler(
             .await
         {
             Ok(_) => String::new(),
-            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
-                pages::error_alert(&format!("Failed to create agent: {err}"))
-            }
+            Err(
+                err @ (AppError::BadRequest(_)
+                | AppError::Conflict(_)
+                | AppError::ResourceOutsideUnit(_)),
+            ) => pages::error_alert(&format!("Failed to create agent: {err}")),
             Err(error) => return Err(error),
         },
     };

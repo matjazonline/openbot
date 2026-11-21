@@ -1,0 +1,2712 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 8e77dae8..74ac6c5c 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -15847,6 +15847,44 @@ CREATE INDEX skills_unit_idx ON public.skills USING btree (company_id, unit_id);
+ CREATE INDEX company_mcp_connections_unit_idx ON public.company_mcp_connections USING btree (company_id, unit_id);
+ CREATE INDEX workflow_http_connections_unit_idx ON public.workflow_http_connections USING btree (company_id, unit_id);
+ 
++-- Whether `unit` is `start` or one of its ancestors (Plan07): a skill or connection is in reach of
++-- the desks, definitions and agents in its unit and below it. Bounded like the tree (8 levels).
++CREATE FUNCTION public.unit_reaches(checked_company uuid, start uuid, unit uuid)
++    RETURNS boolean LANGUAGE sql STABLE AS $$
++    WITH RECURSIVE chain(id, parent_id, depth) AS (
++        SELECT department.id, department.parent_id, 1 FROM public.departments AS department
++        WHERE department.company_id = checked_company AND department.id = start
++        UNION ALL
++        SELECT department.id, department.parent_id, chain.depth + 1 FROM chain
++        JOIN public.departments AS department
++            ON department.company_id = checked_company AND department.id = chain.parent_id
++        WHERE chain.depth < 8
++    )
++    SELECT EXISTS (SELECT 1 FROM chain WHERE chain.id = unit)
++$$;
++
++-- An agent's own reach (Plan07 decision d): any unit it is placed in (member or role) and their
++-- ancestors; the root alone when it has no placement.
++CREATE FUNCTION public.agent_reaches(checked_company uuid, checked_agent uuid, unit uuid)
++    RETURNS boolean LANGUAGE sql STABLE AS $$
++    WITH target AS (
++        SELECT id FROM public.principals
++        WHERE company_id = checked_company AND agent_id = checked_agent AND kind = 'agent'
++    ), placements AS (
++        SELECT member.department_id FROM public.department_members AS member
++        JOIN target ON target.id = member.principal_id WHERE member.company_id = checked_company
++        UNION SELECT holder.department_id FROM public.department_roles AS holder
++        JOIN target ON target.id = holder.principal_id WHERE holder.company_id = checked_company
++    ), starts AS (
++        SELECT department_id FROM placements
++        UNION ALL SELECT id FROM public.departments
++        WHERE company_id = checked_company AND is_root AND NOT EXISTS (SELECT 1 FROM placements)
++    )
++    SELECT EXISTS (
++        SELECT 1 FROM starts WHERE public.unit_reaches(checked_company, starts.department_id, unit)
++    )
++$$;
++
+ -- The unit a new skill or connection gets when its creator names none: the root for a root
+ -- manager, else the one department they lead, else NULL (the creator must choose).
+ CREATE FUNCTION public.resource_default_unit(checked_user uuid, checked_company uuid)
+@@ -16498,7 +16536,8 @@ ALTER TABLE public.schedule_runs ADD COLUMN role_refusal jsonb,
+         AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
+ ALTER TABLE public.schedule_runs DROP CONSTRAINT schedule_runs_refusal_check,
+     ADD CONSTRAINT schedule_runs_refusal_check CHECK ((refusal IS NULL
+-        OR refusal IN ('unavailable','input_rejected','key_conflict')
++        OR refusal IN ('unavailable','input_rejected','key_conflict',
++            'admission.resource_outside_unit')
+         OR (role_refusal IS NOT NULL AND public.valid_workflow_role_refusal(role_refusal)
+             AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
+ 
+diff --git a/plan/07-unit-resources/COORDINATION.md b/plan/07-unit-resources/COORDINATION.md
+index 75d6120b..26404b4e 100644
+--- a/plan/07-unit-resources/COORDINATION.md
++++ b/plan/07-unit-resources/COORDINATION.md
+@@ -2,7 +2,7 @@
+ 
+ - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/07-unit-resources/COORDINATION.md
+ - Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, worktree /Users/mac02/orca/workspaces/openbot/plan06 (branch plan07)
+-- Revision: 3
++- Revision: 4
+ 
+ ## Plan-wide instructions
+ 
+@@ -38,7 +38,7 @@
+ 
+ | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
+ | --- | --- | --- | --- |
+-| p01 (doc 01 ownership and selection): B1 accepted in phase (B PASS 07UR-P01-B1-R3 at 2849d92a…), committed locally; B2 in progress | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
++| p01 (doc 01 ownership and selection): B1 accepted in phase (B PASS 07UR-P01-B1-R3 at 2849d92a…), committed locally (aa22b1b0); B2 implemented, uncommitted, not reviewed; paused at the user's request 2026-11-20 (see HANDOFF) | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
+ 
+ ## Cross-phase notices
+ 
+diff --git a/plan/07-unit-resources/phases/p01/docs/HANDOFF.md b/plan/07-unit-resources/phases/p01/docs/HANDOFF.md
+index 2415eb6b..d64f8221 100644
+--- a/plan/07-unit-resources/phases/p01/docs/HANDOFF.md
++++ b/plan/07-unit-resources/phases/p01/docs/HANDOFF.md
+@@ -1,15 +1,50 @@
+-# 07UR-P01 handoff
+-
+-- Workflow implement-opus-reviewed-2_4; phase p01 (Plan07 doc 01); record root
+-  plan/07-unit-resources/phases/p01/docs. Root/A Claude Code Opus 5.5/xhigh (session
+-  b36d9dc4-495e-4131-9804-05ebcc381915); B Opus 5.5 (opus/xhigh) agent a42fa3c1931ec8e75.
+-- Worktree /Users/mac02/orca/workspaces/openbot/plan06, branch plan07, start cc545881.
+-  Coordination r1 (plan/07-unit-resources/COORDINATION.md; this session writes it).
+-- User decisions 2026-11-20 in coordination: (a) unit managers everywhere, (b) local machines out
+-  of scope, (c) budget caps by the unit's own manager (p02).
+-- Authorizations: local commit after each independently accepted batch; never push.
+-- State: G1 r3 PASS (07UR-P01-G1-R3; r1 → r2 → r3 after findings F1–F14; user decision (d)).
+-  B1 accepted (B PASS 07UR-P01-B1-R3 at 2849d92a…) and committed locally; not pushed.
+-- Resources: test DBs on @55407 openbot_p07_schema, openbot_p07_b1(+_test), openbot_p07_sqlx.
+-- Next: B2 (D6–D11: capture units, offers, refusal codes, admission/binding/native checks,
+-  unslotted reach, competing tests); B review; accept; commit.
++# 07UR-P01 handoff (paused at the user's request, 2026-11-20)
++
++## Identity
++- Workflow implement-opus-reviewed-2_4; Plan07 (07-unit-resources) phase p01 = doc 01; record root
++  plan/07-unit-resources/phases/p01/docs. Root/A Claude Code Opus 5.5/xhigh (user-confirmed),
++  session b36d9dc4-495e-4131-9804-05ebcc381915. Reviewer B: Opus 5.5 (model opus, effort xhigh,
++  by user choice over Fable 5.1), agent a42fa3c1931ec8e75, idle; continue it with SendMessage.
++- Worktree /Users/mac02/orca/workspaces/openbot/plan06 (directory named after Plan06), branch
++  plan07, phase start cc545881, B1 commit aa22b1b0 (HEAD). Not pushed.
++- Coordination: plan/07-unit-resources/COORDINATION.md revision 4 (this session writes it). User
++  decisions (a) unit managers everywhere, (b) local machines out of scope, (c) budget caps by the
++  unit's own manager (p02), (d) agent resources follow the agent's own units, workflow-level
++  connections the run's scope. No cross-phase notices.
++- Preserved untracked files, not part of Plan07: .trail/learnings/2026-11-19-a-local-check-sh-run-
++  can-mac02.md (user declined to commit), plan/06-delegated-administration/phases/p01/docs/logs/
++  B{1,2}-accepted-source.snapshot.tar, B3-frozen-source.snapshot.tar.
++
++## State
++- G1 architecture gate: r1 → r2 → r3, B PASS 07UR-P01-G1-R3 (findings F1–F15 in
++  agent-review-findings.md; decisions in TASK "Architecture gate G1" r1/r2/r3).
++- B1 (schema, unit authority, default unit, move, delete guidance): accepted (B PASS
++  07UR-P01-B1-R3 at 2849d92a…; rounds R1–R3) and committed locally as aa22b1b0.
++- B2 (capture, reach checks, refusal codes, offers, competing): implemented in the working tree,
++  uncommitted (56 files; safety copy logs/B2-wip.patch, verified to match the tree). New B2 tests
++  pass. Not frozen, not reviewed, not accepted. Details and the remaining test list: TASK "B2
++  plan", "B2 implementation", "B2 checks so far".
++- p02 (models, budgets, usage) and p03 (docs, final gate) not started.
++
++## Resources (this session's, on the UTF-8 PG18 cluster 127.0.0.1:55407)
++- Databases openbot_p07_schema (schema apply check), openbot_p07_b1 and openbot_p07_b1_test
++  (recreated after the init-schema edit; the harness refuses a stale checksum), openbot_p07_sqlx;
++  Plan06's openbot_p06_final_sqlx and openbot_p06_final_rest are retained. The C-locale cluster
++  @55406 is still running. Scratchpad: Node 24.21.0 toolchain, ripgrep/python3.13 shim
++  (toolshim), ONNX Runtime NuGet download.
++- Test environment: SQLX_OFFLINE=true, DATABASE_URL=postgres://mac02@127.0.0.1:55407/openbot_p07_b1
++  (its `_test` sibling must exist and match the current init schema), Node 24 first on PATH
++  (/opt/homebrew/opt/node@24/bin) — the Cloudroom e2e peers exit early under the default Node 26.
++
++## Authorizations
++- Commit locally after each independently accepted batch; never push without a new request.
++  No deployment or shared/production database reset.
++
++## Next
++1. Last full lib suite on the B2 tree: 4906 passed, 1 failed (only the deferred Doop 8 vs 7
++   assertion) — logs/B2-lib-suite-summary.txt. No B2 regression is known.
++2. Add the remaining B2 tests listed in TASK, then clippy, `SQLX_OFFLINE=false cargo sqlx prepare
++   --check -- --all-targets` on a fresh database, and the fresh-schema apply.
++3. Freeze (snapshot.sh with exclusions plan/07-unit-resources/phases/p01/docs and
++   plan/07-unit-resources/COORDINATION.md), write logs/07UR-P01-B2-R1.evidence.json, request the
++   B2 review from a42fa3c1931ec8e75, correct, accept, commit locally, then start p02.
+diff --git a/plan/07-unit-resources/phases/p01/docs/TASK.md b/plan/07-unit-resources/phases/p01/docs/TASK.md
+index 291c38ed..1eeea421 100644
+--- a/plan/07-unit-resources/phases/p01/docs/TASK.md
++++ b/plan/07-unit-resources/phases/p01/docs/TASK.md
+@@ -415,6 +415,93 @@ Answers 07UR-P01-G1-R2 (F13, F14). r2 stands except where changed here.
+   local_agent_mcp_history, native_mcp_native, ui_agents, skill, department: 304 passed; clippy
+   PASS; whitespace clean.
+ 
++## B2 plan (D6–D11 with r2/r3, on accepted B1 aa22b1b0)
++- D11 finding (2026-11-20): prepared agents store only `AgentSelectionIdentity` and derived
++  `PreparedTool`s, so `PREPARED_AGENT_VERSION` and the history validators are unaffected; SQL
++  readers of `agent_revisions.content` use `item->'binding'` (`check_agent_revision_members`),
++  binding id/source (`native_mcp_revision_live`) or whole-tool equality with `broker.contract`
++  written from the same struct (`native_mcp_witness`), so added unit fields are tolerated; the
++  native bundle is a projection the plugin parses without skill ids. No version bump.
++- Order: (1) types: `ResolvedAgentTool.unit_id: Option<Uuid>` (set exactly for HTTP/MCP
++  connection tools, validated) and `SkillSnapshot.unit_id: Uuid`; (2) capture at agent
++  publication from the locked rows; (3) SQL reach helpers: agent reach (placements ∪ roles, root
++  when none; unit or ancestor) and chain reach (start unit or ancestor); (4) `AppError::
++  ResourceOutsideUnit {stage, ..}` and its plumbing (HTTP, classify, schedule CHECK, agent
++  publication failure class); (5) agent publication refusal; (6) `check_readiness` takes a reach
++  (association target chain) and a stage, checks slot resources and unslotted resolution; binding
++  save uses stage Binding; (7) `registered_on` filters by reach everywhere (runtime: the run's
++  base scope rows); (8) admission agent check in the manifest's agent edges (Tools mode, current
++  unit in current agent reach), native bundle selection and native MCP admission; (9) offers:
++  agent catalog connections and skills by agent reach, workflow editor by managing department
++  chain, binding slots by the association chain; Agent Builder lookups by agent reach; (10) tests
++  incl. competing move vs publication in both orders and a fresh-migration format round trip.
++
++## B2 implementation (D6–D11, implemented; not yet frozen or reviewed)
++- Formats: `ResolvedAgentTool.unit_id: Option<Uuid>` (skipped when none; `validate` requires it
++  exactly for HTTP/MCP tools), `SkillSnapshot.unit_id: Uuid`; captured from the rows agent
++  publication already locks (`connection_with_locks_on` / `publication_connection_with_locks_on`
++  FOR SHARE, skills FOR SHARE). No preparation version bump (see B2 plan).
++- SQL: `unit_reaches(company, start, unit)` (start or an ancestor, ≤8) and
++  `agent_reaches(company, agent, unit)` (any placement member/role, the root when none).
++- Refusal: `AppError::ResourceOutsideUnit(ResourceOutsideUnit {stage, kind, resource, name})`,
++  codes `publication.|binding.|admission.resource_outside_unit`; HTTP 400 `{code, error, resource,
++  name}`; message/schedule `classify` → Refused(code); `schedule_runs_refusal_check` admits the
++  admission code; inbound events treat it as a routing refusal; agent publication failure class
++  `resource_outside_unit`.
++- Agent reach (`unit_resources::check_agent_reach_on`, current units, deleted connections left to
++  revocation): agent publication (`capture.rs`, stage Publication), admission manifest agent
++  edges for Tools mode (`agent_manifest/capture.rs`), native bundle selection for every native
++  path (`local_agents/native.rs selected_with_locks_on`).
++- Run reach (workflow-level): `ReadinessSelection {reach, stage}` built from
++  `association_reach_on` (the association's base department, `role_binding::context_on`) at
++  binding save (Binding), admission preflight, replay and channel reply (Admission), and from the
++  manifest's `context_department_id` for reachable bundles; slot connections checked by
++  `check_connection_unit_on`; unslotted HTTP `registered_on(.., ConnectionReach::From(start))`
++  everywhere a run or binding resolves it, runtime start from `run_reach_on` (base scope rows'
++  own unit); `supported_publication` keeps `ConnectionReach::Company` (an existence check always
++  followed by the reach-aware readiness check in its Run callers) — refinement of the r3
++  contract row.
++- Workflow publication: MCP/HTTP selection captures (and sample capture) check
++  `check_definition_reach_on` (managing department, else the author's creating department),
++  stage Publication, naming the connection, tool/operation and slot (capture-time error, not a
++  step diagnostic).
++- Offers: agent catalog connections `agent_reaches(company, agent, unit_id)`; agent skill picker
++  `list_authoring_page(user, company, agent?)` — the agent's reach, or for a new agent units the
++  author manages (where it can be placed); workflow editor `publication_options(.., PublicationReach
++  {workflow, author}, ..)` by the definition reach; binding slot offers by reach of any unit the
++  author manages (the desk is chosen in the same form; save checks the chosen desk); Agent Builder
++  skill slugs and tool names (`resolve_bindings_in_reach_on`) by the spec's department (root when
++  none).
++
++### B2 checks so far (2026-11-20)
++- New B2 tests pass (filters unit_resource, workflow::sample, message_admission: 56 passed,
++  scratchpad p07-b2-new-2.txt): `unit_resource_selection_binding_and_admission_refuse_a_slot_
++  connection_out_of_reach`, `unit_resource_selection_admission_agent_uses_current_units_and_
++  placement`, `unit_resource_selection_publication_agent_refuses_out_of_reach_resources`,
++  `unit_resource_competing_move_and_agent_publication_in_both_orders` (production move held open
++  vs publication; publication paused at activation vs production move),
++  `unit_resource_selection_unslotted_http_resolution_is_judged_within_reach`,
++  `unit_resource_selection_offers_follow_definition_and_author_reach`,
++  `unit_resource_selection_offers_follow_the_agent_reach`,
++  `unit_resource_selection_refusal_settles_a_schedule_occurrence`, classify assertion in
++  message_admission tests; B1 tests adapted (authoring reads by reach; F5 use = agent re-placed
++  after publishing).
++- First full lib run after the production changes: 448 failures = 431 stale `_test` database
++  (VersionMismatch after the init-schema edit; database recreated), 15 sample tests whose fixture
++  built connection tools without a unit (fixed), the F5 test (adapted), the deferred Doop 8 vs 7.
++  Second full run on the recreated database: 4906 passed, 1 failed, 30 ignored — the failure is
++  the deferred Doop assertion `doop_agent_current_preparation_reaches_ready_before_model_io`
++  (8 vs 7, also red on main) (logs/B2-lib-suite-summary.txt; new tests logs/B2-new-tests.txt).
++- Still to add before review: workflow publication refusal for an MCP/HTTP selection outside the
++  definition's reach; native bundle selection / native MCP refusal; Agent Builder slug and tool
++  name outside the placement's reach; ModelOnly agent unaffected; two-placement agent admitted on
++  either desk and desk-less; fresh-migration format evidence (existing agent publication,
++  preparation and checkpoint suites on fresh own databases). Then clippy, `cargo sqlx prepare
++  --check`, freeze, manifest, B review (continue reviewer a42fa3c1931ec8e75), accept, commit.
++- To confirm in review: the native maintenance sweep still retires in-flight Status/Cancel after a
++  reach loss (G1 F15 note); run-time action authority and `ResourceDirectory::inspect` still
++  require root management (pre-B1, noted by B in B1-R3).
++
+ ## Status
+ - G1 r1 frozen at digest c2d338160c48d4d2eabaa84b5bd5fa5cd389b58d2a93db85478eb2e05fb9ac33 (HEAD
+   cc545881; exclusions as above). B (Opus 5.5, model opus / effort xhigh as for Plan06's reviewer)
+@@ -438,4 +525,5 @@ Answers 07UR-P01-G1-R2 (F13, F14). r2 stands except where changed here.
+   ordering, company-wide admission learnings) — not those mechanisms; reason in the commit.
+   Committed locally (not pushed). Reviewer note for B2: run-time action authority and
+   `ResourceDirectory::inspect` still require root management (pre-B1).
+-- Implementation: B2 (D6–D11) next.
++- Implementation: B2 (D6–D11) implemented, uncommitted (WIP patch logs/B2-wip.patch); paused
++  at the user's request after the full-suite run. Not frozen, not reviewed, not accepted.
+diff --git a/src/adapters/http/app_error_impl.rs b/src/adapters/http/app_error_impl.rs
+index 25077026..cb63432f 100644
+--- a/src/adapters/http/app_error_impl.rs
++++ b/src/adapters/http/app_error_impl.rs
+@@ -11,6 +11,7 @@ impl IntoResponse for AppError {
+         let error_kind = match &self {
+             AppError::WorkflowRole(_) => "workflow_role",
+             AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
++            AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
+             AppError::KnowledgeRelease { .. } => "knowledge_release",
+             AppError::Execution(_) => "execution",
+             AppError::Database(_) => "database",
+@@ -36,6 +37,11 @@ impl IntoResponse for AppError {
+                 StatusCode::BAD_REQUEST,
+                 axum::Json(serde_json::json!({"code":refusal.kind.code(),"error":refusal.to_string(),"step":refusal.step,"role":refusal.role})),
+             ).into_response(),
++            AppError::ResourceOutsideUnit(refusal) => (
++                StatusCode::BAD_REQUEST,
++                axum::Json(serde_json::json!({"code":refusal.code(),"error":refusal.to_string(),
++                    "resource":refusal.resource,"name":refusal.name})),
++            ).into_response(),
+             AppError::KnowledgeTrigger { .. } => (
+                 StatusCode::BAD_REQUEST,
+                 axum::Json(serde_json::json!({"code":knowledge_code,"error":"The triggering message exceeds this audience's access level"})),
+diff --git a/src/adapters/http/routes/ui_agents.rs b/src/adapters/http/routes/ui_agents.rs
+index 3cbae580..c71ca9ec 100644
+--- a/src/adapters/http/routes/ui_agents.rs
++++ b/src/adapters/http/routes/ui_agents.rs
+@@ -546,12 +546,17 @@ impl AgentSettingsView<'_> {
+             .await
+     }
+ 
+-    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
++    /// The skills offered for `agent`, or for a new agent of this author (Plan07).
++    async fn skills(
++        &self,
++        agent: Option<Uuid>,
++    ) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
+         Ok(self
+             .skill_use_cases
+             .list_authoring_page(
+                 self.user_id,
+                 self.company.id,
++                agent,
+                 SkillPageRequest {
+                     before: None,
+                     limit: MAX_SKILL_PAGE_SIZE,
+@@ -588,7 +593,7 @@ impl AgentSettingsView<'_> {
+     async fn create_pane(&self, form: CreateForm<'_>) -> AppResult<String> {
+         let model_connections = self.model_connections().await?;
+         let library_agents = self.agent_use_cases.list_library_agents().await?;
+-        let mut skills = self.skills().await?;
++        let mut skills = self.skills(None).await?;
+         for skill_id in &form.draft.skill_ids {
+             if !skills.iter().any(|skill| skill.id == *skill_id)
+                 && let Some(skill) = self
+@@ -654,7 +659,7 @@ impl AgentSettingsView<'_> {
+             .company_agent_capabilities(self.user_id, self.company.id, agent.id)
+             .await?
+             .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
+-        let mut skills = self.skills().await?;
++        let mut skills = self.skills(Some(agent.id)).await?;
+         for selected in &capabilities.skills {
+             if !skills.iter().any(|skill| skill.id == selected.id) {
+                 skills.push(selected.into());
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/bindings.rs b/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+index 67982331..ad535485 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+@@ -229,7 +229,7 @@ impl Ui {
+         let mut options = self
+             .engine
+             .authoring_reads()
+-            .binding_options(company_id)
++            .binding_options(company_id, self.user)
+             .await?;
+         let mut visibility = Visibility::new(&self.engine, company_id, self.actor()?);
+         let mut channels = Vec::new();
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/editor.rs b/src/adapters/http/routes/workflows/ui/authoring/editor.rs
+index b7399330..9c3ea40e 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/editor.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/editor.rs
+@@ -27,7 +27,10 @@ impl Ui {
+             .decode(draft.source)
+             .and_then(|decoded| publication_needs(&decoded));
+         let (options, too_many_tools) = match &needs {
+-            Ok(needs) => self.editor_options(company, needs).await?,
++            Ok(needs) => {
++                self.editor_options(company, detail.summary.workflow, needs)
++                    .await?
++            }
+             Err(_) => (PublicationOptions::default(), false),
+         };
+         let unsaved = state.typed.as_ref().is_some_and(|typed| {
+@@ -99,6 +102,7 @@ impl Ui {
+     pub(super) async fn editor_options(
+         &self,
+         company: Uuid,
++        workflow: crate::domain::workflow::WorkflowId,
+         needs: &PublicationNeeds,
+     ) -> AppResult<(PublicationOptions, bool)> {
+         if needs.is_empty() {
+@@ -119,7 +123,15 @@ impl Ui {
+         let options = self
+             .engine
+             .authoring_reads()
+-            .publication_options(super::company(company), &mcp, &http)
++            .publication_options(
++                super::company(company),
++                crate::application::workflow::reads::PublicationReach {
++                    workflow,
++                    author: self.user,
++                },
++                &mcp,
++                &http,
++            )
+             .await?;
+         Ok((options, mcp_cut || http_cut))
+     }
+diff --git a/src/adapters/http/routes/workflows/ui/authoring/sample.rs b/src/adapters/http/routes/workflows/ui/authoring/sample.rs
+index c2bd35bc..ec87697b 100644
+--- a/src/adapters/http/routes/workflows/ui/authoring/sample.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/sample.rs
+@@ -22,7 +22,10 @@ impl Ui {
+             .decode(&detail.source)
+             .and_then(|decoded| publication_needs(&decoded));
+         let (options, too_many) = match &needs {
+-            Ok(needs) => self.editor_options(company, needs).await?,
++            Ok(needs) => {
++                self.editor_options(company, detail.summary.workflow, needs)
++                    .await?
++            }
+             Err(_) => (PublicationOptions::default(), false),
+         };
+         let selections = state.selections.unwrap_or_else(|| {
+diff --git a/src/adapters/http/routes/workflows/ui/runs/mod.rs b/src/adapters/http/routes/workflows/ui/runs/mod.rs
+index 64d9e060..2f899dab 100644
+--- a/src/adapters/http/routes/workflows/ui/runs/mod.rs
++++ b/src/adapters/http/routes/workflows/ui/runs/mod.rs
+@@ -252,7 +252,8 @@ impl Ui {
+         Ok(self
+             .engine
+             .authoring_reads()
+-            .binding_options(super::company(company))
++            // Only the people are read here; the connection lists' reach is irrelevant.
++            .binding_options(super::company(company), self.user)
+             .await?
+             .people
+             .into_iter()
+diff --git a/src/adapters/persistence/agent_authoring/catalog.rs b/src/adapters/persistence/agent_authoring/catalog.rs
+index 694787c3..728aca9d 100644
+--- a/src/adapters/persistence/agent_authoring/catalog.rs
++++ b/src/adapters/persistence/agent_authoring/catalog.rs
+@@ -32,6 +32,13 @@ pub(super) async fn connections(
+         }
+     });
+     query.push_bind(scope.company.as_uuid());
++    // Only connections in the agent's own reach are offered (Plan07 decision d, 01B.1).
++    query
++        .push(" AND agent_reaches(")
++        .push_bind(scope.company.as_uuid())
++        .push(",")
++        .push_bind(scope.agent.as_uuid())
++        .push(",unit_id)");
+     if let Some(after) = after {
+         query.push(" AND id>").push_bind(after);
+     }
+diff --git a/src/adapters/persistence/agent_binding_selection.rs b/src/adapters/persistence/agent_binding_selection.rs
+index 6b59e69c..f0284f7e 100644
+--- a/src/adapters/persistence/agent_binding_selection.rs
++++ b/src/adapters/persistence/agent_binding_selection.rs
+@@ -8,11 +8,26 @@ use serde_json::Value;
+ use sqlx::PgConnection;
+ use uuid::Uuid;
+ 
++/// Fixtures resolve names in the root's reach, where they create their connections.
++#[cfg(test)]
+ pub(super) async fn resolve_bindings_on(
+     db: &mut PgConnection,
+     company: Uuid,
+     agent: Option<Uuid>,
+     names: &[TypeName],
++) -> AppResult<Vec<AgentToolBinding>> {
++    resolve_bindings_in_reach_on(db, company, agent, names, None).await
++}
++
++/// Resolve tool names for an agent placed in `placement` (the root when `None`): only
++/// connections in that unit's reach are candidates (Plan07 decision d), so another unit's same
++/// operation name neither stands in nor makes the choice ambiguous.
++pub(super) async fn resolve_bindings_in_reach_on(
++    db: &mut PgConnection,
++    company: Uuid,
++    agent: Option<Uuid>,
++    names: &[TypeName],
++    placement: Option<Uuid>,
+ ) -> AppResult<Vec<AgentToolBinding>> {
+     if names.len() > 32 {
+         return Err(AppError::BadRequest(
+@@ -27,7 +42,7 @@ pub(super) async fn resolve_bindings_on(
+     for name in names {
+         let source = match AgentBuiltinTool::parse(name.as_str()) {
+             Some(tool) => AgentBindingSource::Builtin { tool },
+-            None => registered_source_on(db, company, name).await?,
++            None => registered_source_on(db, company, name, placement).await?,
+         };
+         let binding = previous
+             .iter()
+@@ -49,6 +64,7 @@ async fn registered_source_on(
+     db: &mut PgConnection,
+     company: Uuid,
+     name: &TypeName,
++    placement: Option<Uuid>,
+ ) -> AppResult<AgentBindingSource> {
+     let sources: Vec<Value> = sqlx::query_scalar(
+         "SELECT source FROM (
+@@ -56,6 +72,7 @@ async fn registered_source_on(
+             FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection
+                 ON connection.company_id=operation.company_id AND connection.id=operation.connection_id
+             WHERE operation.company_id=$1 AND operation.name=$2 AND operation.revoked_at IS NULL AND connection.enabled
++                AND unit_reaches($1,COALESCE($3,(SELECT id FROM departments WHERE company_id=$1 AND is_root)),connection.unit_id)
+             UNION ALL
+             SELECT jsonb_build_object('kind','mcp','connection',operation.connection_id,'operation',operation.name,
+                 'reviewed_version',operation.version,'remote_name',operation.name)
+@@ -63,13 +80,14 @@ async fn registered_source_on(
+                 ON connection.company_id=operation.company_id AND connection.id=operation.connection_id
+             WHERE operation.company_id=$1 AND operation.name=$2 AND operation.revoked_at IS NULL AND connection.enabled
+                 AND connection.deleted_at IS NULL
++                AND unit_reaches($1,COALESCE($3,(SELECT id FROM departments WHERE company_id=$1 AND is_root)),connection.unit_id)
+             UNION ALL
+             SELECT jsonb_build_object('kind','workflow','registration',registration.name,'workflow',registration.workflow_id,
+                 'version',registration.version_id,'params',registration.params)
+             FROM workflow_tool_registrations AS registration
+             WHERE registration.company_id=$1 AND registration.name=$2 AND registration.revoked_at IS NULL
+         ) AS selections LIMIT 2",
+-    ).bind(company).bind(name.as_str()).fetch_all(db).await?;
++    ).bind(company).bind(name.as_str()).bind(placement).fetch_all(db).await?;
+     match sources.as_slice() {
+         [source] => serde_json::from_value(source.clone())
+             .map_err(|_| AppError::Internal("Invalid registered agent tool target".into())),
+diff --git a/src/adapters/persistence/agent_publication/capture.rs b/src/adapters/persistence/agent_publication/capture.rs
+index 6e725955..94916c43 100644
+--- a/src/adapters/persistence/agent_publication/capture.rs
++++ b/src/adapters/persistence/agent_publication/capture.rs
+@@ -75,6 +75,16 @@ pub(super) async fn capture_on(
+     .await?;
+     let tools = super::tools::resolve_tools(tx, scope.company, &bindings, model.is_none()).await?;
+     let skills = capture_skills(tx, scope).await?;
++    // Read under the capture's row locks: what is published is in the agent's reach (01B.2).
++    super::super::unit_resources::check_agent_reach_on(
++        tx,
++        scope.company,
++        scope.agent.as_uuid(),
++        &tools,
++        &skills,
++        crate::app_error::UnitCheckStage::Publication,
++    )
++    .await?;
+     let draft = AgentDraft {
+         company_id: scope.company,
+         agent_id: scope.agent,
+@@ -214,6 +224,7 @@ fn resolved_skill(
+         assignment_id: AgentSkillAssignmentId::new(assignment),
+         skill: SkillSnapshot {
+             company_id: company,
++            unit_id: skill.unit_id.ok_or_else(invalid)?,
+             skill_id: skill.id,
+             name: TypeName::parse(skill.slug.as_str()).map_err(|_| invalid())?,
+             instructions: skill.instructions.clone(),
+diff --git a/src/adapters/persistence/agent_publication/commands.rs b/src/adapters/persistence/agent_publication/commands.rs
+index aff065d1..852678cf 100644
+--- a/src/adapters/persistence/agent_publication/commands.rs
++++ b/src/adapters/persistence/agent_publication/commands.rs
+@@ -108,6 +108,7 @@ impl AgentPublications for PostgresPersistence {
+ fn publication_failure(error: &AppError) -> &'static str {
+     match error {
+         AppError::WorkflowRole(_) => "role_resolution_refused",
++        AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
+         AppError::BadRequest(_) | AppError::NativeMcpNotAdmitted => "invalid_definition",
+         AppError::Conflict(_) | AppError::Superseded(_) => "conflict",
+         AppError::Forbidden(_) | AppError::InvalidCredentials => "forbidden",
+diff --git a/src/adapters/persistence/agent_publication/tools.rs b/src/adapters/persistence/agent_publication/tools.rs
+index f88d7f81..123d1618 100644
+--- a/src/adapters/persistence/agent_publication/tools.rs
++++ b/src/adapters/persistence/agent_publication/tools.rs
+@@ -51,6 +51,8 @@ fn source_order(binding: &AgentToolBinding) -> SourceOrder<'_> {
+ pub(in crate::adapters::persistence) struct RegisteredTool {
+     pub(in crate::adapters::persistence) tool: ToolSnapshot,
+     pub(in crate::adapters::persistence) approval_required: bool,
++    /// The connection's unit, read under the same row lock (Plan07); none for other tools.
++    pub(in crate::adapters::persistence) unit_id: Option<Uuid>,
+ }
+ 
+ pub(in crate::adapters::persistence) fn ordered_bindings<'a>(
+@@ -96,6 +98,7 @@ pub(super) async fn resolve_tools(
+                 RegisteredTool {
+                     tool: snapshot,
+                     approval_required: false,
++                    unit_id: None,
+                 }
+             }
+             source => direct_registration_on(tx, company, source, native_only).await?,
+@@ -162,6 +165,7 @@ pub(in crate::adapters::persistence) async fn direct_registration_with_locks_on(
+         AgentBindingSource::Builtin { tool } => Ok(RegisteredTool {
+             tool: builtin(company, *tool)?,
+             approval_required: false,
++            unit_id: None,
+         }),
+         AgentBindingSource::Http {
+             connection,
+@@ -203,6 +207,7 @@ fn resolved_registration(
+         output_schema: snapshot.contract.output_schema,
+         policy: snapshot.policy,
+         approval_required: captured.approval_required,
++        unit_id: captured.unit_id,
+     })
+ }
+ 
+@@ -329,6 +334,7 @@ async fn http_tool(
+     Ok(RegisteredTool {
+         tool,
+         approval_required,
++        unit_id: Some(current.unit_id),
+     })
+ }
+ 
+@@ -437,5 +443,6 @@ async fn mcp_tool(
+     Ok(RegisteredTool {
+         tool,
+         approval_required: reviewed.approval_required,
++        unit_id: Some(current.unit_id.ok_or_else(invalid)?),
+     })
+ }
+diff --git a/src/adapters/persistence/delegated_agent_management_tests.rs b/src/adapters/persistence/delegated_agent_management_tests.rs
+index 4a878bf9..ff9a87e6 100644
+--- a/src/adapters/persistence/delegated_agent_management_tests.rs
++++ b/src/adapters/persistence/delegated_agent_management_tests.rs
+@@ -643,7 +643,9 @@ async fn unit_resource_library_agent_copies_skills_into_its_placement_or_the_roo
+     assert_eq!(skill_units(unplaced.agent.id).await, vec![Some(root)]);
+ }
+ 
+-/// B1-F5: uses in units the mover does not manage are counted, not named.
++/// B1-F5: uses in units the mover does not manage are counted, not named. With decision d an
++/// agent can only publish what it reaches, so the unmanaged use is an agent re-placed elsewhere
++/// after publishing (its active revision still uses the skill).
+ #[tokio::test]
+ async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
+     let Some(m) = ManagedAgents::new().await else {
+@@ -655,9 +657,9 @@ async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
+         .create_agent(
+             m.d.f.owner,
+             m.d.f.company,
+-            write("support-agent"),
++            write("sales-then-support"),
+             Some(AgentPlacement {
+-                department: m.d.sibling.id,
++                department: m.d.unit.id,
+                 role: None,
+             }),
+         )
+@@ -706,12 +708,33 @@ async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
+             scope: m.scope(owner, created.agent.id),
+             expected_draft_revision: updated.draft_revision,
+             expected_active_revision: Some(initial.id),
+-            key: AgentPublicationKey::parse("support-publish").unwrap(),
++            key: AgentPublicationKey::parse("sales-publish").unwrap(),
+         })
+         .await
+         .unwrap();
+-    // The Sales lead moves their skill down to Field; the Support agent using it is theirs to
+-    // know about only as a count.
++    // The owner re-places the agent outside Sales; the Sales lead no longer manages it.
++    sqlx::query(
++        "WITH agent AS (SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2 AND kind='agent') \
++         DELETE FROM department_members USING agent WHERE company_id=$1 AND department_id=$3 \
++         AND principal_id=agent.id",
++    )
++    .bind(m.d.f.company)
++    .bind(created.agent.id)
++    .bind(m.d.unit.id.as_uuid())
++    .execute(m.d.f.pool())
++    .await
++    .unwrap();
++    let elsewhere = m.p().test_unit(m.d.f.company, "elsewhere").await;
++    sqlx::query(
++        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
++         SELECT $1, $3, 'lead', id FROM principals WHERE company_id=$1 AND agent_id=$2 AND kind='agent'",
++    )
++    .bind(m.d.f.company)
++    .bind(created.agent.id)
++    .bind(elsewhere)
++    .execute(m.d.f.pool())
++    .await
++    .unwrap();
+     let moved = SkillManagementPersistence::move_company(
+         m.p(),
+         m.actor().user_id(),
+@@ -724,3 +747,99 @@ async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
+     assert!(moved.uses.is_empty(), "{moved:?}");
+     assert_eq!(moved.more_uses, 1);
+ }
++
++/// Plan07 01B.1 with decision d: an agent is offered only skills and connections in its reach.
++#[tokio::test]
++async fn unit_resource_selection_offers_follow_the_agent_reach() {
++    use crate::application::agent::{AgentAuthoringReads, AgentToolKind};
++    let Some(m) = ManagedAgents::new().await else {
++        return;
++    };
++    let created = m.create("sales-agent", m.d.unit.id).await;
++    let root = m.p().test_root_unit(m.d.f.company).await;
++    let skill = |slug: &'static str| SkillWrite {
++        slug: slug.into(),
++        name: slug.into(),
++        description: "Unit guidance".into(),
++        instructions: "Follow the unit's guidance.".into(),
++        files: None,
++        required_tools: None,
++        created_by: None,
++    };
++    let mut reachable = Vec::new();
++    for (unit, slug, offered) in [
++        (root, "root-guide", true),
++        (m.d.unit.id.as_uuid(), "sales-guide", true),
++        (m.d.sibling.id.as_uuid(), "support-guide", false),
++    ] {
++        let created =
++            SkillManagementPersistence::create_company(m.p(), m.d.f.company, unit, skill(slug))
++                .await
++                .unwrap();
++        if offered {
++            reachable.push(created.id);
++        }
++    }
++    reachable.sort();
++    let skills = crate::use_cases::skill::SkillUseCases::new(
++        Arc::new(m.p().clone()),
++        Arc::new(m.p().clone()),
++        Arc::new(m.p().clone()),
++    );
++    let mut offered: Vec<Uuid> = skills
++        .list_authoring_page(
++            m.d.f.owner,
++            m.d.f.company,
++            Some(created.agent.id),
++            crate::use_cases::skill::SkillPageRequest {
++                before: None,
++                limit: 50,
++            },
++        )
++        .await
++        .unwrap()
++        .items
++        .into_iter()
++        .map(|skill| skill.id)
++        .collect();
++    offered.sort();
++    assert_eq!(offered, reachable, "the owner authoring a Sales agent");
++    // Connections: one in Sales is offered, one in Support is not.
++    let mut ids = Vec::new();
++    for (slug, unit) in [("sales-crm", m.d.unit.id), ("support-crm", m.d.sibling.id)] {
++        let connection = crate::use_cases::mcp::McpPersistence::create_mcp_connection(
++            m.p(),
++            m.d.f.company,
++            unit.as_uuid(),
++            crate::use_cases::mcp::McpConnectionWrite {
++                slug: slug.into(),
++                endpoint: format!("https://{slug}.example.test/mcp")
++                    .try_into()
++                    .unwrap(),
++                enabled: true,
++                auth: crate::entities::mcp::McpAuth::None,
++                discovered_tools: vec![],
++                tool_grants: vec![],
++            },
++        )
++        .await
++        .unwrap();
++        ids.push(connection.id);
++    }
++    let page = m
++        .p()
++        .tool_connections(
++            m.scope(
++                WorkflowActor::authenticated(m.d.f.owner).unwrap(),
++                created.agent.id,
++            ),
++            AgentToolKind::Mcp,
++            None,
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        page.items.iter().map(|item| item.id).collect::<Vec<_>>(),
++        vec![ids[0]]
++    );
++}
+diff --git a/src/adapters/persistence/local_agents/native.rs b/src/adapters/persistence/local_agents/native.rs
+index 04ce4b00..b5917e8a 100644
+--- a/src/adapters/persistence/local_agents/native.rs
++++ b/src/adapters/persistence/local_agents/native.rs
+@@ -95,6 +95,17 @@ pub(in crate::adapters::persistence) async fn selected_with_locks_on(
+         AppError::BadRequest(message) => AppError::Forbidden(message),
+         other => other,
+     })?;
++    // Every native path selects the bundle here (sessions, dispatch, bundle reads, native MCP):
++    // the agent's skills and connections must be in its own reach (Plan07 decision d, G1 F14).
++    super::super::unit_resources::check_agent_reach_on(
++        tx,
++        CompanyId::new(company),
++        agent_id.as_uuid(),
++        &revision.definition.tools,
++        &revision.definition.skills,
++        crate::app_error::UnitCheckStage::Admission,
++    )
++    .await?;
+     let bundle = NativeBundle::from_definition(&revision.definition)?;
+     if bundle.digest()? != *digest {
+         return Err(AppError::Internal("Native bundle digest mismatch".into()));
+diff --git a/src/adapters/persistence/skill.rs b/src/adapters/persistence/skill.rs
+index 0920b7fc..49b61455 100644
+--- a/src/adapters/persistence/skill.rs
++++ b/src/adapters/persistence/skill.rs
+@@ -316,15 +316,36 @@ impl SkillManagementPersistence for PostgresPersistence {
+     async fn list_authoring_page(
+         &self,
+         company_id: Uuid,
++        author: Uuid,
++        agent: Option<Uuid>,
+         page: SkillPageRequest,
+     ) -> AppResult<SkillPage> {
+-        let units: Vec<Uuid> =
+-            sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1")
+-                .bind(company_id)
+-                .fetch_all(&self.pool)
+-                .await
+-                .map_err(AppError::from)?;
+-        self.list_company_page(company_id, &units, page).await
++        let before_at = page.before.map(|cursor| cursor.updated_at);
++        let before_id = page.before.map(|cursor| cursor.id);
++        let rows = sqlx::query_as::<_, SkillSummaryDb>(&format!(
++            "SELECT {SKILL_SUMMARY_COLUMNS} FROM skills AS skill \
++             WHERE skill.company_id = $1 \
++               AND CASE WHEN $6::uuid IS NOT NULL THEN agent_reaches($1, $6, skill.unit_id) \
++                   ELSE EXISTS (SELECT 1 FROM departments AS unit WHERE unit.company_id = $1 \
++                       AND unit_management_role($5, $1, unit.id) IS NOT NULL \
++                       AND unit_reaches($1, unit.id, skill.unit_id)) END \
++               AND ($2::timestamptz IS NULL OR (skill.updated_at, skill.id) < ($2, $3)) \
++             ORDER BY skill.updated_at DESC, skill.id DESC LIMIT $4"
++        ))
++        .bind(company_id)
++        .bind(before_at)
++        .bind(before_id)
++        .bind(i64::from(page.limit) + 1)
++        .bind(author)
++        .bind(agent)
++        .fetch_all(&self.pool)
++        .await
++        .map_err(AppError::from)?;
++        let skills = rows
++            .into_iter()
++            .map(TryInto::try_into)
++            .collect::<AppResult<Vec<_>>>()?;
++        Ok(SkillPage::from_probe(skills, page.limit))
+     }
+ 
+     async fn list_company_page(
+diff --git a/src/adapters/persistence/unit_resources.rs b/src/adapters/persistence/unit_resources.rs
+index ef18452e..9c73059d 100644
+--- a/src/adapters/persistence/unit_resources.rs
++++ b/src/adapters/persistence/unit_resources.rs
+@@ -265,3 +265,106 @@ pub(crate) async fn owned_resources_on(
+     let total = rows.first().map_or(0, |row| row.1);
+     Ok((rows.into_iter().map(|row| row.0).collect(), total))
+ }
++
++/// Every connection tool and skill of an agent must belong to a unit in the agent's own reach
++/// (Plan07 decision d): one of its current placements or an ancestor, the root when it has none.
++/// Reads the resources' current units, so a move since publication is seen; a deleted
++/// connection (no unit) is left to the existing revocation refusals.
++pub(crate) async fn check_agent_reach_on(
++    db: &mut PgConnection,
++    company: CompanyId,
++    agent: Uuid,
++    tools: &[crate::application::agent::ResolvedAgentTool],
++    skills: &[crate::application::agent::ResolvedAgentSkill],
++    stage: crate::app_error::UnitCheckStage,
++) -> AppResult<()> {
++    use crate::entities::agent_capability::AgentBindingSource;
++    let mut resources = Vec::new();
++    for tool in tools {
++        match &tool.binding.source {
++            AgentBindingSource::Http { connection, .. } => resources.push((
++                UnitResourceKind::HttpConnection,
++                *connection,
++                tool.binding.alias.as_str().to_owned(),
++            )),
++            AgentBindingSource::Mcp { connection, .. } => resources.push((
++                UnitResourceKind::McpConnection,
++                *connection,
++                tool.binding.alias.as_str().to_owned(),
++            )),
++            _ => {}
++        }
++    }
++    for assigned in skills {
++        resources.push((
++            UnitResourceKind::Skill,
++            assigned.skill.skill_id,
++            assigned.skill.name.as_str().to_owned(),
++        ));
++    }
++    for (kind, id, name) in resources {
++        let table = match kind {
++            UnitResourceKind::Skill => "skills",
++            UnitResourceKind::McpConnection => "company_mcp_connections",
++            UnitResourceKind::HttpConnection => "workflow_http_connections",
++        };
++        let reached: Option<Option<bool>> = sqlx::query_scalar(&format!(
++            "SELECT CASE WHEN unit_id IS NULL THEN NULL ELSE agent_reaches($1,$3,unit_id) END \
++             FROM {table} WHERE company_id=$1 AND id=$2"
++        ))
++        .bind(company.as_uuid())
++        .bind(id)
++        .bind(agent)
++        .fetch_optional(&mut *db)
++        .await?;
++        if reached.flatten() == Some(false) {
++            return Err(AppError::ResourceOutsideUnit(
++                crate::app_error::ResourceOutsideUnit {
++                    stage,
++                    kind,
++                    resource: id,
++                    name,
++                },
++            ));
++        }
++    }
++    Ok(())
++}
++
++/// A workflow publication may select only connections in reach of its definition's managing
++/// department, or of the author's creating department before it exists (Plan07 01B.2).
++pub(crate) async fn check_definition_reach_on(
++    db: &mut PgConnection,
++    company: CompanyId,
++    reach: crate::application::workflow::reads::PublicationReach,
++    kind: UnitResourceKind,
++    id: Uuid,
++    unit: Option<Uuid>,
++    name: String,
++) -> AppResult<()> {
++    let Some(unit) = unit else {
++        return Ok(());
++    };
++    let reached: bool = sqlx::query_scalar(
++        "SELECT unit_reaches($1, COALESCE((SELECT managing_department_id FROM \
++         workflow_definitions WHERE company_id=$1 AND id=$2), \
++         workflow_creating_department($3,$1)), $4)",
++    )
++    .bind(company.as_uuid())
++    .bind(reach.workflow.as_uuid())
++    .bind(reach.author)
++    .bind(unit)
++    .fetch_one(&mut *db)
++    .await?;
++    if reached {
++        return Ok(());
++    }
++    Err(AppError::ResourceOutsideUnit(
++        crate::app_error::ResourceOutsideUnit {
++            stage: crate::app_error::UnitCheckStage::Publication,
++            kind,
++            resource: id,
++            name,
++        },
++    ))
++}
+diff --git a/src/adapters/persistence/unit_resources_tests.rs b/src/adapters/persistence/unit_resources_tests.rs
+index a95a4c28..cf527b25 100644
+--- a/src/adapters/persistence/unit_resources_tests.rs
++++ b/src/adapters/persistence/unit_resources_tests.rs
+@@ -964,15 +964,28 @@ async fn unit_resource_skills_tab_and_agent_authoring_reads() {
+         ids.sort();
+         ids
+     };
++    // B2 (decision d): a new agent of the Sales lead can be placed in Sales or below, so its
++    // offers are what reaches from there: Sales and the root, not the sibling Support.
++    let mut reachable = vec![root.id, sales.id];
++    reachable.sort();
++    assert_eq!(
++        ids(cases
++            .list_authoring_page(d.f.member, company, None, page())
++            .await
++            .unwrap()
++            .items),
++        reachable
++    );
+     let mut every = vec![root.id, support.id, sales.id];
+     every.sort();
+     assert_eq!(
+         ids(cases
+-            .list_authoring_page(d.f.member, company, page())
++            .list_authoring_page(d.f.owner, company, None, page())
+             .await
+             .unwrap()
+             .items),
+-        every
++        every,
++        "the owner can place an agent anywhere"
+     );
+     assert_eq!(
+         ids(cases
+@@ -984,7 +997,7 @@ async fn unit_resource_skills_tab_and_agent_authoring_reads() {
+     );
+     refused(
+         cases
+-            .list_authoring_page(d.f.stranger, company, page())
++            .list_authoring_page(d.f.stranger, company, None, page())
+             .await,
+     );
+ }
+diff --git a/src/adapters/persistence/workflow/admission.rs b/src/adapters/persistence/workflow/admission.rs
+index 3c6e64b4..bae753e2 100644
+--- a/src/adapters/persistence/workflow/admission.rs
++++ b/src/adapters/persistence/workflow/admission.rs
+@@ -71,7 +71,18 @@ impl WorkflowAdmission for PostgresPersistence {
+             return Ok(AdmissionResult::Stale);
+         }
+         authorize_token_reviewers(&mut tx, command).await?;
+-        resources::check_readiness(&mut tx, command.binding().as_ref().into()).await?;
++        let reach =
++            resources::association_reach_on(&mut tx, command.company_id(), command.association())
++                .await?;
++        resources::check_readiness(
++            &mut tx,
++            resources::ReadinessSelection::of(
++                command.binding().as_ref(),
++                reach,
++                crate::app_error::UnitCheckStage::Admission,
++            ),
++        )
++        .await?;
+         if let Err(error) = admission_write::create(&mut tx, command, &source).await {
+             if let AppError::WorkflowRole(refusal) = &error {
+                 if !admission_refusal::record_on(&mut tx, command, &source, refusal).await? {
+diff --git a/src/adapters/persistence/workflow/admission_replay.rs b/src/adapters/persistence/workflow/admission_replay.rs
+index 99449a59..7d7aedf9 100644
+--- a/src/adapters/persistence/workflow/admission_replay.rs
++++ b/src/adapters/persistence/workflow/admission_replay.rs
+@@ -99,7 +99,17 @@ async fn replay(
+     .await?;
+     authority::supported_publication(tx, configuration.bundle(), workflow_tools::ToolCheck::Run)
+         .await?;
+-    resources::check_readiness(tx, configuration.as_ref().into()).await?;
++    let reach =
++        resources::association_reach_on(tx, command.company_id(), command.association()).await?;
++    resources::check_readiness(
++        tx,
++        resources::ReadinessSelection::of(
++            configuration.as_ref(),
++            reach,
++            crate::app_error::UnitCheckStage::Admission,
++        ),
++    )
++    .await?;
+     Ok(AdmissionResult::Replayed(RunId::new(run)))
+ }
+ 
+diff --git a/src/adapters/persistence/workflow/agent_manifest/capture.rs b/src/adapters/persistence/workflow/agent_manifest/capture.rs
+index 99d1f485..d7d34deb 100644
+--- a/src/adapters/persistence/workflow/agent_manifest/capture.rs
++++ b/src/adapters/persistence/workflow/agent_manifest/capture.rs
+@@ -44,6 +44,9 @@ impl Closure {
+                 company: self.company,
+                 bundle: &bundle,
+                 resources: &self.resources,
++                // The same admitted base context as the root (learning 2026-11-17).
++                reach: self.context_department_id,
++                stage: crate::app_error::UnitCheckStage::Admission,
+             },
+         )
+         .await?;
+@@ -82,6 +85,19 @@ impl Closure {
+         .await?
+         .ok_or_else(refused)?;
+         super::super::agent_authority::check_definition_on(tx, &revision.definition, mode).await?;
++        // An agent's own tools and skills must be in its own reach now (Plan07 decision d), for
++        // the use mode that runs them: model-only uses expose neither.
++        if mode == AgentUseMode::Tools {
++            crate::adapters::persistence::unit_resources::check_agent_reach_on(
++                tx,
++                self.company,
++                agent.as_uuid(),
++                &revision.definition.tools,
++                &revision.definition.skills,
++                crate::app_error::UnitCheckStage::Admission,
++            )
++            .await?;
++        }
+         Ok(crate::application::agent::dependency::agent_edges(
+             &revision.definition,
+             mode,
+diff --git a/src/adapters/persistence/workflow/authoring_reads.rs b/src/adapters/persistence/workflow/authoring_reads.rs
+index aac45008..0e8d606f 100644
+--- a/src/adapters/persistence/workflow/authoring_reads.rs
++++ b/src/adapters/persistence/workflow/authoring_reads.rs
+@@ -42,6 +42,12 @@ struct VersionSourceRow {
+     created_at: DateTime<Utc>,
+ }
+ 
++/// A connection is offered to a definition in reach of its managing department, or of its
++/// author's creating department before it exists (Plan07); `$4` workflow, `$5` author.
++const DEFINITION_REACH: &str = "unit_reaches($1, COALESCE((SELECT managing_department_id \
++    FROM workflow_definitions WHERE company_id = $1 AND id = $4), \
++    workflow_creating_department($5, $1)), connection.unit_id)";
++
+ /// Each needed name's first [`MAX_CONNECTIONS_PER_TOOL`] connections, one past the bound so a
+ /// cut name is known. `{operations}`/`{connections}`/`{label}`/`{live}` name the kind's tables.
+ fn options_sql(operations: &str, connections: &str, label: &str, live: &str) -> String {
+@@ -56,7 +62,8 @@ fn options_sql(operations: &str, connections: &str, label: &str, live: &str) ->
+              FROM {operations} AS operation \
+              JOIN {connections} AS connection ON connection.company_id = operation.company_id \
+               AND connection.id = operation.connection_id{live} \
+-            WHERE operation.revoked_at IS NULL AND operation.company_id = $1 AND operation.name = ANY($2)) AS ranked \
++            WHERE operation.revoked_at IS NULL AND operation.company_id = $1 AND operation.name = ANY($2) \
++              AND {DEFINITION_REACH}) AS ranked \
+           WHERE rank <= $3 ORDER BY name, rank"
+     )
+ }
+@@ -173,6 +180,7 @@ impl PostgresPersistence {
+         &self,
+         sql: &str,
+         company: CompanyId,
++        reach: crate::application::workflow::reads::PublicationReach,
+         names: &[String],
+         cut: &mut std::collections::BTreeSet<String>,
+     ) -> AppResult<Vec<OperationOption>> {
+@@ -183,6 +191,8 @@ impl PostgresPersistence {
+             .bind(company.as_uuid())
+             .bind(names)
+             .bind(MAX_CONNECTIONS_PER_TOOL + 1)
++            .bind(reach.workflow.as_uuid())
++            .bind(reach.author)
+             .fetch_all(self.pool())
+             .await?;
+         let mut options = Vec::with_capacity(rows.len());
+@@ -352,7 +362,7 @@ impl AuthoringReads for PostgresPersistence {
+         ))
+     }
+ 
+-    async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions> {
++    async fn binding_options(&self, company: CompanyId, author: Uuid) -> AppResult<BindingOptions> {
+         let bound = MAX_BINDING_OPTIONS + 1;
+         let choices = |rows: Vec<(Uuid, String, bool, String)>| {
+             let truncated = rows.len() as i64 > MAX_BINDING_OPTIONS;
+@@ -372,6 +382,7 @@ impl AuthoringReads for PostgresPersistence {
+             sqlx::query_as::<_, (Uuid, String, bool, String)>(sql)
+                 .bind(company.as_uuid())
+                 .bind(bound)
++                .bind(author)
+                 .fetch_all(self.pool())
+         };
+         let (channels, channels_cut) = choices(
+@@ -383,15 +394,22 @@ impl AuthoringReads for PostgresPersistence {
+         );
+         let (http, http_cut) = choices(
+             read(
+-                "SELECT id, origin, enabled, '' FROM workflow_http_connections \
+-                 WHERE company_id = $1 ORDER BY origin, id LIMIT $2",
++                "SELECT id, origin, enabled, '' FROM workflow_http_connections AS connection \
++                 WHERE company_id = $1 AND EXISTS (SELECT 1 FROM departments AS unit \
++                     WHERE unit.company_id = $1 AND unit_management_role($3, $1, unit.id) \
++                     IS NOT NULL AND unit_reaches($1, unit.id, connection.unit_id)) \
++                 ORDER BY origin, id LIMIT $2",
+             )
+             .await?,
+         );
+         let (mcp, mcp_cut) = choices(
+             read(
+-                "SELECT id, slug::text, enabled, '' FROM company_mcp_connections \
+-                 WHERE company_id = $1 AND deleted_at IS NULL ORDER BY slug, id LIMIT $2",
++                "SELECT id, slug::text, enabled, '' FROM company_mcp_connections AS connection \
++                 WHERE company_id = $1 AND deleted_at IS NULL AND EXISTS (SELECT 1 \
++                     FROM departments AS unit WHERE unit.company_id = $1 \
++                     AND unit_management_role($3, $1, unit.id) IS NOT NULL \
++                     AND unit_reaches($1, unit.id, connection.unit_id)) \
++                 ORDER BY slug, id LIMIT $2",
+             )
+             .await?,
+         );
+@@ -466,6 +484,7 @@ impl AuthoringReads for PostgresPersistence {
+     async fn publication_options(
+         &self,
+         company: CompanyId,
++        reach: crate::application::workflow::reads::PublicationReach,
+         mcp_tools: &[String],
+         http_tools: &[String],
+     ) -> AppResult<PublicationOptions> {
+@@ -484,6 +503,7 @@ impl AuthoringReads for PostgresPersistence {
+                     " AND connection.deleted_at IS NULL",
+                 ),
+                 company,
++                reach,
+                 mcp_tools,
+                 &mut mcp_cut,
+             )
+@@ -497,6 +517,7 @@ impl AuthoringReads for PostgresPersistence {
+                     "",
+                 ),
+                 company,
++                reach,
+                 http_tools,
+                 &mut http_cut,
+             )
+diff --git a/src/adapters/persistence/workflow/authority.rs b/src/adapters/persistence/workflow/authority.rs
+index 4852f08f..b121bcd4 100644
+--- a/src/adapters/persistence/workflow/authority.rs
++++ b/src/adapters/persistence/workflow/authority.rs
+@@ -171,11 +171,23 @@ pub(super) async fn supported_publication(
+                 ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
+                 ToolKind::Memory => builtin_memory_tool(tx, tool, check).await?,
+                 ToolKind::Http => {
+-                    http::registered_on(tx, current.company_id(), tool).await?;
++                    http::registered_on(
++                        tx,
++                        current.company_id(),
++                        tool,
++                        http::ConnectionReach::Company,
++                    )
++                    .await?;
+                 }
+                 ToolKind::Slot(slot) => match resources::slot_kind(definition, slot) {
+                     Some("http") => {
+-                        http::registered_on(tx, current.company_id(), tool).await?;
++                        http::registered_on(
++                            tx,
++                            current.company_id(),
++                            tool,
++                            http::ConnectionReach::Company,
++                        )
++                        .await?;
+                     }
+                     Some("mcp") => {
+                         mcp::registered_on(tx, current.company_id(), tool).await?;
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs
+index 5ec1853f..6d0f3c86 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs
+@@ -312,3 +312,283 @@ async fn autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent
+         .unwrap();
+     assert_eq!(calls, 0);
+ }
++
++fn outside(error: &AppError, code: &str, resource: Uuid) -> bool {
++    matches!(error, AppError::ResourceOutsideUnit(refusal)
++        if refusal.code() == code && refusal.resource == resource)
++}
++
++async fn agent_skill(setup: &AgentSetup) -> Uuid {
++    sqlx::query_scalar("SELECT skill_id FROM agent_skills WHERE agent_id=$1")
++        .bind(setup.agent)
++        .fetch_one(setup.fixture.persistence.pool())
++        .await
++        .unwrap()
++}
++
++/// Place the agent's principal in `unit` (a role there is a placement, Plan07 decision d).
++async fn place_agent(setup: &AgentSetup, unit: Uuid) {
++    sqlx::query(
++        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
++         SELECT $1, $2, 'lead', id FROM principals WHERE company_id=$1 AND agent_id=$3 \
++         AND kind='agent'",
++    )
++    .bind(setup.fixture.target.company.as_uuid())
++    .bind(unit)
++    .bind(setup.agent)
++    .execute(setup.fixture.persistence.pool())
++    .await
++    .unwrap();
++}
++
++/// Plan07 D9b with decision d: admission checks the agent's skills and tool connections against
++/// their current units and the agent's current placements; a resource moved up stays usable.
++#[tokio::test]
++async fn unit_resource_selection_admission_agent_uses_current_units_and_placement() {
++    let (origin, _server) = server(HTTP_OK).await;
++    let setup = Box::pin(agent_setup_with(
++        &origin,
++        Some("Follow the support policy."),
++    ))
++    .await;
++    let p = &setup.fixture.persistence;
++    let company = setup.fixture.target.company;
++    let owner = setup.fixture.target.actor.user_id();
++    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
++    let skill = agent_skill(&setup).await;
++    let root = p.test_root_unit(company.as_uuid()).await;
++    let billing = p.test_unit(company.as_uuid(), "billing").await;
++    let support = p.test_unit(company.as_uuid(), "support").await;
++    let admit = |key: &'static str| {
++        let service = &service;
++        let setup = &setup;
++        async move {
++            service
++                .admit(request(setup, key, Uuid::new_v4()).await)
++                .await
++        }
++    };
++    created(admit("unit-baseline").await.unwrap());
++    let runs = run_count(&setup).await;
++    // Moved into Billing, the unplaced agent (the root's reach) can no longer use it.
++    crate::use_cases::skill::SkillManagementPersistence::move_company(
++        p,
++        owner,
++        company.as_uuid(),
++        skill,
++        billing,
++    )
++    .await
++    .unwrap();
++    let refused = admit("unit-skill-moved").await;
++    assert!(
++        refused.as_ref().err().is_some_and(|error| outside(
++            error,
++            "admission.resource_outside_unit",
++            skill
++        )),
++        "{:?}",
++        refused.err()
++    );
++    assert_eq!(run_count(&setup).await, runs, "refused before any run row");
++    // Placed in Billing, the agent reaches it without republishing.
++    place_agent(&setup, billing).await;
++    created(admit("unit-agent-placed").await.unwrap());
++    // Moved up to the root, it stays in reach.
++    crate::use_cases::skill::SkillManagementPersistence::move_company(
++        p,
++        owner,
++        company.as_uuid(),
++        skill,
++        root,
++    )
++    .await
++    .unwrap();
++    created(admit("unit-skill-up").await.unwrap());
++    // The tool's connection moved to the sibling Support is out of the agent's reach.
++    p.move_http(
++        company,
++        setup.fixture.target.actor,
++        setup.connection.id,
++        crate::entities::department::DepartmentId::new(support),
++    )
++    .await
++    .unwrap();
++    let refused = admit("unit-connection-moved").await;
++    assert!(
++        refused.as_ref().err().is_some_and(|error| outside(
++            error,
++            "admission.resource_outside_unit",
++            setup.connection.id
++        )),
++        "{:?}",
++        refused.err()
++    );
++}
++
++/// Plan07 01B.2: publishing an agent refuses a skill or connection outside its reach.
++#[tokio::test]
++async fn unit_resource_selection_publication_agent_refuses_out_of_reach_resources() {
++    let (origin, _server) = server(HTTP_OK).await;
++    let setup = Box::pin(agent_setup_with(
++        &origin,
++        Some("Follow the support policy."),
++    ))
++    .await;
++    let p = &setup.fixture.persistence;
++    let company = setup.fixture.target.company;
++    let owner = setup.fixture.target.actor.user_id();
++    let skill = agent_skill(&setup).await;
++    let root = p.test_root_unit(company.as_uuid()).await;
++    let billing = p.test_unit(company.as_uuid(), "billing").await;
++    use crate::use_cases::skill::SkillManagementPersistence;
++    SkillManagementPersistence::move_company(p, owner, company.as_uuid(), skill, billing)
++        .await
++        .unwrap();
++    let refused = setup.fixture.try_publish_agent(setup.agent).await;
++    assert!(
++        refused.as_ref().err().is_some_and(|error| outside(
++            error,
++            "publication.resource_outside_unit",
++            skill
++        )),
++        "{:?}",
++        refused.err()
++    );
++    SkillManagementPersistence::move_company(p, owner, company.as_uuid(), skill, root)
++        .await
++        .unwrap();
++    p.move_http(
++        company,
++        setup.fixture.target.actor,
++        setup.connection.id,
++        crate::entities::department::DepartmentId::new(billing),
++    )
++    .await
++    .unwrap();
++    let refused = setup.fixture.try_publish_agent(setup.agent).await;
++    assert!(
++        refused.as_ref().err().is_some_and(|error| outside(
++            error,
++            "publication.resource_outside_unit",
++            setup.connection.id
++        )),
++        "{:?}",
++        refused.err()
++    );
++    place_agent(&setup, billing).await;
++    setup.fixture.try_publish_agent(setup.agent).await.unwrap();
++}
++
++/// Plan07 D10: a move racing an agent publication either precedes it (the publication sees the
++/// new unit and is refused) or follows it (the revision keeps the old unit and admission refuses).
++/// Both orders use the production move and publication; the skill row lock orders them.
++#[tokio::test]
++async fn unit_resource_competing_move_and_agent_publication_in_both_orders() {
++    use crate::adapters::persistence::test_support::wait_until_backends_are_blocked;
++    use crate::use_cases::skill::SkillManagementPersistence;
++    for move_first in [true, false] {
++        let (origin, _server) = server(HTTP_OK).await;
++        let setup = Box::pin(agent_setup_with(
++            &origin,
++            Some("Follow the support policy."),
++        ))
++        .await;
++        let p = setup.fixture.persistence.clone();
++        let company = setup.fixture.target.company;
++        let owner = setup.fixture.target.actor.user_id();
++        let skill = agent_skill(&setup).await;
++        let billing = p.test_unit(company.as_uuid(), "billing").await;
++        let support = p.test_unit(company.as_uuid(), "support").await;
++        place_agent(&setup, billing).await;
++        SkillManagementPersistence::move_company(&p, owner, company.as_uuid(), skill, billing)
++            .await
++            .unwrap();
++        let published = if move_first {
++            // The move holds the skill row; publication's capture waits for it, then sees Support.
++            let mut moving = p.pool().begin().await.unwrap();
++            crate::adapters::persistence::unit_resources::move_resource_on(
++                &mut moving,
++                WorkflowActor::authenticated(owner).unwrap(),
++                company,
++                crate::application::ports::unit_resources::UnitResourceKind::Skill,
++                skill,
++                crate::entities::department::DepartmentId::new(support),
++            )
++            .await
++            .unwrap();
++            let (published, ()) =
++                tokio::join!(setup.fixture.try_publish_agent(setup.agent), async {
++                    wait_until_backends_are_blocked(p.pool(), 1).await;
++                    moving.commit().await.unwrap();
++                });
++            published
++        } else {
++            // Publication captures the skill (FOR SHARE) and pauses at activation; the move waits.
++            let mut blocker = p.pool().begin().await.unwrap();
++            sqlx::query(
++                "SELECT 1 FROM agent_active_revisions WHERE company_id=$1 AND agent_id=$2 FOR SHARE",
++            )
++            .bind(company.as_uuid())
++            .bind(setup.agent)
++            .execute(&mut *blocker)
++            .await
++            .unwrap();
++            let moving = {
++                let p = p.clone();
++                async move {
++                    SkillManagementPersistence::move_company(
++                        &p,
++                        owner,
++                        company.as_uuid(),
++                        skill,
++                        support,
++                    )
++                    .await
++                }
++            };
++            let (published, moved, ()) = tokio::join!(
++                setup.fixture.try_publish_agent(setup.agent),
++                async {
++                    // Start the move only once publication is waiting at activation.
++                    wait_until_backends_are_blocked(p.pool(), 1).await;
++                    moving.await
++                },
++                async {
++                    wait_until_backends_are_blocked(p.pool(), 2).await;
++                    blocker.commit().await.unwrap();
++                }
++            );
++            moved.unwrap();
++            published
++        };
++        if move_first {
++            assert!(
++                published.as_ref().err().is_some_and(|error| outside(
++                    error,
++                    "publication.resource_outside_unit",
++                    skill
++                )),
++                "move first: {:?}",
++                published.err()
++            );
++        } else {
++            let revision = published.expect("publication first captures the old unit");
++            assert_eq!(revision.definition.skills[0].skill.unit_id, billing);
++        }
++        // Either way the skill is now out of the agent's reach, so admission refuses it.
++        let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
++        let refused = service
++            .admit(request(&setup, "unit-competing", Uuid::new_v4()).await)
++            .await;
++        assert!(
++            refused.as_ref().err().is_some_and(|error| outside(
++                error,
++                "admission.resource_outside_unit",
++                skill
++            )),
++            "{:?}",
++            refused.err()
++        );
++    }
++}
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs
+index 42bf1428..96e6624a 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs
+@@ -105,6 +105,7 @@ async fn autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignm
+     value.skills = vec![ResolvedAgentSkill {
+         assignment_id: AgentSkillAssignmentId::new(assigned[0]),
+         skill: SkillSnapshot {
++            unit_id: uuid::Uuid::nil(),
+             description: "Skill instructions".into(),
+             files: Vec::new(),
+             company_id: f.binding.target.company,
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs
+index b8efb879..2952d80f 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs
+@@ -40,6 +40,7 @@ impl SkillHistory {
+         value.skills.push(ResolvedAgentSkill {
+             assignment_id: AgentSkillAssignmentId::new(assignment),
+             skill: SkillSnapshot {
++                unit_id: uuid::Uuid::nil(),
+                 description: "Skill instructions".into(),
+                 files: Vec::new(),
+                 company_id: f.binding.target.company,
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs b/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
+index 83235008..f3f31413 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
+@@ -74,6 +74,7 @@ pub(super) fn definition(
+                     _ => panic!("Storage revision fixture expects an explicitly trusted built-in"),
+                 };
+                 ResolvedAgentTool {
++                    unit_id: None,
+                     binding,
+                     input_schema: snapshot.contract.input_schema,
+                     output_schema: snapshot.contract.output_schema,
+diff --git a/src/adapters/persistence/workflow/binding_tests.rs b/src/adapters/persistence/workflow/binding_tests.rs
+index 9bf107bb..037c669a 100644
+--- a/src/adapters/persistence/workflow/binding_tests.rs
++++ b/src/adapters/persistence/workflow/binding_tests.rs
+@@ -571,3 +571,96 @@ async fn unit_resource_move_lists_active_bindings_of_the_current_configuration()
+         .unwrap();
+     assert_eq!(moved.uses.len(), 1);
+ }
++
++fn unit_refusal(error: &AppError, code: &str, resource: Uuid) -> bool {
++    matches!(error, AppError::ResourceOutsideUnit(refusal)
++        if refusal.code() == code && refusal.resource == resource)
++}
++
++/// Plan07 D8/D9a: a company-wide binding reaches only the root's connections, so a slot mapped to
++/// a connection moved into a department is refused at save and at admission, with nothing written.
++#[tokio::test]
++async fn unit_resource_selection_binding_and_admission_refuse_a_slot_connection_out_of_reach() {
++    let mut f = BindingFixture::new(json!([{"slot":"service","kind":"mcp"}])).await;
++    let connection = f.mcp().await;
++    let p = f.fixture.persistence.clone();
++    let company = f.target.company.as_uuid();
++    let owner = f.target.actor.user_id();
++    let root = p.test_root_unit(company).await;
++    let billing = p.test_unit(company, "billing").await;
++    p.move_mcp_connection(owner, company, connection, billing)
++        .await
++        .unwrap();
++    let refused = f.service().configure(f.request(None)).await;
++    assert!(
++        refused
++            .as_ref()
++            .err()
++            .is_some_and(|error| matches!(error, LifecycleError::Application(error)
++                if unit_refusal(error, "binding.resource_outside_unit", connection))),
++        "{:?}",
++        refused.err()
++    );
++    let revisions: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM workflow_binding_revisions WHERE company_id=$1 AND binding_id=$2",
++    )
++    .bind(company)
++    .bind(f.target.binding.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(revisions, 0, "a refused save writes no configuration");
++    // Moved up to the root, the same binding saves and activates.
++    p.move_mcp_connection(owner, company, connection, root)
++        .await
++        .unwrap();
++    let configured = f.service().configure(f.request(None)).await.unwrap();
++    f.service()
++        .activate(SetBindingActivity {
++            target: f.target,
++            expected: configured.revision,
++        })
++        .await
++        .unwrap();
++    // Moved out again, admission refuses before any run exists.
++    p.move_mcp_connection(owner, company, connection, billing)
++        .await
++        .unwrap();
++    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
++    let request = AdmitWorkflowRequest {
++        history_session: None,
++        company_id: f.target.company,
++        actor: f.target.actor,
++        association: RelatedAssociation::Company,
++        trigger: TriggerRef::new(
++            f.target.company,
++            TriggerId::new(Uuid::new_v4()),
++            TriggerSource::Manual,
++        )
++        .unwrap(),
++        correlation_id: crate::domain::entities::correlation::CorrelationId::new(),
++        binding_id: f.target.binding,
++        idempotency_key: IdempotencyKey::parse("unit-out-of-reach").unwrap(),
++        input: json!({}),
++        rerun_of: None,
++        delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
++        expected_binding_revision: None,
++        admission_claim: None,
++    };
++    let refused = service.admit(request).await;
++    assert!(
++        refused.as_ref().err().is_some_and(|error| unit_refusal(
++            error,
++            "admission.resource_outside_unit",
++            connection
++        )),
++        "{:?}",
++        refused.err()
++    );
++    let runs: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
++        .bind(company)
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++    assert_eq!(runs, 0);
++}
+diff --git a/src/adapters/persistence/workflow/bindings.rs b/src/adapters/persistence/workflow/bindings.rs
+index 9ef4c061..39baaa4a 100644
+--- a/src/adapters/persistence/workflow/bindings.rs
++++ b/src/adapters/persistence/workflow/bindings.rs
+@@ -72,7 +72,16 @@ pub(super) async fn save_binding_on(
+     }
+     if !matches!(change, Change::Deactivate) {
+         verify_selection(tx, configuration).await?;
+-        resources::check_readiness(tx, configuration.as_ref().into()).await?;
++        let reach = resources::association_reach_on(tx, company, state.association).await?;
++        resources::check_readiness(
++            tx,
++            resources::ReadinessSelection::of(
++                configuration.as_ref(),
++                reach,
++                crate::app_error::UnitCheckStage::Binding,
++            ),
++        )
++        .await?;
+         check_run_as(tx, command, current.as_ref()).await?;
+         if state.active && configuration.message_trigger().is_some() {
+             check_message_binding_cap(tx, command).await?;
+diff --git a/src/adapters/persistence/workflow/channel_reply.rs b/src/adapters/persistence/workflow/channel_reply.rs
+index b989f3ec..b326dc74 100644
+--- a/src/adapters/persistence/workflow/channel_reply.rs
++++ b/src/adapters/persistence/workflow/channel_reply.rs
+@@ -311,7 +311,21 @@ async fn selected_on(
+     )
+     .await?;
+     bindings::verify_selection(tx, configuration).await?;
+-    resources::check_readiness(tx, configuration.as_ref().into()).await?;
++    let reach = resources::association_reach_on(
++        tx,
++        request.company,
++        RelatedAssociation::inbox(request.target),
++    )
++    .await?;
++    resources::check_readiness(
++        tx,
++        resources::ReadinessSelection::of(
++            configuration.as_ref(),
++            reach,
++            crate::app_error::UnitCheckStage::Admission,
++        ),
++    )
++    .await?;
+     selection.contract.validate(
+         configuration
+             .bundle()
+diff --git a/src/adapters/persistence/workflow/http.rs b/src/adapters/persistence/workflow/http.rs
+index 95eb6d2b..b150a2e3 100644
+--- a/src/adapters/persistence/workflow/http.rs
++++ b/src/adapters/persistence/workflow/http.rs
+@@ -30,11 +30,27 @@ pub(super) use publication_owner::capture_on as capture_publication_on;
+ #[path = "http_runtime.rs"]
+ pub(super) mod runtime;
+ 
++/// Which HTTP connections may own an unslotted operation (Plan07 G1 r2 F2).
++#[derive(Debug, Clone, Copy)]
++pub(super) enum ConnectionReach {
++    /// Existence anywhere in the company: publication-time support checks, followed by the
++    /// reach-aware readiness check wherever a run or binding uses it.
++    Company,
++    /// Connections in reach of this base department (the root when `None`); ambiguity is judged
++    /// among them only, so another unit's identical operation neither stands in nor collides.
++    From(Option<crate::entities::department::DepartmentId>),
++}
++
+ pub(super) async fn registered_on(
+     tx: &mut Transaction<'_, Postgres>,
+     company: CompanyId,
+     wanted: &publication::ToolSnapshot,
++    reach: ConnectionReach,
+ ) -> AppResult<Uuid> {
++    let (anywhere, start) = match reach {
++        ConnectionReach::Company => (true, None),
++        ConnectionReach::From(start) => (false, start.map(|unit| unit.as_uuid())),
++    };
+     let mut normalized = wanted.clone();
+     normalized.contract.connection = None;
+     HttpOperation {
+@@ -43,8 +59,8 @@ pub(super) async fn registered_on(
+     }
+     .validate(company)?;
+     let snapshot = serde_json::to_value(normalized).map_err(|_| invalid())?;
+-    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) ORDER BY operation.connection_id LIMIT 2")
+-        .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).fetch_all(&mut **tx).await?;
++    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) AND ($4 OR unit_reaches($1, COALESCE($5, (SELECT id FROM departments WHERE company_id=$1 AND is_root)), connection.unit_id)) ORDER BY operation.connection_id LIMIT 2")
++        .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).bind(anywhere).bind(start).fetch_all(&mut **tx).await?;
+     // A tool without a binding must have exactly one owner; ambiguous routing fails closed.
+     if ids.is_empty() || (wanted.contract.connection.is_none() && ids.len() != 1) {
+         return Err(missing());
+diff --git a/src/adapters/persistence/workflow/http_publication.rs b/src/adapters/persistence/workflow/http_publication.rs
+index ae4d6aaf..15b15a4b 100644
+--- a/src/adapters/persistence/workflow/http_publication.rs
++++ b/src/adapters/persistence/workflow/http_publication.rs
+@@ -25,7 +25,11 @@ impl PublicationDirectory for HttpPublicationDirectory {
+         let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
+         management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
+             .await?;
+-        let tools = capture_on(&mut tx, draft.company(), &self.selections).await?;
++        let reach = crate::application::workflow::reads::PublicationReach {
++            workflow: draft.workflow(),
++            author: actor.user_id(),
++        };
++        let tools = capture_on(&mut tx, draft.company(), reach, &self.selections).await?;
+         tx.commit().await?;
+         Ok(PublicationDependencies {
+             snapshots: publication::DependencySnapshots {
+@@ -40,6 +44,7 @@ impl PublicationDirectory for HttpPublicationDirectory {
+ pub(in crate::adapters::persistence::workflow) async fn capture_on(
+     tx: &mut Transaction<'_, Postgres>,
+     company: CompanyId,
++    reach: crate::application::workflow::reads::PublicationReach,
+     selections: &[HttpPublicationSelection],
+ ) -> AppResult<Vec<publication::ToolSnapshot>> {
+     if selections.len() > 256 {
+@@ -53,6 +58,20 @@ pub(in crate::adapters::persistence::workflow) async fn capture_on(
+         if !connection.enabled || (connection.uses_owned_bearer() && !connection.secret_set) {
+             return Err(missing());
+         }
++        crate::adapters::persistence::unit_resources::check_definition_reach_on(
++            tx,
++            company,
++            reach,
++            crate::application::ports::unit_resources::UnitResourceKind::HttpConnection,
++            connection.id,
++            Some(connection.unit_id),
++            format!(
++                "{} for operation {}",
++                connection.origin.as_str(),
++                selection.operation
++            ),
++        )
++        .await?;
+         let snapshot: Value = sqlx::query_scalar("SELECT snapshot FROM workflow_http_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3")
+                 .bind(company.as_uuid()).bind(connection.id).bind(selection.operation.as_str()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
+         let mut tool: publication::ToolSnapshot =
+diff --git a/src/adapters/persistence/workflow/http_runtime.rs b/src/adapters/persistence/workflow/http_runtime.rs
+index 90102afe..e63f753f 100644
+--- a/src/adapters/persistence/workflow/http_runtime.rs
++++ b/src/adapters/persistence/workflow/http_runtime.rs
+@@ -163,7 +163,12 @@ impl HttpActionPreparation for PostgresPersistence {
+             .ok_or_else(missing)?;
+         let id = match &tool.contract.connection {
+             Some(slot) => facts.resources.get(slot).ok_or_else(missing)?.as_uuid(),
+-            None => registered_on(&mut tx, scope.company, &tool).await?,
++            None => {
++                let reach =
++                    super::super::resources::run_reach_on(&mut tx, scope.company, scope.run)
++                        .await?;
++                registered_on(&mut tx, scope.company, &tool, ConnectionReach::From(reach)).await?
++            }
+         };
+         policy_on(&mut tx, scope.company, id, &tool).await?;
+         let mut result = request(scope, &facts, id, tool, arguments)?;
+@@ -233,7 +238,11 @@ impl HttpActionPreparation for PostgresPersistence {
+             .find(|tool| tool.contract.name == call.operation && tool.contract.connection.is_none())
+             .cloned()
+             .ok_or_else(missing)?;
+-        if registered_on(&mut tx, scope.company, &tool).await? != call.connection {
++        let reach =
++            super::super::resources::run_reach_on(&mut tx, scope.company, scope.run).await?;
++        if registered_on(&mut tx, scope.company, &tool, ConnectionReach::From(reach)).await?
++            != call.connection
++        {
+             return Err(missing());
+         }
+         if matches!(
+diff --git a/src/adapters/persistence/workflow/http_tests.rs b/src/adapters/persistence/workflow/http_tests.rs
+index 42d53b1f..a5958f13 100644
+--- a/src/adapters/persistence/workflow/http_tests.rs
++++ b/src/adapters/persistence/workflow/http_tests.rs
+@@ -562,3 +562,192 @@ async fn unit_resource_authority_http_operation_register_needs_the_connection_un
+         .unwrap();
+     assert_eq!(registered.unit_id, billing);
+ }
++
++/// Plan07 G1 r2 F2: an unslotted HTTP operation resolves among connections in reach only, so two
++/// sibling units can each own it, and neither substitutes for the other.
++#[tokio::test]
++async fn unit_resource_selection_unslotted_http_resolution_is_judged_within_reach() {
++    let mut fixture = Fixture::new().await;
++    fixture.persistence = PostgresPersistence::with_credential_cipher(
++        fixture.persistence.pool().clone(),
++        CredentialCipher::for_test(),
++    );
++    let billing_connection = Box::pin(configured(
++        &fixture,
++        "https://billing.example.test",
++        Entrance::Http,
++    ))
++    .await;
++    let support_connection = Box::pin(configured(
++        &fixture,
++        "https://support.example.test",
++        Entrance::Http,
++    ))
++    .await;
++    let p = &fixture.persistence;
++    let company = fixture.target.company;
++    let unit = crate::entities::department::DepartmentId::new;
++    let billing = unit(p.test_unit(company.as_uuid(), "billing").await);
++    let support = unit(p.test_unit(company.as_uuid(), "support").await);
++    for (connection, target) in [
++        (&billing_connection, billing),
++        (&support_connection, support),
++    ] {
++        p.move_http(company, fixture.target.actor, connection.id, target)
++            .await
++            .unwrap();
++    }
++    let wanted = operation(company, "http.request").tool;
++    let mut tx = p.pool().begin().await.unwrap();
++    use super::super::http::{ConnectionReach, registered_on};
++    assert_eq!(
++        registered_on(
++            &mut tx,
++            company,
++            &wanted,
++            ConnectionReach::From(Some(billing))
++        )
++        .await
++        .unwrap(),
++        billing_connection.id
++    );
++    assert_eq!(
++        registered_on(
++            &mut tx,
++            company,
++            &wanted,
++            ConnectionReach::From(Some(support))
++        )
++        .await
++        .unwrap(),
++        support_connection.id
++    );
++    // The root reaches neither; company-wide the name is ambiguous. Both fail closed.
++    assert!(matches!(
++        registered_on(&mut tx, company, &wanted, ConnectionReach::From(None)).await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        registered_on(&mut tx, company, &wanted, ConnectionReach::Company).await,
++        Err(AppError::NotFound(_))
++    ));
++    // With Billing's connection disabled, Billing's runs do not fall back to Support's.
++    tx.rollback().await.unwrap();
++    let current = p
++        .list_http(company, fixture.target.actor)
++        .await
++        .unwrap()
++        .into_iter()
++        .find(|connection| connection.id == billing_connection.id)
++        .unwrap();
++    p.set_http_enabled(
++        company,
++        fixture.target.actor,
++        current.id,
++        current.revision,
++        false,
++    )
++    .await
++    .unwrap();
++    let mut tx = p.pool().begin().await.unwrap();
++    assert!(matches!(
++        registered_on(
++            &mut tx,
++            company,
++            &wanted,
++            ConnectionReach::From(Some(billing))
++        )
++        .await,
++        Err(AppError::NotFound(_))
++    ));
++}
++
++/// Plan07 01B.1: the workflow editor offers a definition only connections in reach of its
++/// managing department; the binding form offers a lead only those in reach of a unit they manage.
++#[tokio::test]
++async fn unit_resource_selection_offers_follow_definition_and_author_reach() {
++    use crate::application::workflow::reads::{AuthoringReads, PublicationReach};
++    let mut fixture = Fixture::new().await;
++    fixture.persistence = PostgresPersistence::with_credential_cipher(
++        fixture.persistence.pool().clone(),
++        CredentialCipher::for_test(),
++    );
++    let p = &fixture.persistence;
++    let company = fixture.target.company;
++    let root_connection = Box::pin(configured(
++        &fixture,
++        "https://root.example.test",
++        Entrance::Http,
++    ))
++    .await;
++    let billing_connection = Box::pin(configured(
++        &fixture,
++        "https://billing.example.test",
++        Entrance::Http,
++    ))
++    .await;
++    let support_connection = Box::pin(configured(
++        &fixture,
++        "https://support.example.test",
++        Entrance::Http,
++    ))
++    .await;
++    let billing = p.test_unit(company.as_uuid(), "billing").await;
++    let support = p.test_unit(company.as_uuid(), "support").await;
++    for (connection, target) in [
++        (&billing_connection, billing),
++        (&support_connection, support),
++    ] {
++        p.move_http(
++            company,
++            fixture.target.actor,
++            connection.id,
++            crate::entities::department::DepartmentId::new(target),
++        )
++        .await
++        .unwrap();
++    }
++    // The fixture's definition is managed by the root, which reaches only root connections.
++    let options = p
++        .publication_options(
++            company,
++            PublicationReach {
++                workflow: fixture.target.workflow,
++                author: fixture.target.actor.user_id(),
++            },
++            &[],
++            &["http.request".to_owned()],
++        )
++        .await
++        .unwrap();
++    assert_eq!(
++        options
++            .http
++            .iter()
++            .map(|option| option.connection)
++            .collect::<Vec<_>>(),
++        vec![root_connection.id]
++    );
++    let lead = p.test_unit_lead(company.as_uuid(), billing).await;
++    let offered = |options: crate::application::workflow::reads::BindingOptions| {
++        let mut ids: Vec<Uuid> = options.http.into_iter().map(|choice| choice.id).collect();
++        ids.sort();
++        ids
++    };
++    let mut expected = vec![root_connection.id, billing_connection.id];
++    expected.sort();
++    assert_eq!(
++        offered(p.binding_options(company, lead).await.unwrap()),
++        expected
++    );
++    assert_eq!(
++        offered(
++            p.binding_options(company, fixture.target.actor.user_id())
++                .await
++                .unwrap()
++        )
++        .len(),
++        3,
++        "a root manager is offered every unit's connections"
++    );
++}
+diff --git a/src/adapters/persistence/workflow/mcp_publication.rs b/src/adapters/persistence/workflow/mcp_publication.rs
+index 1ed755ef..c2af7136 100644
+--- a/src/adapters/persistence/workflow/mcp_publication.rs
++++ b/src/adapters/persistence/workflow/mcp_publication.rs
+@@ -25,7 +25,11 @@ impl PublicationDirectory for McpPublicationDirectory {
+         let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
+         management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
+             .await?;
+-        let tools = capture_on(&mut tx, draft.company(), &self.selections).await?;
++        let reach = crate::application::workflow::reads::PublicationReach {
++            workflow: draft.workflow(),
++            author: actor.user_id(),
++        };
++        let tools = capture_on(&mut tx, draft.company(), reach, &self.selections).await?;
+         tx.commit().await?;
+         Ok(PublicationDependencies {
+             snapshots: publication::DependencySnapshots {
+@@ -40,6 +44,7 @@ impl PublicationDirectory for McpPublicationDirectory {
+ pub(in crate::adapters::persistence::workflow) async fn capture_on(
+     tx: &mut Transaction<'_, Postgres>,
+     company: CompanyId,
++    reach: crate::application::workflow::reads::PublicationReach,
+     selections: &[McpPublicationSelection],
+ ) -> AppResult<Vec<publication::ToolSnapshot>> {
+     if selections.len() > MAX_MCP_OPERATIONS {
+@@ -53,6 +58,19 @@ pub(in crate::adapters::persistence::workflow) async fn capture_on(
+         if status_on(tx, &connection).await?.readiness != ResourceReadiness::Ready {
+             return Err(missing());
+         }
++        crate::adapters::persistence::unit_resources::check_definition_reach_on(
++            tx,
++            company,
++            reach,
++            crate::application::ports::unit_resources::UnitResourceKind::McpConnection,
++            connection.id,
++            connection.unit_id,
++            format!(
++                "{} for tool {} (slot {})",
++                connection.slug, selection.tool, selection.slot
++            ),
++        )
++        .await?;
+         let snapshot: Value = sqlx::query_scalar("SELECT snapshot FROM workflow_mcp_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3")
+                 .bind(company.as_uuid()).bind(connection.id).bind(selection.tool.as_str()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
+         let mut tool: publication::ToolSnapshot =
+diff --git a/src/adapters/persistence/workflow/provisioning.rs b/src/adapters/persistence/workflow/provisioning.rs
+index a4bfa9ba..8f5b5d80 100644
+--- a/src/adapters/persistence/workflow/provisioning.rs
++++ b/src/adapters/persistence/workflow/provisioning.rs
+@@ -570,13 +570,29 @@ async fn agent_write(
+             tools.push(name);
+         }
+     }
++    // The created agent's placement decides what it may use (Plan07 decision d): skills and
++    // tools named in the spec resolve only within that department's reach (the root's when the
++    // spec names none), so another unit's same slug reads as absent.
++    let placement: Option<Uuid> = match &spec.department {
++        Some(slug) => {
++            sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1 AND slug = $2")
++                .bind(company.as_uuid())
++                .bind(slug)
++                .fetch_optional(&mut **tx)
++                .await?
++        }
++        None => None,
++    };
+     let mut skill_ids = Vec::with_capacity(spec.skills.len());
+     for slug in &spec.skills {
+         let id: Option<Uuid> = sqlx::query_scalar(
+-            "SELECT id FROM skills WHERE company_id = $1 AND slug = $2 FOR KEY SHARE",
++            "SELECT id FROM skills WHERE company_id = $1 AND slug = $2 \
++             AND unit_reaches($1, COALESCE($3, (SELECT id FROM departments \
++                 WHERE company_id = $1 AND is_root)), unit_id) FOR KEY SHARE",
+         )
+         .bind(company.as_uuid())
+         .bind(slug)
++        .bind(placement)
+         .fetch_optional(&mut **tx)
+         .await?;
+         match id {
+@@ -597,11 +613,12 @@ async fn agent_write(
+         system_prompt: Some(spec.system_prompt.clone()),
+         description: spec.description.clone(),
+         tool_bindings: Some(
+-            super::super::agent_binding_selection::resolve_bindings_on(
++            super::super::agent_binding_selection::resolve_bindings_in_reach_on(
+                 tx,
+                 company.as_uuid(),
+                 None,
+                 &tools,
++                placement,
+             )
+             .await?,
+         ),
+diff --git a/src/adapters/persistence/workflow/resources.rs b/src/adapters/persistence/workflow/resources.rs
+index b9d35b86..45a8ddbe 100644
+--- a/src/adapters/persistence/workflow/resources.rs
++++ b/src/adapters/persistence/workflow/resources.rs
+@@ -46,18 +46,96 @@ pub(super) struct ReadinessSelection<'a> {
+     pub bundle: &'a PublishedBundle,
+     pub resources:
+         &'a std::collections::BTreeMap<crate::domain::workflow::ResourceName, RuntimeResourceId>,
++    /// Where workflow-level connections must be reachable from (Plan07): the association's base
++    /// department, the root when `None`.
++    pub reach: Option<crate::entities::department::DepartmentId>,
++    pub stage: crate::app_error::UnitCheckStage,
+ }
+ 
+-impl<'a> From<&'a binding::ConfiguredBinding> for ReadinessSelection<'a> {
+-    fn from(binding: &'a binding::ConfiguredBinding) -> Self {
++impl<'a> ReadinessSelection<'a> {
++    pub(super) fn of(
++        binding: &'a binding::ConfiguredBinding,
++        reach: Option<crate::entities::department::DepartmentId>,
++        stage: crate::app_error::UnitCheckStage,
++    ) -> Self {
+         Self {
+             company: binding.company_id(),
+             bundle: binding.bundle(),
+             resources: binding.resources(),
++            reach,
++            stage,
+         }
+     }
+ }
+ 
++/// The start of a run's reach for workflow-level connections (Plan07 decision d): the
++/// association's base department, which equals the run's base read set; the root when none.
++pub(super) async fn association_reach_on(
++    tx: &mut PgConnection,
++    company: CompanyId,
++    association: crate::application::workflow::RelatedAssociation,
++) -> AppResult<Option<crate::entities::department::DepartmentId>> {
++    Ok(super::role_binding::context_on(tx, company, association)
++        .await?
++        .ok())
++}
++
++/// A run's reach once it exists: its base scope rows' own unit (the root when the chain was
++/// empty), the same start admission used.
++pub(super) async fn run_reach_on(
++    tx: &mut PgConnection,
++    company: CompanyId,
++    run: crate::domain::workflow::RunId,
++) -> AppResult<Option<crate::entities::department::DepartmentId>> {
++    let unit: Option<Uuid> = sqlx::query_scalar(
++        "SELECT unit_id FROM workflow_run_scopes WHERE company_id=$1 AND run_id=$2 \
++         AND acting_principal_id IS NULL AND access='read' AND own LIMIT 1",
++    )
++    .bind(company.as_uuid())
++    .bind(run.as_uuid())
++    .fetch_optional(tx)
++    .await?;
++    Ok(unit.map(crate::entities::department::DepartmentId::new))
++}
++
++/// A slot's HTTP or MCP connection must belong to a unit in reach (Plan07 01B.3, D8).
++async fn check_connection_unit_on(
++    tx: &mut PgConnection,
++    configuration: &ReadinessSelection<'_>,
++    slot: &crate::domain::workflow::ResourceName,
++    id: Uuid,
++) -> AppResult<()> {
++    use crate::application::ports::unit_resources::UnitResourceKind;
++    let owner: Option<(String, bool)> = sqlx::query_as(
++        "SELECT kind, unit_reaches($1, COALESCE($3, (SELECT id FROM departments \
++            WHERE company_id=$1 AND is_root)), unit_id) FROM ( \
++            SELECT 'http' AS kind, unit_id FROM workflow_http_connections \
++                WHERE company_id=$1 AND id=$2 \
++            UNION ALL SELECT 'mcp', unit_id FROM company_mcp_connections \
++                WHERE company_id=$1 AND id=$2 AND unit_id IS NOT NULL) AS owner",
++    )
++    .bind(configuration.company.as_uuid())
++    .bind(id)
++    .bind(configuration.reach.map(|unit| unit.as_uuid()))
++    .fetch_optional(&mut *tx)
++    .await?;
++    match owner {
++        Some((kind, false)) => Err(AppError::ResourceOutsideUnit(
++            crate::app_error::ResourceOutsideUnit {
++                stage: configuration.stage,
++                kind: if kind == "http" {
++                    UnitResourceKind::HttpConnection
++                } else {
++                    UnitResourceKind::McpConnection
++                },
++                resource: id,
++                name: slot.as_str().to_owned(),
++            },
++        )),
++        _ => Ok(()),
++    }
++}
++
+ pub(super) async fn check_readiness(
+     tx: &mut Transaction<'_, Postgres>,
+     configuration: ReadinessSelection<'_>,
+@@ -94,7 +172,13 @@ pub(super) async fn check_readiness(
+                 continue;
+             }
+             ToolKind::Http => {
+-                http::registered_on(tx, company, tool).await?;
++                http::registered_on(
++                    tx,
++                    company,
++                    tool,
++                    http::ConnectionReach::From(configuration.reach),
++                )
++                .await?;
+                 continue;
+             }
+             // A frozen pin runs while its name is registered for the same workflow (P07-Q2).
+@@ -142,6 +226,7 @@ pub(super) async fn check_readiness(
+             .resources
+             .get(&requirement.slot)
+             .ok_or_else(missing)?;
++        check_connection_unit_on(tx, &configuration, &requirement.slot, id.as_uuid()).await?;
+         let status = inspect_on(tx, configuration.company, id)
+             .await?
+             .ok_or_else(missing)?;
+diff --git a/src/adapters/persistence/workflow/sample_capture.rs b/src/adapters/persistence/workflow/sample_capture.rs
+index adce0060..71eba19a 100644
+--- a/src/adapters/persistence/workflow/sample_capture.rs
++++ b/src/adapters/persistence/workflow/sample_capture.rs
+@@ -129,14 +129,30 @@ impl SampleCapture {
+                 .values()
+                 .any(|step| step.step_type.as_str() == tool.contract.name.as_str())
+         });
+-        captured
+-            .snapshots
+-            .tools
+-            .extend(http::capture_publication_on(tx, target.company, &self.http).await?);
+-        captured
+-            .snapshots
+-            .tools
+-            .extend(mcp::capture_publication_on(tx, target.company, &self.mcp).await?);
++        captured.snapshots.tools.extend(
++            http::capture_publication_on(
++                tx,
++                target.company,
++                crate::application::workflow::reads::PublicationReach {
++                    workflow: target.workflow,
++                    author: target.actor.user_id(),
++                },
++                &self.http,
++            )
++            .await?,
++        );
++        captured.snapshots.tools.extend(
++            mcp::capture_publication_on(
++                tx,
++                target.company,
++                crate::application::workflow::reads::PublicationReach {
++                    workflow: target.workflow,
++                    author: target.actor.user_id(),
++                },
++                &self.mcp,
++            )
++            .await?,
++        );
+         agent_publication::capture_sample_agents_on(tx, &state.draft, &mut captured).await?;
+         let captured = child_publication::capture_on(tx, &state.draft, captured).await?;
+         Ok(Arc::new(
+diff --git a/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs b/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
+index d68eff5f..4adef3d7 100644
+--- a/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
++++ b/src/adapters/persistence/workflow/sample_capture_bounds_tests.rs
+@@ -74,6 +74,7 @@ fn request(root: &PublishedBundle, children: &[Arc<PublishedBundle>]) -> SampleR
+         .map(|(index, child)| {
+             let definition = child.compiled().graph().definition();
+             ResolvedAgentTool {
++                unit_id: None,
+                 binding: AgentToolBinding {
+                     id: AgentBindingId::new(Uuid::from_u128(3000 + index as u128)),
+                     alias: AgentToolAlias::parse(format!("child_{index}")).unwrap(),
+diff --git a/src/adapters/persistence/workflow/schedule_tests.rs b/src/adapters/persistence/workflow/schedule_tests.rs
+index f4b285ca..6adc50cd 100644
+--- a/src/adapters/persistence/workflow/schedule_tests.rs
++++ b/src/adapters/persistence/workflow/schedule_tests.rs
+@@ -1615,3 +1615,32 @@ async fn channel_path_fk_schedules_of_both_binding_kinds_leave_with_channel_and_
+         assert_eq!(schedule_rows(&s).await, 0);
+     }
+ }
++
++/// Plan07 D8: a scheduled run refused because a resource left its reach settles with that code,
++/// which the schedule refusal CHECK admits.
++#[tokio::test]
++async fn unit_resource_selection_refusal_settles_a_schedule_occurrence() {
++    let s = Schedules::new().await;
++    let schedule = s.schedule("Hourly").await;
++    s.due(schedule.id).await;
++    let worker = ScheduleWorkerId(Uuid::new_v4());
++    let lease = Utc::now() + chrono::Duration::minutes(1);
++    let claimed = s.p().claim_due(worker, lease, 10).await.unwrap();
++    let claim = OccurrenceClaim {
++        company: s.fixture.target.company,
++        occurrence: claimed[0].id,
++        worker,
++        generation: claimed[0].materialization_generation,
++    };
++    assert!(
++        s.p()
++            .record_refusal(claim, "admission.resource_outside_unit", None)
++            .await
++            .unwrap()
++    );
++    let (_, status, _, refusal, _) = s.occurrences(schedule.id).await[0].clone();
++    assert_eq!(
++        (status.as_str(), refusal.as_deref()),
++        ("failed", Some("admission.resource_outside_unit"))
++    );
++}
+diff --git a/src/application/agent/contract_tests.rs b/src/application/agent/contract_tests.rs
+index 74c21e96..5e475b20 100644
+--- a/src/application/agent/contract_tests.rs
++++ b/src/application/agent/contract_tests.rs
+@@ -17,6 +17,7 @@ fn definition() -> ResolvedAgentDefinition {
+             max_output_tokens: 1000,
+         }),
+         tools: vec![ResolvedAgentTool {
++            unit_id: None,
+             binding: AgentToolBinding::builtin(AgentBuiltinTool::SearchKnowledge),
+             input_schema: json!({"type":"object","additionalProperties":false}),
+             output_schema: json!({"type":"object"}),
+@@ -121,6 +122,7 @@ fn autonomous_agent_contract_skills_require_local_aliases_without_granting_tools
+     value.skills.push(ResolvedAgentSkill {
+         assignment_id: AgentSkillAssignmentId::new(Uuid::new_v4()),
+         skill: SkillSnapshot {
++            unit_id: uuid::Uuid::nil(),
+             description: "Skill instructions".into(),
+             files: Vec::new(),
+             company_id: value.company_id,
+diff --git a/src/application/agent/definition.rs b/src/application/agent/definition.rs
+index 70fc69b7..ff22bd34 100644
+--- a/src/application/agent/definition.rs
++++ b/src/application/agent/definition.rs
+@@ -55,6 +55,11 @@ pub struct ResolvedAgentTool {
+     pub output_schema: Value,
+     pub policy: ApprovedActionPolicy,
+     pub approval_required: bool,
++    /// The unit that owned the HTTP or MCP connection when this revision was published
++    /// (Plan07): present exactly for connection tools, beside the binding identity it never
++    /// changes. Admission checks the connection's current unit, so a later move shows here.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub unit_id: Option<uuid::Uuid>,
+ }
+ 
+ #[derive(Clone, Serialize, Deserialize)]
+@@ -107,6 +112,18 @@ impl ResolvedAgentDefinition {
+         }
+         let bindings: Vec<_> = self.tools.iter().map(|tool| tool.binding.clone()).collect();
+         validate_agent_bindings(&bindings).map_err(AppError::BadRequest)?;
++        if self.tools.iter().any(|tool| {
++            tool.unit_id.is_some()
++                != matches!(
++                    tool.binding.source,
++                    crate::entities::agent_capability::AgentBindingSource::Http { .. }
++                        | crate::entities::agent_capability::AgentBindingSource::Mcp { .. }
++                )
++        }) {
++            return Err(invalid(
++                "A connection tool records its unit; no other tool has one",
++            ));
++        }
+         let mut skills = BTreeSet::new();
+         let mut assignments = BTreeSet::new();
+         if self.skills.len() > crate::entities::agent::MAX_AGENT_SKILLS {
+diff --git a/src/application/agent/mod.rs b/src/application/agent/mod.rs
+index e96bc871..1586cd97 100644
+--- a/src/application/agent/mod.rs
++++ b/src/application/agent/mod.rs
+@@ -60,6 +60,8 @@ pub struct ModelSettings {
+ #[serde(deny_unknown_fields)]
+ pub struct SkillSnapshot {
+     pub company_id: CompanyId,
++    /// The skill's unit when this revision was published (Plan07).
++    pub unit_id: uuid::Uuid,
+     /// Trusted library identity for revocation checks; never model input.
+     pub skill_id: uuid::Uuid,
+     pub name: TypeName,
+diff --git a/src/application/agent/resolution_tests.rs b/src/application/agent/resolution_tests.rs
+index 8b9445e0..e050631e 100644
+--- a/src/application/agent/resolution_tests.rs
++++ b/src/application/agent/resolution_tests.rs
+@@ -29,6 +29,7 @@ fn facts() -> AgentResolutionFacts {
+             skills: vec![],
+         },
+         tools: vec![ResolvedAgentTool {
++            unit_id: None,
+             binding,
+             input_schema: tool.contract.input_schema,
+             output_schema: tool.contract.output_schema,
+@@ -50,6 +51,7 @@ fn assigned(facts: &mut AgentResolutionFacts, name: &str, required: &str) {
+     facts.skills.push(ResolvedAgentSkill {
+         assignment_id: assignment,
+         skill: SkillSnapshot {
++            unit_id: uuid::Uuid::nil(),
+             description: "Skill instructions".into(),
+             files: Vec::new(),
+             company_id: facts.draft.company_id,
+diff --git a/src/application/app_error.rs b/src/application/app_error.rs
+index 763f1833..19b6d4dc 100644
+--- a/src/application/app_error.rs
++++ b/src/application/app_error.rs
+@@ -11,6 +11,10 @@ pub enum AppError {
+         content: crate::entities::access_level::AccessLevel,
+         ceiling: crate::entities::access_level::AccessLevel,
+     },
++    /// A skill or connection outside the reach of the agent, definition, desk or run that would
++    /// use it (Plan07). A definite refusal: retrying the same command refuses again.
++    #[error("{0}")]
++    ResourceOutsideUnit(ResourceOutsideUnit),
+     #[error("The destination cannot receive this run's content")]
+     KnowledgeRelease {
+         content: crate::entities::access_level::AccessLevel,
+@@ -157,6 +161,54 @@ impl std::fmt::Display for WorkflowGuardViolation {
+     }
+ }
+ 
++/// Where a unit-owned resource was found out of reach (Plan07 G1 D8).
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum UnitCheckStage {
++    /// Publishing an agent or workflow that selects it.
++    Publication,
++    /// Saving a binding that maps a slot to it or resolves it.
++    Binding,
++    /// Admitting a run, including native sessions and native MCP calls.
++    Admission,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct ResourceOutsideUnit {
++    pub stage: UnitCheckStage,
++    pub kind: crate::application::ports::unit_resources::UnitResourceKind,
++    pub resource: uuid::Uuid,
++    /// A name a person can act on: the tool alias, skill slug or connection, and where it was
++    /// required (a step, for workflow publication).
++    pub name: String,
++}
++
++impl ResourceOutsideUnit {
++    pub fn code(&self) -> &'static str {
++        match self.stage {
++            UnitCheckStage::Publication => "publication.resource_outside_unit",
++            UnitCheckStage::Binding => "binding.resource_outside_unit",
++            UnitCheckStage::Admission => "admission.resource_outside_unit",
++        }
++    }
++}
++
++impl std::fmt::Display for ResourceOutsideUnit {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        use crate::application::ports::unit_resources::UnitResourceKind;
++        let kind = match self.kind {
++            UnitResourceKind::Skill => "Skill",
++            UnitResourceKind::McpConnection => "MCP connection",
++            UnitResourceKind::HttpConnection => "HTTP connection",
++        };
++        write!(
++            f,
++            "{kind} {} belongs to a department outside the reach of what uses it; move it up or \
++             choose another",
++            self.name
++        )
++    }
++}
++
+ pub const KNOWLEDGE_TRIGGER_ABOVE_CEILING: &str = "knowledge.trigger_above_ceiling";
+ pub use crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT;
+ 
+diff --git a/src/application/local_agents/harness.rs b/src/application/local_agents/harness.rs
+index da7e01fd..94fc787a 100644
+--- a/src/application/local_agents/harness.rs
++++ b/src/application/local_agents/harness.rs
+@@ -154,6 +154,7 @@ mod tests {
+             AgentBindingId, AgentBindingSource, AgentToolAlias, AgentToolBinding,
+         };
+         ResolvedAgentTool {
++            unit_id: Some(uuid::Uuid::nil()),
+             binding: AgentToolBinding {
+                 id: AgentBindingId::new(Uuid::new_v4()),
+                 alias: AgentToolAlias::parse(format!("mcp_{index}")).unwrap(),
+@@ -192,6 +193,7 @@ mod tests {
+             definition.skills.push(ResolvedAgentSkill {
+                 assignment_id: AgentSkillAssignmentId::new(Uuid::new_v4()),
+                 skill: SkillSnapshot {
++                    unit_id: uuid::Uuid::nil(),
+                     company_id: company,
+                     skill_id: Uuid::new_v4(),
+                     name: TypeName::parse(format!("skill-{i}")).unwrap(),
+diff --git a/src/application/services/inbound_event_worker.rs b/src/application/services/inbound_event_worker.rs
+index 6184969c..7a2437bc 100644
+--- a/src/application/services/inbound_event_worker.rs
++++ b/src/application/services/inbound_event_worker.rs
+@@ -658,6 +658,7 @@ fn validate_commit_request(
+ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
+     match error {
+         AppError::WorkflowRole(_)
++        | AppError::ResourceOutsideUnit(_)
+         | AppError::KnowledgeTrigger { .. }
+         | AppError::KnowledgeRelease { .. }
+         | AppError::Execution(_)
+diff --git a/src/application/use_cases/skill.rs b/src/application/use_cases/skill.rs
+index 73361139..f4124b1e 100644
+--- a/src/application/use_cases/skill.rs
++++ b/src/application/use_cases/skill.rs
+@@ -136,10 +136,13 @@ pub trait SkillManagementPersistence: Send + Sync {
+         page: SkillPageRequest,
+     ) -> AppResult<SkillPage>;
+     async fn count_company(&self, company_id: Uuid, units: &[Uuid]) -> AppResult<u64>;
+-    /// Every company skill, for choosing an agent's skills (not for configuring them).
++    /// The skills offered for an agent (Plan07 decision d): those in the agent's own reach, or,
++    /// for an agent not created yet, in reach of a unit `author` manages (where it can be placed).
+     async fn list_authoring_page(
+         &self,
+         company_id: Uuid,
++        author: Uuid,
++        agent: Option<Uuid>,
+         page: SkillPageRequest,
+     ) -> AppResult<SkillPage>;
+     async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage>;
+@@ -371,16 +374,18 @@ impl SkillUseCases {
+     }
+ 
+     /// The skills offered when choosing an agent's skills: any unit manager may read them
+-    /// (Plan06 U3), unlike the configuration list, which shows only managed units' skills.
++    /// (Plan06 U3), limited to what the agent can use (Plan07 decision d), unlike the
++    /// configuration list, which shows only managed units' skills.
+     pub async fn list_authoring_page(
+         &self,
+         user_id: Uuid,
+         company_id: Uuid,
++        agent: Option<Uuid>,
+         page: SkillPageRequest,
+     ) -> AppResult<SkillPage> {
+         self.verify_skill_manager(user_id, company_id).await?;
+         self.persistence
+-            .list_authoring_page(company_id, page.validate()?)
++            .list_authoring_page(company_id, user_id, agent, page.validate()?)
+             .await
+     }
+ 
+diff --git a/src/application/workflow/agent_department_tests.rs b/src/application/workflow/agent_department_tests.rs
+index 7d1f61b2..eefbefec 100644
+--- a/src/application/workflow/agent_department_tests.rs
++++ b/src/application/workflow/agent_department_tests.rs
+@@ -67,6 +67,7 @@ fn with_skill() -> ResolvedAgent {
+     definition.skills = vec![ResolvedAgentSkill {
+         assignment_id: AgentSkillAssignmentId::new(Uuid::from_u128(80)),
+         skill: SkillSnapshot {
++            unit_id: uuid::Uuid::nil(),
+             company_id: company(),
+             skill_id: Uuid::from_u128(81),
+             name: name("pricing"),
+@@ -179,6 +180,7 @@ fn department_directory_tool_description_names_departments_and_desks() {
+     let snapshot = builtin_provisioning_snapshot(company(), ProvisioningKind::ListAgents).unwrap();
+     let mut definition = definition();
+     definition.tools = vec![ResolvedAgentTool {
++        unit_id: None,
+         binding: AgentToolBinding {
+             id: AgentBindingId::new(Uuid::from_u128(100)),
+             alias: AgentToolAlias::parse("list_company_agents").unwrap(),
+diff --git a/src/application/workflow/agent_tests.rs b/src/application/workflow/agent_tests.rs
+index 46d863f3..8fc4f0f8 100644
+--- a/src/application/workflow/agent_tests.rs
++++ b/src/application/workflow/agent_tests.rs
+@@ -27,6 +27,7 @@ fn selection(tools: Vec<&str>) -> ResolvedAgent {
+         .map(|(index, alias)| {
+             let snapshot = tool_snapshot("tool.call");
+             ResolvedAgentTool {
++                unit_id: Some(uuid::Uuid::nil()),
+                 binding: AgentToolBinding {
+                     id: AgentBindingId::new(Uuid::from_u128(100 + index as u128)),
+                     alias: AgentToolAlias::parse(*alias).unwrap(),
+diff --git a/src/application/workflow/message_admission.rs b/src/application/workflow/message_admission.rs
+index acba714d..ed8e8c1c 100644
+--- a/src/application/workflow/message_admission.rs
++++ b/src/application/workflow/message_admission.rs
+@@ -466,6 +466,10 @@ pub(super) fn classify(result: AppResult<AdmissionResult>) -> Classified {
+         Err(AppError::BadRequest(_)) => {
+             Classified::Settled(BindingOutcome::Refused("input_rejected"))
+         }
++        Err(AppError::ResourceOutsideUnit(refusal)) => {
++            tracing::warn!(code = refusal.code(), "Workflow admission refused");
++            Classified::Settled(BindingOutcome::Refused(refusal.code()))
++        }
+         Err(AppError::KnowledgeTrigger { content, ceiling }) => {
+             tracing::warn!(
+                 content_level = content.as_i16(),
+@@ -605,6 +609,18 @@ mod tests {
+             classify(Err(AppError::BadRequest("input".into()))),
+             Classified::Settled(BindingOutcome::Refused("input_rejected"))
+         ));
++        // Plan07: a resource outside the run's reach is a definite refusal naming its code.
++        assert!(matches!(
++            classify(Err(AppError::ResourceOutsideUnit(
++                crate::app_error::ResourceOutsideUnit {
++                    stage: crate::app_error::UnitCheckStage::Admission,
++                    kind: crate::application::ports::unit_resources::UnitResourceKind::Skill,
++                    resource: uuid::Uuid::nil(),
++                    name: "policy".into(),
++                }
++            ))),
++            Classified::Settled(BindingOutcome::Refused("admission.resource_outside_unit"))
++        ));
+         assert!(matches!(
+             classify(Err(AppError::Database("down".into()))),
+             Classified::Transient
+diff --git a/src/application/workflow/native_mcp/tests.rs b/src/application/workflow/native_mcp/tests.rs
+index 88d31b5a..b385f57d 100644
+--- a/src/application/workflow/native_mcp/tests.rs
++++ b/src/application/workflow/native_mcp/tests.rs
+@@ -17,6 +17,7 @@ fn identity() -> NativeBrokerIdentity {
+ 
+ fn tool(approval_required: bool) -> ResolvedAgentTool {
+     ResolvedAgentTool {
++        unit_id: Some(uuid::Uuid::nil()),
+         binding: AgentToolBinding {
+             id: AgentBindingId::new(Uuid::new_v4()),
+             alias: AgentToolAlias::parse("lookup").unwrap(),
+diff --git a/src/application/workflow/publication/capabilities_tests.rs b/src/application/workflow/publication/capabilities_tests.rs
+index e698c431..16b3bc7f 100644
+--- a/src/application/workflow/publication/capabilities_tests.rs
++++ b/src/application/workflow/publication/capabilities_tests.rs
+@@ -3,6 +3,7 @@ use crate::application::agent::{AgentKey, SkillSnapshot};
+ 
+ fn skill(name_: &str, id: u128, required: Vec<TypeName>) -> SkillSnapshot {
+     SkillSnapshot {
++        unit_id: uuid::Uuid::nil(),
+         description: "Skill instructions".into(),
+         files: Vec::new(),
+         company_id: company(),
+@@ -26,6 +27,7 @@ fn capable_definition() -> crate::application::agent::ResolvedAgentDefinition {
+         .map(|(index, alias)| {
+             let snapshot = tool_snapshot("tool.call");
+             ResolvedAgentTool {
++                unit_id: Some(uuid::Uuid::nil()),
+                 binding: AgentToolBinding {
+                     id: AgentBindingId::new(Uuid::from_u128(20 + index as u128)),
+                     alias: AgentToolAlias::parse(*alias).unwrap(),
+diff --git a/src/application/workflow/reads.rs b/src/application/workflow/reads.rs
+index e0f0557f..1d776222 100644
+--- a/src/application/workflow/reads.rs
++++ b/src/application/workflow/reads.rs
+@@ -485,6 +485,13 @@ pub struct ReviewerChoices {
+     pub next: Option<crate::entities::transport::PrincipalId>,
+ }
+ 
++/// The definition whose authoring unit decides which connections it may select (Plan07).
++#[derive(Debug, Clone, Copy)]
++pub struct PublicationReach {
++    pub workflow: crate::domain::workflow::WorkflowId,
++    pub author: uuid::Uuid,
++}
++
+ #[async_trait]
+ pub trait AuthoringReads: Send + Sync {
+     async fn reviewer_choice(
+@@ -511,9 +518,12 @@ pub trait AuthoringReads: Send + Sync {
+     ) -> AppResult<WorkflowUsage>;
+     /// The approved MCP operations named `mcp_tools` and HTTP operations named `http_tools`;
+     /// more than [`MAX_OPTION_NAMES`] names in either list is refused.
++    /// Only connections in reach of the definition's managing department (or, for a definition
++    /// not created yet, the author's creating department) are offered (Plan07 01B.1).
+     async fn publication_options(
+         &self,
+         company: CompanyId,
++        reach: PublicationReach,
+         mcp_tools: &[String],
+         http_tools: &[String],
+     ) -> AppResult<PublicationOptions>;
+@@ -527,7 +537,9 @@ pub trait AuthoringReads: Send + Sync {
+     /// `agent_ids` display index (p09 gate P09-B1b-D1), as the run list's agent filter
+     /// ([`RunFilter::agent`]) does; nothing decides or authorizes on it.
+     async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage>;
+-    async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions>;
++    /// `author` limits slot connections to those in reach of a unit they manage, where the
++    /// desks they may bind are (Plan07); saving still checks the chosen desk's reach.
++    async fn binding_options(&self, company: CompanyId, author: Uuid) -> AppResult<BindingOptions>;
+     /// The company's agents by name, at most [`MAX_BINDING_OPTIONS`], and whether there were more:
+     /// what the runs workspace's agent filter offers.
+     async fn agent_options(&self, company: CompanyId) -> AppResult<(Vec<ChoiceOption>, bool)>;
+diff --git a/src/application/workflow/sample/approval_tests.rs b/src/application/workflow/sample/approval_tests.rs
+index 88e3e66f..87cc0e23 100644
+--- a/src/application/workflow/sample/approval_tests.rs
++++ b/src/application/workflow/sample/approval_tests.rs
+@@ -72,6 +72,7 @@ fn autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_a
+         vec![],
+     );
+     let tool = ResolvedAgentTool {
++        unit_id: Some(uuid::Uuid::nil()),
+         binding: AgentToolBinding {
+             id: AgentBindingId::new(Uuid::from_u128(501)),
+             alias: AgentToolAlias::parse("crm.write").unwrap(),
+@@ -105,6 +106,7 @@ fn autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_
+         .unwrap();
+     let pin = snapshot.workflow.as_ref().unwrap();
+     let tool = ResolvedAgentTool {
++        unit_id: None,
+         binding: AgentToolBinding {
+             id: AgentBindingId::new(Uuid::from_u128(502)),
+             alias: AgentToolAlias::parse("memory.child").unwrap(),
+diff --git a/src/application/workflow/sample/tests.rs b/src/application/workflow/sample/tests.rs
+index 1dbfbde0..799224b0 100644
+--- a/src/application/workflow/sample/tests.rs
++++ b/src/application/workflow/sample/tests.rs
+@@ -105,7 +105,14 @@ fn execute(bundle: Arc<PublishedBundle>, mut request: SampleRequest) -> AppResul
+                                 operation: tool.contract.name.clone(),
+                             }
+                         };
++                        // A connection tool records its unit (Plan07); others have none.
++                        let unit_id = matches!(
++                            source,
++                            AgentBindingSource::Http { .. } | AgentBindingSource::Mcp { .. }
++                        )
++                        .then(Uuid::nil);
+                         ResolvedAgentTool {
++                            unit_id,
+                             binding: AgentToolBinding {
+                                 id: AgentBindingId::new(Uuid::from_u128(100 + index as u128)),
+                                 alias: AgentToolAlias::parse(tool.contract.name.as_str()).unwrap(),

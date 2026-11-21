@@ -67,6 +67,7 @@ fn with_skill() -> ResolvedAgent {
     definition.skills = vec![ResolvedAgentSkill {
         assignment_id: AgentSkillAssignmentId::new(Uuid::from_u128(80)),
         skill: SkillSnapshot {
+            unit_id: uuid::Uuid::nil(),
             company_id: company(),
             skill_id: Uuid::from_u128(81),
             name: name("pricing"),
@@ -179,6 +180,7 @@ fn department_directory_tool_description_names_departments_and_desks() {
     let snapshot = builtin_provisioning_snapshot(company(), ProvisioningKind::ListAgents).unwrap();
     let mut definition = definition();
     definition.tools = vec![ResolvedAgentTool {
+        unit_id: None,
         binding: AgentToolBinding {
             id: AgentBindingId::new(Uuid::from_u128(100)),
             alias: AgentToolAlias::parse("list_company_agents").unwrap(),

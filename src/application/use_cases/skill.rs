@@ -136,10 +136,13 @@ pub trait SkillManagementPersistence: Send + Sync {
         page: SkillPageRequest,
     ) -> AppResult<SkillPage>;
     async fn count_company(&self, company_id: Uuid, units: &[Uuid]) -> AppResult<u64>;
-    /// Every company skill, for choosing an agent's skills (not for configuring them).
+    /// The skills offered for an agent (Plan07 decision d): those in the agent's own reach, or,
+    /// for an agent not created yet, in reach of a unit `author` manages (where it can be placed).
     async fn list_authoring_page(
         &self,
         company_id: Uuid,
+        author: Uuid,
+        agent: Option<Uuid>,
         page: SkillPageRequest,
     ) -> AppResult<SkillPage>;
     async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage>;
@@ -371,16 +374,18 @@ impl SkillUseCases {
     }
 
     /// The skills offered when choosing an agent's skills: any unit manager may read them
-    /// (Plan06 U3), unlike the configuration list, which shows only managed units' skills.
+    /// (Plan06 U3), limited to what the agent can use (Plan07 decision d), unlike the
+    /// configuration list, which shows only managed units' skills.
     pub async fn list_authoring_page(
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        agent: Option<Uuid>,
         page: SkillPageRequest,
     ) -> AppResult<SkillPage> {
         self.verify_skill_manager(user_id, company_id).await?;
         self.persistence
-            .list_authoring_page(company_id, page.validate()?)
+            .list_authoring_page(company_id, user_id, agent, page.validate()?)
             .await
     }
 

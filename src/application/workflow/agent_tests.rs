@@ -27,6 +27,7 @@ fn selection(tools: Vec<&str>) -> ResolvedAgent {
         .map(|(index, alias)| {
             let snapshot = tool_snapshot("tool.call");
             ResolvedAgentTool {
+                unit_id: Some(uuid::Uuid::nil()),
                 binding: AgentToolBinding {
                     id: AgentBindingId::new(Uuid::from_u128(100 + index as u128)),
                     alias: AgentToolAlias::parse(*alias).unwrap(),

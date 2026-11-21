@@ -546,12 +546,17 @@ impl AgentSettingsView<'_> {
             .await
     }
 
-    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
+    /// The skills offered for `agent`, or for a new agent of this author (Plan07).
+    async fn skills(
+        &self,
+        agent: Option<Uuid>,
+    ) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
         Ok(self
             .skill_use_cases
             .list_authoring_page(
                 self.user_id,
                 self.company.id,
+                agent,
                 SkillPageRequest {
                     before: None,
                     limit: MAX_SKILL_PAGE_SIZE,
@@ -588,7 +593,7 @@ impl AgentSettingsView<'_> {
     async fn create_pane(&self, form: CreateForm<'_>) -> AppResult<String> {
         let model_connections = self.model_connections().await?;
         let library_agents = self.agent_use_cases.list_library_agents().await?;
-        let mut skills = self.skills().await?;
+        let mut skills = self.skills(None).await?;
         for skill_id in &form.draft.skill_ids {
             if !skills.iter().any(|skill| skill.id == *skill_id)
                 && let Some(skill) = self
@@ -654,7 +659,7 @@ impl AgentSettingsView<'_> {
             .company_agent_capabilities(self.user_id, self.company.id, agent.id)
             .await?
             .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
-        let mut skills = self.skills().await?;
+        let mut skills = self.skills(Some(agent.id)).await?;
         for selected in &capabilities.skills {
             if !skills.iter().any(|skill| skill.id == selected.id) {
                 skills.push(selected.into());

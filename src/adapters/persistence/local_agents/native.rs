@@ -21,6 +21,17 @@ pub(in crate::adapters::persistence) async fn capture_on(
     let revision = active_on(tx, profile.company_id, actor, agent).await?;
     super::super::workflow::agent_authority::check_native_definition_on(tx, &revision.definition)
         .await?;
+    // Refuse a session whose agent resources are out of its reach before recording it; every
+    // later bundle selection repeats the check (Plan07 decision d).
+    super::super::unit_resources::check_agent_reach_on(
+        tx,
+        CompanyId::new(profile.company_id),
+        agent.as_uuid(),
+        &revision.definition.tools,
+        &revision.definition.skills,
+        crate::app_error::UnitCheckStage::Admission,
+    )
+    .await?;
     let bundle = NativeBundle::from_definition(&revision.definition)?;
     if !bundle.tools.is_empty()
         && profile.selection.provider != crate::domain::local_agents::LocalProvider::ClaudeCode
@@ -93,6 +104,24 @@ pub(in crate::adapters::persistence) async fn selected_with_locks_on(
     .await
     .map_err(|error| match error {
         AppError::BadRequest(message) => AppError::Forbidden(message),
+        other => other,
+    })?;
+    // Every native path selects the bundle here (sessions, dispatch, bundle reads, native MCP):
+    // the agent's skills and connections must be in its own reach (Plan07 decision d, G1 F14).
+    // A loss after capture reads as the agent's resource being gone: NotFound is what every
+    // consumer of a selected bundle (command delivery, local-agent steps and waits, native MCP
+    // actions, Status/Cancel) settles as a definite refusal (B2-F2).
+    super::super::unit_resources::check_agent_reach_on(
+        tx,
+        CompanyId::new(company),
+        agent_id.as_uuid(),
+        &revision.definition.tools,
+        &revision.definition.skills,
+        crate::app_error::UnitCheckStage::Admission,
+    )
+    .await
+    .map_err(|error| match error {
+        AppError::ResourceOutsideUnit(refusal) => AppError::NotFound(refusal.to_string()),
         other => other,
     })?;
     let bundle = NativeBundle::from_definition(&revision.definition)?;

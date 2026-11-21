@@ -1,0 +1,132 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.51s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 120 tests
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_machine_reference_constraints_reject_foreign_rows ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_revocation_repair_is_new_and_installation_reservation_survives_company_deletion ... ok
+test adapters::http::routes::local_agents::tests::cloudroom_management_http_foreign_ids_cannot_read_or_mutate_resources ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_native_forms_parse_save_start_and_render_original_session ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_company_profiles_sessions_operations_are_scoped_and_frozen ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cross_company ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_revocation_fences_competing_connections_and_preserves_uncertainty ... ok
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... ignored, explicit browser fixture output
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_session_operation_constraints_reject_foreign_rows ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_explicit_permissions_default_full_and_roundtrip_lower_modes ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation ... ok
+test adapters::http::routes::local_agents::tests::cloudroom_management_http_auth_csrf_typed_requests_and_frozen_session_roundtrip ... ok
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_workflow_session_constraint_rejects_existing_foreign_run ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_competing_starts_freeze_one_session_and_replay_before_profile_edits ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_connection_diagnostics_are_fenced_and_do_not_claim_provider_execution ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_controls_keep_disabled_headroom_and_stable_request_actor ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_profile_pages_are_complete_without_cross_company_rows ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_recent_output_is_bounded_and_usage_remains_unavailable ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_populated_company_cascade_removes_broker_call_run_and_thread ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_auth_and_admission_refuse_busy_owners_without_writes ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_foreign_conversation_refuses_before_session_publication ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_source_preserves_target_and_immutable_witness ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_authenticates_before_body_and_refuses_foreign_or_stale_connections ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_bounds_untrusted_input_then_publishes_one_visible_no_store_run ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_broker_rejects_foreign_or_wrong_account_principal_and_identity_updates ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_new_person_incarnation_gets_new_broker_without_reviving_old_invocation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_competing_machine_capacity_refuses_the_ninth_and_releases_only_finished_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::integration_tests::native_mcp_integration_owned_consent_approval_credential_and_revocation_reach_real_gateway ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... ignored, requires the owned patched Cloudroom checkout, Node24 and local scripted native CLI fixture
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_ingress_auth_and_admission_never_wait_for_current_source_owners ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::root_department_company_and_account_teardown_remove_tree_documents_and_direct_native_history ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_bad_input_or_unacknowledged_turn_never_publishes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_real_operation_expiration_never_waits_for_broker_and_competing_sweeps_finish_once ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_operation_capacity_includes_resolved_calls_but_never_blocks_existing_identity_replay ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_stop_and_archive_commit_without_broker_owner_then_revoke_old_calls_but_allow_new_explicit_input ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_company_cascade_removes_real_broker_call_and_run_with_deferred_provenance ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but_run_history_is_visible ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::retention_tests::native_mcp_retention_competitors_keep_identity_and_later_status_after_collecting_original_payload ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_refuses_public_save_archive_and_publication_without_mutation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::unit_resource_selection_native_session_and_mcp_call_refuse_a_moved_connection ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_http_authorizes_cached_reads_and_preserves_connection_identity ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_refuses_a_valid_foreign_machine_and_revoked_original_actor ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_capture_foreign_keys_preserve_history_and_allow_company_cascade ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_secret_encodings_entropy_and_debug_redaction ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_publication_and_admission_capture_a_coherent_revision ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_starts_capture_one_revision_and_replay_before_profile_change ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_profile_uses_published_permissions_and_database_rejects_foreign_agent ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_company_live_issuer_revocation_and_management_scope ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_budget_cardinality_is_bounded_under_competing_new_keys ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_cancel_and_consume_are_linearized ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_code_limit_cancel_and_competing_attempt_budget ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_competing_claimants_and_lost_response_recover_only_winner ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_expiry_uses_database_time_after_waiting_for_locks ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_reused_claim_or_credential_never_reserves_another_installation ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_capacity_sql_matches_command_kind_and_terminal_evidence_matrix ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_capacity_keeps_eight_control_slots ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_expiration_sweeps_leave_no_poison_batch ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_logical_invocations_reuse_frozen_operation ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_readiness_stays_open_for_new_delivery_but_not_replacement ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_withdrawal_refuses_untouched_but_reconciles_possible_delivery ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_accepted_controls_still_bound_the_outstanding_queue ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_create_binds_once_and_logical_replay_survives_native_mapping ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_foreign_session_and_observation_are_missing_to_an_authorized_manager ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_lost_ack_replay_uses_current_fence_and_same_payload ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_lost_journal_or_cursor_cannot_release_recovery_barrier ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_matching_turn_result_is_durable_and_human_turn_cannot_replace_it ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_competing_sequence_claims_commit_only_one_content ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_lease_expiry_is_rechecked_after_an_actual_row_lock_wait ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_one_native_turn_cannot_settle_two_operations ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_thread_stop_is_separate_and_allowed_after_disable ... ok
+test adapters::persistence::local_agents::protocol::operation_record_tests::cloudroom_commands_persisted_command_session_binding_is_checked_beyond_its_digest ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_late_result_is_audit_without_successful_wait ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_explicit_uncertainty ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_rejects_after_possible_submission ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_admission_preserves_control_capacity ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_output_and_catalog_decode_at_their_limits ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug ... ok
+test application::local_agents::contract_tests::cloudroom_catalog_requires_explicit_supported_permissions ... ok
+test application::local_agents::contract_tests::cloudroom_contract_aligned_leap_seconds_are_not_representable_operation_deadlines ... ok
+test application::local_agents::contract_tests::cloudroom_contract_catalog_refuses_unsupported_model_reasoning ... ok
+test application::local_agents::contract_tests::cloudroom_contract_catalog_success_requires_catalog_evidence ... ok
+test application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit ... ok
+test application::local_agents::contract_tests::cloudroom_contract_deadline_precision_is_frozen_before_hashing ... ok
+test application::local_agents::contract_tests::cloudroom_contract_effect_success_requires_its_thread_and_a_turn ... ok
+test application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode ... ok
+test application::local_agents::contract_tests::cloudroom_contract_machine_capabilities_reference_an_installation_scoped_snapshot ... ok
+test application::local_agents::contract_tests::cloudroom_contract_operations_freeze_digest_and_separate_dispatch_outcomes ... ok
+test application::local_agents::contract_tests::cloudroom_contract_reasoning_is_frozen_into_the_create_digest ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_preflight_refusals_before_intent_are_definitive ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_expired_uncertainty ... ok
+test application::local_agents::harness::tests::native_bundle_mcp_contract_preserves_large_schema_numbers_and_refuses_other_tools ... ok
+test application::local_agents::lifecycle::tests::cloudroom_lifecycle_retention_shutdown_cancels_the_actual_pending_port_future ... ok
+test application::local_agents::mcp::tests::native_mcp_maximum_result_fits_the_complete_response_with_maximum_origin_ids ... ok
+test application::local_agents::harness::tests::native_bundle_maximum_projection_retains_twenty_five_percent_headroom ... ok
+test application::local_agents::harness::tests::native_bundle_maximum_mcp_contract_projection_retains_twenty_five_percent_headroom ... ok
+test application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority ... ok
+test application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_queued_thread_maps_once_without_completing_native_work ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_requires_intent_and_preserves_known_turn_and_foreign_binding ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_lifecycle_mapping_retirement_is_bounded_read_only_and_current_installation_fenced ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_management_durable_status_distinguishes_queue_permission_uncertainty_gaps_and_native_success ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_missing_and_late_identity_preserve_uncertainty_and_capacity ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_competing_collectors_remove_only_bounded_old_summaries_and_keep_unknown_work ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_new_manual_requests_require_current_timestamp_and_replay_current_identity ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_saved_old_manual_replay_survives_age_then_collected_id_cannot_create_again ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_unknown_native_work_survives_and_compacted_receipt_replays_under_current_fence ... ok
+
+test result: ok. 118 passed; 0 failed; 2 ignored; 0 measured; 4824 filtered out; finished in 51.38s
+

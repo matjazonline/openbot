@@ -415,6 +415,173 @@ Answers 07UR-P01-G1-R2 (F13, F14). r2 stands except where changed here.
   local_agent_mcp_history, native_mcp_native, ui_agents, skill, department: 304 passed; clippy
   PASS; whitespace clean.
 
+## B2 plan (D6–D11 with r2/r3, on accepted B1 aa22b1b0)
+- D11 finding (2026-11-20): prepared agents store only `AgentSelectionIdentity` and derived
+  `PreparedTool`s, so `PREPARED_AGENT_VERSION` and the history validators are unaffected; SQL
+  readers of `agent_revisions.content` use `item->'binding'` (`check_agent_revision_members`),
+  binding id/source (`native_mcp_revision_live`) or whole-tool equality with `broker.contract`
+  written from the same struct (`native_mcp_witness`), so added unit fields are tolerated; the
+  native bundle is a projection the plugin parses without skill ids. No version bump.
+- Order: (1) types: `ResolvedAgentTool.unit_id: Option<Uuid>` (set exactly for HTTP/MCP
+  connection tools, validated) and `SkillSnapshot.unit_id: Uuid`; (2) capture at agent
+  publication from the locked rows; (3) SQL reach helpers: agent reach (placements ∪ roles, root
+  when none; unit or ancestor) and chain reach (start unit or ancestor); (4) `AppError::
+  ResourceOutsideUnit {stage, ..}` and its plumbing (HTTP, classify, schedule CHECK, agent
+  publication failure class); (5) agent publication refusal; (6) `check_readiness` takes a reach
+  (association target chain) and a stage, checks slot resources and unslotted resolution; binding
+  save uses stage Binding; (7) `registered_on` filters by reach everywhere (runtime: the run's
+  base scope rows); (8) admission agent check in the manifest's agent edges (Tools mode, current
+  unit in current agent reach), native bundle selection and native MCP admission; (9) offers:
+  agent catalog connections and skills by agent reach, workflow editor by managing department
+  chain, binding slots by the association chain; Agent Builder lookups by agent reach; (10) tests
+  incl. competing move vs publication in both orders and a fresh-migration format round trip.
+
+## B2 implementation (D6–D11, implemented; not yet frozen or reviewed)
+- Formats: `ResolvedAgentTool.unit_id: Option<Uuid>` (skipped when none; `validate` requires it
+  exactly for HTTP/MCP tools), `SkillSnapshot.unit_id: Uuid`; captured from the rows agent
+  publication already locks (`connection_with_locks_on` / `publication_connection_with_locks_on`
+  FOR SHARE, skills FOR SHARE). No preparation version bump (see B2 plan).
+- SQL: `unit_reaches(company, start, unit)` (start or an ancestor, ≤8) and
+  `agent_reaches(company, agent, unit)` (any placement member/role, the root when none).
+- Refusal: `AppError::ResourceOutsideUnit(ResourceOutsideUnit {stage, kind, resource, name})`,
+  codes `publication.|binding.|admission.resource_outside_unit`; HTTP 400 `{code, error, resource,
+  name}`; message/schedule `classify` → Refused(code); `schedule_runs_refusal_check` admits the
+  admission code; inbound events treat it as a routing refusal; agent publication failure class
+  `resource_outside_unit`.
+- Agent reach (`unit_resources::check_agent_reach_on`, current units, deleted connections left to
+  revocation): agent publication (`capture.rs`, stage Publication), admission manifest agent
+  edges for Tools mode (`agent_manifest/capture.rs`), native bundle selection for every native
+  path (`local_agents/native.rs selected_with_locks_on`).
+- Run reach (workflow-level): `ReadinessSelection {reach, stage}` built from
+  `association_reach_on` (the association's base department, `role_binding::context_on`) at
+  binding save (Binding), admission preflight, replay and channel reply (Admission), and from the
+  manifest's `context_department_id` for reachable bundles; slot connections checked by
+  `check_connection_unit_on`; unslotted HTTP `registered_on(.., ConnectionReach::From(start))`
+  everywhere a run or binding resolves it, runtime start from `run_reach_on` (base scope rows'
+  own unit); `supported_publication` keeps `ConnectionReach::Company` (an existence check always
+  followed by the reach-aware readiness check in its Run callers) — refinement of the r3
+  contract row.
+- Workflow publication: MCP/HTTP selection captures (and sample capture) check
+  `check_definition_reach_on` (managing department, else the author's creating department),
+  stage Publication, naming the connection, tool/operation and slot (capture-time error, not a
+  step diagnostic).
+- Offers: agent catalog connections `agent_reaches(company, agent, unit_id)`; agent skill picker
+  `list_authoring_page(user, company, agent?)` — the agent's reach, or for a new agent units the
+  author manages (where it can be placed); workflow editor `publication_options(.., PublicationReach
+  {workflow, author}, ..)` by the definition reach; binding slot offers by reach of any unit the
+  author manages (the desk is chosen in the same form; save checks the chosen desk); Agent Builder
+  skill slugs and tool names (`resolve_bindings_in_reach_on`) by the spec's department (root when
+  none).
+
+### B2 checks so far (2026-11-20)
+- New B2 tests pass (filters unit_resource, workflow::sample, message_admission: 56 passed,
+  scratchpad p07-b2-new-2.txt): `unit_resource_selection_binding_and_admission_refuse_a_slot_
+  connection_out_of_reach`, `unit_resource_selection_admission_agent_uses_current_units_and_
+  placement`, `unit_resource_selection_publication_agent_refuses_out_of_reach_resources`,
+  `unit_resource_competing_move_and_agent_publication_in_both_orders` (production move held open
+  vs publication; publication paused at activation vs production move),
+  `unit_resource_selection_unslotted_http_resolution_is_judged_within_reach`,
+  `unit_resource_selection_offers_follow_definition_and_author_reach`,
+  `unit_resource_selection_offers_follow_the_agent_reach`,
+  `unit_resource_selection_refusal_settles_a_schedule_occurrence`, classify assertion in
+  message_admission tests; B1 tests adapted (authoring reads by reach; F5 use = agent re-placed
+  after publishing).
+- First full lib run after the production changes: 448 failures = 431 stale `_test` database
+  (VersionMismatch after the init-schema edit; database recreated), 15 sample tests whose fixture
+  built connection tools without a unit (fixed), the F5 test (adapted), the deferred Doop 8 vs 7.
+  Second full run on the recreated database: 4906 passed, 1 failed, 30 ignored — the failure is
+  the deferred Doop assertion `doop_agent_current_preparation_reaches_ready_before_model_io`
+  (8 vs 7, also red on main) (logs/B2-lib-suite-summary.txt; new tests logs/B2-new-tests.txt).
+- Still to add before review: workflow publication refusal for an MCP/HTTP selection outside the
+  definition's reach; native bundle selection / native MCP refusal; Agent Builder slug and tool
+  name outside the placement's reach; ModelOnly agent unaffected; two-placement agent admitted on
+  either desk and desk-less; fresh-migration format evidence (existing agent publication,
+  preparation and checkpoint suites on fresh own databases). Then clippy, `cargo sqlx prepare
+  --check`, freeze, manifest, B review (continue reviewer a42fa3c1931ec8e75), accept, commit.
+- Session 2 (2026-11-20, root session 73d846ee; root/A Opus 5.5/xhigh re-confirmed by the user;
+  reviewer for B2 is Fable/medium by the user's choice in this session — a new B agent, the old
+  a42fa3c1931ec8e75 is not reachable). Working tree verified identical to logs/B2-wip.patch
+  (source portion) before continuing. Remaining tests added:
+  `unit_resource_selection_admission_agent_model_only_use_is_unaffected` (ai.classify step, skill
+  moved to Billing, admitted), `unit_resource_selection_admission_agent_two_placements_reach_both_
+  on_any_desk` (skills in Billing and Support, agent placed in both: admitted desk-less and on a
+  Billing and a Support desk; Support placement removed → refused naming the Support skill),
+  `unit_resource_selection_native_session_and_mcp_call_refuse_a_moved_connection` (native MCP
+  call refused, no native call/run row; new session refused, no operation row; moved back →
+  admitted), `unit_resource_selection_publication_workflow_refuses_an_mcp_selection_out_of_reach`
+  and `..._an_http_selection_out_of_reach` (publication refused naming connection and
+  tool/operation, no version row; MCP moved up → publishes),
+  `unit_resource_selection_agent_builder_skills_follow_the_placement_reach` (provisioning
+  create_agent: Billing skill refused for root and Support placements, provisioned for Billing,
+  skill linked) and `unit_resource_selection_agent_builder_tool_names_follow_the_placement_reach`
+  (`resolve_bindings_in_reach_on`: none/Support refuse, Billing resolves).
+- Defect found by the native test and fixed: `native::capture_on` (session start, conversation
+  and workflow) recorded the session before any reach check; the bundle was refused only when a
+  command was later selected. It now runs `check_agent_reach_on` at capture as well, so a refused
+  session writes no operation row; every later selection still repeats it.
+- Session-2 checks on fresh openbot_p07_b2 (+_test): unit_resource 29 passed; local_agents 118;
+  autonomous_agent 154; agent_publication 39; provisioning 56; agent_history 158 passed, 1 failed
+  = deferred Doop 8 vs 7; clippy -D warnings clean; sqlx prepare --check clean (fresh
+  openbot_p07_b2_sqlx); fresh schema apply exit 0 (openbot_p07_b2_schema). Native/vault group
+  (`local_agent_ run_scope_native cloudroom native_mcp vault_tests`) 283 passed, 1 failed twice:
+  `vault_google_e2e_two_pools_http_mcp_share_one_refresh_and_cache_without_sharing_a_session`
+  (`log.contains(event)` on a scoped tracing capture). Confirmed unrelated: the same
+  `vault_tests` filter fails identically on accepted B1 aa22b1b0 in a separate worktree
+  (logs/B2-vault-group-B1-baseline.txt); it passes isolated 3/3 and passed in B1's focused runs and
+  the B2 full suite. Left unchanged; reported separately.
+- B2 frozen: digest f228e7fe9f45aaeb23cdc98d10d8c70681394eb5d87df9aaf066d9c8b7e73167, base/HEAD
+  aa22b1b0 + working tree, exclusions unchanged (logs/B2-author-freeze.snapshot.txt); manifest
+  logs/07UR-P01-B2-R1.evidence.json validated (9 PASS, 3 FAIL dispositioned above). Untracked
+  `.trail/learnings/2026-11-20-check-an-agent-s-resource-reach-mac02.md`: the user declined to
+  commit it (2026-11-20) — preserved, not part of the phase, like the 2026-11-19 one.
+- To confirm in review: the native maintenance sweep still retires in-flight Status/Cancel after a
+  reach loss (G1 F15 note); run-time action authority and `ResourceDirectory::inspect` still
+  require root management (pre-B1, noted by B in B1-R3).
+
+## B2-R1 corrections (for recheck 07UR-P01-B2-R2, 2026-11-21)
+User decision (e) taken on F5 (coordination r6). Every actionable finding addressed in one round.
+
+| Finding | Change | Decisive test(s) |
+| --- | --- | --- |
+| F1 unslotted support check | `http::registered_on` `ConnectionReach::Company` is existence only (multiplicity is not ambiguity there; it never routes); `From(reach)` keeps the single-owner rule | `unit_resource_selection_desk_routes_an_unslotted_operation_within_its_reach` (Billing desk while Support owns the identical operation: binding save, admission, replay `Replayed(first)`, runtime call to Billing's origin; company-wide binding refused; Billing disabled after admission → action fails, no fallback); direct test updated (Company → Ok) |
+| F2 native consumers | `native::selected_with_locks_on` maps a post-capture `ResourceOutsideUnit` to `NotFound(<refusal message>)`, which command delivery (`prepare`), local-agent steps, the wait continuation and native MCP action failure all settle definitely; session capture (`capture_on`) keeps the code; the application local-agent classifier also maps the variant to `local_agent.refused` (Terminal). Status/Cancel/CancelInvocation of an in-flight call after a reach loss answer 404, as after a revocation; the run's action settles `*.rejected` (Terminal) and the sweep retires the call at its deadline/turn end, unchanged | `unit_resource_selection_native_queued_command_after_a_reach_loss_is_cancelled` (poll Ok, operation `cancelled`), `unit_resource_selection_native_workflow_step_refuses_a_moved_skill_terminally` (in reach parks; moved → `local_agent.refused` Terminal, no operation), native MCP test updated (in-session call NotFound with the refusal text; new session keeps the code) |
+| F3 HTML surfaces | the refusal's message rendered by binding save/activate, editor validate/publish and save, sample approval, agent preview/publish, agent create and run controls | `unit_resource_selection_binding_form_shows_the_out_of_reach_refusal` (route: "Not saved:" + message, choice kept, nothing saved), `unit_resource_selection_agent_publish_form_shows_the_out_of_reach_refusal` (route: panel names the skill, nothing published) |
+| F4 missing cases | added the closure, desk, runtime and production refusal cases; mapping below updated | `unit_resource_selection_admission_workflow_child_bundle_out_of_reach_is_refused`, `unit_resource_selection_admission_workflow_agent_tool_bundle_out_of_reach_is_refused`, the two desk tests, `unit_resource_selection_refusal_of_a_scheduled_run_settles_its_occurrence` (real materializer + admission → `Refused("admission.resource_outside_unit")`, occurrence failed, no run) |
+| F5 run-time authority | decision (e): `resources::authorize_use_on` (HTTP/MCP connection → `unit_resources::authorize_resource_on`, its unit's managers; messaging/JEV → root management) at `ResourceDirectory::inspect`, reconciliation `lock_resource`, `http_for_action` and `mcp_use` | `unit_resource_selection_desk_slot_connection_follows_desk_reach_and_unit_managers` (Billing lead, not a root manager, saves a binding with Billing's connection on a Billing desk, is admitted and the action calls it; the lead cannot bind a root-owned connection; Support desk refused with `binding.resource_outside_unit`; moved up → selectable on Support desk) |
+| F6 tool page / draft choice | `catalog::http`/`mcp` and `choices::current_source` require `agent_reaches` | `unit_resource_selection_offers_follow_the_agent_reach` extended (sibling HTTP tool page NotFound, in-reach listed; sibling draft choice refused, in-reach saved) |
+| F7 step / JSON | publication refusals name the draft steps using the selection (`resources::steps_using`: literal `connection` = slot, or literal `tool` = operation for unslotted; expression-chosen steps not named); JSON adds `kind` (`skill`/`mcp`/`http`) | MCP and HTTP publication tests assert `…, used by step lookup` / `…, used by step start` |
+| F8 optional | (1) adopted: channel-reply settings save (both callers of `selected_on` are configuration writes) refuses with stage Binding; not adopted: (2) binding slot offers stay a superset checked at save; (3) fallback only before first save; (4) admission reads current units without row locks — an admitted run is not stopped by a later move (D10 text superseded) | — |
+
+### B2-R1 correction checks (fresh openbot_p07_b2r2 +_test)
+- Full lib suite (logs/B2-R2-lib-suite.txt): 4921 passed, 2 failed — the deferred Doop 8 vs 7,
+  and `vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation`
+  (Membership case) caused by my change to the shared `claimed_with_key` helper (admitting as
+  the binding's actor instead of the fixture's; that test binds as the owner and admits as a
+  member). Bisected: restoring root checks in `http_for_action` and `authorize_use_on` did not
+  change it. Helper reverted to HEAD; the lead test sets the fixture actor instead. That test,
+  the desk tests and `channel_reply` (316) pass afterwards.
+- Focused after all fixes (logs/B2-R2-focused.txt, `unit_resource local_agent_ run_scope_native
+  cloudroom native_mcp vault_tests channel_reply`): 630 passed, 1 failed = the baseline-reproduced
+  vault log-capture test (R1 disposition). clippy -D warnings, fmt, sqlx prepare --check (fresh
+  openbot_p07_b2r2_sqlx), fresh schema apply: clean.
+- Frozen: digest 9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b (base/HEAD
+  aa22b1b0 + working tree, exclusions unchanged, logs/B2-R2-author-freeze.snapshot.txt);
+  manifest logs/07UR-P01-B2-R2.evidence.json validated (4 PASS, 2 FAIL dispositioned here).
+
+### Acceptance mapping (actual, B2)
+| Criterion | Test (actual) | Status / stand-in limits |
+| --- | --- | --- |
+| 01B.1 offers | `unit_resource_selection_offers_follow_the_agent_reach` (skills, connections, tool page, draft choice), `unit_resource_selection_offers_follow_definition_and_author_reach`, `unit_resource_selection_agent_builder_*` | PASS; two-department union shown at admission (same `agent_reaches`), not on the offers page |
+| 01B.2 publication | `unit_resource_selection_publication_agent_refuses_out_of_reach_resources`, `unit_resource_selection_publication_workflow_refuses_an_{mcp,http}_selection_out_of_reach`, agent publish route test | PASS |
+| 01B.3 admission + D9a/D9b | `unit_resource_selection_binding_and_admission_refuse_a_slot_connection_out_of_reach`, the two closure tests, `unit_resource_selection_admission_agent_{uses_current_units_and_placement,model_only_use_is_unaffected,two_placements_reach_both_on_any_desk}` | PASS |
+| D8 binding / desk reach | the two desk tests, binding form route test | PASS |
+| F2 runtime (G1 r2) | desk unslotted test (runtime `run_reach_on` from a Billing desk; no fallback) | PASS |
+| F4/F14 native | native session/MCP test, queued command test, workflow step test | PASS; Status/Cancel 404 after a loss is by inspection |
+| refusal settling | production schedule test; literal CHECK test; message `classify` unit assertion | PASS; message intent refusal through production not exercised (classify shares the code path) |
+| D10 race | `unit_resource_competing_move_and_agent_publication_in_both_orders` | PASS; skill lock only (connections use the same FOR SHARE capture) |
+| decision (e) | desk slot test (lead binding, admission, action; root-owned refused) | PASS; reconciliation `lock_resource` by inspection |
+| D11 formats | agent publication / preparation / checkpoint suites on fresh databases | PASS except the deferred Doop 8 vs 7 |
+
 ## Status
 - G1 r1 frozen at digest c2d338160c48d4d2eabaa84b5bd5fa5cd389b58d2a93db85478eb2e05fb9ac33 (HEAD
   cc545881; exclusions as above). B (Opus 5.5, model opus / effort xhigh as for Plan06's reviewer)
@@ -438,4 +605,19 @@ Answers 07UR-P01-G1-R2 (F13, F14). r2 stands except where changed here.
   ordering, company-wide admission learnings) — not those mechanisms; reason in the commit.
   Committed locally (not pushed). Reviewer note for B2: run-time action authority and
   `ResourceDirectory::inspect` still require root management (pre-B1).
-- Implementation: B2 (D6–D11) next.
+- Implementation: B2 (D6–D11) implemented, uncommitted (WIP patch logs/B2-wip.patch); paused
+  at the user's request after the full-suite run. Not frozen, not reviewed, not accepted.
+- **B2 accepted in phase** 2026-11-21: B (Fable/medium, agent a931587a5cc354000) PASS
+  07UR-P01-B2-R2 at 9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b (rounds
+  B2-R1 changes required F1–F7 + optional F8, B2-R2 PASS); root re-digest identical
+  (logs/B2-root-acceptance.snapshot.txt); R2 manifest validates; coordination r6 unchanged.
+  Optional F9 (consequences of decision e: a root-owned connection is usable on a lead's desk
+  only when the run actor manages the root; offers list ancestor connections a lead cannot bind;
+  an agent's own tool call depends on the run actor managing the connection's unit, unchecked at
+  admission; reconciliation command entry root-only) — non-blocking, raised with the user.
+  Gaps by inspection only: wait-continuation settling, Status/Cancel after a reach loss,
+  reconciliation `lock_resource`, message-intent refusal through production. Full lib suite last
+  ran before the helper revert and the F8(1) stage change (focused reruns since); the full gate
+  is p03's. trail check: 3 keyword matches on the unit FK block (definition-creation authority,
+  cascade ordering, agent-tool edges) — not those mechanisms; B2 checks agent-tool edges.
+  Committed locally (not pushed).

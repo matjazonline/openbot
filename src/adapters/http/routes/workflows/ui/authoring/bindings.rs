@@ -191,6 +191,7 @@ fn binding_refusal(error: &WorkflowError) -> Option<String> {
         }),
         WorkflowError::App(AppError::BadRequest(message)) => Some(message.clone()),
         WorkflowError::App(AppError::WorkflowRole(refusal)) => Some(refusal.to_string()),
+        WorkflowError::App(AppError::ResourceOutsideUnit(refusal)) => Some(refusal.to_string()),
         WorkflowError::App(AppError::NotFound(_)) => Some(
             "A chosen desk, version, run-as or resource is not available: it may be hidden from \
              you, disabled, revoked or not ready, or a tool the version froze is no longer \
@@ -229,7 +230,7 @@ impl Ui {
         let mut options = self
             .engine
             .authoring_reads()
-            .binding_options(company_id)
+            .binding_options(company_id, self.user)
             .await?;
         let mut visibility = Visibility::new(&self.engine, company_id, self.actor()?);
         let mut channels = Vec::new();

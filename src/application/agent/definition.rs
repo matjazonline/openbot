@@ -55,6 +55,11 @@ pub struct ResolvedAgentTool {
     pub output_schema: Value,
     pub policy: ApprovedActionPolicy,
     pub approval_required: bool,
+    /// The unit that owned the HTTP or MCP connection when this revision was published
+    /// (Plan07): present exactly for connection tools, beside the binding identity it never
+    /// changes. Admission checks the connection's current unit, so a later move shows here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit_id: Option<uuid::Uuid>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -107,6 +112,18 @@ impl ResolvedAgentDefinition {
         }
         let bindings: Vec<_> = self.tools.iter().map(|tool| tool.binding.clone()).collect();
         validate_agent_bindings(&bindings).map_err(AppError::BadRequest)?;
+        if self.tools.iter().any(|tool| {
+            tool.unit_id.is_some()
+                != matches!(
+                    tool.binding.source,
+                    crate::entities::agent_capability::AgentBindingSource::Http { .. }
+                        | crate::entities::agent_capability::AgentBindingSource::Mcp { .. }
+                )
+        }) {
+            return Err(invalid(
+                "A connection tool records its unit; no other tool has one",
+            ));
+        }
         let mut skills = BTreeSet::new();
         let mut assignments = BTreeSet::new();
         if self.skills.len() > crate::entities::agent::MAX_AGENT_SKILLS {

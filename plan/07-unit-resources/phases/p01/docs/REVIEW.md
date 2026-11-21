@@ -104,3 +104,44 @@
   ui_companies: 80 passed).
 - Fixed: 07UR-P01-B1-F1, 07UR-P01-B1-F2, 07UR-P01-B1-F3, 07UR-P01-B1-F6; optional
   07UR-P01-B1-F5 applied. Optional open (non-blocking): 07UR-P01-B1-F4.
+
+## B2 batch review — round 07UR-P01-B2-R1 (2026-11-20)
+
+- Reviewer B: Claude Fable (claude-fable-5-2, medium). Artifact: HEAD aa22b1b0 + working tree,
+  digest f228e7fe9f45aaeb23cdc98d10d8c70681394eb5d87df9aaf066d9c8b7e73167 (same exclusions);
+  coordination revision 5, no notices; G1 r3 PASS relied on.
+- Outcome: **changes required** (no PASS for B2).
+- Notes: [07UR-P01-B2-R1](agent-review-notes.md#07ur-p01-b2-r1-2026-11-20-batch-review-of-b2).
+- Reviewer check: logs/B2-R1-reviewer-unit-resource.txt (unit_resource and message_admission
+  filters: 31 passed on a disposable database). Author manifest validated (9 PASS, 3 FAIL: the
+  inherited Doop deferral and the vault-group flake with an aa22b1b0 baseline, both unrelated).
+- Actionable findings ([agent-review-findings.md](agent-review-findings.md)):
+  - 07UR-P01-B2-F1 (medium): the company-wide unslotted HTTP support check still fails on a
+    sibling's identical operation at publication, binding save, admission and replay.
+  - 07UR-P01-B2-F2 (medium): native/local-agent consumers do not classify the new refusal; a
+    queued command stalls the machine's queue, workflow native steps retry as storage failures.
+  - 07UR-P01-B2-F3 (medium): binding, editor, sample, agent publish/create and run-control forms
+    return the refusal as 400 JSON instead of rendering it.
+  - 07UR-P01-B2-F4 (medium): closure, desk-reach, runtime and refusal-settling cases promised by
+    the mapping are missing; mapping not updated with actual names.
+  - 07UR-P01-B2-F5 (medium, fix or explicit disposition): slot inspection and action authority
+    still require root management, so a unit lead cannot use the unit's connection on its desk.
+  - 07UR-P01-B2-F6 (low): agent tool page and draft tool choice are not reach-filtered.
+  - 07UR-P01-B2-F7 (low): workflow publication refusal does not name the step; JSON shape differs
+    from D8.
+- Optional: 07UR-P01-B2-F8 (stage of the channel-reply refusal, offer scope, fallback, lock text).
+
+## B2 correction recheck — round 07UR-P01-B2-R2 (2026-11-21)
+
+- Reviewer B: Claude Fable (claude-fable-5-2, medium). Artifact: HEAD aa22b1b0 + working tree,
+  digest 9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b (same exclusions);
+  coordination revision 6 (user decision (e)), no notices.
+- Outcome: **PASS for B2 at digest 9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b.**
+- Notes: [07UR-P01-B2-R2](agent-review-notes.md#07ur-p01-b2-r2-2026-11-21-correction-recheck-of-b2).
+- Reviewer check: logs/B2-R2-reviewer-focused.txt (428 passed, 0 failed; all 38 unit_resource
+  tests). Author manifest validated (4 PASS, 2 FAIL: unrelated/inherited or since-reverted).
+- Fixed: 07UR-P01-B2-F1, F2, F3, F4, F5 (under decision (e)), F6, F7; F8 item 1 adopted, items
+  2–4 dispositioned.
+- Optional open (non-blocking): 07UR-P01-B2-F9 (consequences of decision (e): root-owned
+  connections unusable by a lead's run, offers list them, agent tool calls depend on the run
+  actor, reconciliation entry root-only).

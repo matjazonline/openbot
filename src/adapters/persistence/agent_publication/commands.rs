@@ -108,6 +108,7 @@ impl AgentPublications for PostgresPersistence {
 fn publication_failure(error: &AppError) -> &'static str {
     match error {
         AppError::WorkflowRole(_) => "role_resolution_refused",
+        AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
         AppError::BadRequest(_) | AppError::NativeMcpNotAdmitted => "invalid_definition",
         AppError::Conflict(_) | AppError::Superseded(_) => "conflict",
         AppError::Forbidden(_) | AppError::InvalidCredentials => "forbidden",

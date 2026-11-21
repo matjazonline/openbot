@@ -1,0 +1,8 @@
+# cargo test --locked --offline --lib (no filter), B2 working tree (patch logs/B2-wip.patch), DATABASE_URL openbot_p07_b1 (+ recreated _test), Node 24.22.3 on PATH, 2026-11-20
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io ... FAILED
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io' (38916855) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:435:5:
+test result: FAILED. 4906 passed; 1 failed; 30 ignored; 0 measured; 0 filtered out; finished in 1993.90s
+assertion `left == right` failed
+  left: Number(8)
+ right: 7
+

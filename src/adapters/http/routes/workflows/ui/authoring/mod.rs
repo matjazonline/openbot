@@ -243,6 +243,10 @@ fn refusal(error: WorkflowError) -> Result<EditorState, WorkflowError> {
             banner: Some(Banner::Refused(message)),
             ..Default::default()
         }),
+        WorkflowError::App(AppError::ResourceOutsideUnit(refusal)) => Ok(EditorState {
+            banner: Some(Banner::Refused(refusal.to_string())),
+            ..Default::default()
+        }),
         WorkflowError::App(AppError::NotFound(_)) => Ok(EditorState {
             banner: Some(Banner::Refused(
                 "A selected connection, tool, agent or child workflow is not available to this \

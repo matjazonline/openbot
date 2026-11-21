@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "round": "07UR-P01-B2-R2",
+  "artifact": "9179c26deec5861535a212cd76f3355882dc595b0e3af482290077380178ae9b",
+  "checks": [
+    {
+      "criteria": [
+        "B2-F1",
+        "B2-F2",
+        "B2-F3",
+        "B2-F4",
+        "B2-F5",
+        "B2-F6",
+        "B2-F7",
+        "B2-F8(1)",
+        "01B.1-01B.4",
+        "D8-D11",
+        "decision e"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_resource local_agent_ run_scope_native cloudroom native_mcp vault_tests channel_reply",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b2r2 (+ _test and per-test own databases), fresh init schema, Node 24 first on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-R2-focused.txt",
+          "sha256": "1c596d631085738dfafdb253339f0900bbf9d24a2036df13d57a06ee110a41b1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "broad regression (before the test-helper revert and the F8(1) stage change)"
+      ],
+      "command": "cargo test --locked --offline --lib",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b2r2 (+ _test and per-test own databases), fresh init schema, Node 24 first on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-R2-lib-suite.txt",
+          "sha256": "7fde6de6704c44c565d1a994a35986641effe5b3ab6a84c3dd92b856a4bd3908"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-clippy.txt",
+          "sha256": "8a0a7b1ced4399869bf5772f64585896af1901c3e3a959cb0876dfc2595ce677"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline SQL metadata"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh openbot_p07_b2r2_sqlx @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-sqlx-check.txt",
+          "sha256": "2c89cfe1a0b10e6bd975b51b1938a58e48d09fb93077ff1599576673156ec7f6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "schema apply"
+      ],
+      "command": "psql -X -q -v ON_ERROR_STOP=1 -f migrations/20260817000000_init_schema.sql",
+      "fixture": "fresh openbot_p07_b2r2_schema @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-schema-apply.txt",
+          "sha256": "9044cdf48e7cb9646a8dd1051a0616e12aed0c04fd4faf322aacd90abc130a9f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "vault flake disposition (unchanged)"
+      ],
+      "command": "cargo test --locked --offline --lib -- vault_tests (B2-R1 tree and accepted B1 aa22b1b0); isolated x3",
+      "fixture": "as in round R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-vault-group.txt",
+          "sha256": "c597c3efbac30a5326e5974f898b7ddbceffc4be8e267d7ce1eef9f443b42895"
+        },
+        {
+          "path": "logs/B2-vault-group-B1-baseline.txt",
+          "sha256": "38fd434c07c001f431e7818734d813783abd23b74bac85993595dc3793edb890"
+        },
+        {
+          "path": "logs/B2-vault-shared-rerun.txt",
+          "sha256": "eb06e56913f20388de8e9e9ad663bbf469ed24e08a6173b75e435242ee8202dc"
+        }
+      ]
+    }
+  ]
+}

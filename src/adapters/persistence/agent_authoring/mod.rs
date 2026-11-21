@@ -71,6 +71,7 @@ impl AgentDraftPersistence for PostgresPersistence {
                     choices::resolve(
                         &mut tx,
                         request.scope.company.as_uuid(),
+                        request.scope.agent.as_uuid(),
                         &previous,
                         assignments,
                     )

@@ -1017,3 +1017,53 @@ async fn delegated_admin_authoring_agent_usage_card_follows_the_agents_departmen
         );
     }
 }
+
+/// Plan07 D8 (B2-F3): a company-wide binding choosing a connection that belongs to a
+/// department is refused on the form with the reach refusal, the choice kept.
+#[tokio::test]
+async fn unit_resource_selection_binding_form_shows_the_out_of_reach_refusal() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let workflow = Uuid::new_v4();
+    let version = f
+        .published(
+            workflow,
+            "Http",
+            &serde_json::to_string_pretty(&example("http.request", workflow)).unwrap(),
+        )
+        .await
+        .to_string();
+    let billing = f.persistence.test_unit(f.company, "billing").await;
+    let connection = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO workflow_http_connections (company_id, id, origin, enabled, bearer, unit_id) \
+         VALUES ($1, $2, 'https://billing.example.test', true, false, $3)",
+    )
+    .bind(f.company)
+    .bind(connection)
+    .bind(billing)
+    .execute(f.persistence.pool())
+    .await
+    .unwrap();
+    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
+    let key = field_value(&pane, "form_key");
+    let html = f
+        .save_binding(
+            f.owner,
+            workflow,
+            &[
+                ("form_key", &key),
+                ("version_id", &version),
+                ("association", "company"),
+                ("resource:service", &connection.to_string()),
+            ],
+        )
+        .await;
+    assert!(
+        html.contains("Not saved:") && html.contains("outside the reach"),
+        "{html}"
+    );
+    assert!(html.contains(&format!(r#"<option value="{connection}" selected>"#)));
+    assert!(f.usage(workflow).await.is_empty());
+}

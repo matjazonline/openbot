@@ -129,14 +129,32 @@ impl SampleCapture {
                 .values()
                 .any(|step| step.step_type.as_str() == tool.contract.name.as_str())
         });
-        captured
-            .snapshots
-            .tools
-            .extend(http::capture_publication_on(tx, target.company, &self.http).await?);
-        captured
-            .snapshots
-            .tools
-            .extend(mcp::capture_publication_on(tx, target.company, &self.mcp).await?);
+        captured.snapshots.tools.extend(
+            http::capture_publication_on(
+                tx,
+                target.company,
+                crate::application::workflow::reads::PublicationReach {
+                    workflow: target.workflow,
+                    author: target.actor.user_id(),
+                },
+                state.draft.source(),
+                &self.http,
+            )
+            .await?,
+        );
+        captured.snapshots.tools.extend(
+            mcp::capture_publication_on(
+                tx,
+                target.company,
+                crate::application::workflow::reads::PublicationReach {
+                    workflow: target.workflow,
+                    author: target.actor.user_id(),
+                },
+                state.draft.source(),
+                &self.mcp,
+            )
+            .await?,
+        );
         agent_publication::capture_sample_agents_on(tx, &state.draft, &mut captured).await?;
         let captured = child_publication::capture_on(tx, &state.draft, captured).await?;
         Ok(Arc::new(

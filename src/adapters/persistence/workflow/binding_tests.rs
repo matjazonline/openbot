@@ -571,3 +571,96 @@ async fn unit_resource_move_lists_active_bindings_of_the_current_configuration()
         .unwrap();
     assert_eq!(moved.uses.len(), 1);
 }
+
+fn unit_refusal(error: &AppError, code: &str, resource: Uuid) -> bool {
+    matches!(error, AppError::ResourceOutsideUnit(refusal)
+        if refusal.code() == code && refusal.resource == resource)
+}
+
+/// Plan07 D8/D9a: a company-wide binding reaches only the root's connections, so a slot mapped to
+/// a connection moved into a department is refused at save and at admission, with nothing written.
+#[tokio::test]
+async fn unit_resource_selection_binding_and_admission_refuse_a_slot_connection_out_of_reach() {
+    let mut f = BindingFixture::new(json!([{"slot":"service","kind":"mcp"}])).await;
+    let connection = f.mcp().await;
+    let p = f.fixture.persistence.clone();
+    let company = f.target.company.as_uuid();
+    let owner = f.target.actor.user_id();
+    let root = p.test_root_unit(company).await;
+    let billing = p.test_unit(company, "billing").await;
+    p.move_mcp_connection(owner, company, connection, billing)
+        .await
+        .unwrap();
+    let refused = f.service().configure(f.request(None)).await;
+    assert!(
+        refused
+            .as_ref()
+            .err()
+            .is_some_and(|error| matches!(error, LifecycleError::Application(error)
+                if unit_refusal(error, "binding.resource_outside_unit", connection))),
+        "{:?}",
+        refused.err()
+    );
+    let revisions: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM workflow_binding_revisions WHERE company_id=$1 AND binding_id=$2",
+    )
+    .bind(company)
+    .bind(f.target.binding.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(revisions, 0, "a refused save writes no configuration");
+    // Moved up to the root, the same binding saves and activates.
+    p.move_mcp_connection(owner, company, connection, root)
+        .await
+        .unwrap();
+    let configured = f.service().configure(f.request(None)).await.unwrap();
+    f.service()
+        .activate(SetBindingActivity {
+            target: f.target,
+            expected: configured.revision,
+        })
+        .await
+        .unwrap();
+    // Moved out again, admission refuses before any run exists.
+    p.move_mcp_connection(owner, company, connection, billing)
+        .await
+        .unwrap();
+    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
+    let request = AdmitWorkflowRequest {
+        history_session: None,
+        company_id: f.target.company,
+        actor: f.target.actor,
+        association: RelatedAssociation::Company,
+        trigger: TriggerRef::new(
+            f.target.company,
+            TriggerId::new(Uuid::new_v4()),
+            TriggerSource::Manual,
+        )
+        .unwrap(),
+        correlation_id: crate::domain::entities::correlation::CorrelationId::new(),
+        binding_id: f.target.binding,
+        idempotency_key: IdempotencyKey::parse("unit-out-of-reach").unwrap(),
+        input: json!({}),
+        rerun_of: None,
+        delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+        expected_binding_revision: None,
+        admission_claim: None,
+    };
+    let refused = service.admit(request).await;
+    assert!(
+        refused.as_ref().err().is_some_and(|error| unit_refusal(
+            error,
+            "admission.resource_outside_unit",
+            connection
+        )),
+        "{:?}",
+        refused.err()
+    );
+    let runs: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
+        .bind(company)
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    assert_eq!(runs, 0);
+}

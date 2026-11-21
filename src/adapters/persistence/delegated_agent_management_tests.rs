@@ -643,7 +643,9 @@ async fn unit_resource_library_agent_copies_skills_into_its_placement_or_the_roo
     assert_eq!(skill_units(unplaced.agent.id).await, vec![Some(root)]);
 }
 
-/// B1-F5: uses in units the mover does not manage are counted, not named.
+/// B1-F5: uses in units the mover does not manage are counted, not named. With decision d an
+/// agent can only publish what it reaches, so the unmanaged use is an agent re-placed elsewhere
+/// after publishing (its active revision still uses the skill).
 #[tokio::test]
 async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
     let Some(m) = ManagedAgents::new().await else {
@@ -655,9 +657,9 @@ async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
         .create_agent(
             m.d.f.owner,
             m.d.f.company,
-            write("support-agent"),
+            write("sales-then-support"),
             Some(AgentPlacement {
-                department: m.d.sibling.id,
+                department: m.d.unit.id,
                 role: None,
             }),
         )
@@ -706,12 +708,33 @@ async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
             scope: m.scope(owner, created.agent.id),
             expected_draft_revision: updated.draft_revision,
             expected_active_revision: Some(initial.id),
-            key: AgentPublicationKey::parse("support-publish").unwrap(),
+            key: AgentPublicationKey::parse("sales-publish").unwrap(),
         })
         .await
         .unwrap();
-    // The Sales lead moves their skill down to Field; the Support agent using it is theirs to
-    // know about only as a count.
+    // The owner re-places the agent outside Sales; the Sales lead no longer manages it.
+    sqlx::query(
+        "WITH agent AS (SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2 AND kind='agent') \
+         DELETE FROM department_members USING agent WHERE company_id=$1 AND department_id=$3 \
+         AND principal_id=agent.id",
+    )
+    .bind(m.d.f.company)
+    .bind(created.agent.id)
+    .bind(m.d.unit.id.as_uuid())
+    .execute(m.d.f.pool())
+    .await
+    .unwrap();
+    let elsewhere = m.p().test_unit(m.d.f.company, "elsewhere").await;
+    sqlx::query(
+        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
+         SELECT $1, $3, 'lead', id FROM principals WHERE company_id=$1 AND agent_id=$2 AND kind='agent'",
+    )
+    .bind(m.d.f.company)
+    .bind(created.agent.id)
+    .bind(elsewhere)
+    .execute(m.d.f.pool())
+    .await
+    .unwrap();
     let moved = SkillManagementPersistence::move_company(
         m.p(),
         m.actor().user_id(),
@@ -723,4 +746,182 @@ async fn unit_resource_move_counts_but_does_not_name_unmanaged_uses() {
     .unwrap();
     assert!(moved.uses.is_empty(), "{moved:?}");
     assert_eq!(moved.more_uses, 1);
+}
+
+/// Plan07 01B.1 with decision d: an agent is offered only skills and connections in its reach.
+#[tokio::test]
+async fn unit_resource_selection_offers_follow_the_agent_reach() {
+    use crate::application::agent::{AgentAuthoringReads, AgentToolKind};
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let created = m.create("sales-agent", m.d.unit.id).await;
+    let root = m.p().test_root_unit(m.d.f.company).await;
+    let skill = |slug: &'static str| SkillWrite {
+        slug: slug.into(),
+        name: slug.into(),
+        description: "Unit guidance".into(),
+        instructions: "Follow the unit's guidance.".into(),
+        files: None,
+        required_tools: None,
+        created_by: None,
+    };
+    let mut reachable = Vec::new();
+    for (unit, slug, offered) in [
+        (root, "root-guide", true),
+        (m.d.unit.id.as_uuid(), "sales-guide", true),
+        (m.d.sibling.id.as_uuid(), "support-guide", false),
+    ] {
+        let created =
+            SkillManagementPersistence::create_company(m.p(), m.d.f.company, unit, skill(slug))
+                .await
+                .unwrap();
+        if offered {
+            reachable.push(created.id);
+        }
+    }
+    reachable.sort();
+    let skills = crate::use_cases::skill::SkillUseCases::new(
+        Arc::new(m.p().clone()),
+        Arc::new(m.p().clone()),
+        Arc::new(m.p().clone()),
+    );
+    let mut offered: Vec<Uuid> = skills
+        .list_authoring_page(
+            m.d.f.owner,
+            m.d.f.company,
+            Some(created.agent.id),
+            crate::use_cases::skill::SkillPageRequest {
+                before: None,
+                limit: 50,
+            },
+        )
+        .await
+        .unwrap()
+        .items
+        .into_iter()
+        .map(|skill| skill.id)
+        .collect();
+    offered.sort();
+    assert_eq!(offered, reachable, "the owner authoring a Sales agent");
+    // Connections: one in Sales is offered, one in Support is not.
+    let mut ids = Vec::new();
+    for (slug, unit) in [("sales-crm", m.d.unit.id), ("support-crm", m.d.sibling.id)] {
+        let connection = crate::use_cases::mcp::McpPersistence::create_mcp_connection(
+            m.p(),
+            m.d.f.company,
+            unit.as_uuid(),
+            crate::use_cases::mcp::McpConnectionWrite {
+                slug: slug.into(),
+                endpoint: format!("https://{slug}.example.test/mcp")
+                    .try_into()
+                    .unwrap(),
+                enabled: true,
+                auth: crate::entities::mcp::McpAuth::None,
+                discovered_tools: vec![],
+                tool_grants: vec![],
+            },
+        )
+        .await
+        .unwrap();
+        ids.push(connection.id);
+    }
+    let page = m
+        .p()
+        .tool_connections(
+            m.scope(
+                WorkflowActor::authenticated(m.d.f.owner).unwrap(),
+                created.agent.id,
+            ),
+            AgentToolKind::Mcp,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        page.items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![ids[0]]
+    );
+    // A named connection's tool page and a new draft choice follow the same reach (B2-F6).
+    use crate::application::workflow::http::{HttpConnectionWrite, HttpConnections, HttpOrigin};
+    let owner = WorkflowActor::authenticated(m.d.f.owner).unwrap();
+    let company = crate::domain::workflow::CompanyId::new(m.d.f.company);
+    let operation = crate::application::workflow::http::HttpOperation {
+        tool: crate::application::workflow::publication::ToolSnapshot {
+            workflow: None,
+            company_id: company,
+            contract: crate::application::workflow::registry::ToolContract {
+                name: crate::domain::workflow::TypeName::parse("unit.lookup").unwrap(),
+                connection: None,
+                input_schema: serde_json::json!({"type":"object","properties":{"method":{"type":"string"},"path":{"type":"string"}},"required":["method","path"],"additionalProperties":false}),
+                output_schema: serde_json::json!(true),
+            },
+            policy: crate::application::agent::ApprovedActionPolicy {
+                capability: crate::domain::workflow::TypeName::parse("http.request").unwrap(),
+                policy_revision: 1,
+                effect: crate::application::agent::ActionEffect::Read,
+                recovery: crate::application::agent::ActionRecovery::Reconcile,
+            },
+        },
+        approval_required: false,
+    };
+    let mut http = Vec::new();
+    for (origin, unit) in [
+        ("https://sales.example.test", m.d.unit.id),
+        ("https://support.example.test", m.d.sibling.id),
+    ] {
+        let connection = m
+            .p()
+            .create_http(
+                company,
+                owner,
+                Some(unit),
+                HttpConnectionWrite {
+                    origin: HttpOrigin::parse(origin).unwrap(),
+                    bearer: false,
+                },
+            )
+            .await
+            .unwrap();
+        m.p()
+            .register_http_operation(
+                company,
+                owner,
+                connection.id,
+                connection.revision,
+                operation.clone(),
+            )
+            .await
+            .unwrap();
+        http.push(connection.id);
+    }
+    let options = |connection: Uuid| {
+        m.p().tool_options(AgentToolPageRequest {
+            scope: m.scope(owner, created.agent.id),
+            kind: AgentToolKind::Http,
+            connection: Some(connection),
+            after: None,
+        })
+    };
+    assert_eq!(options(http[0]).await.unwrap().items.len(), 1);
+    assert!(matches!(options(http[1]).await, Err(AppError::NotFound(_))));
+    let m = &m;
+    let choose = |connection: Uuid| async move {
+        let command = m.changes(owner, created.agent.id).await;
+        m.p()
+            .save_company_agent(SaveCompanyAgent {
+                tools: Some(vec![AgentToolAssignment {
+                    binding: None,
+                    alias: AgentToolAlias::parse("unit.lookup").unwrap(),
+                    choice: AgentToolChoice::Http {
+                        connection,
+                        operation: crate::domain::workflow::TypeName::parse("unit.lookup").unwrap(),
+                    },
+                }]),
+                ..command
+            })
+            .await
+    };
+    assert!(choose(http[1]).await.is_err(), "a sibling's operation");
+    choose(http[0]).await.unwrap();
 }

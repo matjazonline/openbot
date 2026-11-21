@@ -154,6 +154,7 @@ mod tests {
             AgentBindingId, AgentBindingSource, AgentToolAlias, AgentToolBinding,
         };
         ResolvedAgentTool {
+            unit_id: Some(uuid::Uuid::nil()),
             binding: AgentToolBinding {
                 id: AgentBindingId::new(Uuid::new_v4()),
                 alias: AgentToolAlias::parse(format!("mcp_{index}")).unwrap(),
@@ -192,6 +193,7 @@ mod tests {
             definition.skills.push(ResolvedAgentSkill {
                 assignment_id: AgentSkillAssignmentId::new(Uuid::new_v4()),
                 skill: SkillSnapshot {
+                    unit_id: uuid::Uuid::nil(),
                     company_id: company,
                     skill_id: Uuid::new_v4(),
                     name: TypeName::parse(format!("skill-{i}")).unwrap(),

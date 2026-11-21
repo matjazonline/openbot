@@ -485,6 +485,13 @@ pub struct ReviewerChoices {
     pub next: Option<crate::entities::transport::PrincipalId>,
 }
 
+/// The definition whose authoring unit decides which connections it may select (Plan07).
+#[derive(Debug, Clone, Copy)]
+pub struct PublicationReach {
+    pub workflow: crate::domain::workflow::WorkflowId,
+    pub author: uuid::Uuid,
+}
+
 #[async_trait]
 pub trait AuthoringReads: Send + Sync {
     async fn reviewer_choice(
@@ -511,9 +518,12 @@ pub trait AuthoringReads: Send + Sync {
     ) -> AppResult<WorkflowUsage>;
     /// The approved MCP operations named `mcp_tools` and HTTP operations named `http_tools`;
     /// more than [`MAX_OPTION_NAMES`] names in either list is refused.
+    /// Only connections in reach of the definition's managing department (or, for a definition
+    /// not created yet, the author's creating department) are offered (Plan07 01B.1).
     async fn publication_options(
         &self,
         company: CompanyId,
+        reach: PublicationReach,
         mcp_tools: &[String],
         http_tools: &[String],
     ) -> AppResult<PublicationOptions>;
@@ -527,7 +537,9 @@ pub trait AuthoringReads: Send + Sync {
     /// `agent_ids` display index (p09 gate P09-B1b-D1), as the run list's agent filter
     /// ([`RunFilter::agent`]) does; nothing decides or authorizes on it.
     async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage>;
-    async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions>;
+    /// `author` limits slot connections to those in reach of a unit they manage, where the
+    /// desks they may bind are (Plan07); saving still checks the chosen desk's reach.
+    async fn binding_options(&self, company: CompanyId, author: Uuid) -> AppResult<BindingOptions>;
     /// The company's agents by name, at most [`MAX_BINDING_OPTIONS`], and whether there were more:
     /// what the runs workspace's agent filter offers.
     async fn agent_options(&self, company: CompanyId) -> AppResult<(Vec<ChoiceOption>, bool)>;

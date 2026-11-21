@@ -570,13 +570,29 @@ async fn agent_write(
             tools.push(name);
         }
     }
+    // The created agent's placement decides what it may use (Plan07 decision d): skills and
+    // tools named in the spec resolve only within that department's reach (the root's when the
+    // spec names none), so another unit's same slug reads as absent.
+    let placement: Option<Uuid> = match &spec.department {
+        Some(slug) => {
+            sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1 AND slug = $2")
+                .bind(company.as_uuid())
+                .bind(slug)
+                .fetch_optional(&mut **tx)
+                .await?
+        }
+        None => None,
+    };
     let mut skill_ids = Vec::with_capacity(spec.skills.len());
     for slug in &spec.skills {
         let id: Option<Uuid> = sqlx::query_scalar(
-            "SELECT id FROM skills WHERE company_id = $1 AND slug = $2 FOR KEY SHARE",
+            "SELECT id FROM skills WHERE company_id = $1 AND slug = $2 \
+             AND unit_reaches($1, COALESCE($3, (SELECT id FROM departments \
+                 WHERE company_id = $1 AND is_root)), unit_id) FOR KEY SHARE",
         )
         .bind(company.as_uuid())
         .bind(slug)
+        .bind(placement)
         .fetch_optional(&mut **tx)
         .await?;
         match id {
@@ -597,11 +613,12 @@ async fn agent_write(
         system_prompt: Some(spec.system_prompt.clone()),
         description: spec.description.clone(),
         tool_bindings: Some(
-            super::super::agent_binding_selection::resolve_bindings_on(
+            super::super::agent_binding_selection::resolve_bindings_in_reach_on(
                 tx,
                 company.as_uuid(),
                 None,
                 &tools,
+                placement,
             )
             .await?,
         ),

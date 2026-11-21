@@ -27,7 +27,10 @@ impl Ui {
             .decode(draft.source)
             .and_then(|decoded| publication_needs(&decoded));
         let (options, too_many_tools) = match &needs {
-            Ok(needs) => self.editor_options(company, needs).await?,
+            Ok(needs) => {
+                self.editor_options(company, detail.summary.workflow, needs)
+                    .await?
+            }
             Err(_) => (PublicationOptions::default(), false),
         };
         let unsaved = state.typed.as_ref().is_some_and(|typed| {
@@ -99,6 +102,7 @@ impl Ui {
     pub(super) async fn editor_options(
         &self,
         company: Uuid,
+        workflow: crate::domain::workflow::WorkflowId,
         needs: &PublicationNeeds,
     ) -> AppResult<(PublicationOptions, bool)> {
         if needs.is_empty() {
@@ -119,7 +123,15 @@ impl Ui {
         let options = self
             .engine
             .authoring_reads()
-            .publication_options(super::company(company), &mcp, &http)
+            .publication_options(
+                super::company(company),
+                crate::application::workflow::reads::PublicationReach {
+                    workflow,
+                    author: self.user,
+                },
+                &mcp,
+                &http,
+            )
             .await?;
         Ok((options, mcp_cut || http_cut))
     }
@@ -195,6 +207,12 @@ pub(super) async fn save(
         Err(WorkflowError::App(AppError::BadRequest(message))) => EditorState {
             typed: Some(typed),
             banner: Some(Banner::Refused(message)),
+            selections: Some(selections),
+            ..Default::default()
+        },
+        Err(WorkflowError::App(AppError::ResourceOutsideUnit(refusal))) => EditorState {
+            typed: Some(typed),
+            banner: Some(Banner::Refused(refusal.to_string())),
             selections: Some(selections),
             ..Default::default()
         },

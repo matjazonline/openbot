@@ -362,10 +362,11 @@ impl McpActionUse for PostgresPersistence {
                 return Err(missing());
             }
         } else {
-            authority::authorize_company(
+            super::resources::authorize_use_on(
                 &mut tx,
                 company,
                 WorkflowActor::authenticated(request.context.actor)?,
+                mcp_target(&request.target)?,
             )
             .await?;
         }

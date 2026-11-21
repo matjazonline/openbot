@@ -311,7 +311,22 @@ async fn selected_on(
     )
     .await?;
     bindings::verify_selection(tx, configuration).await?;
-    resources::check_readiness(tx, configuration.as_ref().into()).await?;
+    let reach = resources::association_reach_on(
+        tx,
+        request.company,
+        RelatedAssociation::inbox(request.target),
+    )
+    .await?;
+    resources::check_readiness(
+        tx,
+        resources::ReadinessSelection::of(
+            configuration.as_ref(),
+            reach,
+            // Choosing a responder is a configuration write (B2-F8).
+            crate::app_error::UnitCheckStage::Binding,
+        ),
+    )
+    .await?;
     selection.contract.validate(
         configuration
             .bundle()

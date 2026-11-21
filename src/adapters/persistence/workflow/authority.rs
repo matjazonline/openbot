@@ -171,11 +171,23 @@ pub(super) async fn supported_publication(
                 ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
                 ToolKind::Memory => builtin_memory_tool(tx, tool, check).await?,
                 ToolKind::Http => {
-                    http::registered_on(tx, current.company_id(), tool).await?;
+                    http::registered_on(
+                        tx,
+                        current.company_id(),
+                        tool,
+                        http::ConnectionReach::Company,
+                    )
+                    .await?;
                 }
                 ToolKind::Slot(slot) => match resources::slot_kind(definition, slot) {
                     Some("http") => {
-                        http::registered_on(tx, current.company_id(), tool).await?;
+                        http::registered_on(
+                            tx,
+                            current.company_id(),
+                            tool,
+                            http::ConnectionReach::Company,
+                        )
+                        .await?;
                     }
                     Some("mcp") => {
                         mcp::registered_on(tx, current.company_id(), tool).await?;

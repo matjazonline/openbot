@@ -949,3 +949,58 @@ mod builder;
 
 #[path = "provisioning_directory_tests.rs"]
 mod directory;
+
+/// Plan07 decision d: the Agent Builder resolves a spec's skills within the reach of the
+/// department the agent joins (the root's when none), so another unit's skill reads as absent.
+#[tokio::test]
+async fn unit_resource_selection_agent_builder_skills_follow_the_placement_reach() {
+    let (f, claim) = claimed(false).await;
+    let pool = f.persistence().pool();
+    let tenant = company(&f).as_uuid();
+    let billing = f.persistence().test_unit(tenant, "billing").await;
+    // A sibling the agent could join instead.
+    f.persistence().test_unit(tenant, "support").await;
+    sqlx::query("INSERT INTO skills(id,company_id,slug,name,description,instructions,created_by,required_tools,unit_id) VALUES(gen_random_uuid(),$1,'billing-policy','Billing','Billing policy','Bill politely.','{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}','{}',$2)")
+        .bind(tenant).bind(billing).execute(pool).await.unwrap();
+    let with = |slug: &str, department: Option<&str>| {
+        let mut arguments = spec(slug);
+        arguments["skills"] = json!(["billing-policy"]);
+        if let Some(department) = department {
+            arguments["department"] = json!(department);
+        }
+        arguments
+    };
+    for (slug, department) in [("rooted", None), ("sibling", Some("support"))] {
+        let before = written(&f).await;
+        let request = call(
+            &f,
+            &claim,
+            ProvisioningKind::CreateAgent,
+            with(slug, department),
+        )
+        .await;
+        let refused = committed(&dispatch(&f), &request).await;
+        assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
+        assert_eq!(grew(&before, &written(&f).await)["agents"], 0, "{slug}");
+    }
+    let request = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgent,
+        with("billed", Some("billing")),
+    )
+    .await;
+    let created = committed(&dispatch(&f), &request).await;
+    assert_eq!(created["agent"]["slug"], "billed", "{created}");
+    let linked: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM agent_skills AS link JOIN agents AS agent \
+         ON agent.company_id=link.company_id AND agent.id=link.agent_id \
+         JOIN skills AS skill ON skill.company_id=link.company_id AND skill.id=link.skill_id \
+         WHERE agent.company_id=$1 AND agent.slug='billed' AND skill.slug='billing-policy'",
+    )
+    .bind(tenant)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(linked, 1);
+}

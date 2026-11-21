@@ -29,6 +29,7 @@ fn facts() -> AgentResolutionFacts {
             skills: vec![],
         },
         tools: vec![ResolvedAgentTool {
+            unit_id: None,
             binding,
             input_schema: tool.contract.input_schema,
             output_schema: tool.contract.output_schema,
@@ -50,6 +51,7 @@ fn assigned(facts: &mut AgentResolutionFacts, name: &str, required: &str) {
     facts.skills.push(ResolvedAgentSkill {
         assignment_id: assignment,
         skill: SkillSnapshot {
+            unit_id: uuid::Uuid::nil(),
             description: "Skill instructions".into(),
             files: Vec::new(),
             company_id: facts.draft.company_id,

@@ -1,8 +1,8 @@
 # Plan coordination: 07-unit-resources
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/07-unit-resources/COORDINATION.md
-- Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, worktree /Users/mac02/orca/workspaces/openbot/plan06 (branch plan07)
-- Revision: 3
+- Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, then 73d846ee-63bd-49f3-bbdf-7f3d92fcce54 (from B2), worktree /Users/mac02/orca/workspaces/openbot/plan06 (branch plan07)
+- Revision: 6
 
 ## Plan-wide instructions
 
@@ -14,6 +14,9 @@
   correction). Execute documents 01, 02, 03 in order as phases p01, p02, p03 in this worktree.
 - Authorizations: commit locally after each independently accepted batch; never push (a push
   needs a new user request). No deployment, no shared or production database reset.
+- 2026-11-20 (session 73d846ee, same root role, Opus 5.5/xhigh re-confirmed): the user authorized
+  a push to main once all of Plan07 (p01–p03) is complete and accepted; not before. Reviewer for
+  the remaining work: Fable/medium (user choice this session). Default auto-compaction.
 - No backward compatibility. Use fresh owned databases for schema verification.
 - User decisions 2026-11-20:
   (a) Unit managers everywhere: creating, editing, deleting and moving a unit's skills, MCP and
@@ -28,6 +31,11 @@
   (d) An agent's own tools and skills must be in reach of one of the agent's current departments
   (its unit or an ancestor) wherever it runs; workflow-level connections follow the run's (desk's)
   scope. Asked after review finding 07UR-P01-G1-F9.
+- User decision (e), 2026-11-21 (asked on review finding 07UR-P01-B2-F5): using a unit's HTTP or
+  MCP connection — a binding's slot inspection and every run action — belongs to whoever manages
+  the connection's unit (its lead or anyone above), in addition to the desk-reach check; the
+  company's messaging and JEV resources stay with root management. Replaces root management as
+  the run actor's requirement for connections.
 - Inherited: Plan05 Doop deferral (05SC-C001/04RU-C005) stays visible and unfixed; Plan06
   authorization conventions (404 for what the caller does not manage, 403 inside their authority).
 - Plan08 p01 exists unmerged on branch plan08_ph1 (6c63f292, base 8fdb892b; Codex root session
@@ -38,7 +46,7 @@
 
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
-| p01 (doc 01 ownership and selection): B1 accepted in phase (B PASS 07UR-P01-B1-R3 at 2849d92a…), committed locally; B2 in progress | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
+| p01 (doc 01 ownership and selection): B1 accepted in phase (B PASS 07UR-P01-B1-R3 at 2849d92a…), committed locally (aa22b1b0); B2 accepted in phase (B PASS 07UR-P01-B2-R2 at 9179c26d…), committed locally; p01 complete in phase pending the user's answer on optional F9 | Claude root/A; Opus B (G1, B1), Fable B (B2 on) | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
 
 ## Cross-phase notices
 

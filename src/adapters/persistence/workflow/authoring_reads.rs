@@ -42,6 +42,12 @@ struct VersionSourceRow {
     created_at: DateTime<Utc>,
 }
 
+/// A connection is offered to a definition in reach of its managing department, or of its
+/// author's creating department before it exists (Plan07); `$4` workflow, `$5` author.
+const DEFINITION_REACH: &str = "unit_reaches($1, COALESCE((SELECT managing_department_id \
+    FROM workflow_definitions WHERE company_id = $1 AND id = $4), \
+    workflow_creating_department($5, $1)), connection.unit_id)";
+
 /// Each needed name's first [`MAX_CONNECTIONS_PER_TOOL`] connections, one past the bound so a
 /// cut name is known. `{operations}`/`{connections}`/`{label}`/`{live}` name the kind's tables.
 fn options_sql(operations: &str, connections: &str, label: &str, live: &str) -> String {
@@ -56,7 +62,8 @@ fn options_sql(operations: &str, connections: &str, label: &str, live: &str) -> 
              FROM {operations} AS operation \
              JOIN {connections} AS connection ON connection.company_id = operation.company_id \
               AND connection.id = operation.connection_id{live} \
-            WHERE operation.revoked_at IS NULL AND operation.company_id = $1 AND operation.name = ANY($2)) AS ranked \
+            WHERE operation.revoked_at IS NULL AND operation.company_id = $1 AND operation.name = ANY($2) \
+              AND {DEFINITION_REACH}) AS ranked \
           WHERE rank <= $3 ORDER BY name, rank"
     )
 }
@@ -173,6 +180,7 @@ impl PostgresPersistence {
         &self,
         sql: &str,
         company: CompanyId,
+        reach: crate::application::workflow::reads::PublicationReach,
         names: &[String],
         cut: &mut std::collections::BTreeSet<String>,
     ) -> AppResult<Vec<OperationOption>> {
@@ -183,6 +191,8 @@ impl PostgresPersistence {
             .bind(company.as_uuid())
             .bind(names)
             .bind(MAX_CONNECTIONS_PER_TOOL + 1)
+            .bind(reach.workflow.as_uuid())
+            .bind(reach.author)
             .fetch_all(self.pool())
             .await?;
         let mut options = Vec::with_capacity(rows.len());
@@ -352,7 +362,7 @@ impl AuthoringReads for PostgresPersistence {
         ))
     }
 
-    async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions> {
+    async fn binding_options(&self, company: CompanyId, author: Uuid) -> AppResult<BindingOptions> {
         let bound = MAX_BINDING_OPTIONS + 1;
         let choices = |rows: Vec<(Uuid, String, bool, String)>| {
             let truncated = rows.len() as i64 > MAX_BINDING_OPTIONS;
@@ -372,6 +382,7 @@ impl AuthoringReads for PostgresPersistence {
             sqlx::query_as::<_, (Uuid, String, bool, String)>(sql)
                 .bind(company.as_uuid())
                 .bind(bound)
+                .bind(author)
                 .fetch_all(self.pool())
         };
         let (channels, channels_cut) = choices(
@@ -383,15 +394,22 @@ impl AuthoringReads for PostgresPersistence {
         );
         let (http, http_cut) = choices(
             read(
-                "SELECT id, origin, enabled, '' FROM workflow_http_connections \
-                 WHERE company_id = $1 ORDER BY origin, id LIMIT $2",
+                "SELECT id, origin, enabled, '' FROM workflow_http_connections AS connection \
+                 WHERE company_id = $1 AND EXISTS (SELECT 1 FROM departments AS unit \
+                     WHERE unit.company_id = $1 AND unit_management_role($3, $1, unit.id) \
+                     IS NOT NULL AND unit_reaches($1, unit.id, connection.unit_id)) \
+                 ORDER BY origin, id LIMIT $2",
             )
             .await?,
         );
         let (mcp, mcp_cut) = choices(
             read(
-                "SELECT id, slug::text, enabled, '' FROM company_mcp_connections \
-                 WHERE company_id = $1 AND deleted_at IS NULL ORDER BY slug, id LIMIT $2",
+                "SELECT id, slug::text, enabled, '' FROM company_mcp_connections AS connection \
+                 WHERE company_id = $1 AND deleted_at IS NULL AND EXISTS (SELECT 1 \
+                     FROM departments AS unit WHERE unit.company_id = $1 \
+                     AND unit_management_role($3, $1, unit.id) IS NOT NULL \
+                     AND unit_reaches($1, unit.id, connection.unit_id)) \
+                 ORDER BY slug, id LIMIT $2",
             )
             .await?,
         );
@@ -466,6 +484,7 @@ impl AuthoringReads for PostgresPersistence {
     async fn publication_options(
         &self,
         company: CompanyId,
+        reach: crate::application::workflow::reads::PublicationReach,
         mcp_tools: &[String],
         http_tools: &[String],
     ) -> AppResult<PublicationOptions> {
@@ -484,6 +503,7 @@ impl AuthoringReads for PostgresPersistence {
                     " AND connection.deleted_at IS NULL",
                 ),
                 company,
+                reach,
                 mcp_tools,
                 &mut mcp_cut,
             )
@@ -497,6 +517,7 @@ impl AuthoringReads for PostgresPersistence {
                     "",
                 ),
                 company,
+                reach,
                 http_tools,
                 &mut http_cut,
             )

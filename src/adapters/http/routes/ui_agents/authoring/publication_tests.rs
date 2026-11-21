@@ -463,3 +463,44 @@ async fn autonomous_agent_authoring_malformed_skill_csv_keeps_input_and_does_not
     assert!(html.contains("unsaved &lt;/textarea&gt;"));
     assert_eq!(f.state().await.agent.draft_revision, f.agent.draft_revision);
 }
+
+/// Plan07 01B.2 (B2-F3): publishing an agent whose skill belongs to a department outside its
+/// reach shows the refusal on the publication panel and publishes nothing.
+#[tokio::test]
+async fn unit_resource_selection_agent_publish_form_shows_the_out_of_reach_refusal() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let billing = f.f.persistence.test_unit(f.f.company.id, "billing").await;
+    let skill = Uuid::new_v4();
+    sqlx::query("INSERT INTO skills(id,company_id,slug,name,description,instructions,created_by,required_tools,unit_id) VALUES($1,$2,'billing-policy','Billing','Billing policy','Bill politely.','{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}','{}',$3)")
+        .bind(skill).bind(f.f.company.id).bind(billing).execute(f.f.persistence.pool()).await.unwrap();
+    sqlx::query(
+        "INSERT INTO agent_skills(company_id,agent_id,skill_id,position) VALUES($1,$2,$3,0)",
+    )
+    .bind(f.f.company.id)
+    .bind(f.agent.id)
+    .bind(skill)
+    .execute(f.f.persistence.pool())
+    .await
+    .unwrap();
+    let html = publish_form(
+        f.workspace(f.f.owner.id),
+        Path(f.agent.id),
+        f.query(),
+        Form(PublicationForm {
+            expected_draft_revision: f.agent.draft_revision,
+            expected_active_revision: String::new(),
+            key: AgentPublicationKey::parse(Uuid::new_v4().to_string()).unwrap(),
+        }),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(
+        html.contains("billing-policy") && html.contains("outside the reach"),
+        "{html}"
+    );
+    let state = f.state().await;
+    assert!(state.active.is_none() && state.history.items.is_empty());
+}

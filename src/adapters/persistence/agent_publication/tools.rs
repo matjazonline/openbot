@@ -51,6 +51,8 @@ fn source_order(binding: &AgentToolBinding) -> SourceOrder<'_> {
 pub(in crate::adapters::persistence) struct RegisteredTool {
     pub(in crate::adapters::persistence) tool: ToolSnapshot,
     pub(in crate::adapters::persistence) approval_required: bool,
+    /// The connection's unit, read under the same row lock (Plan07); none for other tools.
+    pub(in crate::adapters::persistence) unit_id: Option<Uuid>,
 }
 
 pub(in crate::adapters::persistence) fn ordered_bindings<'a>(
@@ -96,6 +98,7 @@ pub(super) async fn resolve_tools(
                 RegisteredTool {
                     tool: snapshot,
                     approval_required: false,
+                    unit_id: None,
                 }
             }
             source => direct_registration_on(tx, company, source, native_only).await?,
@@ -162,6 +165,7 @@ pub(in crate::adapters::persistence) async fn direct_registration_with_locks_on(
         AgentBindingSource::Builtin { tool } => Ok(RegisteredTool {
             tool: builtin(company, *tool)?,
             approval_required: false,
+            unit_id: None,
         }),
         AgentBindingSource::Http {
             connection,
@@ -203,6 +207,7 @@ fn resolved_registration(
         output_schema: snapshot.contract.output_schema,
         policy: snapshot.policy,
         approval_required: captured.approval_required,
+        unit_id: captured.unit_id,
     })
 }
 
@@ -329,6 +334,7 @@ async fn http_tool(
     Ok(RegisteredTool {
         tool,
         approval_required,
+        unit_id: Some(current.unit_id),
     })
 }
 
@@ -437,5 +443,6 @@ async fn mcp_tool(
     Ok(RegisteredTool {
         tool,
         approval_required: reviewed.approval_required,
+        unit_id: Some(current.unit_id.ok_or_else(invalid)?),
     })
 }
