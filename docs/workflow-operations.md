@@ -29,7 +29,16 @@ A large database can exceed the query budget; collection failure is explicit, ne
 | `reconciliation_runs`, `unknown_actions` | Parked reconciliation runs; action states needing reconciliation or applied without a result. An in-flight possible dispatch is not counted as known uncertainty. |
 | `unknown_deliveries`, `delivered_last24h`, `dead_deliveries_last24h` | Delivery outcome unknown; accepted deliveries by delivered time; currently dead-lettered deliveries updated in the last 24 hours. Includes non-workflow mail handled by the shared delivery worker. Acceptance is not proof the recipient read the message. |
 | `model_reserved_tokens`, `model_charged_tokens_last24h` | Outstanding input/output reservations; actual usage where known, otherwise conservative reserved usage for calls requested in the last 24 hours. These can overlap. |
-| `model_reserved_estimated_usd`, `model_charged_estimated_usd_last24h`, `unpriced_model_calls` | Those amounts at current company/provider/model prices; unpriced calls in the same live/24-hour scope. Missing prices are excluded from the monetary sums, so a zero estimate is not free usage. Historical price changes affect estimates. This is not a bill or an enforced monetary budget. |
+| `model_reserved_estimated_usd`, `model_charged_estimated_usd_last24h`, `unpriced_model_calls` | Those amounts at current company/provider/model prices; unpriced calls in the same live/24-hour scope. Missing prices are excluded from the monetary sums, so a zero estimate is not free usage. Historical price changes affect estimates. This is not a bill; department spend caps (below) are enforced separately from their own counted totals. |
+
+Two budgets bound model work. A run's root budget caps its own activations, model calls,
+repetitions and tokens and is enforced during the run: exhausting it fails the run with
+`workflow.root_budget_exhausted`, except that a token allowance may instead park the run for a
+reviewer's approval. A department's spend caps (per UTC day and month, see
+[Departments](departments.md#spend-caps)) are checked when a run is admitted: from the run's
+department upward, the first department whose counted spend reached a cap refuses the run with
+`budget.unit_exhausted`, and a refused schedule occurrence or message records that code. Admitted
+runs are not stopped by a cap.
 
 Use the company Workflows/Runs page to filter failures/waits and open the exact run, execution,
 action and decision. The authenticated read API is

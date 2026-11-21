@@ -292,7 +292,8 @@ desk only through its own desk grants.
 | An agent: authoring, publication, tools, skills, deletion | Whoever manages any department the agent belongs to; an agent in none is the root's. |
 | A workflow definition | Whoever manages a department of one of its active bindings; an unbound definition, its creating department (chosen at creation, the root by default). |
 | Knowledge documents | See "The knowledge library". |
-| The company itself (edit, delete), its model connections, skills and onboarding | The owner. |
+| Skills, MCP and HTTP connections, model connections and spend caps of a department | Whoever manages that department; the root's belong to the owner, root admins and root leads. Moving one takes managing both departments. See [Resources](#resources). |
+| The company itself (edit, delete) and onboarding | The owner. |
 | Team access levels, invitations, connections, memory, local agents, runs, deliveries and the dashboard | Company administration: the owner and root admins, as described on those pages. A person who leads the root manages every department but is not a company administrator. |
 
 Root admins may invite people as members; an invitation carrying the admin role, or addressed to
@@ -310,11 +311,69 @@ deleted department has no card to show it. Desk email
 bindings, workflow bindings and workflow definitions record the acting role on their own audit
 rows the same way.
 
+## Resources
+
+Skills, MCP connections, HTTP connections and model connections each belong to one department,
+the root unless chosen otherwise. A new one goes to the department named when it is created; with
+none named it goes to the root for a root manager, or to the one department its creator leads (a
+creator leading several must choose). Library skills and agents have no department.
+
+A resource is usable at its department and everything below it; a sibling never shares it, and
+sharing means moving it up:
+
+- **Agents.** An agent's tools, skills and model must belong to one of its departments or an
+  ancestor (the root when it is in none). This is checked when the agent is published and when a
+  run that uses it is admitted; a native session also checks its tools and skills whenever it
+  selects its bundle. Moving a resource out of reach refuses the next publication or run
+  (`publication.resource_outside_unit`, `admission.resource_outside_unit`) until it moves back up
+  or the agent is placed below it; published revisions are not rewritten. Editing an agent offers
+  only the tools, skills and models it can reach; the new-agent form lists every model connection
+  with its department and refuses one out of reach when submitted.
+- **Workflows.** A connection a workflow selects must be in reach of its managing department when
+  it is published, and a binding's connections in reach of its desk's department when it is saved
+  (`binding.resource_outside_unit`) and when each run is admitted. An unslotted HTTP operation
+  resolves only among the connections the run's desk reaches, so another department's identical
+  operation neither substitutes nor makes it ambiguous. Any run whose desk reaches a connection may
+  use it, provided the person it runs as is still a company member.
+- **Models.** Each provider is configured once per company, by the department that owns it. A
+  department may mark one of its own model connections as its default; an agent created without a
+  model pins the nearest default from its department up to the root (the root's for an agent in
+  no department). Changing a default affects later creations only. The company keeps at least one
+  model connection once it has one, and the root exactly one default while it has any; the company
+  settings page edits the root's model connections and a department's page edits its own.
+
+Moving a resource takes managing both departments and lists the agents and bindings that use it.
+Skills, MCP connections and HTTP connections have a move form on their pages; every kind moves
+with `POST /api/companies/{company_id}/{skills|mcp-connections|http-connections|model-connections}/{id}/move`
+and `{"unit_id": …}`. A moved model connection
+stops being a default, unless the root had none, and the root's default cannot move away while the
+root keeps another connection.
+
+### Spend caps
+
+A department may cap its model spend per UTC day and per UTC month. Each settled model call adds
+its priced cost (the price configured when it settled) to the department its run was admitted
+under and to every department above it, so a cap bounds the department's whole subtree.
+Models with no price count zero and are shown as unpriced tokens. Once counted spend reaches a cap,
+a new run on that department or below is refused with `budget.unit_exhausted`, naming the nearest
+exhausted department; runs already started finish and may go past it. A cap is set by whoever
+manages that department, on its page or with `PUT` / `DELETE
+/api/companies/{company_id}/departments/{department_id}/budgets/{day|month}` (`{"cap_micros": …}`,
+micro-USD). Deleting a department deletes its caps and keeps what it counted in the departments
+above it.
+
+The usage page groups spend by the department each call was attributed to and drills down to its
+desks; a department's manager sees the departments they manage, root managers all of them, and
+only root managers change prices. Its "Spend counted toward caps" section and the dashboard's
+"Spend by department" panel show each cap, the counted spend and what remains.
+
 ## Delete
 
-The root cannot be deleted. A child department is deleted only when it owns no desks or knowledge
-documents and has no child departments. Reassign or delete its desks, move or delete its documents,
-and move or delete its children first. Its members and role rows go with it; its memory namespace
+The root cannot be deleted. A child department is deleted only when it owns no desks, knowledge
+documents, skills or connections, and has no child departments. Reassign or delete its desks,
+move or delete its documents and resources, and move or delete its children first. The refusal
+says it still owns desks, or names the skills and connections it still owns; one for knowledge
+documents says only that the department is still referenced. Its members and role rows go with it; its memory namespace
 is retired through the durable lifecycle worker.
 
 ## JSON API
@@ -333,7 +392,7 @@ for someone outside the company.
 | `PUT` / `DELETE /departments/{department_id}/members/{principal_id}` | Adds or removes a member. |
 | `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role: `lead` replaces the current lead; `reviewer` adds or removes that holder. |
 
-Refusals: `409 Conflict` for a taken slug or a department that still owns desks or knowledge documents, or has children;
+Refusals: `409 Conflict` for a taken slug or a department that still owns desks, knowledge documents, skills or connections, or has children;
 `400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither
 a person nor an agent; `404 Not Found` for a principal or parent department that is not the
 company's.

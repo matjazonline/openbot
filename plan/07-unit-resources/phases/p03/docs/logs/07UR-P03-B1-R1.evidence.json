@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "round": "07UR-P03-B1-R1",
+  "artifact": "d30f98a13277aab7980f5bd3bddc8ac2f666becca082adc8f21182970dd2e62e",
+  "checks": [
+    {
+      "criteria": [
+        "03A startup plan paths (main.rs unittests)",
+        "carried B1-F7",
+        "carried B2-F2 (HTTP 400 body)",
+        "unit_budget regression"
+      ],
+      "command": "cargo test --locked --offline --bins; cargo test --locked --offline --lib -- unit_budget_http prompt_model_uses agent_edit_pane unit_budget",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b2 (+ _test), Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused.txt",
+          "sha256": "7dac51e520cac2bf338bde384a549f5239c72f347087fbe0ac86dbd2a8a63fff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-clippy.txt",
+          "sha256": "02aaf806f7b1eaa15269f024176b2b3ff299533fabfe13f2698f1d2c147b636b"
+        }
+      ]
+    }
+  ]
+}

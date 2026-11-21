@@ -1,0 +1,7 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.70s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+running 3 tests
+test application::use_cases::agent::model_preparation::tests::prompt_model_uses_only_the_roots_default ... ok
+test adapters::http::app_error_impl::role_tests::unit_budget_http_refusal_is_a_bounded_named_bad_request ... ok
+test adapters::http::pages::tests::agent_edit_pane_prefills_the_stored_agent_and_offers_delete ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4976 filtered out; finished in 0.04s

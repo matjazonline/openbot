@@ -1108,6 +1108,37 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     )));
     assert!(html.contains("This cannot be undone."));
 
+    // Plan07 02A (07UR-P02-B1-F7): a department's provider is labelled with its department, and
+    // its own default is not marked as the company default.
+    let model_connections = [
+        CompanyModelConnection {
+            provider: "anthropic".into(),
+            unit_name: "<Sales>".into(),
+            in_root: false,
+            ..model_connections[0].clone()
+        },
+        CompanyModelConnection {
+            is_default: false,
+            ..model_connections[0].clone()
+        },
+    ];
+    let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
+        authoring: None,
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &model_connections,
+        agent: &agent,
+        draft: None,
+        error: None,
+        capability_options: AgentCapabilityOptions::default(),
+    });
+    assert!(
+        html.contains(">anthropic — &lt;Sales&gt;</option>"),
+        "{html}"
+    );
+    assert!(!html.contains("(default)"), "{html}");
+
     // An agent with nothing overridden keeps the model section collapsed.
     let plain = settings_agent(company.id, "Plain", "plain");
     let plain_html = agent_edit_pane(&AgentEditPane {

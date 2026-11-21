@@ -214,11 +214,15 @@ rather than fabricating operation names, review versions or workflow parameter d
 Create uses `POST /api/companies/{company}/agents` with flat agent metadata. It creates the agent,
 publishes its first revision and gives its principal the direct address at its slug, an autonomous
 reply workflow and an active direct binding, all in one transaction. No desk is created. The company needs a model
-connection first: an omitted provider and model are pinned to the default connection's first model.
+connection first: an omitted provider and model are pinned to the first model of the nearest
+default from the agent's department up to the root (the root's default when it is in no
+department), and an explicit model must belong to that department or one above it. The form's
+"Default for its department" choice does the same.
 A taken address, a model the company's connections lack or an unmet publication prerequisite (such
 as a skill whose tool the draft does not bind) refuses the whole create. Optional `department_id`
 and `role` (`"lead"`, which needs `department_id`) place the agent in a department. Library
-copies follow the same rules. Later edits are saved to the draft and published as new revisions.
+copies follow the same rules; a library model outside the copy's department is replaced by the
+nearest default from that department up to the root. Later edits are saved to the draft and published as new revisions.
 The update contract requires the nested payload and expected revision.
 
 An `agent.run` on a desk a department owns gets that department's context as system text after

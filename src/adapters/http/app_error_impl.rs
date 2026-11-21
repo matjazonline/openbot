@@ -126,4 +126,26 @@ mod role_tests {
         assert_eq!(value.as_object().unwrap().len(), 4);
         assert!(value["error"].as_str().unwrap().contains("draft"));
     }
+
+    /// Plan07 02B (07UR-P02-B2-F2): a cap refusal is a 400 naming the code, unit and period.
+    #[tokio::test]
+    async fn unit_budget_http_refusal_is_a_bounded_named_bad_request() {
+        let unit = uuid::Uuid::new_v4();
+        let response = AppError::BudgetExhausted(crate::app_error::BudgetExhausted {
+            unit,
+            name: "Sales".into(),
+            period: "month",
+        })
+        .into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["code"], "budget.unit_exhausted");
+        assert_eq!(value["unit"], unit.to_string());
+        assert_eq!(value["period"], "month");
+        assert_eq!(value.as_object().unwrap().len(), 4);
+        assert!(value["error"].as_str().unwrap().contains("Sales"));
+    }
 }
