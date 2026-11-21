@@ -113,6 +113,7 @@ fn section<'a>(
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
         models: None,
+        budgets: None,
     })
 }
 
@@ -373,6 +374,7 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
         models: None,
+        budgets: None,
     });
     assert!(cut.contains("Only the first 500 people and agents are listed."));
 
@@ -754,12 +756,14 @@ fn department_views_usage_page_groups_by_department() {
         grouping: UsageGrouping::Department,
         agent: None,
         workflow: None,
+        unit: None,
     };
     let group = |department: UsageDepartment| UsageGroup {
         provider: None,
         model: None,
         workflow: None,
         department: Some(department),
+        desk: None,
         calls: 2,
         completed_calls: 2,
         unconfirmed_calls: 0,
@@ -789,6 +793,9 @@ fn department_views_usage_page_groups_by_department() {
         truncated: false,
         prices: Vec::new(),
         prices_truncated: false,
+        budgets: Vec::new(),
+        budgets_truncated: false,
+        prices_editable: true,
     };
     let html = model_usage_page(company, &query, &report);
     assert!(
@@ -922,6 +929,7 @@ fn led_section(
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
         models: None,
+        budgets: None,
     })
 }
 
@@ -1062,6 +1070,7 @@ fn administration_audit_pane_shows_recent_history_to_managers_only() {
             notice: None,
             knowledge: DepartmentKnowledge::Documents(&[]),
             models: None,
+            budgets: None,
         })
     };
     let managing: std::collections::HashSet<DepartmentId> =

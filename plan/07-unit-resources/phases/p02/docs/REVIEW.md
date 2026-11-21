@@ -171,3 +171,36 @@
   lock order in the planned (6) shape (with the author's negative check), re-parent, child
   attribution, company-wide attribution. B re-ran 11 `unit_budget_*` tests: all passed.
 - 07UR-P02-B2-F2 (optional): deferred to p03, recorded.
+
+## B3 (02C) — round 07UR-P02-B3-R1 (2026-11-21, batch review)
+
+- Reviewer B: Claude Opus 5.5. Artifact: HEAD f95d7906 (accepted B2) plus the working tree,
+  digest 6dffa7b3c234814fa0a647f0051fcfc7051ab1702b879d06b60a28336e95ad2c (same exclusions).
+  Coordination revision 9. Author manifest validated (2 PASS, 1 FAIL: the pre-update run). B
+  re-ran 29 affected tests: all passed.
+- Outcome: **changes required** (no PASS for B3).
+- Notes: [07UR-P02-B3-R1](agent-review-notes.md#07ur-p02-b3-r1-2026-11-21).
+- Actionable: 07UR-P02-B3-F1 (low): the department cap form writes the daily cap before
+  validating the monthly one, so a mixed submission saves one period and reports "not saved".
+- Optional: 07UR-P02-B3-F2: agent/workflow filter probes; lead-subtree and no-truncation
+  properties hold on inspection only.
+- D9 r2 is satisfied:
+  - the subtree filter points the right way and sits before the limit in both sources;
+  - price writes stay with root managers;
+  - cap and remaining equal what admission reads;
+  - unpriced tokens are flagged;
+  - the desk drill-down works;
+  - the dashboard follows the same scope rule;
+  - the read takes no lock.
+- No other 02A–02C item is missing; the remaining items are recorded omissions or deferrals.
+
+## B3 (02C) — round 07UR-P02-B3-R2 (2026-11-21, correction recheck)
+
+- Reviewer B: Claude Opus 5.5. Artifact: HEAD f95d7906 plus the working tree, digest
+  b83aca1623541a7b51632b52cfcc6fb192cf438aaf56534a80816897ad4a4bd8 (same exclusions).
+  Coordination revision 9.
+- Outcome: **PASS for B3** at this digest.
+- Notes: [07UR-P02-B3-R2](agent-review-notes.md#07ur-p02-b3-r2-2026-11-21).
+- 07UR-P02-B3-F1: fixed (both amounts parsed first, applied in one transaction; mixed
+  valid/invalid submission tested). 07UR-P02-B3-F2 (optional): closed (sub-unit visibility
+  tested; the rest not adopted, recorded). B re-ran 29 affected tests: all passed.

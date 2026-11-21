@@ -9,12 +9,22 @@ pub fn model_usage_page(company: Uuid, query: &UsageQuery, report: &UsageReport)
     } else {
         ""
     };
-    let rows = report.groups.iter().map(usage_row).collect::<String>();
-    let prices = report
-        .prices
+    let rows = report
+        .groups
         .iter()
-        .map(|price| price_form(company, Some(price)))
+        .map(|group| usage_row(company, query, group))
         .collect::<String>();
+    let prices = if report.prices_editable {
+        report
+            .prices
+            .iter()
+            .map(|price| price_form(company, Some(price)))
+            .collect::<String>()
+            + &price_form(company, None)
+    } else {
+        price_list(&report.prices)
+    };
+    let budgets = budgets_section(report);
     let content = format!(
         r#"<main class="p-6 space-y-6 h-full overflow-auto">
 {THEME_CONTROLLER}
@@ -24,10 +34,11 @@ pub fn model_usage_page(company: Uuid, query: &UsageQuery, report: &UsageReport)
 {}
 <p>{} to {} · {} calls scanned</p>{warning}
 <div class="overflow-x-auto"><table class="table"><caption>Usage by {}</caption><thead><tr><th scope="col">Model / workflow</th><th scope="col">Calls</th><th scope="col">Completed / unconfirmed</th><th scope="col">Reported / estimated / mixed</th><th scope="col">Input / output tokens</th><th scope="col">Estimated cost at current configured rates (USD)</th></tr></thead><tbody>{rows}</tbody></table></div>
-<p>Cost uses current prices, including for historical calls. A priced subtotal excludes unpriced calls. Estimated and unconfirmed tokens also produce estimated costs. No monetary caps apply.</p>
+<p>Cost uses current prices, including for historical calls. A priced subtotal excludes unpriced calls. Estimated and unconfirmed tokens also produce estimated costs.</p>
+{budgets}
 <h2 class="text-xl font-bold">Prices per million tokens (USD)</h2>
-<p>Set both rates to calculate cost. Zero means free; no configured rate means unavailable. Changing a price recalculates historical estimates.</p>
-{prices}{}{}
+<p>Set both rates to calculate cost. Zero means free; no configured rate means unavailable. Changing a price recalculates historical estimates; spend already counted toward caps keeps the price it was settled at.</p>
+{prices}{}
 </main>"#,
         filter_form(company, query),
         escape_html_text(&report.start.to_rfc3339()),
@@ -37,13 +48,13 @@ pub fn model_usage_page(company: Uuid, query: &UsageQuery, report: &UsageReport)
             UsageGrouping::Model => "model",
             UsageGrouping::Workflow => "workflow",
             UsageGrouping::Department => "department",
+            UsageGrouping::Desk => "desk",
         },
         if report.prices_truncated {
             "<p role=\"status\">Only the first 200 configured prices are shown.</p>"
         } else {
             ""
         },
-        price_form(company, None)
     );
     ui_layout("Model usage", &content)
 }
@@ -51,7 +62,7 @@ fn filter_form(company: Uuid, query: &UsageQuery) -> String {
     format!(
         r#"<form method="get" action="/ui/companies/{company}/usage" class="flex flex-wrap gap-3 items-end" data-submit="busy-once" data-pending-label="Working…">
 <label>Last days <input class="input" type="number" name="days" min="1" max="90" value="{}" required></label>
-<label>Group by <select class="select" name="group"><option value="model" {}>Model</option><option value="workflow" {}>Workflow</option><option value="department" {}>Department</option></select></label>
+<label>Group by <select class="select" name="group"><option value="model" {}>Model</option><option value="workflow" {}>Workflow</option><option value="department" {}>Department</option>{}</select></label>{}
 <label>Agent ID (optional) <input class="input" name="agent" value="{}" maxlength="36"></label>
 <label>Workflow ID (optional) <input class="input" name="workflow" value="{}" maxlength="36"></label>
 <button class="btn btn-primary" type="submit"><span data-label>Show usage</span></button></form>"#,
@@ -71,21 +82,51 @@ fn filter_form(company: Uuid, query: &UsageQuery) -> String {
         } else {
             ""
         },
+        // The desk drill-down keeps its department.
+        match query.unit {
+            Some(_) => format!(
+                r#"<option value="desk" {}>Desk</option>"#,
+                if query.grouping == UsageGrouping::Desk {
+                    "selected"
+                } else {
+                    ""
+                }
+            ),
+            None => String::new(),
+        },
+        query.unit.map_or(String::new(), |unit| format!(
+            r#"<input type="hidden" name="unit" value="{unit}">"#
+        )),
         query.agent.map_or(String::new(), |id| id.to_string()),
         query.workflow.map_or(String::new(), |id| id.to_string())
     )
 }
-fn usage_row(group: &UsageGroup) -> String {
+fn usage_row(company: Uuid, query: &UsageQuery, group: &UsageGroup) -> String {
+    // A department links to its calls by desk over the same range (Plan07 02C).
+    if let Some(department) = &group.department {
+        let label = escape_html_text(&department.name);
+        let link = match department.id {
+            Some(unit) => format!(
+                r#"<a class="link" href="/ui/companies/{company}/usage?days={}&amp;group=desk&amp;unit={unit}">{label}</a>"#,
+                (query.end - query.start).num_days()
+            ),
+            None => label,
+        };
+        return usage_cells(link, group);
+    }
     let label = match (&group.provider, &group.model, group.workflow) {
-        _ if group.department.is_some() => group
-            .department
+        _ if group.desk.is_some() => group
+            .desk
             .as_ref()
-            .map(|department| department.name.clone())
+            .map(|desk| desk.name.clone())
             .unwrap_or_default(),
         (Some(provider), Some(model), _) => format!("{provider} / {model}"),
         (_, _, Some(id)) => format!("Workflow {id}"),
         _ => "Standalone agent activity".into(),
     };
+    usage_cells(escape_html_text(&label), group)
+}
+fn usage_cells(label: String, group: &UsageGroup) -> String {
     let cost = match &group.priced_subtotal_usd {
         Some(cost) if group.unpriced_calls > 0 => format!(
             "{cost} priced subtotal; {} unpriced calls",
@@ -96,7 +137,7 @@ fn usage_row(group: &UsageGroup) -> String {
     };
     format!(
         "<tr><th scope=\"row\">{}</th><td>{}</td><td>{} / {}</td><td>{} / {} / {}</td><td>{} / {}</td><td>{}</td></tr>",
-        escape_html_text(&label),
+        label,
         group.calls,
         group.completed_calls,
         group.unconfirmed_calls,
@@ -106,6 +147,66 @@ fn usage_row(group: &UsageGroup) -> String {
         group.input_tokens,
         group.output_tokens,
         escape_html_text(&cost)
+    )
+}
+/// Caps and counted spend per department for the current UTC day and month (Plan07 02C.1): the
+/// figures admission enforces, from the running totals, apart from the ledger estimate above.
+fn budgets_section(report: &UsageReport) -> String {
+    if report.budgets.is_empty() {
+        return r#"<h2 class="text-xl font-bold">Spend counted toward caps</h2><p>No department has a spend cap or counted spend this UTC day or month.</p>"#.into();
+    }
+    let rows: String = report
+        .budgets
+        .iter()
+        .map(|budget| {
+            let unpriced = if budget.unpriced_tokens > 0 {
+                format!(
+                    r#" <span class="badge badge-warning">{} unpriced tokens not counted</span>"#,
+                    budget.unpriced_tokens
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                "<tr><th scope=\"row\">{}</th><td>{}</td><td>{}</td><td>{}{unpriced}</td><td>{}</td></tr>",
+                escape_html_text(&budget.name),
+                if budget.period == "day" { "Today (UTC)" } else { "This month (UTC)" },
+                escape_html_text(budget.cap_usd.as_deref().unwrap_or("No cap")),
+                escape_html_text(&budget.spent_usd),
+                escape_html_text(budget.remaining_usd.as_deref().unwrap_or("—")),
+            )
+        })
+        .collect();
+    format!(
+        r#"<h2 class="text-xl font-bold">Spend counted toward caps</h2>
+<p>What new runs are checked against: each settled call's priced cost when it settled, counted for its department and every department above it. Unpriced models count zero. Runs already started finish even past a cap.</p>
+<div class="overflow-x-auto"><table class="table"><caption>Counted spend by department (USD)</caption><thead><tr><th scope="col">Department</th><th scope="col">Period</th><th scope="col">Cap</th><th scope="col">Counted</th><th scope="col">Remaining</th></tr></thead><tbody>{rows}</tbody></table></div>{}"#,
+        if report.budgets_truncated {
+            r#"<p role="status">Only the first 200 department periods are shown.</p>"#
+        } else {
+            ""
+        }
+    )
+}
+/// The configured prices, read-only for department managers.
+fn price_list(prices: &[ModelPrice]) -> String {
+    if prices.is_empty() {
+        return "<p>No prices are configured.</p>".into();
+    }
+    let rows: String = prices
+        .iter()
+        .map(|price| {
+            format!(
+                "<tr><th scope=\"row\">{} / {}</th><td>{}</td><td>{}</td></tr>",
+                escape_html_text(price.provider.as_str()),
+                escape_html_text(price.model.as_str()),
+                escape_html_text(&price.input.decimal()),
+                escape_html_text(&price.output.decimal()),
+            )
+        })
+        .collect();
+    format!(
+        r#"<p>Prices are set by the company's managers.</p><table class="table"><thead><tr><th scope="col">Model</th><th scope="col">Input</th><th scope="col">Output</th></tr></thead><tbody>{rows}</tbody></table>"#
     )
 }
 fn price_form(company: Uuid, price: Option<&ModelPrice>) -> String {

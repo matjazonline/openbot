@@ -153,8 +153,9 @@ async fn department_views_runs_narrow_to_the_departments_desks() {
     assert_eq!(counted(Some(DepartmentId::new(other))).await, 0);
 }
 
-/// 01-departments 04C.2 (B2-F4): usage by department follows the call's run to its desk and the
-/// desk's department now: a call on a department-owned desk is under that department's name.
+/// Plan07 02C (replacing 01-departments 04C.2): usage by department is the call's recorded unit —
+/// its run's write unit when the run was admitted — so a desk moved into Sales after admission
+/// leaves the call under the root, where the run was admitted.
 #[tokio::test]
 async fn department_views_usage_names_the_department_of_the_runs_desk() {
     use crate::application::services::model_usage::{
@@ -215,6 +216,7 @@ async fn department_views_usage_names_the_department_of_the_runs_desk() {
                 grouping: UsageGrouping::Department,
                 agent: None,
                 workflow: None,
+                unit: None,
             })
             .await
             .unwrap();
@@ -223,12 +225,19 @@ async fn department_views_usage_names_the_department_of_the_runs_desk() {
         .iter()
         .map(|group| (group.department.clone(), group.calls))
         .collect();
+    let (root, root_name): (Uuid, String) =
+        sqlx::query_as("SELECT id, name FROM departments WHERE company_id = $1 AND is_root")
+            .bind(company)
+            .fetch_one(f.s.pool())
+            .await
+            .unwrap();
+    assert_ne!(root, sales);
     assert_eq!(
         named,
         [(
             Some(UsageDepartment {
-                id: Some(sales),
-                name: "Sales".into(),
+                id: Some(root),
+                name: root_name,
             }),
             1
         )]

@@ -545,6 +545,74 @@ unit's day and month rows (two rows).
   .snapshot.txt); manifest logs/07UR-P02-B2-R2.evidence.json (2 PASS; 1 FAIL = the intended
   negative check).
 
+## B3 plan (02C: D9 r1/r2 with F13 adoptions; on accepted B2 f95d7906)
+1. Report authority (persistence `usage_report`): no company row lock; root managers see every
+   call (`unit_management_role(actor, company, NULL)`); others see calls whose recorded `unit_id`
+   is a unit they manage (`unit_management_role(actor, company, id)`, computed once) — applied in
+   both live and history sources before the 10,000-call limit; nobody else (not-found). Price
+   saves keep root management; the page shows price forms only to root managers.
+2. Department grouping by the recorded `unit_id` (both sources; a deleted unit shows as "Deleted
+   department"); drill-down: `unit` filter + `desk` grouping (the run's desk; archived usage has
+   none).
+3. Report `budgets`: per managed unit and period with a cap or current-period spend, the cap,
+   spent, remaining and unpriced tokens from `unit_spend` for the current UTC day/month — labelled
+   "counted toward caps", apart from the ledger figures.
+4. Dashboard: a spend-by-unit panel from `unit_spend` (current UTC month and day) for the
+   dashboard's company under its existing scope.
+5. Department page: a "Spend caps" card for the unit's managers (current day/month spend, caps,
+   remaining; form to set or clear each cap in USD) posting to
+   `/ui/companies/{c}/departments/{d}/budgets`.
+6. Tests `unit_budget_usage_page_*`: lead of a child / sibling / root manager see their subtree
+   only; numbers equal the ledger and `unit_spend`; unpriced flag; drill-down by desk; price save
+   refused to a lead; department card route; dashboard panel.
+
+## B3 implementation (02C, 2026-11-21; uncommitted on f95d7906)
+- Report (persistence model_usage/report.rs): `report_scope` — no company row lock; root
+  managers (`unit_management_role(.., NULL)`) see all; others the units they manage
+  (`unit_management_role(.., id)`, computed once), applied to both live and history sources
+  before the 10,000-call limit; nobody else → not-found. Price writes keep `authorize_company`
+  (root, with its lock); `prices_editable` tells the page. Calls carry their recorded `unit_id`
+  (department grouping; a deleted unit reads "Deleted department") and the run's desk.
+  `UsageQuery.unit` filter + `UsageGrouping::Desk` (drill-down; routes require the unit for it).
+  `UsageReport.budgets` from `unit_spend` + `unit_budgets` for the current UTC day/month of the
+  viewer's units (cap, counted, remaining, unpriced tokens; ≤200 rows) — page section "Spend
+  counted toward caps" apart from the ledger; department rows link to their desk drill-down;
+  lead pages list prices read-only. `ModelUsageStore::unit_spend` for the dashboard.
+- Dashboard: `Reading.unit_spend` for a company view (not-found → hidden) and a "Spend by
+  department (USD)" panel.
+- Department page: "Spend caps" card for the unit's managers (`CompanyUseCases::
+  unit_budget_states`, current UTC day/month caps and counted spend, unpriced flag) with a USD form
+  (blank clears, 0 refused) posting to `/ui/companies/{c}/departments/{d}/budgets`.
+- Tests: `unit_budget_usage_page_scopes_numbers_drill_down_and_prices` (lead sees only Billing;
+  root manager sees Billing, Support and "Deleted department"; caps/counted/remaining equal the
+  totals; unpriced flagged; desk drill-down; lead's view of Support empty; lead price save 404;
+  `unit_spend` for lead and not-found for a stranger), `unit_budget_usage_page_department_caps_
+  card_for_managers_only` (route: card, save in USD, 0 refused inline, blank clears, member no card
+  and 404), `unit_budget_usage_page_dashboard_panel_lists_department_spend` (panel render, escaped)
+  — 14 `unit_budget*` passed.
+- Changed existing tests (contract change D9 replaces 01-departments 04C.2's "desk's department
+  now"): `model_usage_workflow_exact_provenance_and_grouping` (a company-wide run's call is the
+  root's, was "No department") and `department_views_usage_names_the_department_of_the_runs_desk`
+  (a desk moved into Sales after admission leaves the call with the root, the recorded write
+  unit; was Sales). The first focused run caught both plus a clippy type-complexity lint in the
+  new test (logs/B3-focused.txt); after the updates: 697 passed (logs/B3-R1-focused.txt), clippy
+  clean. No schema change in B3.
+- Frozen: base/HEAD f95d7906 + working tree, digest
+  6dffa7b3c234814fa0a647f0051fcfc7051ab1702b879d06b60a28336e95ad2c
+  (logs/B3-author-freeze.snapshot.txt); manifest logs/07UR-P02-B3-R1.evidence.json.
+
+## B3-R1 corrections (for recheck 07UR-P02-B3-R2, 2026-11-21)
+- F1: the department cap form parses both amounts before writing and applies them through
+  `replace_unit_budgets` (persistence: both periods' set/clear in one transaction). Test: the caps
+  card test now submits a valid daily cap with `abc` and with `0` monthly → refused inline, the
+  stored caps unchanged.
+- F2 (optional): adopted the sub-unit visibility case (a call of Billing's sub-department is in
+  Billing's lead's report and caps); not adopted: hiding agent/workflow filter existence outside a
+  lead's units (UUID probing, low risk, recorded) and a truncation test (by inspection).
+- Checks: 264 passed (logs/B3-R2-focused.txt), clippy clean. Frozen at
+  b83aca1623541a7b51632b52cfcc6fb192cf438aaf56534a80816897ad4a4bd8; manifest
+  logs/07UR-P02-B3-R2.evidence.json.
+
 ## Status
 - p02 started 2026-11-21. Investigation recorded; user decisions (g)(h)(i) taken; G1 r1 reviewed
   (07UR-P02-G1-R1 changes required, F1–F9 actionable, F10 optional); decisions (j)(k) taken; G1 r2
@@ -572,4 +640,11 @@ unit's day and month rows (two rows).
   carried to p03. trail check: keyword matches on schema comments (recorded department, ordering,
   agent-tool edges, select inputs, scope-row recheck of knowledge owners) — not those mechanisms.
   Committed locally. B3 (02C usage pages) next.
+- **B3 accepted in phase** 2026-11-21: B PASS 07UR-P02-B3-R2 at
+  b83aca1623541a7b51632b52cfcc6fb192cf438aaf56534a80816897ad4a4bd8 (rounds B3-R1 F1 + optional F2,
+  B3-R2 PASS); root re-digest identical (logs/B3-root-acceptance.snapshot.txt); coordination r9.
+  Committed locally. **p02 complete in phase** (not integrated; full gate in p03). Carried to p03:
+  optional B1-F7, B2-F2; recorded omissions (model connection move JSON-only, no library
+  reach-fallback warning, B1-F5/F6, B3-F2 remainder) and G1 limits (a deleted unit's later spend
+  to the root, never-settled calls uncounted, orphan rows and `unit_spend` retention).
 

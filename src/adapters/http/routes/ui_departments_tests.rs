@@ -806,3 +806,118 @@ async fn unit_model_default_department_card_saves_for_managers_only() {
         denied.as_ref().map(|_| ())
     );
 }
+
+/// Plan07 02B.1/02C (B3): a department's managers get its "Spend caps" card, save USD caps and
+/// clear them; a bad amount is refused inline; a plain member gets no card and a not-found.
+#[tokio::test]
+async fn unit_budget_usage_page_department_caps_card_for_managers_only() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let sales = create(&f, "Sales", "sales").await;
+    let member = person(&f, &f.member).await;
+    f.departments()
+        .add_member(f.owner.id, f.company.id, sales, PrincipalId::new(member))
+        .await
+        .unwrap();
+    let shown = show_department(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(shown.contains("id=\"department-budgets\""), "{shown}");
+    let caps = |day: &str, month: &str| DepartmentBudgetsForm {
+        day_cap: day.into(),
+        month_cap: month.into(),
+    };
+    let (status, _, html) = body(
+        save_budgets(
+            workspace(&f, &f.owner),
+            Path((f.company.id, sales.as_uuid())),
+            Form(caps("12.5", "")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Saved spend caps."), "{html}");
+    assert!(html.contains("12.500000"), "{html}");
+    let stored: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT period, cap_micros FROM unit_budgets WHERE company_id=$1 AND unit_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(sales.as_uuid())
+    .fetch_all(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(stored, vec![("day".to_owned(), 12_500_000)]);
+    let (_, _, html) = body(
+        save_budgets(
+            workspace(&f, &f.owner),
+            Path((f.company.id, sales.as_uuid())),
+            Form(caps("0", "")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(html.contains("Spend caps not saved:"), "{html}");
+    // A valid daily cap beside an invalid monthly one changes nothing (B3-F1).
+    for month in ["abc", "0"] {
+        let (_, _, html) = body(
+            save_budgets(
+                workspace(&f, &f.owner),
+                Path((f.company.id, sales.as_uuid())),
+                Form(caps("99", month)),
+            )
+            .await
+            .unwrap(),
+        )
+        .await;
+        assert!(html.contains("Spend caps not saved:"), "{html}");
+        let kept: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT period, cap_micros FROM unit_budgets WHERE company_id=$1 AND unit_id=$2",
+        )
+        .bind(f.company.id)
+        .bind(sales.as_uuid())
+        .fetch_all(f.persistence.pool())
+        .await
+        .unwrap();
+        assert_eq!(kept, vec![("day".to_owned(), 12_500_000)], "{month}");
+    }
+    save_budgets(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+        Form(caps("", "")),
+    )
+    .await
+    .unwrap();
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM unit_budgets WHERE company_id=$1")
+        .bind(f.company.id)
+        .fetch_one(f.persistence.pool())
+        .await
+        .unwrap();
+    assert_eq!(left, 0, "blank clears");
+    let shown = show_department(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!shown.contains("department-budgets"));
+    let denied = save_budgets(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+        Form(caps("1", "")),
+    )
+    .await;
+    assert!(
+        matches!(&denied, Err(AppError::NotFound(_))),
+        "{:?}",
+        denied.as_ref().map(|_| ())
+    );
+}

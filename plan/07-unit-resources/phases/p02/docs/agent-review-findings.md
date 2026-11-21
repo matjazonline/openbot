@@ -811,3 +811,50 @@ verification.
     only at persistence.
 - **Resolution history:** 2026-11-21 open (B2-R1, optional).
   - 2026-11-21 recheck 07UR-P02-B2-R2 (digest 60e2c15f…1929; tests only, schema confirmed restored with the ordered `PERFORM`): **deferred** to p03 by the author (the production message path, the HTTP body and the cap routes; recorded in TASK). Acceptable for an optional suggestion; carried as an open item for p03's route and final checks.
+
+## 07UR-P02-B3-R1 findings
+
+Context for B3-F1, B3-F2: round note
+[07UR-P02-B3-R1](agent-review-notes.md#07ur-p02-b3-r1-2026-11-21), batch B3 = doc 02C (G1 D9 r1/r2
+with the F13 adoptions), batch review. HEAD f95d7906 (accepted B2) plus the working tree, digest
+6dffa7b3c234814fa0a647f0051fcfc7051ab1702b879d06b60a28336e95ad2c, exclusions unchanged.
+Coordination revision 9. Reviewer B Claude Opus 5.5. Both are in the implementation.
+
+## 07UR-P02-B3-F1 — The department cap form saves one period before validating the other, then reports "not saved"
+
+- **Classification:** actionable defect; **low**; correctness/UX.
+- **Evidence:**
+  - `save_budgets` (routes/ui_departments.rs:841-890) loops over `[("day", ..), ("month", ..)]`.
+    In each turn it parses the amount (`cap_micros(value)?`) and then writes it through its own
+    transaction (`set_unit_budget` or `clear_unit_budget`, each `pool.begin()…commit()` in
+    persistence/company.rs).
+  - Submitting a valid daily cap with an invalid monthly one (`5` and `abc`, or `0`) commits the
+    daily cap, then fails on the monthly. The section re-renders "Spend caps not saved: …".
+    Likewise, a valid daily change followed by a monthly write that errors leaves the day
+    applied.
+  - A manager reading the message believes nothing changed, yet the daily cap, which immediately
+    governs admissions, is new.
+  - The route test (`unit_budget_usage_page_department_caps_card_for_managers_only`) checks only
+    single-field submissions.
+- **Required:** parse both fields before any write, and apply both in one transaction (or at
+  least validate both first). Add a case with one valid and one invalid field asserting nothing
+  changed.
+- **Instruction lesson:** none beyond keeping one form submission one logical commit (application
+  AGENTS "Durable effects form one logical commit").
+- **Resolution history:** 2026-11-21 open (B3-R1).
+  - 2026-11-21 recheck 07UR-P02-B3-R2 (digest b83aca16…4bd8): **fixed**. `save_budgets` parses both amounts before any write and calls `replace_unit_budgets` (persistence/company.rs:372-397), which runs both periods' `set_on`/`clear_on` in one transaction; an error drops it uncommitted. The caps-card route test submits `99` with `abc` and with `0` and asserts the stored caps unchanged. The old per-period writes would have stored the 99. B re-ran it, passed ([logs/07UR-P02-B3-R2-reviewer-focused.txt](logs/07UR-P02-B3-R2-reviewer-focused.txt)).
+
+## 07UR-P02-B3-F2 — Smaller observations (optional)
+
+- **Classification:** optional suggestion; **low**.
+- **Evidence:**
+  - `validate_filters` (report.rs) still answers agent/workflow existence company-wide, so a
+    unit lead can probe ids outside their units (a NotFound versus an empty report). Ids are
+    UUIDs, so the risk is low; this was noted in G1 F5 and not addressed by D9 r2.
+  - Two properties hold on inspection only:
+    - a lead's view includes a sub-unit's calls (`unit_management_role` covers descendants);
+    - other units' volume cannot truncate a lead's report (the filter sits inside both sources,
+      before `LIMIT`).
+    No test has a lead of a parent with a child unit, or enough foreign calls to show the second.
+- **Resolution history:** 2026-11-21 open (B3-R1, optional).
+  - 2026-11-21 recheck 07UR-P02-B3-R2 (digest b83aca16…4bd8): partly adopted: sub-unit visibility is now tested (a call of Billing's sub-department appears in Billing's lead's report). Not adopted, with reasons recorded in TASK: filter-existence probing (UUIDs, low risk) and a truncation test (inspection). Acceptable for an optional item; **closed**.

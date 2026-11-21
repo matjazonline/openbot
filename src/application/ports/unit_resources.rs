@@ -51,3 +51,14 @@ pub struct MovedResource {
     pub uses: Vec<ResourceUse>,
     pub more_uses: u64,
 }
+
+/// One period's spend cap of a unit and its counted spend for the current UTC period (Plan07 02B,
+/// 02C), as the department's managers see it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnitBudgetState {
+    /// `day` or `month`.
+    pub period: &'static str,
+    pub cap_micros: Option<i64>,
+    pub spent_micros: i64,
+    pub unpriced_tokens: i64,
+}

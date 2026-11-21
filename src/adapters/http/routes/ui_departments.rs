@@ -71,6 +71,10 @@ pub fn router() -> Router<AppState> {
             post(save_models),
         )
         .route(
+            "/ui/companies/{company_id}/departments/{department_id}/budgets",
+            post(save_budgets),
+        )
+        .route(
             "/ui/companies/{company_id}/departments/{department_id}/lead/{principal_id}",
             delete(clear_lead),
         )
@@ -140,6 +144,14 @@ pub(super) async fn department_section(
         ),
         _ => None,
     };
+    let budgets = match &view {
+        Some(view) if managed.contains(&view.detail.department.id) => Some(
+            companies
+                .unit_budget_states(user_id, company_id, view.detail.department.id.as_uuid())
+                .await?,
+        ),
+        _ => None,
+    };
     let history = match &view {
         Some(view) if managed.contains(&view.detail.department.id) => {
             departments
@@ -192,6 +204,7 @@ pub(super) async fn department_section(
                 pages::DepartmentKnowledge::Documents,
             ),
             models: models.as_deref(),
+            budgets: budgets.as_deref(),
         },
     ))
 }
@@ -784,6 +797,79 @@ async fn save_models(
                     },
                     None,
                     Some(&format!("Model connections not saved: {message}")),
+                )
+                .await?,
+        )
+        .into_response()),
+        Err(error) => Err(error),
+    }
+}
+
+/// The department cap form: USD amounts for the UTC day and month; blank removes that cap.
+#[derive(Debug, Default, Deserialize)]
+struct DepartmentBudgetsForm {
+    #[serde(default)]
+    day_cap: String,
+    #[serde(default)]
+    month_cap: String,
+}
+
+/// A USD amount with at most six decimals as micro-USD; blank is `None` (no cap).
+fn cap_micros(value: &str) -> AppResult<Option<i64>> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let micros = crate::services::model_usage::TokenPrice::parse(value)
+        .map_err(|_| {
+            AppError::BadRequest(
+                "A cap is an amount in USD up to 1000000 with at most six decimal places.".into(),
+            )
+        })?
+        .micros();
+    if micros == 0 {
+        return Err(AppError::BadRequest(
+            "A cap is a positive amount; leave it blank to remove it.".into(),
+        ));
+    }
+    Ok(Some(micros))
+}
+
+/// POST /ui/companies/{company_id}/departments/{department_id}/budgets - Set or clear the
+/// department's spend caps (Plan07 02B.1, decision c): whoever manages the department.
+#[instrument(skip_all)]
+async fn save_budgets(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<DepartmentBudgetsForm>,
+) -> AppResult<Response> {
+    let access = workspace.readable(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    // Both amounts are checked before anything is written, then applied together (B3-F1).
+    let saved = async {
+        let (day, month) = (cap_micros(&form.day_cap)?, cap_micros(&form.month_cap)?);
+        workspace
+            .company_use_cases
+            .replace_unit_budgets(workspace.user_id, company_id, department_id, day, month)
+            .await
+    }
+    .await;
+    match saved {
+        Ok(()) => {
+            workspace
+                .saved(&access, Some(department), "Saved spend caps.")
+                .await
+        }
+        Err(AppError::BadRequest(message)) => Ok(Html(
+            workspace
+                .section(
+                    &access,
+                    DepartmentSelection::Department {
+                        id: department,
+                        draft: None,
+                    },
+                    None,
+                    Some(&format!("Spend caps not saved: {message}")),
                 )
                 .await?,
         )

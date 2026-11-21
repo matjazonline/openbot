@@ -723,3 +723,123 @@
   evidence that a concurrency test discriminates. Worth recommending for lock-order fixes
   generally. Candidate: "for a concurrency fix, retain a log of the test failing with the fix
   reverted."
+
+## 07UR-P02-B3-R1 (2026-11-21)
+
+### Identity
+
+- Round 07UR-P02-B3-R1, batch review of B3 = doc 02C (G1 D9 r1/r2 with the F13 adoptions), the
+  last p02 batch. Workflow implement-opus-reviewed-2_4. Task [TASK.md](TASK.md) ("B3 plan", "B3
+  implementation"), review [REVIEW.md](REVIEW.md), findings
+  [agent-review-findings.md](agent-review-findings.md).
+- Reviewer: Claude Opus 5.5 (B, claude-opus-5-5), the same agent as earlier rounds.
+- Review base = HEAD f95d7906b5a225649366d8868193b04b5711dd04 (accepted B2); B3 is `git diff HEAD`
+  (22 source files; no schema change; no new untracked source). Digest
+  6dffa7b3c234814fa0a647f0051fcfc7051ab1702b879d06b60a28336e95ad2c, exclusions unchanged.
+  Verified at start and before returning. Coordination revision 9, unchanged. TASK.md sha256
+  a96571ba…daaa at return.
+- Evidence:
+  - Author manifest `logs/07UR-P02-B3-R1.evidence.json` validated with `--expect-artifact` (exit
+    0: 2 PASS, 1 FAIL; the FAIL is the run before the two test updates and the clippy fix).
+    Focused rerun after them: 697 passed.
+  - B's run:
+    [logs/07UR-P02-B3-R1-reviewer-focused.txt](logs/07UR-P02-B3-R1-reviewer-focused.txt)
+    (sha256 81fd5b65…f669): `unit_budget model_usage department_views_usage`, 29 passed, against
+    B's `openbot_p07_p02r_b3` (dropped); the new and changed tests are listed by name.
+
+### Coverage and evidence
+
+- Read the whole delta and its callers:
+  - `report_scope`: no row lock; root managers through `unit_management_role(.., NULL)`; others
+    get the units they manage, computed once (descendants included); a non-manager gets 404.
+  - The managed and drill-down filters sit inside both the live and history sources, before
+    `LIMIT` — D9 r2's direction and placement.
+  - Grouping uses the recorded `unit_id` ("Deleted department" for dangling ids, visible to root
+    managers only).
+  - The desk drill-down requires `unit`.
+  - `unit_budgets_on`: current UTC day/month rows from `unit_budgets` and `unit_spend`, the same
+    rows and period starts admission reads; remaining `max(cap − spent, 0)`; unpriced tokens;
+    ≤200 rows with a truncation flag.
+  - `usd` is exact. Price writes still use `authorize_company` (root, with lock), and the page
+    shows price forms only when `prices_editable`; leads see prices read-only.
+  - Dashboard: `unit_spend` through the same scope; NotFound hides the panel (operator or
+    non-manager); other errors propagate like the other dashboard loaders.
+  - The department "Spend caps" card is loaded only for managers through `states_on`
+    (management of that unit). Its POST route goes through `set_unit_budget` /
+    `clear_unit_budget` (decision c with locks); USD parsing via `TokenPrice::parse`; 0 refused,
+    blank clears; a non-manager gets 404.
+- The two existing tests changed for the recorded-attribution contract were checked against
+  D9 r2 ("groups by the recorded `unit_id` (replacing the desk's current department)"). They are
+  justified contract updates, not weakened assertions.
+- Tests read:
+  - `unit_budget_usage_page_scopes_numbers_drill_down_and_prices`: Billing's lead sees only
+    Billing; the root manager sees Billing, Support and "Deleted department"; counted, cap and
+    remaining equal the totals (0.000200 / 0.001000 / 0.000800); unpriced 5 flagged; desk
+    drill-down; the lead's view of Support empty; the lead's price save 404; the dashboard store
+    for the lead, 404 for a stranger.
+  - The department caps route test.
+  - The dashboard panel render test.
+- **Remaining p02 items (02A–02C), all recorded rather than missing:**
+  - the model connection move has a JSON API only;
+  - no warning on a library copy's reach fallback;
+  - B1-F5/F6 not adopted;
+  - optional B1-F7 and B2-F2 deferred to p03;
+  - the G1 recorded limits (a deleted unit's later spend goes to the root; never-settled calls
+    are not counted; orphan rows and retention).
+  Every 02A–02C item and the three focused-check families are implemented and tested.
+
+### Outcome
+
+- **Changes required; no PASS for B3.**
+- Actionable: 07UR-P02-B3-F1 (low; the cap form's partial save behind a "not saved" message).
+- Optional: 07UR-P02-B3-F2.
+- No other defect found in the delta.
+
+### Process and instruction feedback
+
+- The author caught and recorded the two contract-changing test updates with their source rule
+  (D9 replacing 01-departments 04C.2), which made them quick to verify.
+
+## 07UR-P02-B3-R2 (2026-11-21)
+
+### Identity
+
+- Round 07UR-P02-B3-R2, correction recheck of batch B3 (02C) by finding ID: 07UR-P02-B3-F1
+  (actionable) and F2 (optional). Workflow implement-opus-reviewed-2_4. Task [TASK.md](TASK.md)
+  ("B3-R1 corrections"), review [REVIEW.md](REVIEW.md), findings
+  [agent-review-findings.md](agent-review-findings.md).
+- Reviewer: Claude Opus 5.5 (B, claude-opus-5-5).
+- Review base = HEAD f95d7906b5a225649366d8868193b04b5711dd04 plus the working tree, digest
+  b83aca1623541a7b51632b52cfcc6fb192cf438aaf56534a80816897ad4a4bd8, exclusions unchanged.
+  Verified at start and before returning. Coordination revision 9, unchanged. TASK.md sha256
+  103cb620…f42e at return; B log sha256 583ed99d…d305.
+- Evidence:
+  - Author manifest `logs/07UR-P02-B3-R2.evidence.json` validated with `--expect-artifact` (exit
+    0: 2 PASS). Focused run: 264 passed. Clippy clean.
+  - B's run:
+    [logs/07UR-P02-B3-R2-reviewer-focused.txt](logs/07UR-P02-B3-R2-reviewer-focused.txt):
+    `unit_budget model_usage department_views_usage`, 29 passed, against B's
+    `openbot_p07_p02r_b3r2` (dropped).
+
+### Coverage and evidence
+
+- F1: read the corrected `save_budgets`, the new `replace_unit_budgets` (use case and
+  persistence, one transaction over both periods with the unchanged `set_on`/`clear_on`
+  authority), and the mock persistence update.
+  - The new route assertions (valid day plus `abc` or `0` month → "not saved", stored caps
+    unchanged) discriminate the defect.
+- F2: read the added sub-unit case (`departments(&led) == ["billing", "field"]`).
+- The rest of B3 is unchanged since B3-R1; that review and its evidence are reused.
+
+### Outcome
+
+- **PASS for B3** at digest b83aca1623541a7b51632b52cfcc6fb192cf438aaf56534a80816897ad4a4bd8.
+- B3-F1 fixed; B3-F2 (optional) closed with the partial adoption recorded.
+- With B1 (PASS 07UR-P02-B1-R2) and B2 (PASS 07UR-P02-B2-R2) accepted, every p02 batch has a
+  PASS.
+- Open items carried to p03: optional B1-F7 and B2-F2, plus the recorded omissions and limits
+  listed in B3-R1.
+
+### Process and instruction feedback
+
+- No issues. The correction was small and complete in one round.

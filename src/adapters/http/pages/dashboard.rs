@@ -109,6 +109,8 @@ pub struct DashboardPage<'a> {
     /// The outstanding jobs group under their desk's department and narrow to `department`.
     pub departments: &'a DeskDepartments,
     pub department: Option<DepartmentId>,
+    /// Spend counted toward department caps this UTC day and month (Plan07 02C); `None` hides it.
+    pub unit_spend: Option<(&'a [crate::services::model_usage::UnitBudgetStatus], bool)>,
 }
 
 impl DashboardPage<'_> {
@@ -210,6 +212,7 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
                     {queue_depth}
                 </div>
             </div>
+            {unit_spend}
             {machine}
             {query_health}
         </div>
@@ -225,8 +228,47 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
         throughput = throughput_panel(page.snapshot, page.window),
         latency = latency_panel(page.snapshot, page.window),
         queue_depth = queue_depth_panel(page.snapshot, page.window),
+        unit_spend = unit_spend_panel(page.unit_spend),
         machine = machine_section(page),
         query_health = database_query_health_section(page.query_health),
+    )
+}
+
+/// Spend counted toward each department's caps for the current UTC day and month (Plan07 02C):
+/// the running totals new runs are checked against.
+fn unit_spend_panel(
+    spend: Option<(&[crate::services::model_usage::UnitBudgetStatus], bool)>,
+) -> String {
+    let Some((rows, cut)) = spend else {
+        return String::new();
+    };
+    let body = if rows.is_empty() {
+        "<p class=\"text-sm opacity-70\">No department has a cap or counted spend this UTC day or month.</p>".to_owned()
+    } else {
+        let rows: String = rows
+            .iter()
+            .map(|row| {
+                format!(
+                    "<tr><th scope=\"row\">{}</th><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+                    escape_html_text(&row.name),
+                    if row.period == "day" { "Today" } else { "This month" },
+                    escape_html_text(row.cap_usd.as_deref().unwrap_or("No cap")),
+                    escape_html_text(&row.spent_usd),
+                    escape_html_text(row.remaining_usd.as_deref().unwrap_or("—")),
+                )
+            })
+            .collect();
+        format!(
+            r#"<table class="table table-sm"><thead><tr><th scope="col">Department</th><th scope="col">Period (UTC)</th><th scope="col">Cap</th><th scope="col">Counted</th><th scope="col">Remaining</th></tr></thead><tbody>{rows}</tbody></table>{}"#,
+            if cut {
+                r#"<p class="text-xs opacity-70">Only the first 200 department periods are shown.</p>"#
+            } else {
+                ""
+            }
+        )
+    };
+    format!(
+        r#"<section id="dashboard-unit-spend"><h2 class="mb-3 text-lg font-semibold">Spend by department (USD)</h2>{body}</section>"#
     )
 }
 
@@ -1227,6 +1269,31 @@ fn plural(count: i64) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    /// Plan07 02C (B3): the dashboard's spend-by-department panel lists each department's cap,
+    /// counted spend and remaining for the UTC day or month, escaped; absent when not loaded.
+    #[test]
+    fn unit_budget_usage_page_dashboard_panel_lists_department_spend() {
+        use crate::services::model_usage::UnitBudgetStatus;
+        let rows = [UnitBudgetStatus {
+            unit: uuid::Uuid::nil(),
+            name: "<Sales>".into(),
+            period: "month".into(),
+            cap_usd: Some("10.000000".into()),
+            spent_usd: "2.500000".into(),
+            remaining_usd: Some("7.500000".into()),
+            unpriced_tokens: 0,
+        }];
+        let html = unit_spend_panel(Some((&rows, false)));
+        assert!(
+            html.contains("&lt;Sales&gt;") && !html.contains("<Sales>"),
+            "{html}"
+        );
+        assert!(html.contains("This month") && html.contains("10.000000"));
+        assert!(html.contains("2.500000") && html.contains("7.500000"));
+        assert!(unit_spend_panel(None).is_empty());
+        assert!(unit_spend_panel(Some((&[], false))).contains("No department has a cap"));
+    }
+
     use super::*;
     use crate::entities::{company_member::CompanyMembership, dashboard::TaskStatusCount};
 
@@ -1472,6 +1539,7 @@ mod tests {
         };
         dashboard_panels(&DashboardPage {
             department: None,
+            unit_spend: None,
             departments: &Default::default(),
             user: &user,
             scope,
@@ -1514,6 +1582,7 @@ mod tests {
 
         let hidden = dashboard_panels(&DashboardPage {
             department: None,
+            unit_spend: None,
             departments: &Default::default(),
             user: &user,
             scope: DashboardScopeView::Company(&company),
@@ -1530,6 +1599,7 @@ mod tests {
 
         let visible = dashboard_panels(&DashboardPage {
             department: None,
+            unit_spend: None,
             departments: &Default::default(),
             user: &user,
             scope: DashboardScopeView::Company(&company),
@@ -1847,6 +1917,7 @@ mod tests {
         let panels = |department| {
             dashboard_panels(&DashboardPage {
                 department,
+                unit_spend: None,
                 departments: &departments,
                 user: &user,
                 scope: DashboardScopeView::Company(&companies[0]),
@@ -1881,6 +1952,7 @@ mod tests {
         };
         let empty = dashboard_panels(&DashboardPage {
             department: Some(revenue),
+            unit_spend: None,
             departments: &departments,
             user: &user,
             scope: DashboardScopeView::Company(&companies[0]),
@@ -1904,6 +1976,7 @@ mod tests {
         let render_capped = |department, snapshot: &DashboardSnapshot| {
             dashboard_panels(&DashboardPage {
                 department,
+                unit_spend: None,
                 departments: &departments,
                 user: &user,
                 scope: DashboardScopeView::Company(&companies[0]),

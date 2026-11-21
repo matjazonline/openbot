@@ -12,6 +12,7 @@ fn dashboard(f: &Fixture, account: &crate::entities::user::User, caller: Caller)
         runtime_metrics: f.persistence.clone(),
         runtime_identity: MachineIdentity::process().clone(),
         monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+        usage: f.persistence.clone(),
         config: f.config.clone(),
         user_id: account.id,
         account: account.clone(),

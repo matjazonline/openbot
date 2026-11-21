@@ -343,6 +343,26 @@ impl CompanyPersistence for MockCompanyPersistence {
         Err(company_not_found())
     }
 
+    async fn replace_unit_budgets(
+        &self,
+        _user_id: Uuid,
+        _company_id: Uuid,
+        _unit_id: Uuid,
+        _day_micros: Option<i64>,
+        _month_micros: Option<i64>,
+    ) -> AppResult<()> {
+        Err(company_not_found())
+    }
+
+    async fn unit_budget_states(
+        &self,
+        _user_id: Uuid,
+        _company_id: Uuid,
+        _unit_id: Uuid,
+    ) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>> {
+        Err(company_not_found())
+    }
+
     async fn clear_unit_budget(
         &self,
         _user_id: Uuid,

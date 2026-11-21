@@ -100,6 +100,49 @@ pub(crate) async fn clear_on(
     Ok(())
 }
 
+/// A unit's caps and counted spend for the current UTC day and month, for its managers.
+pub(crate) async fn states_on(
+    db: &mut PgConnection,
+    actor: WorkflowActor,
+    company: CompanyId,
+    unit: DepartmentId,
+) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>> {
+    super::administration::management_role_on(
+        db,
+        actor.user_id(),
+        company,
+        ManagementTarget::Unit(unit),
+    )
+    .await?
+    .ok_or_else(|| AppError::NotFound("Department not found".into()))?;
+    let rows: Vec<(String, Option<i64>, i64, i64)> = sqlx::query_as(
+        "SELECT period.name, budget.cap_micros, COALESCE(spend.spent_micros, 0),
+                COALESCE(spend.unpriced_tokens, 0)
+           FROM (VALUES ('day'), ('month')) AS period(name)
+           LEFT JOIN unit_budgets AS budget ON budget.company_id = $1 AND budget.unit_id = $2
+            AND budget.period = period.name
+           LEFT JOIN unit_spend AS spend ON spend.company_id = $1 AND spend.unit_id = $2
+            AND spend.period = period.name
+            AND spend.period_start = date_trunc(period.name, clock_timestamp() AT TIME ZONE 'UTC')
+                AT TIME ZONE 'UTC'
+          ORDER BY period.name",
+    )
+    .bind(company.as_uuid())
+    .bind(unit.as_uuid())
+    .fetch_all(&mut *db)
+    .await?;
+    rows.into_iter()
+        .map(|(name, cap, spent, unpriced)| {
+            Ok(crate::application::ports::unit_resources::UnitBudgetState {
+                period: period(&name)?,
+                cap_micros: cap,
+                spent_micros: spent,
+                unpriced_tokens: unpriced,
+            })
+        })
+        .collect()
+}
+
 #[derive(sqlx::FromRow)]
 struct Exhausted {
     unit: Uuid,

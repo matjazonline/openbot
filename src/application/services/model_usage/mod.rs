@@ -74,8 +74,11 @@ pub struct UsageScope {
 pub enum UsageGrouping {
     Model,
     Workflow,
-    /// By the department that owns the run's desk now (01-departments 04C.2).
+    /// By the department the call is attributed to: its run's write unit when it was made
+    /// (Plan07 02C), so archived usage keeps it too.
     Department,
+    /// By the run's desk, within one department (`UsageQuery::unit`): the drill-down.
+    Desk,
 }
 #[derive(Clone)]
 pub struct UsageQuery {
@@ -85,6 +88,8 @@ pub struct UsageQuery {
     pub grouping: UsageGrouping,
     pub agent: Option<Uuid>,
     pub workflow: Option<Uuid>,
+    /// Only calls attributed to this department (Plan07 02C drill-down).
+    pub unit: Option<Uuid>,
 }
 impl UsageQuery {
     pub fn validate(&self) -> AppResult<()> {
@@ -143,6 +148,37 @@ pub struct UsageDepartment {
     pub name: String,
 }
 
+/// The desk a usage group is for; `id` is `None` for calls with no live desk (archived usage, or
+/// runs without one).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct UsageDesk {
+    pub id: Option<Uuid>,
+    pub name: String,
+}
+
+/// One department's spend counted toward a cap for the current UTC day or month (Plan07 02C):
+/// what admission enforces, from the running totals, apart from the ledger figures above it.
+#[derive(Debug, Clone, Serialize)]
+pub struct UnitBudgetStatus {
+    pub unit: Uuid,
+    pub name: String,
+    /// `day` or `month`.
+    pub period: String,
+    /// Exact USD decimals.
+    pub cap_usd: Option<String>,
+    pub spent_usd: String,
+    pub remaining_usd: Option<String>,
+    /// Tokens of models with no configured price, which count zero toward caps (decision h).
+    pub unpriced_tokens: u64,
+}
+
+/// Micro-USD as an exact USD decimal.
+pub fn usd(micros: i64) -> String {
+    let sign = if micros < 0 { "-" } else { "" };
+    let micros = micros.unsigned_abs();
+    format!("{sign}{}.{:06}", micros / 1_000_000, micros % 1_000_000)
+}
+
 #[derive(Debug, Serialize)]
 pub struct UsageGroup {
     pub provider: Option<ModelProvider>,
@@ -151,6 +187,8 @@ pub struct UsageGroup {
     /// Set when grouping by department: the department, or `None` for runs on a desk no
     /// department owns, runs without a desk, and archived usage, which keeps no run.
     pub department: Option<UsageDepartment>,
+    /// Set when grouping by desk.
+    pub desk: Option<UsageDesk>,
     pub calls: u64,
     pub completed_calls: u64,
     pub unconfirmed_calls: u64,
@@ -173,12 +211,20 @@ pub struct UsageReport {
     pub truncated: bool,
     pub prices: Vec<ModelPrice>,
     pub prices_truncated: bool,
+    /// Caps and counted spend of the departments the viewer manages.
+    pub budgets: Vec<UnitBudgetStatus>,
+    pub budgets_truncated: bool,
+    /// Prices are the company's; only root managers change them (Plan07 G1 r2 D9).
+    pub prices_editable: bool,
 }
 #[async_trait]
 pub trait ModelUsageStore: Send + Sync {
     /// Rechecks current manager membership inside the same transaction as the read/write.
     async fn usage_report(&self, query: UsageQuery) -> AppResult<UsageReport>;
     async fn save_model_price(&self, write: PriceWrite) -> AppResult<()>;
+    /// The viewer's departments' caps and counted spend for the current UTC day and month (the
+    /// dashboard panel), and whether the list was cut; not-found for someone managing nothing.
+    async fn unit_spend(&self, scope: UsageScope) -> AppResult<(Vec<UnitBudgetStatus>, bool)>;
 }
 
 #[cfg(test)]

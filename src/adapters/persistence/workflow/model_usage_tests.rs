@@ -75,6 +75,7 @@ async fn model_usage_workflow_exact_provenance_and_grouping() {
         grouping: UsageGrouping::Workflow,
         agent: Some(agent.id),
         workflow: Some(serde_json::from_value(row["workflow_id"].clone()).unwrap()),
+        unit: None,
     };
     let report = f.persistence().usage_report(query.clone()).await.unwrap();
     assert_eq!(report.groups.len(), 1);
@@ -85,8 +86,8 @@ async fn model_usage_workflow_exact_provenance_and_grouping() {
     assert_eq!(report.groups[0].calls, 1);
     assert_eq!(report.groups[0].unconfirmed_calls, 1);
 
-    // 01-departments 04C.2: by department, through the run's desk; this run has no desk, so its
-    // call is under "No department".
+    // Plan07 02C: by the call's recorded unit; this company-wide run has no write unit, so its
+    // call is the root's.
     let by_department = f
         .persistence()
         .usage_report(UsageQuery {
@@ -96,11 +97,17 @@ async fn model_usage_workflow_exact_provenance_and_grouping() {
         .await
         .unwrap();
     assert_eq!(by_department.groups.len(), 1);
+    let (root, root_name): (Uuid, String) =
+        sqlx::query_as("SELECT id, name FROM departments WHERE company_id = $1 AND is_root")
+            .bind(company)
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
     assert_eq!(
         by_department.groups[0].department,
         Some(crate::application::services::model_usage::UsageDepartment {
-            id: None,
-            name: "No department".into(),
+            id: Some(root),
+            name: root_name,
         })
     );
     assert_eq!(by_department.groups[0].calls, 1);

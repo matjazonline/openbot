@@ -18,6 +18,4 @@
 - Planned batches after the gate: B1 = 02A (D1–D4), B2 = 02B (D5–D8), B3 = 02C (D9).
 - Authorizations: commit locally after each accepted batch; push to main only when p01–p03 are
   complete and accepted. No deployment or shared/production database reset.
-- Next: implement B3 (usage report by recorded unit with subtree authority before the limit, cap/
-  remaining from unit_spend, unpriced flag, desk drill-down, dashboard panel, cap form on the
-  department page), focused checks, freeze, B review (same reviewer).
+- Next: p03 (doc 03 integration and final verification) in its own records under phases/p03/docs.

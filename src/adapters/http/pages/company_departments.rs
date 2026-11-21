@@ -86,6 +86,8 @@ pub struct DepartmentSection<'a> {
     pub knowledge: DepartmentKnowledge<'a>,
     /// The selected department's own model connections, loaded only for its managers.
     pub models: Option<&'a [crate::entities::company::CompanyModelConnection]>,
+    /// The selected department's spend caps and counted spend, loaded only for its managers.
+    pub budgets: Option<&'a [crate::application::ports::unit_resources::UnitBudgetState]>,
 }
 
 impl DepartmentSection<'_> {
@@ -533,6 +535,7 @@ fn department_detail(
             {desks}
             {knowledge}
             {models}
+            {budgets}
             {history}
             {edit}
         </div>"##,
@@ -553,6 +556,59 @@ fn department_detail(
         desks = desks_card(section, view.detail.department.id, &view.desks),
         knowledge = knowledge_card(section, department),
         models = models_card(section, department),
+        budgets = budgets_card(section, department),
+    )
+}
+
+/// The department's spend caps (Plan07 02B/02C), for its managers: counted spend this UTC day and
+/// month and a form to set or clear each cap. A cap stops new runs here and below once reached.
+fn budgets_card(section: &DepartmentSection<'_>, department: &Department) -> String {
+    let Some(states) = section.budgets else {
+        return String::new();
+    };
+    let usd = crate::services::model_usage::usd;
+    let rows: String = states
+        .iter()
+        .map(|state| {
+            format!(
+                "<tr><th scope=\"row\">{}</th><td>{}</td><td>{}</td><td>{}</td></tr>",
+                if state.period == "day" {
+                    "Today (UTC)"
+                } else {
+                    "This month (UTC)"
+                },
+                state.cap_micros.map_or("No cap".to_owned(), usd),
+                usd(state.spent_micros),
+                if state.unpriced_tokens > 0 {
+                    format!("{} unpriced tokens not counted", state.unpriced_tokens)
+                } else {
+                    String::new()
+                },
+            )
+        })
+        .collect();
+    let value = |period: &str| {
+        states
+            .iter()
+            .find(|state| state.period == period)
+            .and_then(|state| state.cap_micros)
+            .map_or(String::new(), usd)
+    };
+    format!(
+        r##"<section id="department-budgets" class="card bg-base-200 p-4 space-y-3">
+            <h3 class="font-semibold">Spend caps</h3>
+            <p class="text-xs opacity-70">Counted spend is each settled model call's priced cost, for this department and every one below it. Once a cap is reached, new runs here and below are refused until the next UTC day or month; runs already started finish.</p>
+            <table class="table table-sm"><thead><tr><th scope="col">Period</th><th scope="col">Cap (USD)</th><th scope="col">Counted (USD)</th><th scope="col"></th></tr></thead><tbody>{rows}</tbody></table>
+            <form class="flex flex-wrap gap-3 items-end" hx-post="/ui/companies/{company}/departments/{unit}/budgets" hx-target="#department-section" hx-swap="outerHTML">
+                <label class="form-control"><span class="text-xs opacity-70">Daily cap (USD)</span><input name="day_cap" value="{day}" inputmode="decimal" class="input input-sm"></label>
+                <label class="form-control"><span class="text-xs opacity-70">Monthly cap (USD)</span><input name="month_cap" value="{month}" inputmode="decimal" class="input input-sm"></label>
+                <button type="submit" class="btn btn-sm btn-primary">Save spend caps</button>
+            </form>
+        </section>"##,
+        company = section.company.id,
+        unit = department.id,
+        day = escape_html_attr(&value("day")),
+        month = escape_html_attr(&value("month")),
     )
 }
 

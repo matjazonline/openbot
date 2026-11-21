@@ -2,6 +2,7 @@
 //! trigger keeps, and the admission cap check, with the competing-claimant cases of G1 r3–r5.
 use super::*;
 use crate::adapters::persistence::test_support::wait_until_backends_are_blocked;
+use crate::services::model_usage::{UsageGrouping, UsageQuery, UsageReport, UsageScope};
 use crate::use_cases::company::CompanyPersistence;
 
 struct Budgets {
@@ -597,4 +598,192 @@ async fn unit_budget_charge_follows_a_reparented_unit_and_a_childs_inherited_sco
         unit, billing,
         "the child inherits the Billing desk's write unit"
     );
+}
+
+fn usage_query(
+    b: &Budgets,
+    actor: Uuid,
+    grouping: UsageGrouping,
+    unit: Option<Uuid>,
+) -> UsageQuery {
+    let end = chrono::Utc::now() + chrono::Duration::minutes(1);
+    UsageQuery {
+        scope: UsageScope {
+            company: b.company,
+            actor,
+        },
+        start: end - chrono::Duration::days(2),
+        end,
+        grouping,
+        agent: None,
+        workflow: None,
+        unit,
+    }
+}
+
+/// Plan07 02C (D9 r2): the usage report groups calls by the department they were attributed to;
+/// a unit's lead sees only their departments' calls and caps, a root manager every one (a deleted
+/// department's calls too); counted spend, caps and remaining equal the running totals; unpriced
+/// tokens are flagged; the drill-down groups one department's calls by desk; price writes stay
+/// with root managers.
+#[tokio::test]
+async fn unit_budget_usage_page_scopes_numbers_drill_down_and_prices() {
+    use crate::services::model_usage::{ModelUsageStore, PriceWrite};
+    let b = Budgets::new().await;
+    let p = b.p();
+    let billing_desk = b.desk(b.billing).await;
+    let billing_run = b.admit(billing_desk).await.unwrap();
+    let support_run = b.admit(b.desk(b.support).await).await.unwrap();
+    let billed = b.call(&billing_run, "fixture", None, None).await;
+    b.settle(billed, 100, 50).await;
+    let unpriced = b.call(&billing_run, "unpriced-model", None, None).await;
+    b.settle(unpriced, 4, 1).await;
+    let supported = b.call(&support_run, "fixture", None, None).await;
+    b.settle(supported, 7, 0).await;
+    b.cap(b.billing, "month", 1_000).await;
+    // A call of Billing's sub-department is Billing's lead's to see too.
+    let field = sqlx::query_scalar::<_, Uuid>(
+        "INSERT INTO departments (id, company_id, parent_id, name, slug, created_by) \
+         VALUES (gen_random_uuid(), $1, $2, 'field', 'field', \
+         '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}') RETURNING id",
+    )
+    .bind(b.company)
+    .bind(b.billing)
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    let fielded = b.call(&billing_run, "fixture", Some(field), None).await;
+    b.settle(fielded, 1, 0).await;
+    let gone = p.test_unit(b.company, "gone").await;
+    let orphan = b.call(&support_run, "fixture", Some(gone), None).await;
+    b.settle(orphan, 1, 0).await;
+    sqlx::query("DELETE FROM departments WHERE company_id=$1 AND id=$2")
+        .bind(b.company)
+        .bind(gone)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    let lead = p.test_unit_lead(b.company, b.billing).await;
+    let departments = |report: &UsageReport| {
+        let mut names: Vec<String> = report
+            .groups
+            .iter()
+            .map(|group| group.department.as_ref().unwrap().name.clone())
+            .collect();
+        names.sort();
+        names
+    };
+    let led = p
+        .usage_report(usage_query(&b, lead, UsageGrouping::Department, None))
+        .await
+        .unwrap();
+    assert_eq!(departments(&led), ["billing", "field"]);
+    assert!(!led.prices_editable);
+    type Row = (String, String, Option<String>, String, Option<String>, u64);
+    let budgets: Vec<Row> = led
+        .budgets
+        .iter()
+        .map(|budget| {
+            (
+                budget.name.clone(),
+                budget.period.clone(),
+                budget.cap_usd.clone(),
+                budget.spent_usd.clone(),
+                budget.remaining_usd.clone(),
+                budget.unpriced_tokens,
+            )
+        })
+        .collect();
+    assert_eq!(
+        budgets,
+        vec![
+            (
+                "billing".into(),
+                "day".into(),
+                None,
+                "0.000201".into(),
+                None,
+                5
+            ),
+            (
+                "billing".into(),
+                "month".into(),
+                Some("0.001000".into()),
+                "0.000201".into(),
+                Some("0.000799".into()),
+                5
+            ),
+            (
+                "field".into(),
+                "day".into(),
+                None,
+                "0.000001".into(),
+                None,
+                0
+            ),
+            (
+                "field".into(),
+                "month".into(),
+                None,
+                "0.000001".into(),
+                None,
+                0
+            ),
+        ]
+    );
+    let all = p
+        .usage_report(usage_query(&b, b.owner, UsageGrouping::Department, None))
+        .await
+        .unwrap();
+    assert_eq!(
+        departments(&all),
+        ["Deleted department", "billing", "field", "support"]
+    );
+    assert!(all.prices_editable);
+    // The drill-down: Billing's calls by the run's desk.
+    let desks = p
+        .usage_report(usage_query(&b, lead, UsageGrouping::Desk, Some(b.billing)))
+        .await
+        .unwrap();
+    assert_eq!(desks.groups.len(), 1);
+    assert_eq!(desks.groups[0].desk.as_ref().unwrap().name, "Unit desk");
+    assert_eq!(desks.groups[0].calls, 2);
+    // A lead reads nothing outside their units and cannot change prices.
+    let outside = p
+        .usage_report(usage_query(&b, lead, UsageGrouping::Desk, Some(b.support)))
+        .await
+        .unwrap();
+    assert!(outside.groups.is_empty());
+    let price = p
+        .save_model_price(PriceWrite {
+            scope: UsageScope {
+                company: b.company,
+                actor: lead,
+            },
+            provider: "openai".into(),
+            model: "fixture".into(),
+            expected_revision: None,
+            rates: Some(crate::services::model_usage::PriceRates {
+                input: crate::services::model_usage::TokenPrice::from_micros(0).unwrap(),
+                output: crate::services::model_usage::TokenPrice::from_micros(0).unwrap(),
+            }),
+        })
+        .await;
+    assert!(matches!(price, Err(AppError::NotFound(_))), "{price:?}");
+    // The dashboard panel reads the same totals.
+    let (spend, _) = p
+        .unit_spend(UsageScope {
+            company: b.company,
+            actor: lead,
+        })
+        .await
+        .unwrap();
+    assert_eq!(spend.len(), 4);
+    let stranger = p
+        .unit_spend(UsageScope {
+            company: b.company,
+            actor: Uuid::new_v4(),
+        })
+        .await;
+    assert!(matches!(stranger, Err(AppError::NotFound(_))));
 }

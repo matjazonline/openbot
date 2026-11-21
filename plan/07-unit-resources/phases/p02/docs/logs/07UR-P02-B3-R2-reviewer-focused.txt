@@ -1,0 +1,7 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+running 29 tests
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 4948 filtered out; finished in 11.63s
+test adapters::http::pages::dashboard::tests::unit_budget_usage_page_dashboard_panel_lists_department_spend ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_usage_page_scopes_numbers_drill_down_and_prices ... ok
+test adapters::http::routes::ui_departments::tests::unit_budget_usage_page_department_caps_card_for_managers_only ... ok

@@ -98,6 +98,7 @@ fn query(f: &AdmissionFixture) -> UsageQuery {
         grouping: UsageGrouping::Model,
         agent: None,
         workflow: None,
+        unit: None,
     }
 }
 async fn report(f: &AdmissionFixture, query: UsageQuery) -> Value {

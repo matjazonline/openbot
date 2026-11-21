@@ -369,6 +369,51 @@ impl CompanyPersistence for PostgresPersistence {
         Ok(())
     }
 
+    async fn replace_unit_budgets(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        day_micros: Option<i64>,
+        month_micros: Option<i64>,
+    ) -> AppResult<()> {
+        let actor = crate::application::workflow::WorkflowActor::authenticated(user_id)?;
+        let company = crate::domain::workflow::CompanyId::new(company_id);
+        let unit = crate::entities::department::DepartmentId::new(unit_id);
+        // Both periods in one transaction: a refused amount leaves both caps as they were.
+        let mut tx = self.pool.begin().await?;
+        for (period, cap) in [("day", day_micros), ("month", month_micros)] {
+            match cap {
+                Some(cap) => {
+                    super::unit_budgets::set_on(&mut tx, actor, company, unit, period, cap).await?
+                }
+                None => {
+                    super::unit_budgets::clear_on(&mut tx, actor, company, unit, period).await?
+                }
+            }
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn unit_budget_states(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+    ) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>> {
+        let mut tx = self.pool.begin().await?;
+        let states = super::unit_budgets::states_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::entities::department::DepartmentId::new(unit_id),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(states)
+    }
+
     async fn clear_unit_budget(
         &self,
         user_id: Uuid,

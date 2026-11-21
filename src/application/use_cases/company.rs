@@ -204,6 +204,24 @@ pub trait CompanyPersistence:
         cap_micros: i64,
     ) -> AppResult<()>;
 
+    /// Replace both of a unit's caps at once (the department form): `None` clears that period.
+    async fn replace_unit_budgets(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        day_micros: Option<i64>,
+        month_micros: Option<i64>,
+    ) -> AppResult<()>;
+
+    /// A unit's caps and counted spend for the current UTC day and month, for its managers.
+    async fn unit_budget_states(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+    ) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>>;
+
     /// Remove one period's spend cap of a unit, under the same authority.
     async fn clear_unit_budget(
         &self,
@@ -575,6 +593,32 @@ impl CompanyUseCases {
     ) -> AppResult<()> {
         self.persistence
             .set_unit_budget(user_id, company_id, unit_id, period, cap_micros)
+            .await
+    }
+
+    /// Replace a unit's day and month caps together, in one transaction (`None` clears one).
+    pub async fn replace_unit_budgets(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        day_micros: Option<i64>,
+        month_micros: Option<i64>,
+    ) -> AppResult<()> {
+        self.persistence
+            .replace_unit_budgets(user_id, company_id, unit_id, day_micros, month_micros)
+            .await
+    }
+
+    /// A unit's caps and counted spend for the current UTC day and month (Plan07 02C).
+    pub async fn unit_budget_states(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+    ) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>> {
+        self.persistence
+            .unit_budget_states(user_id, company_id, unit_id)
             .await
     }
 
