@@ -1,18 +1,19 @@
 # Plan coordination: 08-goals
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan08_ph1/plan/08-goals/COORDINATION.md
-- Writer: /root, session 01a1e095-f8c8-71b1-ba77-c9713f0395f5 in `/Users/mac02/orca/workspaces/openbot/plan08_ph1`
-- Revision: 2
+- Writer: Claude Code session `plan08-ph1-51` (root/A of p02) in `/Users/mac02/orca/workspaces/openbot/plan08_ph1`. Ownership handoff 2026-11-21: previous writer /root session 01a1e095 (p01) stopped after its handoff; the user authorized continuing with p02 in this session.
+- Revision: 3
 
 ## Plan-wide instructions
 
-No additional instructions. Original plan documents and repository instructions apply. Only p01 is authorized in this session; stop after its handoff.
+No additional instructions. Original plan documents and repository instructions apply. r3: p01 accepted and committed (`6c63f292`); origin/main with plans 04–07 merged at `73afd5a7`. p02 authorized 2026-11-21. User confirmed README proposals 2 (sponsor decider manages) and 3 (archive refuses open work) on 2026-11-21.
 
 ## Phase directory
 
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
-| p01 | /root; resumed on integrated prerequisite | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p01/docs/TASK.md; phases/p01/docs/HANDOFF.md |
+| p01 | /root; resumed on integrated prerequisite (complete) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p01/docs/TASK.md; phases/p01/docs/HANDOFF.md |
+| p02 | Claude Code `plan08-ph1-51` | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p02/docs/TASK.md; phases/p02/docs/HANDOFF.md |
 
 ## Cross-phase notices
 
