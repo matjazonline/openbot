@@ -11470,6 +11470,8 @@ CREATE TABLE public.model_usage_calls (
     run_id uuid NOT NULL,
     execution_id uuid NOT NULL,
     root_run_id uuid NOT NULL,
+    -- The unit the call is attributed to (Plan07 02B.3), set on insert by `attribute_model_usage`.
+    unit_id uuid NOT NULL,
     provider text NOT NULL CHECK (octet_length(provider) BETWEEN 1 AND 128 AND provider = lower(btrim(provider))),
     model text NOT NULL CHECK (octet_length(model) BETWEEN 1 AND 256 AND model = btrim(model)),
     requested_at timestamptz NOT NULL DEFAULT statement_timestamp(),
@@ -11497,6 +11499,7 @@ CREATE TABLE public.model_usage_calls (
         REFERENCES public.workflow_run_budgets(company_id,run_id,root_run_id) ON DELETE CASCADE
 );
 CREATE INDEX model_usage_company_time ON public.model_usage_calls(company_id,requested_at,request_id);
+CREATE INDEX model_usage_calls_unit_time ON public.model_usage_calls(company_id,unit_id,requested_at);
 -- A run's calls, for the simulation's per-run usage (p08 D4.6) and the run delete cascade.
 CREATE INDEX model_usage_calls_run ON public.model_usage_calls(company_id,run_id);
 CREATE FUNCTION public.guard_model_usage_update() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -12082,6 +12085,7 @@ CREATE TABLE public.model_usage_history (
     agent_id uuid,
     workflow_id uuid NOT NULL,
     version_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
     provider text NOT NULL,
     model text NOT NULL,
     requested_at timestamptz NOT NULL,
@@ -12097,6 +12101,7 @@ CREATE TABLE public.model_usage_history (
         DEFERRABLE INITIALLY DEFERRED
 );
 CREATE INDEX model_usage_history_company_time ON public.model_usage_history(company_id,requested_at,request_id);
+CREATE INDEX model_usage_history_unit_time ON public.model_usage_history(company_id,unit_id,requested_at);
 CREATE FUNCTION public.guard_model_usage_history() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE original jsonb;
 BEGIN
@@ -15894,6 +15899,123 @@ CREATE FUNCTION public.agent_reaches(checked_company uuid, checked_agent uuid, u
     )
 $$;
 
+-- A model call is attributed to the unit of its run's write scope (Plan07 02B.3), the root when
+-- the run has none. A recorded id, not a key: a department's deletion never touches usage rows.
+CREATE FUNCTION public.attribute_model_usage() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.unit_id IS NULL THEN
+        NEW.unit_id := COALESCE(
+            (SELECT scope.unit_id FROM public.workflow_run_scopes AS scope
+             WHERE scope.company_id = NEW.company_id AND scope.run_id = NEW.run_id
+               AND scope.acting_principal_id IS NULL AND scope.access = 'write' LIMIT 1),
+            (SELECT id FROM public.departments WHERE company_id = NEW.company_id AND is_root));
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER model_usage_attributed BEFORE INSERT ON public.model_usage_calls
+    FOR EACH ROW EXECUTE FUNCTION public.attribute_model_usage();
+
+-- A unit's spend caps (Plan07 02B.1, decisions c and i): one per UTC day or month, set by whoever
+-- manages the unit; configuration of the unit, so they go with it.
+CREATE TABLE public.unit_budgets (
+    company_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
+    period text NOT NULL CHECK (period IN ('day', 'month')),
+    cap_micros bigint NOT NULL CHECK (cap_micros > 0),
+    created_by jsonb NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, unit_id, period),
+    FOREIGN KEY (company_id, unit_id) REFERENCES public.departments(company_id, id) ON DELETE CASCADE
+);
+
+-- Running spend per unit and period (Plan07 decision j): each settled call adds its priced cost to
+-- its unit and every ancestor at that moment, so caps read a few rows and deleting or moving a
+-- department leaves what was counted above it. No key to departments: charging never locks them.
+CREATE TABLE public.unit_spend (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    unit_id uuid NOT NULL,
+    period text NOT NULL CHECK (period IN ('day', 'month')),
+    period_start timestamptz NOT NULL,
+    spent_micros bigint NOT NULL DEFAULT 0 CHECK (spent_micros >= 0),
+    unpriced_tokens bigint NOT NULL DEFAULT 0 CHECK (unpriced_tokens >= 0),
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, unit_id, period, period_start)
+);
+
+-- Charge a settled call once, at its transaction's commit (Plan07 G1 r3-r5): cost in micro-USD
+-- with the price current now, rounded up and saturated; unpriced tokens counted apart (decision
+-- h); the UTC day and month containing `requested_at`; the call's unit and its ancestors (≤8),
+-- the root alone when the unit is gone. Totals rows are taken in (unit_id, period, period_start)
+-- order, the order the department-delete cleanup uses too.
+CREATE FUNCTION public.charge_unit_spend() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    cost numeric;
+    priced boolean;
+    chain uuid[];
+BEGIN
+    SELECT ceil((NEW.input_tokens::numeric * price.input_micro_usd_per_million
+               + NEW.output_tokens::numeric * price.output_micro_usd_per_million) / 1000000)
+      INTO cost
+      FROM public.model_prices AS price
+     WHERE price.company_id = NEW.company_id AND price.provider = NEW.provider
+       AND price.model = NEW.model;
+    priced := FOUND;
+    WITH RECURSIVE up(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1 FROM public.departments AS department
+        WHERE department.company_id = NEW.company_id AND department.id = NEW.unit_id
+        UNION ALL
+        SELECT department.id, department.parent_id, up.depth + 1 FROM up
+        JOIN public.departments AS department
+            ON department.company_id = NEW.company_id AND department.id = up.parent_id
+        WHERE up.depth < 8
+    )
+    SELECT array_agg(id) INTO chain FROM up;
+    IF chain IS NULL THEN
+        SELECT ARRAY[id] INTO chain FROM public.departments
+         WHERE company_id = NEW.company_id AND is_root;
+    END IF;
+    IF chain IS NULL THEN
+        RETURN NULL;
+    END IF;
+    INSERT INTO public.unit_spend AS spend
+        (company_id, unit_id, period, period_start, spent_micros, unpriced_tokens, updated_at)
+    SELECT NEW.company_id, unit, period.name, period.start,
+           CASE WHEN priced THEN LEAST(cost, 9223372036854775807)::bigint ELSE 0 END,
+           CASE WHEN priced THEN 0 ELSE NEW.input_tokens + NEW.output_tokens END,
+           clock_timestamp()
+      FROM unnest(chain) AS unit,
+           (VALUES ('day', date_trunc('day', NEW.requested_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),
+                   ('month', date_trunc('month', NEW.requested_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'))
+               AS period(name, start)
+     ORDER BY unit, period.name, period.start
+    ON CONFLICT (company_id, unit_id, period, period_start) DO UPDATE
+       SET spent_micros = LEAST(spend.spent_micros::numeric + EXCLUDED.spent_micros,
+                                9223372036854775807)::bigint,
+           unpriced_tokens = LEAST(spend.unpriced_tokens::numeric + EXCLUDED.unpriced_tokens,
+                                   9223372036854775807)::bigint,
+           updated_at = EXCLUDED.updated_at;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER model_usage_charges_unit_spend
+    AFTER UPDATE OF settled_at ON public.model_usage_calls
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+    WHEN (OLD.settled_at IS NULL AND NEW.settled_at IS NOT NULL)
+    EXECUTE FUNCTION public.charge_unit_spend();
+
+-- A deleted department's own totals go with it, taken in the charge's lock order (G1 r5 F16);
+-- its ancestors keep what was counted.
+CREATE FUNCTION public.forget_unit_spend() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM 1 FROM public.unit_spend
+     WHERE company_id = OLD.company_id AND unit_id = OLD.id
+     ORDER BY period, period_start FOR UPDATE;
+    DELETE FROM public.unit_spend WHERE company_id = OLD.company_id AND unit_id = OLD.id;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER departments_forget_unit_spend AFTER DELETE ON public.departments
+    FOR EACH ROW EXECUTE FUNCTION public.forget_unit_spend();
+
 -- The model a new agent pins when it names none (Plan07 02A.2): the default connection of the
 -- nearest unit from `start` upward (the root when `start` is NULL) that has one with a key, and
 -- that connection's first model. No row when no unit up to the root has a default.
@@ -16568,7 +16690,7 @@ ALTER TABLE public.schedule_runs ADD COLUMN role_refusal jsonb,
 ALTER TABLE public.schedule_runs DROP CONSTRAINT schedule_runs_refusal_check,
     ADD CONSTRAINT schedule_runs_refusal_check CHECK ((refusal IS NULL
         OR refusal IN ('unavailable','input_rejected','key_conflict',
-            'admission.resource_outside_unit')
+            'admission.resource_outside_unit','budget.unit_exhausted')
         OR (role_refusal IS NOT NULL AND public.valid_workflow_role_refusal(role_refusal)
             AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
 

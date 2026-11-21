@@ -45,6 +45,7 @@ pub mod skill;
 pub mod test_support;
 pub mod thread;
 pub mod thread_activity;
+pub(crate) mod unit_budgets;
 pub(crate) mod unit_resources;
 pub mod user;
 mod view_visibility;

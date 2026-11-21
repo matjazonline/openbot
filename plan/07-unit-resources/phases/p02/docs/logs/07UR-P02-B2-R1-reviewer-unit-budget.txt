@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 43.02s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+running 7 tests
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_authority_follows_the_units_manager ... ok
+test adapters::persistence::workflow::tests::schedule_tests::unit_budget_refusal_of_a_scheduled_run_settles_its_occurrence ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_charge_attributes_and_totals_settled_calls ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_concurrent_settlements_and_lock_order ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_delete_and_department_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_admission_waits_and_sees_the_crossing_charge ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_admission_refuses_at_the_nearest_exhausted_unit ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4963 filtered out; finished in 5.05s

@@ -39,6 +39,43 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{company}/model-connections/{id}/move",
             axum::routing::post(move_model_connection),
         )
+        .route(
+            "/api/companies/{company}/departments/{unit}/budgets/{period}",
+            put(set_unit_budget).delete(clear_unit_budget),
+        )
+}
+
+#[derive(Debug, Deserialize)]
+struct UnitBudgetCap {
+    cap_micros: i64,
+}
+
+/// PUT /api/companies/{company}/departments/{unit}/budgets/{period} - Set a department's spend cap
+/// for the UTC day or month, in micro-USD (Plan07 02B.1): whoever manages the department.
+#[instrument(skip_all)]
+async fn set_unit_budget(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, unit, period)): Path<(Uuid, Uuid, String)>,
+    Json(cap): Json<UnitBudgetCap>,
+) -> AppResult<StatusCode> {
+    company_use_cases
+        .set_unit_budget(user.id, company, unit, &period, cap.cap_micros)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/companies/{company}/departments/{unit}/budgets/{period} - Remove that cap.
+#[instrument(skip_all)]
+async fn clear_unit_budget(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, unit, period)): Path<(Uuid, Uuid, String)>,
+) -> AppResult<StatusCode> {
+    company_use_cases
+        .clear_unit_budget(user.id, company, unit, &period)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// POST /api/companies/{company}/model-connections/{id}/move - Move a model connection to

@@ -69,7 +69,7 @@
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
 | p01 (doc 01 ownership and selection): B1 accepted in phase (B PASS 07UR-P01-B1-R3 at 2849d92a…), committed locally (aa22b1b0); B2 accepted in phase (B PASS 07UR-P01-B2-R2 at 9179c26d…), committed locally; B3 (decision f) accepted (B PASS 07UR-P01-B3-R1); p01 complete in phase, committed locally; optional 07UR-P01-B3-F1 carried to p03 | Claude root/A; Opus B (G1, B1), Fable B (B2 on) | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
-| p02 (doc 02 models, budgets, usage): G1 r5 PASS (07UR-P02-G1-R5); B1 (02A) accepted (B PASS 07UR-P02-B1-R2), committed locally; B2 (02B) next | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p02/docs/{TASK,HANDOFF}.md |
+| p02 (doc 02 models, budgets, usage): G1 r5 PASS (07UR-P02-G1-R5); B1 (02A) and B2 (02B) accepted (B PASS 07UR-P02-B1-R2, -B2-R2), committed locally; B3 (02C) next | Claude root/A; Opus B | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p02/docs/{TASK,HANDOFF}.md |
 
 ## Cross-phase notices
 

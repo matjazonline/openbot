@@ -120,7 +120,9 @@ fn publication_failure(error: &AppError) -> &'static str {
         AppError::Execution(_)
         | AppError::WorkflowGuard(_)
         | AppError::KnowledgeTrigger { .. }
-        | AppError::KnowledgeRelease { .. } => "execution_refused",
+        | AppError::KnowledgeRelease { .. }
+        // Never raised by publication (admission only); classed with the run refusals.
+        | AppError::BudgetExhausted(_) => "execution_refused",
         AppError::Internal(_) => "internal",
     }
 }

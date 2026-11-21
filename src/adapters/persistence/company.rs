@@ -346,6 +346,50 @@ impl CompanyPersistence for PostgresPersistence {
         replace_unit_model_connections(self, user_id, company_id, Some(unit_id), connections).await
     }
 
+    async fn set_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+        cap_micros: i64,
+    ) -> AppResult<()> {
+        let period = super::unit_budgets::period(period)?;
+        let mut tx = self.pool.begin().await?;
+        super::unit_budgets::set_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::entities::department::DepartmentId::new(unit_id),
+            period,
+            cap_micros,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn clear_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+    ) -> AppResult<()> {
+        let period = super::unit_budgets::period(period)?;
+        let mut tx = self.pool.begin().await?;
+        super::unit_budgets::clear_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::entities::department::DepartmentId::new(unit_id),
+            period,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     async fn model_connections_in_agent_reach(
         &self,
         company_id: Uuid,

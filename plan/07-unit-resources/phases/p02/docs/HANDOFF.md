@@ -12,9 +12,12 @@
   plan/07-unit-resources/phases/p02/docs, plan/07-unit-resources/COORDINATION.md). Gate rounds
   R1–R5; **G1 r5 PASS** (07UR-P02-G1-R5). Coordination r9 adds decisions (j) running totals and
   (k) soft caps. B1 (02A) accepted in phase (B PASS 07UR-P02-B1-R2 at 5a938fa0…) and committed
-  locally; optional B1-F7 carried to p03. B2 (02B budgets: D5–D8 with r2–r5) next.
+  locally; optional B1-F7 carried to p03. B2 (02B budgets) accepted in phase (B PASS
+  07UR-P02-B2-R2 at 60e2c15f…) and committed locally; optional B2-F2 carried to p03. B3 (02C usage
+  pages, D9 r1/r2, plus the department cap card) next.
 - Planned batches after the gate: B1 = 02A (D1–D4), B2 = 02B (D5–D8), B3 = 02C (D9).
 - Authorizations: commit locally after each accepted batch; push to main only when p01–p03 are
   complete and accepted. No deployment or shared/production database reset.
-- Next: implement B2 (D5 attribution, D6 unit_budgets + unit_spend, D7 deferred charge trigger and
-  admission check, D8 competing tests), focused checks, freeze, B review (same reviewer).
+- Next: implement B3 (usage report by recorded unit with subtree authority before the limit, cap/
+  remaining from unit_spend, unpriced flag, desk drill-down, dashboard panel, cap form on the
+  department page), focused checks, freeze, B review (same reviewer).

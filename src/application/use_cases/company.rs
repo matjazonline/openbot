@@ -193,6 +193,26 @@ pub trait CompanyPersistence:
         connections: Vec<CompanyModelConnectionWrite>,
     ) -> AppResult<()>;
 
+    /// Set one period's spend cap of a unit, in micro-USD (Plan07 02B.1, decision c): whoever
+    /// manages the unit; anyone else gets not-found.
+    async fn set_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+        cap_micros: i64,
+    ) -> AppResult<()>;
+
+    /// Remove one period's spend cap of a unit, under the same authority.
+    async fn clear_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+    ) -> AppResult<()>;
+
     /// The ids of the model connections in `agent`'s own reach (Plan07 02A with decision d).
     async fn model_connections_in_agent_reach(
         &self,
@@ -542,6 +562,33 @@ impl CompanyUseCases {
             .into_iter()
             .filter(|connection| connection.unit_id == unit)
             .collect())
+    }
+
+    /// Set a unit's spend cap for `period` (`day` or `month`, UTC), in micro-USD (Plan07 02B.1).
+    pub async fn set_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+        cap_micros: i64,
+    ) -> AppResult<()> {
+        self.persistence
+            .set_unit_budget(user_id, company_id, unit_id, period, cap_micros)
+            .await
+    }
+
+    /// Remove a unit's spend cap for `period`.
+    pub async fn clear_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+    ) -> AppResult<()> {
+        self.persistence
+            .clear_unit_budget(user_id, company_id, unit_id, period)
+            .await
     }
 
     /// Move a model connection between units the caller manages (Plan07 02A).

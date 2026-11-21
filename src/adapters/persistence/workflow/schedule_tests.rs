@@ -1695,3 +1695,44 @@ async fn unit_resource_selection_refusal_of_a_scheduled_run_settles_its_occurren
     );
     assert!(s.runs_for(occurrence).await.is_empty());
 }
+
+/// Plan07 02B.2 through production: a scheduled run refused because the root has spent its day
+/// cap settles its occurrence with `budget.unit_exhausted` and starts no run.
+#[tokio::test]
+async fn unit_budget_refusal_of_a_scheduled_run_settles_its_occurrence() {
+    let s = Schedules::new().await;
+    let schedule = s.schedule("Hourly").await;
+    let root = s.p().test_root_unit(s.company()).await;
+    crate::application::use_cases::company::CompanyPersistence::set_unit_budget(
+        s.p(),
+        s.owner(),
+        s.company(),
+        root,
+        "day",
+        1,
+    )
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO unit_spend (company_id, unit_id, period, period_start, spent_micros) \
+         VALUES ($1, $2, 'day', date_trunc('day', clock_timestamp() AT TIME ZONE 'UTC') \
+         AT TIME ZONE 'UTC', 5)",
+    )
+    .bind(s.company())
+    .bind(root)
+    .execute(s.pool())
+    .await
+    .unwrap();
+    s.due(schedule.id).await;
+    let materializer = s.materializer(admission(s.p()));
+    assert_eq!(
+        s.drain(&materializer).await,
+        vec![Materialized::Refused("budget.unit_exhausted")]
+    );
+    let (occurrence, status, run, refusal, _) = s.occurrences(schedule.id).await[0].clone();
+    assert_eq!(
+        (status.as_str(), run, refusal.as_deref()),
+        ("failed", None, Some("budget.unit_exhausted"))
+    );
+    assert!(s.runs_for(occurrence).await.is_empty());
+}

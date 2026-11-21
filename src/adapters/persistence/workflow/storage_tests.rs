@@ -265,7 +265,7 @@ async fn run_retention_archive_guards_refuse_forgery_duplicates_and_mutation() {
     let f = AdmissionFixture::new().await;
     let scope = admitted(&f, "history-guards").await;
     usage(&f, scope, Some("reported")).await;
-    let columns = "company_id,request_id,agent_id,workflow_id,version_id,provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at";
+    let columns = "company_id,request_id,agent_id,workflow_id,version_id,unit_id,provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at";
     let copy = format!(
         "INSERT INTO model_usage_history({columns}) SELECT {columns} FROM model_usage_calls"
     );

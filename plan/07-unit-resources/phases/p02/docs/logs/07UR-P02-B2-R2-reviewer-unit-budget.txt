@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.65s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+running 11 tests
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_authority_follows_the_units_manager ... ok
+test adapters::persistence::workflow::tests::schedule_tests::unit_budget_refusal_of_a_scheduled_run_settles_its_occurrence ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_charge_attributes_and_totals_settled_calls ... ok
+test adapters::persistence::workflow::tests::jev_runtime_tests::unit_budget_charge_production_jev_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_admission_waits_and_sees_the_crossing_charge ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_concurrent_settlements_and_lock_order ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_delete_takes_totals_in_the_charges_order ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_delete_and_department_writes ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::unit_budget_charge_production_agent_settlement_on_a_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_charge_follows_a_reparented_unit_and_a_childs_inherited_scope ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_admission_refuses_at_the_nearest_exhausted_unit ... ok
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 4963 filtered out; finished in 8.03s

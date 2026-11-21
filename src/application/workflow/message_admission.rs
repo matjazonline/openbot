@@ -470,6 +470,10 @@ pub(super) fn classify(result: AppResult<AdmissionResult>) -> Classified {
             tracing::warn!(code = refusal.code(), "Workflow admission refused");
             Classified::Settled(BindingOutcome::Refused(refusal.code()))
         }
+        Err(AppError::BudgetExhausted(refusal)) => {
+            tracing::warn!(code = refusal.code(), "Workflow admission refused");
+            Classified::Settled(BindingOutcome::Refused(refusal.code()))
+        }
         Err(AppError::KnowledgeTrigger { content, ceiling }) => {
             tracing::warn!(
                 content_level = content.as_i16(),
@@ -620,6 +624,17 @@ mod tests {
                 }
             ))),
             Classified::Settled(BindingOutcome::Refused("admission.resource_outside_unit"))
+        ));
+        // Plan07 02B.2: an exhausted unit budget is a definite refusal naming its code.
+        assert!(matches!(
+            classify(Err(AppError::BudgetExhausted(
+                crate::app_error::BudgetExhausted {
+                    unit: uuid::Uuid::nil(),
+                    name: "Billing".into(),
+                    period: "day",
+                }
+            ))),
+            Classified::Settled(BindingOutcome::Refused("budget.unit_exhausted"))
         ));
         assert!(matches!(
             classify(Err(AppError::Database("down".into()))),

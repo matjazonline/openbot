@@ -12,6 +12,7 @@ impl IntoResponse for AppError {
             AppError::WorkflowRole(_) => "workflow_role",
             AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
             AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
+            AppError::BudgetExhausted(_) => "budget_exhausted",
             AppError::KnowledgeRelease { .. } => "knowledge_release",
             AppError::Execution(_) => "execution",
             AppError::Database(_) => "database",
@@ -36,6 +37,11 @@ impl IntoResponse for AppError {
             AppError::WorkflowRole(refusal) => (
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({"code":refusal.kind.code(),"error":refusal.to_string(),"step":refusal.step,"role":refusal.role})),
+            ).into_response(),
+            AppError::BudgetExhausted(refusal) => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"code":refusal.code(),"error":refusal.to_string(),
+                    "unit":refusal.unit,"period":refusal.period})),
             ).into_response(),
             AppError::ResourceOutsideUnit(refusal) => (
                 StatusCode::BAD_REQUEST,

@@ -1,0 +1,3 @@
+Applied 20260817000000/migrate init schema (595.727833ms)
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 27s

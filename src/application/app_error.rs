@@ -15,6 +15,10 @@ pub enum AppError {
     /// use it (Plan07). A definite refusal: retrying the same command refuses again.
     #[error("{0}")]
     ResourceOutsideUnit(ResourceOutsideUnit),
+    /// A unit on the run's chain has spent its cap for the period (Plan07 02B.2). A definite
+    /// refusal for this admission: the next period, a raised cap or another desk may admit it.
+    #[error("{0}")]
+    BudgetExhausted(BudgetExhausted),
     #[error("The destination cannot receive this run's content")]
     KnowledgeRelease {
         content: crate::entities::access_level::AccessLevel,
@@ -205,6 +209,40 @@ impl std::fmt::Display for ResourceOutsideUnit {
             f,
             "{kind} {} belongs to a department outside the reach of what uses it; move it up or \
              choose another",
+            self.name
+        )
+    }
+}
+
+/// The first unit from a run's write unit upward whose spend reached its cap (Plan07 02B.2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetExhausted {
+    pub unit: uuid::Uuid,
+    /// The department's name, for the refusal message.
+    pub name: String,
+    /// `day` or `month` (UTC, decision i).
+    pub period: &'static str,
+}
+
+impl BudgetExhausted {
+    pub const CODE: &'static str = "budget.unit_exhausted";
+
+    pub fn code(&self) -> &'static str {
+        Self::CODE
+    }
+}
+
+impl std::fmt::Display for BudgetExhausted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let period = if self.period == "day" {
+            "today's"
+        } else {
+            "this month's"
+        };
+        write!(
+            f,
+            "The department {} has spent {period} budget; new runs start again in the next period \
+             or once its cap is raised",
             self.name
         )
     }

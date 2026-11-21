@@ -140,3 +140,34 @@
   (optional, not adopted). B re-ran 14 affected tests: all passed.
 - Optional, non-blocking: 07UR-P02-B1-F7 (no discriminating test for the label, the marker, and
   `prompt_model` with no root default).
+
+## B2 (02B) — round 07UR-P02-B2-R1 (2026-11-21, batch review)
+
+- Reviewer B: Claude Opus 5.5. Artifact: HEAD 55f5f633 (accepted B1) plus the working tree,
+  digest 80557b37f0f8cfabff6563c651842dff085ae5685de3c3882580ffba0e83cd8b (same exclusions).
+  Coordination revision 9. Author manifest validated (4 PASS, 1 FAIL: the pre-fix full suite plus
+  the inherited Doop deferral). B re-ran `unit_budget`: 7 passed.
+- Outcome: **changes required** (no PASS for B2).
+- Notes: [07UR-P02-B2-R1](agent-review-notes.md#07ur-p02-b2-r1-2026-11-21).
+- Actionable: 07UR-P02-B2-F1 (medium), verification only:
+  - no test charges through the production settle sites (agent checkpoint settlement inside its
+    WriteBound transaction, JEV), as the G1 pass deferred to the batches;
+  - the three-way test does not reproduce the planned (6) shape, so it passes even with an
+    unordered delete;
+  - no re-parent case and no child/JEV attribution case;
+  - the desk-less attribution is never asserted.
+- Optional: 07UR-P02-B2-F2: message production refusal, the HTTP refusal body and the cap routes
+  are untested.
+- No code defect found in the delta.
+
+## B2 (02B) — round 07UR-P02-B2-R2 (2026-11-21, correction recheck)
+
+- Reviewer B: Claude Opus 5.5. Artifact: HEAD 55f5f633 plus the working tree, digest
+  60e2c15f4935ce5371b485a604069eb4ada4f6add0ec3358466e97af4ea11929 (same exclusions); tests
+  only since R1. Coordination revision 9.
+- Outcome: **PASS for B2** at this digest.
+- Notes: [07UR-P02-B2-R2](agent-review-notes.md#07ur-p02-b2-r2-2026-11-21).
+- 07UR-P02-B2-F1: fixed. Covered now: production agent settlement on a desk, JEV settlement,
+  lock order in the planned (6) shape (with the author's negative check), re-parent, child
+  attribution, company-wide attribution. B re-ran 11 `unit_budget_*` tests: all passed.
+- 07UR-P02-B2-F2 (optional): deferred to p03, recorded.

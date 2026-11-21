@@ -573,3 +573,153 @@
 - Fixing every finding in one round worked. The focused rerun caught the directory schema
   break before the recheck, and the author recorded it with its fix. That shows the value of
   running the touched-area suite after a contract-visible output change.
+
+## 07UR-P02-B2-R1 (2026-11-21)
+
+### Identity
+
+- Round 07UR-P02-B2-R1, batch review of B2 = doc 02B (G1 D5–D8 with r2–r5; decisions c, h, i, j,
+  k). Workflow implement-opus-reviewed-2_4. Task [TASK.md](TASK.md) ("B2 plan", "B2
+  implementation"), review [REVIEW.md](REVIEW.md), findings
+  [agent-review-findings.md](agent-review-findings.md).
+- Reviewer: Claude Opus 5.5 (B, claude-opus-5-5), the same agent as earlier rounds.
+- Review base = HEAD 55f5f633f614fec3bef1682c2d0145c780299e24 (accepted B1, committed); phase start
+  107fd588. B2 is `git diff HEAD` (17 source files plus TASK) and two untracked files
+  (`persistence/unit_budgets.rs`, `workflow/unit_budget_tests.rs`). Digest
+  80557b37f0f8cfabff6563c651842dff085ae5685de3c3882580ffba0e83cd8b, exclusions unchanged.
+  Verified at start and before returning. Coordination revision 9, unchanged. TASK.md sha256
+  5472729c…b1b at return.
+- Evidence:
+  - Author manifest `logs/07UR-P02-B2-R1.evidence.json` validated with `--expect-artifact` (exit
+    0: 4 PASS, 1 FAIL). The FAIL is the full suite taken before the retention-test column fix;
+    its other failure is the inherited Doop deferral.
+  - B's run:
+    [logs/07UR-P02-B2-R1-reviewer-unit-budget.txt](logs/07UR-P02-B2-R1-reviewer-unit-budget.txt)
+    (sha256 6cfb1caa…a3ae1): `cargo test --locked --offline --lib -- unit_budget` after a
+    rebuild, against B's `openbot_p07_p02r_b2` (dropped); 7 passed (six `unit_budget_tests` and
+    the schedule production case).
+
+### Coverage and evidence
+
+- Read the whole delta:
+  - schema: `unit_id` on live and history usage without FK, plus indexes; the
+    `attribute_model_usage` BEFORE INSERT trigger; `unit_budgets`; `unit_spend`;
+    `charge_unit_spend` and its deferred constraint trigger; `forget_unit_spend`; the schedule
+    refusal CHECK;
+  - `unit_budgets.rs`: period parsing, cap set/clear under person+company locks with
+    `unit_management_role` on the unit (decision c), `check_admission_on`;
+  - its placement after `run_scopes::capture_on` in `admission_write::create`;
+  - the archive's column list;
+  - the refusal plumbing: `AppError::BudgetExhausted`, HTTP mapping, message/schedule
+    `classify`, inbound events, run controls, the publication failure class;
+  - cap routes and use cases.
+- Checked against code and callers:
+  - **Attribution:** every `model_usage_calls` insert is the agent reserve, the JEV reserve or a
+    test fixture; none names `unit_id`, so the trigger sets it from the run's base write row.
+    That row is unique per run; child runs copy scopes; the root is the fallback. The
+    `NOT NULL` check runs after the BEFORE trigger. The archive copies `unit_id`, and the
+    history guard's whole-row equality keeps them aligned.
+  - **Charge:**
+    - exactly once per call (the only settle sites set `settled_at` from NULL; the immutability
+      guard forbids later change; the WHEN clause);
+    - at COMMIT; no department locks; upserts ordered `(unit, period, start)`;
+    - numeric ceiling and saturating sums; price at settlement; unpriced tokens apart;
+    - UTC period starts from `requested_at`; root fallback.
+    This matches G1 r3–r5.
+  - **Admission read:** ≤8 units × 2 periods via PKs; `clock_timestamp()` period starts; nearest
+    unit, then day before month; READ COMMITTED after the company lock. Only root admissions pass
+    through `create`; replays return earlier; native MCP brokers make no model calls.
+  - **Refusal:** schedule occurrences fail with the code (production test). Message intents store
+    the reason as free text (no closed list). Inbound events are definite. Authoring samples are
+    in-memory and never admit.
+  - **Caps:** `unit_management_role` on the unit itself (lead or above); the period is validated;
+    cap > 0; upsert/delete.
+- Tests: read all seven and the classify assertion.
+  - Discriminating:
+    - nearest/day-before-month and sibling isolation;
+    - unpriced-only;
+    - authority (unit lead, ancestor lead, child lead/sibling 404);
+    - the blocked admission behind the company lock refused after the crossing settlement commits
+      (would fail on a pre-lock read);
+    - 16 concurrent settlements with exact totals (would fail on a lost update);
+    - delete keeps ancestors; a call of a deleted unit charges the root;
+    - no wait on department `FOR UPDATE`;
+    - rollover by `requested_at`.
+  - Not discriminating or missing: B2-F1.
+- Not exercised: the real settlement transaction and JEV (B2-F1); production-size plans; the
+  usage page and dashboard (B3).
+
+### Outcome
+
+- **Changes required; no PASS for B2.**
+- Actionable: 07UR-P02-B2-F1 (medium).
+- Optional: 07UR-P02-B2-F2.
+- No code defect found in the delta. The implementation matches G1 r1–r5 on inspection.
+
+### Process and instruction feedback
+
+- The batch was cohesive and reviewable in one pass.
+- The gate's explicit hand-off of real-path verification to the batches did not make it into the
+  B2 plan's test list (B2-F1). See the candidate instruction in that finding.
+
+## 07UR-P02-B2-R2 (2026-11-21)
+
+### Identity
+
+- Round 07UR-P02-B2-R2, correction recheck of batch B2 (02B) by finding ID: 07UR-P02-B2-F1
+  (actionable) and F2 (optional). Workflow implement-opus-reviewed-2_4. Task [TASK.md](TASK.md)
+  ("B2-R1 corrections"), review [REVIEW.md](REVIEW.md), findings
+  [agent-review-findings.md](agent-review-findings.md).
+- Reviewer: Claude Opus 5.5 (B, claude-opus-5-5), the same agent as B2-R1.
+- Review base = HEAD 55f5f633f614fec3bef1682c2d0145c780299e24 plus the working tree, digest
+  60e2c15f4935ce5371b485a604069eb4ada4f6add0ec3358466e97af4ea11929, exclusions unchanged.
+  Verified at start and before returning. Coordination revision 9, unchanged. TASK.md sha256
+  e09b8bcc…b9e at return.
+- The production-file diff stat is identical to R1's, and `forget_unit_spend` still carries the
+  ordered `PERFORM` (schema restored after the author's negative check). The changes are tests:
+  autonomous_agent_admission_tests.rs, jev_runtime_tests.rs and the untracked
+  unit_budget_tests.rs.
+- Evidence:
+  - Author manifest `logs/07UR-P02-B2-R2.evidence.json` validated with `--expect-artifact` (exit
+    0: 2 PASS, 1 FAIL; the FAIL is the intended negative check, a deadlock with the unordered
+    delete). Focused rerun: 133 passed. Clippy clean.
+  - B's run:
+    [logs/07UR-P02-B2-R2-reviewer-unit-budget.txt](logs/07UR-P02-B2-R2-reviewer-unit-budget.txt)
+    (sha256 d0a35d4f…1bf8): `cargo test --locked --offline --lib -- unit_budget` against B's
+    `openbot_p07_p02r_b2r2` (dropped); 11 passed.
+
+### Coverage and evidence
+
+- Read each new or replaced test against B2-F1's parts (a)–(e) and followed the production
+  branches they drive:
+  - `WorkflowService::admit`, then `claim_io`, then the agent runtime, then
+    `persist_checkpoint_usage_on` in the checkpoint settlement transaction, then the COMMIT
+    charge;
+  - the JEV runtime's `reserve_on` and `settle_on`;
+  - a child created by `child_support::spawn` with copied scopes, then the insert trigger.
+- The decisive assertions, and the failure each one distinguishes:
+  - the recorded `unit_id` versus a root default;
+  - exact spend on the unit and the root versus none or double;
+  - unpriced tokens versus spend;
+  - the old and new parents' counts after re-parenting;
+  - no deadlock with the ordered lock, deadlock without it (author's negative log, matching B's
+    R4 reduced-schema result).
+- B did not re-run the negative check: it requires editing the schema, which is outside B's
+  write scope. It relies on the author's retained log plus B's own R4 reproduction.
+
+### Outcome
+
+- **PASS for B2** at digest 60e2c15f4935ce5371b485a604069eb4ada4f6add0ec3358466e97af4ea11929.
+- B2-F1 fixed. B2-F2 (optional) deferred to p03, recorded.
+- Coverage relied on:
+  - B2-R1's full review of the production delta (unchanged since);
+  - this recheck of the corrected tests;
+  - the author's evidence (manifest valid);
+  - B's run of all 11 `unit_budget_*` tests.
+
+### Process and instruction feedback
+
+- The author's negative check (removing the fix and showing the test fail) is the strongest
+  evidence that a concurrency test discriminates. Worth recommending for lock-order fixes
+  generally. Candidate: "for a concurrency fix, retain a log of the test failing with the fix
+  reverted."

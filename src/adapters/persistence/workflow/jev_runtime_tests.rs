@@ -422,3 +422,52 @@ async fn jev_runtime_failures_remain_charged_and_secret_free() {
 
 #[path = "jev_runtime_recovery_tests.rs"]
 mod recovery;
+
+/// Plan07 02B.3 with D7 through production (B2-F1): a JEV evaluation's model call, reserved and
+/// settled by the JEV runtime, is attributed to its company-wide run's root and charged there;
+/// with no price for its model its tokens count as unpriced (decision h).
+#[tokio::test]
+async fn unit_budget_charge_production_jev_settlement() {
+    let f = fixture().await;
+    let c = create(&f).await;
+    let target = bound(&f, &c).await;
+    let first = claim(&f, target).await;
+    let (http, server) = server(
+        200,
+        "",
+        serde_json::to_vec(&output()).unwrap(),
+        Duration::ZERO,
+    )
+    .await;
+    let runtime = JevRuntime::new(f.persistence.clone(), Arc::new(http), policy());
+    let WorkflowHandlerOutcome::Completed(Ok(_)) = runtime
+        .execute(&WorkflowStepKind("jev.evaluate".into()), &first)
+        .await
+    else {
+        panic!("the evaluation completes")
+    };
+    server.await.unwrap();
+    let company = first.fence.scope.company.as_uuid();
+    let root = f.persistence.test_root_unit(company).await;
+    let (unit, tokens): (Uuid, i64) = sqlx::query_as(
+        "SELECT unit_id, input_tokens + output_tokens FROM model_usage_calls \
+         WHERE company_id=$1 AND run_id=$2 AND settled_at IS NOT NULL",
+    )
+    .bind(company)
+    .bind(first.fence.scope.run.as_uuid())
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(unit, root);
+    let (spent, unpriced): (i64, i64) = sqlx::query_as(
+        "SELECT spent_micros, unpriced_tokens FROM unit_spend WHERE company_id=$1 AND unit_id=$2 \
+         AND period='day' AND period_start = date_trunc('day', clock_timestamp() \
+         AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
+    )
+    .bind(company)
+    .bind(root)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!((spent, unpriced), (0, tokens));
+}

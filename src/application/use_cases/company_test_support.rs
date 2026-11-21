@@ -332,6 +332,27 @@ impl CompanyPersistence for MockCompanyPersistence {
         Err(company_not_found())
     }
 
+    async fn set_unit_budget(
+        &self,
+        _user_id: Uuid,
+        _company_id: Uuid,
+        _unit_id: Uuid,
+        _period: &str,
+        _cap_micros: i64,
+    ) -> AppResult<()> {
+        Err(company_not_found())
+    }
+
+    async fn clear_unit_budget(
+        &self,
+        _user_id: Uuid,
+        _company_id: Uuid,
+        _unit_id: Uuid,
+        _period: &str,
+    ) -> AppResult<()> {
+        Err(company_not_found())
+    }
+
     async fn model_connections_in_agent_reach(
         &self,
         _company_id: Uuid,

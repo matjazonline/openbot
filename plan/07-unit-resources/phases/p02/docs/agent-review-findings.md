@@ -737,3 +737,77 @@ except where a finding says otherwise.
 - **Suggestion:** add two small pure tests: the agent form with a root default plus a
   department default, and `prompt_model` with only a department default.
 - **Resolution history:** 2026-11-21 open (B1-R2, optional; does not block).
+
+## 07UR-P02-B2-R1 findings
+
+Context for B2-F1, B2-F2: round note
+[07UR-P02-B2-R1](agent-review-notes.md#07ur-p02-b2-r1-2026-11-21), batch B2 = doc 02B (G1 D5–D8
+with r2–r5), batch review. HEAD 55f5f633 (accepted B1) plus the working tree, digest
+80557b37f0f8cfabff6563c651842dff085ae5685de3c3882580ffba0e83cd8b, exclusions unchanged.
+Coordination revision 9. Reviewer B Claude Opus 5.5. Both are in the implementation's
+verification.
+
+## 07UR-P02-B2-F1 — The real settlement paths and the planned lock-order case are not exercised
+
+- **Classification:** actionable defect; **medium**; verification (an obligation carried from the
+  G1 PASS).
+- **Evidence:**
+  - The G1 r5 PASS (07UR-P02-G1-R5) and TASK's status record: "a gate pass accepts the plan, not
+    its execution: the real settlement transaction and bounds, JEV and production-size plans are
+    B1–B3's tests", and "the planned tests 3a/3b/4/5/6 … must exercise them".
+  - Every `unit_budget_*` test reserves with a raw `INSERT … jsonb_populate_record` and settles
+    with a raw `UPDATE` (unit_budget_tests.rs:85-123), never through the production settle sites.
+  - `unit_spend` is read only by unit_budget_tests.rs and the schedule test (which seeds it
+    directly), so no test asserts that an agent turn settled by `checkpoint_models`
+    (`persist_checkpoint_usage_on` inside the WriteBound settlement transaction, with its server
+    timeouts and COMMIT classification), or a JEV settlement (`jev_runtime::settle_on`), charges
+    its unit. Nor does any test assert that the `BEFORE INSERT` attribution sees the production
+    reserve's run. The suite passing only shows the deferred trigger does not break settlement.
+  - **Test (6) as planned in r5** — "a charge holding the unit's month row, the delete queued, and
+    a second settlement holding the day row → no deadlock". The implemented three-way case
+    (unit_budget_tests.rs:375-442) has the first charge hold all of the unit's rows. Its rows were
+    created day-first by the test's own charges, so the delete's unordered scan would visit them in
+    the charge's order anyway. Reverting `forget_unit_spend` to a plain `DELETE` would still pass.
+    The deadlock shape reproduced in R4 (logs/07UR-P02-G1-R4-delete-heap-order.txt) needs the month
+    row before the day row in heap order and a sequential scan in the deleting session.
+  - Not tested from the G1 r2 mapping:
+    - "re-parent a unit → … later charges follow the new chain";
+    - child-run and JEV attribution (`unit_budget_charge_*`: "JEV/child attribute to the run's
+      write unit").
+  - The desk-less case does not discriminate either. The company-wide run's unpriced call shows
+    up on the root, which every chain includes, and the test never asserts the call's `unit_id`.
+- **Required:**
+  - (a) A real agent run on a priced model whose settled turn charges its desk's unit and
+    ancestors, followed by a refused admission, through the production reserve and settle.
+  - (b) A JEV settlement attributed and charged.
+  - (c) Test (6) in its planned shape: seeded month-before-day rows, the second charge holding
+    the month row, the delete queued with sequential scans forced on its session, then the
+    settlement on the day row. It should fail with a plain `DELETE` and pass with the ordered
+    lock.
+  - (d) The re-parent case.
+  - (e) The desk-less call's recorded `unit_id`, asserted.
+- **Instruction lesson:** cause: gate-carried obligations ("B1–B3's tests") were not copied into
+  B2's plan items. Candidate: "when a gate pass defers verification to batches, list each
+  deferred check in the batch plan by name."
+- **Resolution history:** 2026-11-21 open (B2-R1).
+  - 2026-11-21 recheck 07UR-P02-B2-R2 (digest 60e2c15f…1929; tests only, schema confirmed restored with the ordered `PERFORM`): **fixed**, by part:
+    - (a) `unit_budget_charge_production_agent_settlement_on_a_desk`: a real `WorkflowService::admit` on a Billing desk, `claim_io`, then the agent runtime against a scripted model. The production reserve and the checkpoint settlement attribute the call to Billing, and the COMMIT charge gives Billing and the root exactly the priced cost. The follow-up refused admission was not added; that is acceptable, since the admission read is independent of how a total was charged and is covered by `unit_budget_admission_*`.
+    - (b) `unit_budget_charge_production_jev_settlement`: a JEV run attributed to the root with its unpriced tokens counted.
+    - (c) `unit_budget_competing_delete_takes_totals_in_the_charges_order`: month row before day row in the heap; the holder takes the month row; a delete with index and bitmap scans off is queued; the charge waits on the day row. It completes. The author's negative check (logs/B2-R2-negative-unordered-delete.txt) shows `deadlock detected` without the ordered `PERFORM`, so the case discriminates the F16 fix, consistent with B's R4 reproduction.
+    - (d) Re-parent: the old parent keeps its count and the new parent counts from then.
+    - (e) The company-wide call's recorded `unit_id` is the root, and a spawned child of a Billing-desk run records Billing through its copied scope.
+    B re-ran all 11 `unit_budget_*` tests: passed ([logs/07UR-P02-B2-R2-reviewer-unit-budget.txt](logs/07UR-P02-B2-R2-reviewer-unit-budget.txt)).
+
+## 07UR-P02-B2-F2 — Smaller untested surfaces (optional)
+
+- **Classification:** optional suggestion; **low**; verification.
+- **Evidence:**
+  - The production message path for a budget refusal (an intent settled `refused` with
+    `budget.unit_exhausted`) is covered only by the `classify` unit assertion; schedules have a
+    production test.
+  - The HTTP 400 body `{code, error, unit, period}` (app_error_impl.rs) has no test, unlike
+    `WorkflowRole`'s.
+  - The cap routes `PUT`/`DELETE /api/companies/{c}/departments/{d}/budgets/{period}` are tested
+    only at persistence.
+- **Resolution history:** 2026-11-21 open (B2-R1, optional).
+  - 2026-11-21 recheck 07UR-P02-B2-R2 (digest 60e2c15f…1929; tests only, schema confirmed restored with the ordered `PERFORM`): **deferred** to p03 by the author (the production message path, the HTTP body and the cap routes; recorded in TASK). Acceptable for an optional suggestion; carried as an open item for p03's route and final checks.

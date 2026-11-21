@@ -777,3 +777,100 @@ async fn unit_model_default_admission_refuses_a_model_moved_out_of_reach() {
             .unwrap(),
     );
 }
+
+/// Plan07 02B.3 with D7 through production (B2-F1): an agent run admitted on a Billing desk
+/// reserves its model call through the agent checkpoint, the call is attributed to Billing, and
+/// its settlement inside that checkpoint charges Billing and the root its priced cost.
+#[tokio::test]
+async fn unit_budget_charge_production_agent_settlement_on_a_desk() {
+    let (origin, _server) = server(HTTP_OK).await;
+    let setup = Box::pin(agent_setup(&origin)).await;
+    let p = &setup.fixture.persistence;
+    let company = setup.fixture.target.company;
+    sqlx::query(
+        "INSERT INTO model_prices(company_id, provider, model, input_micro_usd_per_million, \
+         output_micro_usd_per_million) VALUES ($1, $2, $3, 1000000, 2000000)",
+    )
+    .bind(company.as_uuid())
+    .bind(SCRIPTED_PROVIDER)
+    .bind(SCRIPTED_MODEL)
+    .execute(p.pool())
+    .await
+    .unwrap();
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let root = p.test_root_unit(company.as_uuid()).await;
+    let channel = crate::adapters::persistence::test_support::create_channel(
+        p,
+        company.as_uuid(),
+        crate::application::ports::channel::ChannelWrite {
+            name: "Billing desk".into(),
+            slug: "billing-usage".into(),
+            department_id: Some(crate::entities::department::DepartmentId::new(billing)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let mut admission = request(&setup, "desk-usage", Uuid::new_v4()).await;
+    admission.association = RelatedAssociation::Channel(
+        crate::application::workflow::RelatedChannelId::new(channel.id),
+    );
+    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
+    let run = created(service.admit(admission).await.unwrap());
+    let (execution, job): (Uuid, Uuid) = sqlx::query_as(
+        "SELECT execution.id, job.id FROM workflow_executions AS execution \
+         JOIN background_tasks AS job ON job.company_id=execution.company_id \
+          AND job.workflow_execution_id=execution.id \
+         WHERE execution.company_id=$1 AND execution.run_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    let claim = p
+        .claim_io(
+            crate::application::workflow::activation::ActivationRequest {
+                company,
+                run,
+                execution: ExecutionId::new(execution),
+                job: crate::application::workflow::activation::WorkflowJobId(job),
+            },
+            crate::application::workflow::lease::WorkflowWorkerId(Uuid::new_v4()),
+            lease(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    let llm = scripted_llm(vec![LlmTurn::text("\"done\"")]).await;
+    register_scripted_agent_base_url(setup.agent, &llm.base_url);
+    let outcome =
+        Box::pin(agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &claim))
+            .await;
+    assert_eq!(outcome.completed_result().unwrap(), json!("done"));
+    assert_eq!(llm.finish().await.unwrap(), 1);
+    let (unit, cost): (Uuid, i64) = sqlx::query_as(
+        "SELECT unit_id, input_tokens + 2 * output_tokens FROM model_usage_calls \
+         WHERE company_id=$1 AND run_id=$2 AND settled_at IS NOT NULL",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(unit, billing, "the desk's write unit");
+    assert!(cost > 0);
+    for charged in [billing, root] {
+        let spent: i64 = sqlx::query_scalar(
+            "SELECT spent_micros FROM unit_spend WHERE company_id=$1 AND unit_id=$2 \
+             AND period='day' AND period_start = date_trunc('day', clock_timestamp() \
+             AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
+        )
+        .bind(company.as_uuid())
+        .bind(charged)
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+        assert_eq!(spent, cost, "{charged}");
+    }
+}

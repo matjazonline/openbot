@@ -455,6 +455,96 @@ unit's day and month rows (two rows).
   5a938fa0571d0863f5c823653901ca94f59b6cb7effd63222ca4ebd317494359
   (logs/B1-R2-author-freeze.snapshot.txt); manifest logs/07UR-P02-B1-R2.evidence.json; clippy clean.
 
+## B2 plan (02B: D5–D8 with G1 r2–r5; on accepted B1 55f5f633)
+1. Schema: `model_usage_calls.unit_id` / `model_usage_history.unit_id` (`uuid NOT NULL`, no FK,
+   index `(company_id, unit_id, requested_at)`); every insert sets it (agent `reserve_on`, JEV
+   reserve: base write-unit scope row, else the root); archive copies it. `unit_budgets`
+   (PK company/unit/period, FK unit CASCADE, cap > 0, provenance). `unit_spend` (PK
+   company/unit/period/period_start, FK company CASCADE only). Deferred constraint trigger on
+   `model_usage_calls` settlement charging the call's unit chain (≤8, missing unit → root, order
+   `(unit_id, period, period_start)`, numeric saturating cost, unpriced → `unpriced_tokens`);
+   `AFTER DELETE ON departments` locks the unit's totals in the same order and deletes them.
+   Schedule refusal CHECK admits `budget.unit_exhausted`.
+2. Refusal: `AppError::BudgetExhausted(BudgetExhausted {unit, name, period})`, code
+   `budget.unit_exhausted`; HTTP 400 `{code, error, unit, period}`; message/schedule classify,
+   inbound events, author renderers as `ResourceOutsideUnit`.
+3. Admission: after run scopes are captured in `admission_write::create`, W = base write unit or
+   root; read caps ⋈ totals for W's chain with `clock_timestamp()` period starts; refuse at the
+   first unit from W upward with spent ≥ cap (day before month).
+4. Caps: persistence/use case set (upsert) and clear a unit's cap per period, by whoever manages
+   that unit (decision c); JSON `PUT/DELETE /api/companies/{c}/departments/{d}/budgets/{period}`;
+   the department page card is B3's (usage pages).
+5. Tests `unit_budget_*`: attribution (desk run, desk-less, archived), charge (priced, unpriced,
+   unsettled, rollover by `requested_at`, ancestors), admission (child vs sibling, ancestor,
+   nearest, day+month, unpriced only), refusal settling (schedule), authority (decision c),
+   competing (blocked admission vs crossing settlement; concurrent settlements; settlement vs
+   delete both orders; member change does not delay; three-way lock order), delete/move.
+
+## B2 implementation (02B, 2026-11-21; uncommitted on 55f5f633)
+- Schema: `model_usage_calls.unit_id` / `model_usage_history.unit_id` (`uuid NOT NULL`, no FK,
+  `(company_id, unit_id, requested_at)` indexes). Attribution in one place: `BEFORE INSERT`
+  trigger `attribute_model_usage` sets a missing `unit_id` from the run's base write-scope row
+  (`acting_principal_id IS NULL AND access='write'`), else the root — covering the agent reserve,
+  the JEV reserve and every fixture insert (a caller-set id is kept); the archive copies it (the
+  history guard compares rows whole). `unit_budgets` (PK company/unit/period, cap > 0,
+  provenance, FK unit CASCADE). `unit_spend` (PK company/unit/period/period_start, FK company
+  only). `charge_unit_spend` as a deferred constraint trigger on the settlement update (once per
+  call; price at settlement; numeric ceiling, saturated; unpriced tokens apart; UTC day and month
+  of `requested_at`; the unit's chain ≤8, the root when the unit is gone; upserts ordered by
+  `(unit, period, start)`); `forget_unit_spend` `AFTER DELETE ON departments` locks the unit's
+  rows `ORDER BY period, period_start FOR UPDATE` then deletes them. Schedule refusal CHECK admits
+  `budget.unit_exhausted`.
+- Refusal: `AppError::BudgetExhausted(BudgetExhausted {unit, name, period})`, code
+  `budget.unit_exhausted`; HTTP 400 `{code, error, unit, period}`; message/schedule `classify`
+  → Refused(code); inbound events definite; run controls render it; agent publication failure
+  class `execution_refused` (never raised there).
+- Admission: `unit_budgets::check_admission_on` right after `run_scopes::capture_on` in
+  `admission_write::create` (same transaction; a refusal rolls the admission back): from the base
+  write unit (root when none) up ≤8, first unit with spent ≥ cap for the current UTC period
+  (`clock_timestamp()`), nearest first, day before month. Root admissions only (children are
+  created by their parents, replays return the existing run).
+- Caps: `CompanyPersistence::set_unit_budget` / `clear_unit_budget` → `unit_budgets::set_on` /
+  `clear_on` (person + company locks, `unit_management_role` on that unit, decision c; periods
+  day|month, cap > 0); use cases; JSON `PUT/DELETE /api/companies/{c}/departments/{d}/budgets/
+  {period}` (`{cap_micros}`). The department page card is B3.
+- Tests (fresh openbot_p07_p02b2): `unit_budget_charge_attributes_and_totals_settled_calls`
+  (desk run attributed to its unit; priced cost rounded up on unit and ancestor; unpriced tokens
+  apart; unsettled not counted; pre-midnight request charged to yesterday),
+  `unit_budget_admission_refuses_at_the_nearest_exhausted_unit` (child cap refuses child, not
+  sibling or root; root month cap refuses company-wide and sibling naming root/month; nearest
+  wins; unpriced never exhausts), `unit_budget_authority_follows_the_units_manager` (unit lead and
+  ancestor lead set; child lead, sibling, bad period, zero cap refused; clear),
+  `unit_budget_competing_delete_and_department_writes` (delete removes only the unit's rows,
+  ancestors keep; a call of a deleted unit charges the root; a department row held FOR UPDATE does
+  not delay a settlement), `unit_budget_competing_admission_waits_and_sees_the_crossing_charge`
+  (admission blocked on the company lock, settlement commits without it, admission refused),
+  `unit_budget_competing_concurrent_settlements_and_lock_order` (16 concurrent sibling
+  settlements, exact totals; charge holding rows + delete + second charge: no deadlock, all
+  complete), `unit_budget_refusal_of_a_scheduled_run_settles_its_occurrence` (real materializer
+  and admission), and the `classify` unit assertion — 7 + 1 passed.
+- Full lib suite (logs/B2-lib-suite.txt): 4938 passed, 2 failed = the deferred Doop 8 vs 7 and
+  `run_retention_archive_guards_refuse_forgery_duplicates_and_mutation`, whose hand-written history
+  copy lacked the new `unit_id` column (the guard then refused a mismatch); its column list now
+  includes it. Focused rerun `run_retention storage_ model_usage unit_budget message_admission`:
+  107 passed (logs/B2-focused.txt). clippy -D warnings clean; sqlx prepare --check clean (fresh
+  openbot_p07_p02b2_sqlx); fresh schema apply exit 0.
+- Frozen: base/HEAD 55f5f633 + working tree, digest
+  80557b37f0f8cfabff6563c651842dff085ae5685de3c3882580ffba0e83cd8b (exclusions unchanged,
+  logs/B2-author-freeze.snapshot.txt); manifest logs/07UR-P02-B2-R1.evidence.json.
+
+## B2-R1 corrections (for recheck 07UR-P02-B2-R2, 2026-11-21)
+| Finding | Change | Test |
+| --- | --- | --- |
+| F1 real paths | production settlement through the agent checkpoint on a Billing desk (attribution to Billing, Billing and root charged the priced cost) and through the JEV runtime (root attribution, unpriced tokens counted) | `unit_budget_charge_production_agent_settlement_on_a_desk`, `unit_budget_charge_production_jev_settlement` |
+| F1 lock order | the three-way test replaced by the R4 shape: month row before the day row in the heap, sequential scans forced in the deleting session, a holder of the month row, the delete queued, a second charge on the day row → all complete. Negative check: with the ordered `PERFORM` removed from `forget_unit_spend` the same test fails with `deadlock detected` (logs/B2-R2-negative-unordered-delete.txt; schema restored, throwaway databases dropped) | `unit_budget_competing_delete_takes_totals_in_the_charges_order` |
+| F1 re-parent / child / company-wide | a re-parented unit's later charges follow the new chain while the old parent keeps its count; a child of a Billing-desk run inherits Billing (the insert trigger reads its copied scope row); the company-wide run's call records the root | `unit_budget_charge_follows_a_reparented_unit_and_a_childs_inherited_scope`, the charge test's root assertion |
+| F2 (optional) | not adopted in B2: the production message path, the HTTP 400 body and the cap routes are left for p03's route/final checks (recorded) | — |
+- Checks: 133 passed (logs/B2-R2-focused.txt: `unit_budget run_retention storage_ model_usage
+  message_admission jev_runtime autonomous_agent_admission`); clippy clean. Frozen at
+  60e2c15f4935ce5371b485a604069eb4ada4f6add0ec3358466e97af4ea11929 (logs/B2-R2-author-freeze
+  .snapshot.txt); manifest logs/07UR-P02-B2-R2.evidence.json (2 PASS; 1 FAIL = the intended
+  negative check).
+
 ## Status
 - p02 started 2026-11-21. Investigation recorded; user decisions (g)(h)(i) taken; G1 r1 reviewed
   (07UR-P02-G1-R1 changes required, F1–F9 actionable, F10 optional); decisions (j)(k) taken; G1 r2
@@ -475,4 +565,11 @@ unit's day and month rows (two rows).
   root default) carried to p03. trail check: 5 keyword matches on the p01 unit-FK comment block
   (definition-creation authority, cascade ordering, a moved document's cached facts, company-list
   sizing, agent-tool edges) — not those mechanisms. Committed locally. B2 (02B) next.
+- **B2 accepted in phase** 2026-11-21: B PASS 07UR-P02-B2-R2 at
+  60e2c15f4935ce5371b485a604069eb4ada4f6add0ec3358466e97af4ea11929 (rounds B2-R1 changes required
+  F1 + optional F2, B2-R2 PASS); root re-digest identical (logs/B2-root-acceptance.snapshot.txt);
+  coordination r9. Optional B2-F2 (production message refusal path, HTTP 400 body, cap routes)
+  carried to p03. trail check: keyword matches on schema comments (recorded department, ordering,
+  agent-tool edges, select inputs, scope-row recheck of knowledge owners) — not those mechanisms.
+  Committed locally. B3 (02C usage pages) next.
 
