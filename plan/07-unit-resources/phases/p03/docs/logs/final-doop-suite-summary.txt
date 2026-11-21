@@ -1,0 +1,10 @@
+   1       Tests  42 failed | 2660 passed | 26 skipped (2728)
+   2      97|       'Private S3 fixture requires Docker, Python3, the pinned Garage …
+  26      99|     await page.evaluate(() => window.elementPanelHarness.deselect())
+   1  ❯  parallel  tests/drawingBrowser.test.ts (88 tests | 2 failed) 108951ms
+   1  ❯  parallel  tests/elementResizeBrowser.test.ts (39 tests | 39 failed) 805ms
+   1  ❯  parallel  tests/privateMediaStorage.test.ts (9 tests | 9 skipped) 147ms
+   1  ❯  parallel  tests/privatePdfRendering.test.ts (2 tests | 1 failed) 3771ms
+   1  Test Files  4 failed | 298 passed | 1 skipped (303)
+   2 Error: Private S3 fixture requires Docker, Python3, the pinned Garage image and a Docker-shared checkout parent; setup failed
+  26 TypeError: Cannot read properties of undefined (reading 'deselect')

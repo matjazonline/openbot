@@ -137,3 +137,100 @@
   43532e1f004ff6d7e87b3e69fe0619a1455eaec4c612d4e876886151a027721d. P03-B1-F1 and F2 fixed;
   P03-B1-F3 (optional) closed, with messaging/JEV not adopted as recorded.
 - Process: no issues.
+
+## 07UR-P03-B2-R1 (2026-11-21)
+
+### Identity
+
+- Round 07UR-P03-B2-R1: batch review of p03 B2 = doc 03B final gate, plus the combined-integration
+  review of Plan07 (p01, p02, p03 B1, all accepted and committed). Workflow
+  implement-opus-reviewed-2_4. Task [TASK.md](TASK.md) ("B2 = 03B final gate"), review
+  [REVIEW.md](REVIEW.md), findings [agent-review-findings.md](agent-review-findings.md).
+- Reviewer: Claude Opus 5.5 (B, claude-opus-5-5).
+- HEAD b154b3cc5bed59ed39894e12d236c4878f601bf9 plus the working tree (assets/app.css; TASK),
+  digest f53289cf382cb4fc2d08a61d9de50a1336f4b04f93f826e0c9f7517ff8e1f564, exclusions
+  plan/07-unit-resources/phases/p03/docs and plan/07-unit-resources/COORDINATION.md. Verified at
+  start and before returning. Plan07 diff base 5bf6a669. Coordination revision 9.
+- Evidence:
+  - Author manifest `logs/07UR-P03-B2-R1.evidence.json` validated (exit 0: 6 PASS, 3 FAIL; the
+    FAILs are the full check.sh run, the remaining-targets/attribution/Doop rerun, and the Doop
+    rerun under TMPDIR=/tmp).
+  - B spot-checked the retained logs rather than rerunning the multi-hour suites, as instructed:
+    final-check.txt gate table and failure lines, final-rerun.txt, final-doop-suite-summary.txt,
+    final-plugin-package-rerun.txt, final-doop-runner-py39.txt, final-sqlx-prepare.txt,
+    final-trail-build.txt, final-css-rerun.txt, B2-css-focused.txt.
+
+### Coverage and evidence
+
+- **(1) Generated CSS.** The working-tree change adds only the two `.table-sm` rules (a
+  byte-level diff of the minified file). `table-sm` is used by the B3 caps card and the
+  dashboard panel, so this was a Plan07 regression that the gate caught. The gate rerun passes,
+  and the asset/layout tests (19) pass against the embedded CSS. Accepted.
+- **(2) Red gates:**
+  - **Not attributable to Plan07** (it touches nothing under integrations/, services/, scripts/,
+    .github or .cargo; `git diff 5bf6a669..HEAD` is empty there):
+    - the plugin package: rerun passes with the same sha256;
+    - the Doop runner: TLS under Python 3.13, 46/46 under 3.9 as in Plan06;
+    - attribution: timing; rerun 120 passed.
+  - **Unavailable:** the Docker image gates.
+  - **Not exercised:** the Linux network-isolation scope.
+  - **Red only on the deferred Doop assertion:** the DB suite (lib 4948 passed, 1 failed) and the
+    stack budget (no overflow; "unrelated to the stack budget").
+  - **Managed Doop:** deferred and red; the environment attribution is plausible but unverified
+    (P03-B2-F3).
+  - None needs to be treated as a Plan07 regression on this evidence. None may be reported as
+    passed.
+- **(3) Combined integration.** Checked across batches:
+  - **Admission order:** binding readiness reach (p01), then the agent manifest with tool/skill
+    and model reach (p01, p02 B1), then run scopes, then the unit-cap check (p02 B2). All are in
+    one transaction under the company lock, so a refusal rolls everything back and the first
+    failing check names the refusal.
+  - **Lock discipline:** model-connection replace and move, cap writes and admission all
+    serialize on the company row; the charge takes no department or company lock (G1 r4).
+  - **Department delete:** names skills, MCP/HTTP and model connections; caps cascade; totals are
+    forgotten in lock order.
+  - **Company teardown:** inspection only (P03-B2-F3).
+  - **Schema:** fresh migrations and SQLx metadata pass; .sqlx is unchanged.
+  - **Docs:** they match the final code (p03 B1 PASS); nothing in B2 changed code or docs.
+  - **Rebase:** the target fa58df8a overlaps no Plan07 file.
+- **(4) Completeness.** Plan07 cannot be declared complete in doc 03's sense, and doc 03's
+  completion record is still "Pending" (P03-B2-F1, P03-B2-F2).
+
+### Outcome
+
+- **Changes required; no PASS for B2.**
+- Actionable:
+  - P03-B2-F1 (low): fill doc 03's completion record with the true statuses;
+  - P03-B2-F2 (medium, process for root): record "accepted, not declared complete" and confirm
+    the push with the user.
+- Optional: P03-B2-F3.
+- The final-gate evidence and its dispositions are otherwise sound, and the CSS fix is accepted.
+  A recheck can be limited to the completion record and the recorded status.
+
+### Process and instruction feedback
+
+- The CSS regression shows the value of running the full check.sh even after green focused
+  suites: no focused test covered generated assets.
+
+## 07UR-P03-B2-R2 (2026-11-21)
+
+- Round 07UR-P03-B2-R2: correction recheck of p03 B2, records only (P03-B2-F1, F2; F3 optional).
+  Workflow implement-opus-reviewed-2_4. Reviewer Claude Opus 5.5 (B, claude-opus-5-5). Task
+  [TASK.md](TASK.md) ("B2-R1 corrections"), review [REVIEW.md](REVIEW.md), findings
+  [agent-review-findings.md](agent-review-findings.md).
+- HEAD b154b3cc5bed59ed39894e12d236c4878f601bf9 plus the working tree (assets/app.css and
+  plan/07-unit-resources/03-integration-and-final-verification.md), digest
+  c2876c0d1fb91960e9ab63dd56cca47bfe8299bb981225f5671228165f20ec6e, exclusions unchanged.
+  Verified at start and before returning. Coordination revision 9.
+- Coverage: read doc 03's completion-record diff row by row against the retained B2 evidence
+  checked in R1 (final-check.txt gate table, final-rerun.txt, sqlx and trail logs) and TASK's
+  status line. No code changed since R1; the CSS check and the gate dispositions from R1 are
+  reused.
+- **Outcome: PASS for p03 B2** at digest
+  c2876c0d1fb91960e9ab63dd56cca47bfe8299bb981225f5671228165f20ec6e. P03-B2-F1 and F2 fixed;
+  F3 (optional) closed.
+- Plan07 overall: accepted in all phases (p01, p02, p03 B1 and B2), **not declared complete**.
+  Docker image gates are unavailable, the Linux network-isolation scope is not exercised, and
+  managed Doop plus the deferred Doop assertion stay red. The fast-forward push to main waits
+  for the user's explicit confirmation; B sees no other reason against it.
+- Process: none.

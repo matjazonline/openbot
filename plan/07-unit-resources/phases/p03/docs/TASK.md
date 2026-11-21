@@ -92,3 +92,69 @@
   R3 PASS); root re-digest identical (logs/B1-root-acceptance.snapshot.txt). Committed locally.
   Next: B2 = 03B final gate.
 
+## B2 = 03B final gate (2026-11-21, on b154b3cc)
+- Fresh-schema SQLx regeneration: fresh openbot_p07_final_sqlx @55407, `sqlx migrate run`,
+  `SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets`: PASS, .sqlx unchanged
+  (logs/final-sqlx-prepare.txt); database dropped.
+- Tooling (scratchpad only, nothing installed): PATH shim rg → Orca's ripgrep 15.0.0, python3 →
+  /opt/homebrew/bin/python3.13; pinned Node v24.21.0/npm 11.19.0 (Plan06's official tarball,
+  SHA-256 re-checked against SHASUMS256.txt); attribution venv tmp/attribution-contract-env.
+  Docker daemon absent (image gates unavailable). Runner scratchpad/final-check.sh.
+- CI comparison: .github, scripts/check.sh, check-support.sh, stack/lease budget scripts and
+  .cargo unchanged since Plan06's comparison (git diff 5bf6a669..HEAD empty), which found no CI
+  gate omitted by check.sh.
+- scripts/check.sh with DATABASE_URL=postgres://mac02@127.0.0.1:55407/postgres:
+  16:48–18:12Z, EXIT 1 (logs/final-check.txt).
+
+### Gate record (every check.sh gate)
+| Gate | check.sh | Disposition / follow-up evidence |
+| --- | --- | --- |
+| Runner test coverage, Local-agent plugin tests and guards | PASS, PASS | |
+| Reproducible plugin package and runtime install | FAIL 1s | Package built with the expected sha256 5cdb500a…c10d, then `npm ci --omit=dev` in the extracted package refused "Missing: plugin@0.2.0 from lock file". Rerun of `check_plugin_package` alone under the same pinned Node: **PASS**, same sha256 (logs/final-plugin-package-rerun.txt). Plan07 changes nothing under integrations/ or services/ (git diff 5bf6a669..HEAD empty there). Not reproduced; recorded as an environment-dependent failure in the full run. |
+| Generated CSS is current | FAIL 0s | **Plan07 regression**: the B3 budget tables use `table-sm`, absent from assets/app.css. Rebuilt with `npm run build:css` (pinned Node): the only change adds the two `.table-sm` rules. Gate command rerun: **PASS** (logs/final-css-rerun.txt). Fix in B2. |
+| Frontend protocols, Deployment script tests, Knowledge artifact preparation tests | PASS | |
+| Doop runner boundaries | FAIL 7s | 1 of 46 errors: TLS handshake "Missing Authority Key Identifier", which Python 3.13's default strict X.509 verification rejects for the test CA; the shim made python3 3.13. Rerun with /usr/bin/python3 3.9.6 (the interpreter Plan06's run used for it): **PASS 46/46** (logs/final-doop-runner-py39.txt). Tool environment, not Plan07. |
+| Doop probe protocols, Formatting, Patch whitespace | PASS | |
+| Transport abstraction boundary | PASS 9s | With real ripgrep 15.0.0 on PATH (not the vacuous no-rg pass). |
+| Workflow sample/Integration boundaries and documentation, evidence validator, Retained workflow evidence | PASS | |
+| Fetch locked Rust dependencies, Offline compilation, Clippy | PASS | |
+| Test database, Migrations (fresh), SQLx metadata matches migrated schema | PASS | |
+| Compile tests, Query statistics prerequisites, Conformance families | PASS | |
+| Database-backed test suite (isolated network) | FAIL 1965s | lib: **4948 passed, 1 failed, 30 ignored**; the only failure is the deferred Doop assertion `doop_agent_current_preparation_reaches_ready_before_model_io` (05SC-C001/04RU-C005, failing before Plan07, not relabelled). cargo stopped after lib; remaining targets run separately on fresh openbot_p07_final_rest under scripts/test-network-isolation.sh: main.rs **6 passed**, tests/source_modules (reachability) **8 passed** (logs/final-rerun.txt). |
+| Ignored browser fixture producers | PASS | |
+| Browser protocols using native markup | PASS 5s | 18/18 tests ran and passed (no hang this run). |
+| Stack budget | FAIL 2082s | Suite at 2048 KiB: 4948 passed, 1 failed (same Doop assertion); no "has overflowed its stack"; script: "tests failed for a reason unrelated to the stack budget". Budget signal clean; threshold unchanged. |
+| Lease budget | PASS 293s | |
+| Knowledge / Memory / Attribution production image | FAIL ×3 | **Unavailable**: no Docker daemon. |
+| Memory model preparation, extracted suite, backup and restore, standalone journey, OpenBot and memory integration | PASS ×5 | |
+| Attribution extracted service and contracts | FAIL 32s | 1 of 120: `attribution_company_lifecycle_operator_signal_survives_restart_and_repair` (log did not contain "company status healthy"). Plan07 changes nothing in services/attribution. Rerun of the gate: **PASS 48s**, 120 passed (logs/final-rerun.txt). Timing-dependent log assertion; recorded. |
+| Attribution browser integration | PASS | |
+| Managed Doop service and private integration | FAIL 0s | Runner lacked `DOOP_TEST_UI_CHROME` (CI sets it). Reruns with system Chrome: first two failed before tests because tsx's IPC socket path under the macOS `$TMPDIR` work directory (113 bytes) exceeds the 104-byte Unix socket limit ("listen EINVAL … tsx-501/….pipe", reproduced by hand); with TMPDIR=/tmp the suite ran: **Test Files 4 failed, 298 passed; Tests 42 failed, 2660 passed, 26 skipped** (logs/final-doop-retry.txt, logs/final-doop-suite-summary.txt): elementResizeBrowser 39/39 (page script `deselect` undefined, sub-second), drawingBrowser 2, privatePdfRendering 1 (Plan06's deferred case), privateMediaStorage skipped (needs Docker). Doop's pinned upstream revision is unchanged by Plan07. **Deferred** (05SC-C001/04RU-C005), not passed; more browser failures than Plan06's run, attributed to the external suite and host Chrome, unverified. |
+| Linux network-isolation scope | not exercised | macOS: "NOT EXERCISED locally; required in CI". The isolated-network guard ran for the DB suite, stack and lease budgets and the remaining targets. |
+
+- Graph refresh: `trail build` (successor to graft build) exit 0 (logs/final-trail-build.txt).
+- Startup plan paths: `NO_BACKWARD_COMPATIBILITY_NOTES` lists README and docs 01–03 of
+  plan/07-unit-resources; main.rs unittests 6 passed.
+- B2 source change: assets/app.css regenerated (CSS gate fix). Nothing else changed after the
+  gate run; the CSS is embedded (routes/assets.rs `include_bytes!`), so the asset/layout tests were
+  rerun against it (logs/B2-css-focused.txt); CSS gate rerun PASS.
+- Integration note: origin/main advanced to fa58df8a (Plan10 planning docs + 8 startup-list lines
+  in src/main.rs; no overlap with Plan07's files). Plan: rebase plan07 onto it after acceptance,
+  rerun main.rs unittests and `git diff --check`, then fast-forward push (no force).
+
+## B2-R1 corrections (for recheck 07UR-P03-B2-R2)
+- F1: doc 03's completion record filled with actual statuses (passed / red on the deferral /
+  unavailable / not exercised / deferred) and the status line "accepted in phase, not declared
+  complete".
+- F2: Plan07 is recorded as accepted, not declared complete. Push to main waits for the user's
+  confirmation that the authorization covers that state (asked 2026-11-21).
+- F3 (optional): CSS fix committed with B2; `trail check` before push; one-entry check of the
+  plan/07 startup paths after the rebase; CI comparison of the managed Doop failures after push.
+  Company-teardown test with p02 data not added (recorded).
+- **B2 accepted in phase** 2026-11-21: B PASS 07UR-P03-B2-R2 at
+  c2876c0d1fb91960e9ab63dd56cca47bfe8299bb981225f5671228165f20ec6e (R1 F1–F3, R2 PASS); root
+  re-digest identical (logs/B2-root-acceptance.snapshot.txt). **Plan07: p01–p03 accepted in
+  phase, not declared complete** (Docker image gates unavailable, Linux isolation scope not
+  exercised, managed Doop deferred and red). User confirmed the push in that state (2026-11-21,
+  "Push now"). Committed locally; then rebase onto origin/main fa58df8a and fast-forward push.
+

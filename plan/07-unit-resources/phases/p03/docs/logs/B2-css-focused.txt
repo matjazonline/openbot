@@ -1,0 +1,32 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 52.82s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 19 tests
+test adapters::http::routes::assets::tests::the_fingerprint_tracks_the_asset_bytes ... ok
+test adapters::http::routes::assets::tests::first_party_asset_urls_carry_a_version ... ok
+test adapters::http::pages::layout::tests::legacy_layout_reports_and_dismisses_failed_fragment_requests ... ok
+test adapters::http::pages::tests::a_workspace_names_its_list_and_detail_columns_for_the_compact_layout ... ok
+test adapters::storage::gcs::tests::jev_assets_storage_read_bound_declared_and_streamed ... ok
+test application::workflow::jev::assets::tests::jev_assets_forbid_inline_url_mutable_and_excess_references ... ok
+test application::workflow::jev::assets::tests::jev_assets_identity_opaque_wire_and_pixel_reservation ... ok
+test application::workflow::jev::assets::tests::jev_assets_jpeg_and_animation_are_explicitly_validated ... ok
+test application::workflow::jev::assets::tests::jev_assets_aggregate_wire_bound_is_still_64_kib ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_large_skill_suffix_assets_round_trip_at_root_and_inside_a_wrapper ... ok
+test application::workflow::jev::assets::tests::jev_assets_reject_changed_unsupported_oversized_and_invalid_dimensions ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_library_copy_renames_only_new_identity_and_keeps_assets_independent ... ok
+test adapters::http::routes::ui::stream_tests::direct_tests::assets::direct_thread_ui_exact_message_diagnostics_and_attachment_scope_refuse_other_targets ... ok
+test adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_changed_object_retry_never_sends_or_adds_reservation ... ok
+test adapters::persistence::workflow::tests::jev_assets_tests::race::jev_assets_final_authorization_holds_view_grant_across_connection_wait ... ok
+test adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage ... ok
+test adapters::persistence::workflow::tests::jev_assets_tests::race::jev_assets_allowlist_grant_requires_current_verified_email ... ok
+test adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_current_actor_channel_visibility_and_missing_file ... ok
+test adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 4960 filtered out; finished in 4.58s
+

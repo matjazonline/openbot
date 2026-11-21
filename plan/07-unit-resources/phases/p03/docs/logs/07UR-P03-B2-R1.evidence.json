@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "round": "07UR-P03-B2-R1",
+  "artifact": "f53289cf382cb4fc2d08a61d9de50a1336f4b04f93f826e0c9f7517ff8e1f564",
+  "checks": [
+    {
+      "criteria": [
+        "03B.1 fresh-schema SQLx metadata"
+      ],
+      "command": "sqlx migrate run; SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-sqlx-prepare.txt",
+          "sha256": "9a5627d48bd7c33b0bc11c725b5c99a85a286c575f6a77ff5c198d2f38c7fcf7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.2-4 every check.sh gate"
+      ],
+      "command": "scripts/check.sh (DATABASE_URL=@55407/postgres)",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/final-check.txt",
+          "sha256": "9e700427d63fa73417bb29d0a8af4577c9be66b3363edfbc3e46499b183db7d3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "remaining targets: main.rs, source-module reachability (network isolation)",
+        "attribution rerun",
+        "managed Doop (DOOP_TEST_UI_CHROME)"
+      ],
+      "command": "scratchpad/final-rerun.sh",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/final-rerun.txt",
+          "sha256": "e17f7d0f76c13d785ed2dd861572c44ab777cfc4c0bac5a18f82c544bce8ff97"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "managed Doop rerun, TMPDIR=/tmp"
+      ],
+      "command": "TMPDIR=/tmp scratchpad/final-doop.sh",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/final-doop-retry.txt",
+          "sha256": "3a62d76dff727332be674125ca57e91ca32b61c9512bf9aac81f3293e76b0bca"
+        },
+        {
+          "path": "logs/final-doop-suite-summary.txt",
+          "sha256": "f730778272ff14ebb010fd1cbe4a25fc56ce718cc52213505cb994783b54cb91"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "plugin package rerun"
+      ],
+      "command": "check_plugin_package",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-plugin-package-rerun.txt",
+          "sha256": "c4599480596367edf425a1d736b9d7256422032afa17362e0ba460672fbb6550"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "Doop runner boundaries under python 3.9"
+      ],
+      "command": "/usr/bin/python3 scripts/tests/doop-test.py",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-doop-runner-py39.txt",
+          "sha256": "e1d5039a0741dfe8f495ad96852e686be288c58ddf31fe87c47accece03b0655"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "Generated CSS after rebuild"
+      ],
+      "command": "tailwindcss -i assets/app.css.in --minify | cmp assets/app.css",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-css-rerun.txt",
+          "sha256": "7f61a088791ff8a9560c2eda7eb32e99b215467a3e8ebe6173ae7e5afb156e7b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "embedded CSS asset/layout tests"
+      ],
+      "command": "cargo test --locked --offline --lib -- assets layout app_css",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-css-focused.txt",
+          "sha256": "57ae8dded361149cd652607f241b956a924b813272ddf1aa936b9f10e61aab09"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.5 graph refresh"
+      ],
+      "command": "trail build",
+      "fixture": "PG18 @127.0.0.1:55407 (fresh check DB + openbot_p07_final_rest), toolshim rg 15/python 3.13, Node v24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/final-trail-build.txt",
+          "sha256": "87178d4606543d3f6509c84d697250fdcf1855d58433577a66b1a65d02b7cc8b"
+        }
+      ]
+    }
+  ]
+}
