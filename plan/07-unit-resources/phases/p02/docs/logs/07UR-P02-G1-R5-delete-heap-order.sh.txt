@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# 07UR-P02-G1-R5 test (6): the R4 heap-order three-way race against the r5 delete trigger, which
+# locks the unit's rows ORDER BY period, period_start FOR UPDATE before deleting. Sequential scans
+# are forced so heap order (month row before day row) is what the scan sees. Two arrival orders.
+set -u
+L="$1"; DB=openbot_p07_p02g_r5
+p() { psql -h 127.0.0.1 -p 55407 -U mac02 -X "$@"; }
+C=00000000-0000-0000-0000-000000000001
+U() { echo "00000000-0000-0000-0000-0000000000$1"; }
+p -d postgres -qc "DROP DATABASE IF EXISTS $DB" 2>/dev/null; p -d postgres -qc "CREATE DATABASE $DB"
+p -d $DB -q -v ON_ERROR_STOP=1 <<SQL
+CREATE TABLE departments (company_id uuid NOT NULL, id uuid PRIMARY KEY, parent_id uuid, is_root boolean NOT NULL DEFAULT false);
+CREATE TABLE unit_spend (company_id uuid NOT NULL, unit_id uuid NOT NULL, period text NOT NULL,
+  period_start timestamptz NOT NULL, spent_micros bigint NOT NULL DEFAULT 0, PRIMARY KEY (company_id, unit_id, period, period_start));
+CREATE FUNCTION remove_unit_spend() RETURNS trigger LANGUAGE plpgsql AS \$\$
+BEGIN
+  PERFORM 1 FROM unit_spend WHERE company_id = OLD.company_id AND unit_id = OLD.id ORDER BY period, period_start FOR UPDATE;
+  DELETE FROM unit_spend WHERE company_id = OLD.company_id AND unit_id = OLD.id;
+  RETURN NULL;
+END \$\$;
+CREATE TRIGGER departments_remove_spend AFTER DELETE ON departments FOR EACH ROW EXECUTE FUNCTION remove_unit_spend();
+SQL
+CHARGE() { echo "INSERT INTO unit_spend SELECT '$C', unit, period.name, period.start, 7 FROM unnest(ARRAY['$(U a0)'::uuid,'$1'::uuid]) AS unit, (VALUES ('day','2026-11-21+00'::timestamptz),('month','2026-11-01+00'::timestamptz)) AS period(name,start) ORDER BY unit, period.name, period.start ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=LEAST(unit_spend.spent_micros::numeric+EXCLUDED.spent_micros,9223372036854775807)::bigint"; }
+setup() { p -d $DB -q -c "INSERT INTO departments VALUES ('$C','$(U a0)',NULL,true) ON CONFLICT DO NOTHING" -c "INSERT INTO departments VALUES ('$C','$1','$(U a0)',false)" \
+  -c "INSERT INTO unit_spend VALUES ('$C','$1','month','2026-11-01+00',1)" -c "INSERT INTO unit_spend VALUES ('$C','$1','day','2026-11-20+00',1)" -c "INSERT INTO unit_spend VALUES ('$C','$1','day','2026-11-21+00',1)"; }
+run() { # $1 unit, $2 = delete-first|settlement-first
+  local D="$1"
+  ( p -d $DB -a -c "BEGIN" -c "SELECT period FROM unit_spend WHERE unit_id='$D' AND period='month' FOR UPDATE" -c "SELECT pg_sleep(1.0)" -c "COMMIT" > "$L.z" 2>&1; echo "exit $?" >> "$L.z" ) &
+  sleep 0.2
+  if [ "$2" = delete-first ]; then
+    ( p -d $DB -a -c "SET enable_indexscan=off" -c "SET enable_bitmapscan=off" -c "SET enable_indexonlyscan=off" -c '\timing on' -c "DELETE FROM departments WHERE id='$D'" > "$L.x" 2>&1; echo "exit $?" >> "$L.x" ) &
+    sleep 0.2
+    ( p -d $DB -a -c '\timing on' -c "BEGIN" -c "$(CHARGE $D)" -c "COMMIT" > "$L.s" 2>&1; echo "exit $?" >> "$L.s" ) &
+  else
+    ( p -d $DB -a -c '\timing on' -c "BEGIN" -c "$(CHARGE $D)" -c "COMMIT" > "$L.s" 2>&1; echo "exit $?" >> "$L.s" ) &
+    sleep 0.2
+    ( p -d $DB -a -c "SET enable_indexscan=off" -c "SET enable_bitmapscan=off" -c "SET enable_indexonlyscan=off" -c '\timing on' -c "DELETE FROM departments WHERE id='$D'" > "$L.x" 2>&1; echo "exit $?" >> "$L.x" ) &
+  fi
+  wait
+  grep -h 'ERROR\|deadlock\|exit\|Time:\|DELETE 1\|INSERT 0' "$L.x" | sed 's/^/[delete] /'
+  grep -h 'ERROR\|deadlock\|exit\|Time:\|INSERT 0' "$L.s" | sed 's/^/[settlement] /'
+  grep -h 'ERROR\|deadlock\|exit' "$L.z" | sed 's/^/[other charge] /'
+  p -d $DB -c "SELECT CASE unit_id WHEN '$(U a0)' THEN 'root' ELSE CASE WHEN EXISTS (SELECT 1 FROM departments WHERE id=unit_id) THEN 'unit' ELSE 'ORPHAN' END END AS unit, period, period_start::date, spent_micros FROM unit_spend ORDER BY 1,2,3"
+  p -d $DB -qc "DELETE FROM unit_spend"
+}
+{
+p -d $DB -Atc "SELECT version()"
+p -d $DB -At -c "SET enable_indexscan=off" -c "SET enable_bitmapscan=off" -c "SET enable_indexonlyscan=off" -c "EXPLAIN (COSTS OFF) SELECT 1 FROM unit_spend WHERE company_id='$C' AND unit_id='$(U d5)' ORDER BY period, period_start FOR UPDATE" | sed 's/^/[delete lock plan] /'
+echo "== 6a: other charge holds the month row; the delete queues; then the settlement arrives (the R4 deadlock order)"
+setup "$(U d5)"; run "$(U d5)" delete-first
+echo "== 6b: other charge holds the month row; the settlement takes the day row first; then the delete arrives"
+setup "$(U d6)"; run "$(U d6)" settlement-first
+} > "$L" 2>&1
+rm -f "$L".x "$L".s "$L".z; p -d postgres -qc "DROP DATABASE $DB"

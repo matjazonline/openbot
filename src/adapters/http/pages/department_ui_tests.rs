@@ -112,6 +112,7 @@ fn section<'a>(
         error,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
+        models: None,
     })
 }
 
@@ -371,6 +372,7 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
         error: None,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
+        models: None,
     });
     assert!(cut.contains("Only the first 500 people and agents are listed."));
 
@@ -919,6 +921,7 @@ fn led_section(
         error: None,
         notice: None,
         knowledge: DepartmentKnowledge::Documents(&[]),
+        models: None,
     })
 }
 
@@ -1058,6 +1061,7 @@ fn administration_audit_pane_shows_recent_history_to_managers_only() {
             error: None,
             notice: None,
             knowledge: DepartmentKnowledge::Documents(&[]),
+            models: None,
         })
     };
     let managing: std::collections::HashSet<DepartmentId> =

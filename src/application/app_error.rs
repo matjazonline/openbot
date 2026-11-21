@@ -199,6 +199,7 @@ impl std::fmt::Display for ResourceOutsideUnit {
             UnitResourceKind::Skill => "Skill",
             UnitResourceKind::McpConnection => "MCP connection",
             UnitResourceKind::HttpConnection => "HTTP connection",
+            UnitResourceKind::ModelConnection => "Model connection",
         };
         write!(
             f,

@@ -542,9 +542,15 @@ async fn provisioning_lists_agents_and_models() {
         json!([{"slug": "support", "name": "Support", "description": "Answers customers.",
             "provider": "openai", "model": "gpt-4o-mini", "departments": [], "address": null}])
     );
+    let root_name: String =
+        sqlx::query_scalar("SELECT name FROM departments WHERE company_id = $1 AND is_root")
+            .bind(company(&f).as_uuid())
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
     assert_eq!(
         listed["models"],
-        json!([{"provider": "openai", "model": "gpt-4o-mini"}])
+        json!([{"provider": "openai", "model": "gpt-4o-mini", "department": root_name}])
     );
     assert_eq!(listed["truncated"], false);
     // P08-D3 §D3.4: the local provisioning marker exists but no reconciliation names it, so the
@@ -1003,4 +1009,40 @@ async fn unit_resource_selection_agent_builder_skills_follow_the_placement_reach
     .await
     .unwrap();
     assert_eq!(linked, 1);
+}
+
+/// Plan07 02A (B1-F1): the Agent Builder refuses an explicit model whose connection belongs
+/// outside the created agent's department, and provisions it inside.
+#[tokio::test]
+async fn unit_model_default_agent_builder_model_follows_the_placement_reach() {
+    let (f, claim) = claimed(false).await;
+    let tenant = company(&f).as_uuid();
+    let billing = f.persistence().test_unit(tenant, "billing").await;
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        f.persistence(),
+        owner(&f).user_id(),
+        tenant,
+        billing,
+        vec![CompanyModelConnectionWrite {
+            provider: "anthropic".into(),
+            api_key: Some("billing-key".into()),
+            models: vec!["claude-billing".into()],
+            is_default: true,
+        }],
+    )
+    .await
+    .unwrap();
+    let mut outside = spec("outside");
+    outside["provider"] = json!("anthropic");
+    outside["model"] = json!("claude-billing");
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, outside).await;
+    let refused = committed(&dispatch(&f), &request).await;
+    assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
+    let mut inside = spec("inside");
+    inside["provider"] = json!("anthropic");
+    inside["model"] = json!("claude-billing");
+    inside["department"] = json!("billing");
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, inside).await;
+    let created = committed(&dispatch(&f), &request).await;
+    assert_eq!(created["agent"]["slug"], "inside", "{created}");
 }

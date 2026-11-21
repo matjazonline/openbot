@@ -408,8 +408,11 @@ pub(crate) async fn ready_models_on(
     company: CompanyId,
 ) -> AppResult<Vec<(String, String)>> {
     let connections: Vec<(String, Vec<String>)> = sqlx::query_as(
-        "SELECT provider, models FROM company_model_connections \
-         WHERE company_id = $1 AND api_key IS NOT NULL ORDER BY is_default DESC, provider",
+        "SELECT connection.provider, connection.models FROM company_model_connections AS connection \
+         JOIN departments AS unit ON unit.company_id = connection.company_id \
+          AND unit.id = connection.unit_id \
+         WHERE connection.company_id = $1 AND connection.api_key IS NOT NULL \
+         ORDER BY (unit.is_root AND connection.default_for_unit) DESC, connection.provider",
     )
     .bind(company.as_uuid())
     .fetch_all(&mut **tx)
@@ -541,6 +544,10 @@ async fn agent_write(
         .into_iter()
         .map(
             |(provider, model)| crate::entities::company::CompanyModelConnection {
+                id: Uuid::nil(),
+                unit_id: Uuid::nil(),
+                unit_name: String::new(),
+                in_root: false,
                 provider: provider.into(),
                 models: vec![model.into()],
                 is_default: false,
@@ -583,6 +590,14 @@ async fn agent_write(
         }
         None => None,
     };
+    if !super::super::company_agent::model_in_reach_on(tx, company, placement, &spec.provider)
+        .await?
+    {
+        return Ok(Err(ProvisioningRefusal::Invalid(format!(
+            "Model '{}' of provider '{}' belongs to a department outside the agent's department",
+            spec.model, spec.provider
+        ))));
+    }
     let mut skill_ids = Vec::with_capacity(spec.skills.len());
     for slug in &spec.skills {
         let id: Option<Uuid> = sqlx::query_scalar(

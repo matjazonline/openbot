@@ -84,6 +84,8 @@ pub struct DepartmentSection<'a> {
     pub error: Option<(DepartmentForm, &'a str)>,
     pub notice: Option<&'a str>,
     pub knowledge: DepartmentKnowledge<'a>,
+    /// The selected department's own model connections, loaded only for its managers.
+    pub models: Option<&'a [crate::entities::company::CompanyModelConnection]>,
 }
 
 impl DepartmentSection<'_> {
@@ -530,6 +532,7 @@ fn department_detail(
             {members}
             {desks}
             {knowledge}
+            {models}
             {history}
             {edit}
         </div>"##,
@@ -549,6 +552,30 @@ fn department_detail(
         members = members_card(section, view),
         desks = desks_card(section, view.detail.department.id, &view.desks),
         knowledge = knowledge_card(section, department),
+        models = models_card(section, department),
+    )
+}
+
+/// The department's own model connections (Plan07 02A), for its managers: a unit marks at most
+/// one as its default, which agents placed in it or below pin when they name no model.
+fn models_card(section: &DepartmentSection<'_>, department: &Department) -> String {
+    let Some(connections) = section.models else {
+        return String::new();
+    };
+    format!(
+        r##"<section id="department-models" class="card bg-base-200 p-4 space-y-3">
+            <h3 class="font-semibold">Model connections</h3>
+            <p class="text-xs opacity-70">Agents placed here or below pin this department's default when they name no model; without one, the nearest department above decides.</p>
+            <form class="space-y-3" hx-post="/ui/companies/{company}/departments/{unit}/models" hx-target="#department-section" hx-swap="outerHTML">
+                {fields}
+                <button type="submit" class="btn btn-sm btn-primary">Save model connections</button>
+            </form>
+        </section>"##,
+        company = section.company.id,
+        unit = department.id,
+        fields = super::company_settings::unit_model_connection_fields(
+            &super::company_settings::model_connection_drafts(connections)
+        ),
     )
 }
 

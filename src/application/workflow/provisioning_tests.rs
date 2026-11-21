@@ -110,7 +110,7 @@ fn refusals_and_results_are_both_valid_receipts() {
             {"slug": "b", "name": "B", "description": null, "provider": null, "model": null,
                 "departments": [], "address": null}
         ],
-        "models": [{"provider": "anthropic", "model": "claude"}],
+        "models": [{"provider": "anthropic", "model": "claude", "department": "Company"}],
         "truncated": false
     });
     assert!(valid(&list, &listed));

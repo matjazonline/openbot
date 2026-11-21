@@ -534,9 +534,10 @@ struct AgentSettingsView<'a> {
 impl AgentSettingsView<'_> {
     async fn model_connections(
         &self,
+        agent: Option<Uuid>,
     ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
         self.agent_use_cases
-            .list_company_model_connections(self.user_id, self.company.id)
+            .list_company_model_connections(self.user_id, self.company.id, agent)
             .await
     }
 
@@ -591,7 +592,7 @@ impl AgentSettingsView<'_> {
     /// It loads its own model connections and library definitions the way [`Self::edit_pane`]
     /// does, so no caller has to fetch what only this pane reads.
     async fn create_pane(&self, form: CreateForm<'_>) -> AppResult<String> {
-        let model_connections = self.model_connections().await?;
+        let model_connections = self.model_connections(None).await?;
         let library_agents = self.agent_use_cases.list_library_agents().await?;
         let mut skills = self.skills(None).await?;
         for skill_id in &form.draft.skill_ids {
@@ -653,7 +654,7 @@ impl AgentSettingsView<'_> {
             .authoring_state(authoring::scope(self.user_id, self.company.id, agent.id)?)
             .await?;
         let agent = &authoring.agent;
-        let model_connections = self.model_connections().await?;
+        let model_connections = self.model_connections(Some(agent.id)).await?;
         let capabilities = self
             .skill_use_cases
             .company_agent_capabilities(self.user_id, self.company.id, agent.id)

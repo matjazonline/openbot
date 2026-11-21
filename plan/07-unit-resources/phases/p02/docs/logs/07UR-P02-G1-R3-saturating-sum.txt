@@ -1,0 +1,10 @@
+-- D7 r3 saturating sum exactly as written: LEAST(spent_micros + cost, 9223372036854775807), bigint columns.
+SELECT LEAST(9223372036854775800::bigint + 100::bigint, 9223372036854775807) AS as_written;
+ERROR:  bigint out of range
+-- The same with the addition in numeric.
+SELECT LEAST(9223372036854775800::bigint::numeric + 100::bigint, 9223372036854775807)::bigint AS numeric_sum;
+     numeric_sum     
+---------------------
+ 9223372036854775807
+(1 row)
+

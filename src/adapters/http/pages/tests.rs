@@ -1066,6 +1066,10 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         ..settings_agent(company.id, "Triage <bot>", "triage")
     };
     let model_connections = [CompanyModelConnection {
+        id: uuid::Uuid::nil(),
+        unit_id: uuid::Uuid::nil(),
+        unit_name: "Root".into(),
+        in_root: true,
         provider: "openai".into(),
         models: vec![ModelName::from("gpt-4o")],
         is_default: true,
@@ -1404,7 +1408,7 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
 
     // A rejected Advanced submit has to come back on the Advanced tab.
     let advanced = pane(AgentCreateTab::Advanced);
-    assert!(advanced.contains("<option value=\"\">Company default</option>"));
+    assert!(advanced.contains("<option value=\"\">Default for its department</option>"));
     assert!(advanced.contains("Creating an agent requires a model connection with an API key."));
     assert!(!advanced.contains("Leave both blank for native profiles."));
     assert!(advanced.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
@@ -3075,6 +3079,10 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         ..settings_company("Acme & Co", "acme")
     };
     let model_connections = [CompanyModelConnection {
+        id: uuid::Uuid::nil(),
+        unit_id: uuid::Uuid::nil(),
+        unit_name: "Root".into(),
+        in_root: true,
         provider: "openai".into(),
         models: vec![ModelName::from("gpt-4o")],
         is_default: true,
@@ -3135,6 +3143,10 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
 fn rejected_company_edit_gets_key_status_only_from_stored_metadata() {
     let company = settings_company("Acme", "acme");
     let stored_connections = [CompanyModelConnection {
+        id: uuid::Uuid::nil(),
+        unit_id: uuid::Uuid::nil(),
+        unit_name: "Root".into(),
+        in_root: true,
         provider: "openai".into(),
         models: vec![ModelName::from("gpt-5.6-terra")],
         is_default: true,

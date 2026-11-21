@@ -710,3 +710,99 @@ async fn delegated_admin_routes_department_writes_follow_the_lead_unit() {
     )
     .await;
 }
+
+fn models_form(provider: &str, models: &str, key: &str) -> DepartmentModelsForm {
+    DepartmentModelsForm {
+        default_model_provider: Some(0),
+        connection_fields: [
+            ("connection_0_provider", provider),
+            ("connection_0_models", models),
+            ("connection_0_api_key", key),
+        ]
+        .into_iter()
+        .map(|(name, value)| (name.to_owned(), value.to_owned()))
+        .collect(),
+    }
+}
+
+/// Plan07 02A (B1-F1): a department's managers get its "Model connections" card and save it; a
+/// refusal comes back inline on the card's section; a plain member gets no card and a not-found
+/// for the write.
+#[tokio::test]
+async fn unit_model_default_department_card_saves_for_managers_only() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    crate::use_cases::company::CompanyPersistence::replace_model_connections_for_user(
+        f.persistence.as_ref(),
+        f.owner.id,
+        f.company.id,
+        vec![crate::use_cases::company::CompanyModelConnectionWrite {
+            provider: "openai".into(),
+            api_key: Some("root-key".into()),
+            models: vec!["gpt-4o-mini".into()],
+            is_default: true,
+        }],
+    )
+    .await
+    .unwrap();
+    let sales = create(&f, "Sales", "sales").await;
+    let member = person(&f, &f.member).await;
+    f.departments()
+        .add_member(f.owner.id, f.company.id, sales, PrincipalId::new(member))
+        .await
+        .unwrap();
+    let shown = show_department(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(shown.contains("id=\"department-models\""), "{shown}");
+    let saved = save_models(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+        Form(models_form("anthropic", "claude-sales", "sales-key")),
+    )
+    .await
+    .unwrap();
+    let (status, _, html) = body(saved).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Saved model connections."), "{html}");
+    assert!(html.contains("claude-sales"), "{html}");
+    // The root's provider is not Sales's: the refusal lands on the section, nothing changes.
+    let refused = save_models(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+        Form(models_form("openai", "gpt-x", "other-key")),
+    )
+    .await
+    .unwrap();
+    let (status, _, html) = body(refused).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        html.contains("Model connections not saved:") && html.contains("openai"),
+        "{html}"
+    );
+    // A plain member sees the department without the card and cannot save it.
+    let shown = show_department(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!shown.contains("department-models"), "{shown}");
+    let denied = save_models(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+        Form(models_form("groq", "llama", "member-key")),
+    )
+    .await;
+    assert!(
+        matches!(&denied, Err(AppError::NotFound(_))),
+        "{:?}",
+        denied.as_ref().map(|_| ())
+    );
+}

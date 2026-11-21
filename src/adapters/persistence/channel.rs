@@ -648,6 +648,20 @@ pub(crate) async fn prepare_library_agent_on(
         copied_skill_ids.push(copied.id);
     }
     agent.skill_ids = copied_skill_ids;
+    // A library model whose connection belongs outside the copy's department is dropped, so the
+    // copy pins that department's default instead (Plan07 G1 r2 D2).
+    if let Some(provider) = agent.provider.clone()
+        && !super::company_agent::model_in_reach_on(
+            tx,
+            crate::domain::workflow::CompanyId::new(company_id),
+            Some(unit),
+            &provider,
+        )
+        .await?
+    {
+        agent.provider = None;
+        agent.model = None;
+    }
 
     // Library bindings are builtin-only; native scope constraints forbid tenant targets.
     let mut bindings = super::agent_capability::bindings_on(tx, None, library_agent_id).await?;

@@ -1,0 +1,43 @@
+PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit
+[delete lock plan] SET
+[delete lock plan] SET
+[delete lock plan] SET
+[delete lock plan] LockRows
+[delete lock plan]   ->  Sort
+[delete lock plan]         Sort Key: period, period_start
+[delete lock plan]         ->  Seq Scan on unit_spend
+[delete lock plan]               Filter: ((company_id = '00000000-0000-0000-0000-000000000001'::uuid) AND (unit_id = '00000000-0000-0000-0000-0000000000d5'::uuid))
+== 6a: other charge holds the month row; the delete queues; then the settlement arrives (the R4 deadlock order)
+[delete] DELETE 1
+[delete] Time: 771.007 ms
+[delete] exit 0
+[settlement] Time: 0.107 ms
+[settlement] INSERT 0 4
+[settlement] Time: 575.549 ms
+[settlement] Time: 3.856 ms
+[settlement] exit 0
+[other charge] exit 0
+  unit  | period | period_start | spent_micros 
+--------+--------+--------------+--------------
+ ORPHAN | day    | 2026-11-21   |            7
+ ORPHAN | month  | 2026-11-01   |            7
+ root   | day    | 2026-11-21   |            7
+ root   | month  | 2026-11-01   |            7
+(4 rows)
+
+== 6b: other charge holds the month row; the settlement takes the day row first; then the delete arrives
+[delete] DELETE 1
+[delete] Time: 560.372 ms
+[delete] exit 0
+[settlement] Time: 0.144 ms
+[settlement] INSERT 0 4
+[settlement] Time: 778.493 ms
+[settlement] Time: 1.981 ms
+[settlement] exit 0
+[other charge] exit 0
+ unit | period | period_start | spent_micros 
+------+--------+--------------+--------------
+ root | day    | 2026-11-21   |            7
+ root | month  | 2026-11-01   |            7
+(2 rows)
+

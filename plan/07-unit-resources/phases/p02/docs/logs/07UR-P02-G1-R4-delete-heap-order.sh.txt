@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# 07UR-P02-G1-R4 case 6b: the r4 delete trigger visiting the unit's totals in heap order (a
+# sequential scan, as the planner picks for a small table), against a settlement on that unit and
+# a second charge holding the unit's month row. Same reduced schema as the r4 protocol log.
+set -u
+L="$1"; DB=openbot_p07_p02g_r4b
+p() { psql -h 127.0.0.1 -p 55407 -U mac02 -X "$@"; }
+C=00000000-0000-0000-0000-000000000001
+U() { echo "00000000-0000-0000-0000-0000000000$1"; }
+p -d postgres -qc "DROP DATABASE IF EXISTS $DB" 2>/dev/null; p -d postgres -qc "CREATE DATABASE $DB"
+p -d $DB -q -v ON_ERROR_STOP=1 <<SQL
+CREATE TABLE departments (company_id uuid NOT NULL, id uuid PRIMARY KEY, parent_id uuid, is_root boolean NOT NULL DEFAULT false);
+CREATE TABLE unit_spend (company_id uuid NOT NULL, unit_id uuid NOT NULL, period text NOT NULL,
+  period_start timestamptz NOT NULL, spent_micros bigint NOT NULL DEFAULT 0, PRIMARY KEY (company_id, unit_id, period, period_start));
+CREATE FUNCTION remove_unit_spend() RETURNS trigger LANGUAGE plpgsql AS \$\$
+BEGIN DELETE FROM unit_spend WHERE company_id = OLD.company_id AND unit_id = OLD.id; RETURN NULL; END \$\$;
+CREATE TRIGGER departments_remove_spend AFTER DELETE ON departments FOR EACH ROW EXECUTE FUNCTION remove_unit_spend();
+INSERT INTO departments VALUES ('$C','$(U a0)',NULL,true), ('$C','$(U d5)','$(U a0)',false);
+-- heap order: the unit's month row before its day row (the month row is created first in a month)
+INSERT INTO unit_spend VALUES ('$C','$(U d5)','month','2026-11-01+00',1);
+INSERT INTO unit_spend VALUES ('$C','$(U d5)','day','2026-11-21+00',1);
+SQL
+CHARGE="INSERT INTO unit_spend SELECT '$C', unit, period.name, period.start, 7 FROM unnest(ARRAY['$(U a0)'::uuid,'$(U d5)'::uuid]) AS unit, (VALUES ('day','2026-11-21+00'::timestamptz),('month','2026-11-01+00'::timestamptz)) AS period(name,start) ORDER BY unit, period.name ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=LEAST(unit_spend.spent_micros::numeric+EXCLUDED.spent_micros,9223372036854775807)::bigint"
+{
+p -d $DB -Atc "SELECT version()"
+p -d $DB -Atc "SET enable_indexscan=off; SET enable_bitmapscan=off; EXPLAIN (COSTS OFF) DELETE FROM unit_spend WHERE company_id='$C' AND unit_id='$(U d5)'" | sed 's/^/[delete plan] /'
+( p -d $DB -a -c "BEGIN" -c "SELECT period FROM unit_spend WHERE unit_id='$(U d5)' AND period='month' FOR UPDATE" -c "SELECT pg_sleep(1.0)" -c "COMMIT" > "$L.z" 2>&1 ) &
+sleep 0.2
+( p -d $DB -a -c "SET enable_indexscan=off" -c "SET enable_bitmapscan=off" -c '\timing on' -c "DELETE FROM departments WHERE id='$(U d5)'" > "$L.x" 2>&1 ) &
+sleep 0.2
+p -d $DB -a -c '\timing on' -c "BEGIN" -c "$CHARGE" -c "COMMIT" 2>&1 | sed 's/^/[charge at commit] /'
+wait; sed 's/^/[delete] /' "$L.x"; sed 's/^/[other charge] /' "$L.z"
+p -d $DB -c "SELECT right(unit_id::text,2) AS unit, period, spent_micros FROM unit_spend ORDER BY 1,2" -c "SELECT right(id::text,2) AS department FROM departments ORDER BY 1"
+} > "$L" 2>&1
+rm -f "$L".x "$L".z; p -d postgres -qc "DROP DATABASE $DB"

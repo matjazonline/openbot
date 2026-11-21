@@ -723,3 +723,57 @@ async fn unit_resource_selection_admission_agent_two_placements_reach_both_on_an
         refused.err()
     );
 }
+
+/// Plan07 02A with decision d (B1-F1): admission checks the agent's model connection against the
+/// agent's reach for every use: moved into Billing, the unplaced agent's run is refused naming
+/// it; placed in Billing, or with the connection moved back up, it is admitted.
+#[tokio::test]
+async fn unit_model_default_admission_refuses_a_model_moved_out_of_reach() {
+    let (origin, _server) = server(HTTP_OK).await;
+    let setup = Box::pin(agent_setup(&origin)).await;
+    let p = &setup.fixture.persistence;
+    let company = setup.fixture.target.company.as_uuid();
+    let owner = setup.fixture.target.actor.user_id();
+    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
+    let connection: Uuid = sqlx::query_scalar(
+        "SELECT id FROM company_model_connections WHERE company_id=$1 AND provider=$2",
+    )
+    .bind(company)
+    .bind(SCRIPTED_PROVIDER)
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    let billing = p.test_unit(company, "billing").await;
+    let root = p.test_root_unit(company).await;
+    p.move_model_connection(owner, company, connection, billing)
+        .await
+        .unwrap();
+    let refused = service
+        .admit(request(&setup, "model-moved", Uuid::new_v4()).await)
+        .await;
+    assert!(
+        refused.as_ref().err().is_some_and(|error| outside(
+            error,
+            "admission.resource_outside_unit",
+            connection
+        )),
+        "{:?}",
+        refused.err()
+    );
+    place_agent(&setup, billing).await;
+    created(
+        service
+            .admit(request(&setup, "model-placed", Uuid::new_v4()).await)
+            .await
+            .unwrap(),
+    );
+    p.move_model_connection(owner, company, connection, root)
+        .await
+        .unwrap();
+    created(
+        service
+            .admit(request(&setup, "model-up", Uuid::new_v4()).await)
+            .await
+            .unwrap(),
+    );
+}

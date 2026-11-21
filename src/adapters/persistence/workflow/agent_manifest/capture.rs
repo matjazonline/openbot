@@ -85,6 +85,14 @@ impl Closure {
         .await?
         .ok_or_else(refused)?;
         super::super::agent_authority::check_definition_on(tx, &revision.definition, mode).await?;
+        crate::adapters::persistence::unit_resources::check_agent_model_reach_on(
+            tx,
+            self.company,
+            agent.as_uuid(),
+            revision.definition.model.as_ref(),
+            crate::app_error::UnitCheckStage::Admission,
+        )
+        .await?;
         // An agent's own tools and skills must be in its own reach now (Plan07 decision d), for
         // the use mode that runs them: model-only uses expose neither.
         if mode == AgentUseMode::Tools {

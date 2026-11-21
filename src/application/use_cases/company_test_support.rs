@@ -306,6 +306,11 @@ impl CompanyPersistence for MockCompanyPersistence {
             connections
                 .into_iter()
                 .map(|connection| CompanyModelConnection {
+                    id: Uuid::new_v4(),
+                    // This double's root unit is identified by the company id.
+                    unit_id: company_id,
+                    unit_name: "Root".into(),
+                    in_root: true,
                     has_api_key: connection.api_key.is_some(),
                     provider: connection.provider,
                     models: connection.models,
@@ -314,6 +319,43 @@ impl CompanyPersistence for MockCompanyPersistence {
                 .collect(),
         );
         Ok(())
+    }
+
+    async fn replace_unit_model_connections_for_user(
+        &self,
+        _user_id: Uuid,
+        _company_id: Uuid,
+        _unit_id: Uuid,
+        _connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()> {
+        // This double models no departments below the root.
+        Err(company_not_found())
+    }
+
+    async fn model_connections_in_agent_reach(
+        &self,
+        _company_id: Uuid,
+        _agent_id: Uuid,
+    ) -> AppResult<Vec<Uuid>> {
+        // This double models only the root, which every agent reaches.
+        Ok(self
+            .model_connections
+            .lock()
+            .unwrap()
+            .iter()
+            .flatten()
+            .map(|connection| connection.id)
+            .collect())
+    }
+
+    async fn move_model_connection(
+        &self,
+        _user_id: Uuid,
+        _company_id: Uuid,
+        _id: Uuid,
+        _target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        Err(company_not_found())
     }
 }
 
@@ -378,11 +420,28 @@ impl crate::application::ports::administration::AdministrationPersistence
     }
     async fn managed_units(
         &self,
-        _actor: uuid::Uuid,
-        _company: crate::domain::workflow::CompanyId,
+        actor: uuid::Uuid,
+        company: crate::domain::workflow::CompanyId,
     ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
-        // This double models no departments.
-        Ok(Vec::new())
+        // This double models only the root, identified by the company id; its managers manage it.
+        use crate::application::ports::administration::{
+            AdministrationPersistence, ManagementTarget,
+        };
+        Ok(
+            match AdministrationPersistence::management_role(
+                self,
+                actor,
+                company,
+                ManagementTarget::Root,
+            )
+            .await?
+            {
+                Some(_) => vec![crate::entities::department::DepartmentId::new(
+                    company.as_uuid(),
+                )],
+                None => Vec::new(),
+            },
+        )
     }
     async fn managed_unit_choices(
         &self,
@@ -390,8 +449,22 @@ impl crate::application::ports::administration::AdministrationPersistence
         _company: crate::domain::workflow::CompanyId,
     ) -> crate::app_error::AppResult<Vec<crate::application::ports::administration::ManagedUnit>>
     {
-        // This double models no departments.
-        Ok(Vec::new())
+        // This double models only the root, identified by the company id (see `managed_units`).
+        Ok(
+            crate::application::ports::administration::AdministrationPersistence::managed_units(
+                self, _actor, _company,
+            )
+            .await?
+            .into_iter()
+            .map(
+                |id| crate::application::ports::administration::ManagedUnit {
+                    id,
+                    name: "Root".into(),
+                    is_root: true,
+                },
+            )
+            .collect(),
+        )
     }
     async fn default_resource_unit(
         &self,

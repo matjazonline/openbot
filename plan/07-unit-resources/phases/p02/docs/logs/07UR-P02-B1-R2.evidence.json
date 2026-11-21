@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "round": "07UR-P02-B1-R2",
+  "artifact": "5a938fa0571d0863f5c823653901ca94f59b6cb7effd63222ca4ebd317494359",
+  "checks": [
+    {
+      "criteria": [
+        "B1-F1",
+        "B1-F2",
+        "B1-F4 directory",
+        "D1",
+        "D2"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_model_default department_directory provisioning builder_",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b1 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-new-and-fixed.txt",
+          "sha256": "3a2cf7acc91d352659c770c9cf8e762e9ce978e284d99815d9e15527bf492d5f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression (touched areas, before the directory schema fix)"
+      ],
+      "command": "cargo test --locked --offline --lib -- company agent department ui_ onboarding model library provisioning credential pages unit_resource",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b1 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused.txt",
+          "sha256": "012c472fdc22eb3e249a4c15d7ad172c524631c0a933b744e7eb96ad0b2b144c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "a1c2c3178e4169b5d4af25efc60d9edc26e69de9bc86867eb1956daf757780b7"
+        }
+      ]
+    }
+  ]
+}

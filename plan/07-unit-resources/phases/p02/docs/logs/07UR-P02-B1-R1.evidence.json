@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "round": "07UR-P02-B1-R1",
+  "artifact": "bbfb5e1c2cbba8700411b000a30a30bdc40506c4cd22830826b721b4558c03b1",
+  "checks": [
+    {
+      "criteria": [
+        "D1",
+        "D1 r2",
+        "D2",
+        "D2 r2",
+        "D3",
+        "decision g",
+        "decision a"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_model_default autonomous_agent_publication_native_only_needs_no_hosted_connection agent_address_create_builder_refusals_are_tool_errors autonomous_agent_recovery_model_removal_preserves_unknown_effect a_library_pick_is_copied",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b1 (+ _test and per-test own databases), fresh init schema, Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-new-and-fixed.txt",
+          "sha256": "795cf31832f37e1b4d0c4dd05aac31fe5654e08ffaca60bb5f19d63034924831"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression (touched areas, after fixes)"
+      ],
+      "command": "cargo test --locked --offline --lib -- company agent department ui_ onboarding model library provisioning credential pages unit_resource",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b1 (+ _test and per-test own databases), fresh init schema, Node 24 first on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-focused.txt",
+          "sha256": "c354af3e6e6b00ea79610ace2d49070ea021eafc68be36c74bca777ad2a434d2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "broad regression (before the invariant revert)"
+      ],
+      "command": "cargo test --locked --offline --lib",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b1 (+ _test and per-test own databases), fresh init schema, Node 24 first on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-lib-suite.txt",
+          "sha256": "abf01e7fcfd4571686b11d89b5a38d398c4354ce398c0368cde5b932a8423d4b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-clippy.txt",
+          "sha256": "41c41427c523d29db4d60882eb3d56ea6feacec141f0ee7a0df0920821cd683b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline SQL metadata"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh openbot_p07_p02b1_sqlx @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-check.txt",
+          "sha256": "055743607538801d7c57adf3096d72a7e2149ce1f19319446e3750775ee0ccec"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "schema apply"
+      ],
+      "command": "psql -X -q -v ON_ERROR_STOP=1 -f migrations/20260817000000_init_schema.sql",
+      "fixture": "fresh openbot_p07_p02b1_schema @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-schema-apply.txt",
+          "sha256": "ade96cb43a07680634b3010b97d949897e279efc60986faca53aea8ceeed9bbb"
+        }
+      ]
+    }
+  ]
+}

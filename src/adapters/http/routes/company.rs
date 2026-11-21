@@ -35,6 +35,25 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{id}",
             put(update_company_json).delete(delete_company_json),
         )
+        .route(
+            "/api/companies/{company}/model-connections/{id}/move",
+            axum::routing::post(move_model_connection),
+        )
+}
+
+/// POST /api/companies/{company}/model-connections/{id}/move - Move a model connection to
+/// another unit the caller manages, listing the agents pinned to it (Plan07 02A).
+#[instrument(skip_all)]
+async fn move_model_connection(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, id)): Path<(Uuid, Uuid)>,
+    Json(target): Json<super::unit_resources::UnitTarget>,
+) -> AppResult<Json<serde_json::Value>> {
+    let moved = company_use_cases
+        .move_model_connection(user.id, company, id, target.unit_id)
+        .await?;
+    Ok(Json(super::unit_resources::moved_json(&moved)))
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

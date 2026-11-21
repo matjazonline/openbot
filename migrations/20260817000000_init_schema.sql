@@ -3841,10 +3841,12 @@ CREATE TABLE public.company_mcp_tool_grants (
 
 CREATE TABLE public.company_model_connections (
     company_id uuid NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    unit_id uuid NOT NULL,
     provider text NOT NULL,
     api_key text NOT NULL,
     models text[] NOT NULL,
-    is_default boolean DEFAULT false NOT NULL,
+    default_for_unit boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT company_model_connections_api_key_check CHECK (((btrim(api_key) <> ''::text) AND (octet_length(api_key) <= 16384))),
@@ -8167,7 +8169,8 @@ CREATE INDEX company_invites_email_created_idx ON public.company_invites USING b
 -- Name: company_model_connections_one_default_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX company_model_connections_one_default_idx ON public.company_model_connections USING btree (company_id) WHERE is_default;
+CREATE UNIQUE INDEX company_model_connections_one_default_idx ON public.company_model_connections USING btree (company_id, unit_id) WHERE default_for_unit;
+CREATE UNIQUE INDEX company_model_connections_id_idx ON public.company_model_connections USING btree (company_id, id);
 
 
 --
@@ -15846,6 +15849,12 @@ ALTER TABLE ONLY public.workflow_http_connections
 CREATE INDEX skills_unit_idx ON public.skills USING btree (company_id, unit_id);
 CREATE INDEX company_mcp_connections_unit_idx ON public.company_mcp_connections USING btree (company_id, unit_id);
 CREATE INDEX workflow_http_connections_unit_idx ON public.workflow_http_connections USING btree (company_id, unit_id);
+-- Model connections belong to a unit too (Plan07 02A, decision g): one per provider per company,
+-- each unit marking at most one of its own as its default.
+ALTER TABLE ONLY public.company_model_connections
+    ADD CONSTRAINT company_model_connections_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX company_model_connections_unit_idx ON public.company_model_connections USING btree (company_id, unit_id);
 
 -- Whether `unit` is `start` or one of its ancestors (Plan07): a skill or connection is in reach of
 -- the desks, definitions and agents in its unit and below it. Bounded like the tree (8 levels).
@@ -15883,6 +15892,28 @@ CREATE FUNCTION public.agent_reaches(checked_company uuid, checked_agent uuid, u
     SELECT EXISTS (
         SELECT 1 FROM starts WHERE public.unit_reaches(checked_company, starts.department_id, unit)
     )
+$$;
+
+-- The model a new agent pins when it names none (Plan07 02A.2): the default connection of the
+-- nearest unit from `start` upward (the root when `start` is NULL) that has one with a key, and
+-- that connection's first model. No row when no unit up to the root has a default.
+CREATE FUNCTION public.unit_default_model(checked_company uuid, start uuid)
+    RETURNS TABLE (provider text, model text) LANGUAGE sql STABLE AS $$
+    WITH RECURSIVE chain(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1 FROM public.departments AS department
+        WHERE department.company_id = checked_company
+          AND (department.id = start OR (start IS NULL AND department.is_root))
+        UNION ALL
+        SELECT department.id, department.parent_id, chain.depth + 1 FROM chain
+        JOIN public.departments AS department
+            ON department.company_id = checked_company AND department.id = chain.parent_id
+        WHERE chain.depth < 8
+    )
+    SELECT connection.provider, connection.models[1] FROM chain
+    JOIN public.company_model_connections AS connection
+        ON connection.company_id = checked_company AND connection.unit_id = chain.id
+       AND connection.default_for_unit
+    ORDER BY chain.depth LIMIT 1
 $$;
 
 -- The unit a new skill or connection gets when its creator names none: the root for a root

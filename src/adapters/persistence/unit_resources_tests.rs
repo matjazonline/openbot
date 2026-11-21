@@ -1001,3 +1001,48 @@ async fn unit_resource_skills_tab_and_agent_authoring_reads() {
             .await,
     );
 }
+
+/// Plan07 G1 r2 D1 (B1-F2): the root's only model connection may move to a department, but no
+/// department's form then deletes the company's last connection, and the root's department form
+/// is held to the settings form's rules.
+#[tokio::test]
+async fn unit_model_default_a_department_form_keeps_the_last_connection() {
+    let Some(database) = own_database().await else {
+        return;
+    };
+    let d = Delegated::on(database.pool.clone()).await;
+    let (company, owner, lead) = (d.f.company, d.f.owner, d.f.member);
+    let p = &d.f.persistence;
+    let write = |default: bool| crate::use_cases::company::CompanyModelConnectionWrite {
+        provider: "openai".into(),
+        api_key: Some("fixture-key".into()),
+        models: vec!["gpt-4o-mini".into()],
+        is_default: default,
+    };
+    CompanyPersistence::replace_model_connections_for_user(p, owner, company, vec![write(true)])
+        .await
+        .unwrap();
+    let cases = crate::use_cases::company::CompanyUseCases::new(Arc::new(p.clone()));
+    let root = p.test_root_unit(company).await;
+    // The root's department form may not empty the root.
+    assert!(matches!(
+        cases
+            .replace_unit_model_connections(owner, company, root, vec![])
+            .await,
+        Err(AppError::BadRequest(_))
+    ));
+    let openai = CompanyPersistence::list_model_connections(p, company)
+        .await
+        .unwrap()
+        .remove(0);
+    p.move_model_connection(owner, company, openai.id, d.unit.id.as_uuid())
+        .await
+        .unwrap();
+    let last = cases
+        .replace_unit_model_connections(lead, company, d.unit.id.as_uuid(), vec![])
+        .await;
+    assert!(
+        matches!(&last, Err(AppError::BadRequest(message)) if message.contains("at least one")),
+        "{last:?}"
+    );
+}

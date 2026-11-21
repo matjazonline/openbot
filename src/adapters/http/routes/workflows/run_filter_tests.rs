@@ -14,8 +14,8 @@ impl Fixture {
     /// A published agent of `company` on an enabled model connection.
     pub(super) async fn model_agent(&self, company: Uuid, slug: &str) -> Uuid {
         sqlx::query(
-            "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
-             VALUES ($1, 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
+            "INSERT INTO company_model_connections(company_id, unit_id, provider, api_key, models) \
+             VALUES ($1, (SELECT id FROM departments WHERE company_id=$1 AND is_root), 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
         )
         .bind(company)
         .execute(self.persistence.pool())

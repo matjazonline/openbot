@@ -1,0 +1,15 @@
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.70s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 4 tests
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_authority_moves_and_department_delete ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_reach_refuses_publication_after_a_move ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_competing_units_add_one_provider ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_cascade_pins_the_nearest_default_and_stays_frozen ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4953 filtered out; finished in 3.70s
+

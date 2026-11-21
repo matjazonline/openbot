@@ -224,8 +224,10 @@ impl Workspace {
         editable: bool,
     ) -> AppResult<String> {
         let model_connections = if editable {
+            // The settings form edits the root's own connections (Plan07 02A); a department's
+            // are edited on its page.
             self.company_use_cases
-                .list_model_connections(self.user_id, company.id)
+                .list_unit_model_connections(self.user_id, company.id, None)
                 .await?
         } else {
             Vec::new()
@@ -373,6 +375,7 @@ impl Workspace {
         let section = department_section(
             super::ui_departments::DepartmentSectionServices {
                 departments: &self.department_use_cases,
+                companies: &self.company_use_cases,
                 knowledge: &self.knowledge,
                 config: &self.config,
             },
@@ -899,65 +902,73 @@ impl SubmittedCompany {
     }
 
     fn model_connections(&self) -> AppResult<Vec<CompanyModelConnectionWrite>> {
-        // `connection_fields` is a flattened catch-all, so an input named `connection_0_modles`
-        // would otherwise be dropped in silence and read as "this provider enabled no models".
-        // Anything claiming to be a connection field has to be one this loop actually reads.
-        for key in self.form.connection_fields.keys() {
-            let Some(rest) = key.strip_prefix("connection_") else {
-                continue;
-            };
-            let recognized = rest.split_once('_').is_some_and(|(index, field)| {
-                index.parse::<usize>().is_ok_and(|index| {
-                    index < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS
-                }) && matches!(field, "provider" | "models" | "api_key" | "remove")
-            });
-            if !recognized {
-                return Err(AppError::BadRequest(format!(
-                    "Unrecognized model connection field '{key}'."
-                )));
-            }
-        }
-
-        let mut connections = Vec::new();
-        for index in 0..crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
-            if self.connection_removed(index) {
-                continue;
-            }
-            let provider = self
-                .form
-                .connection_fields
-                .get(&format!("connection_{index}_provider"))
-                .map(String::as_str)
-                .unwrap_or_default()
-                .trim();
-            if provider.is_empty() {
-                continue;
-            }
-            let models = self
-                .form
-                .connection_fields
-                .get(&format!("connection_{index}_models"))
-                .map(String::as_str)
-                .unwrap_or_default()
-                .split([',', '\n'])
-                .map(str::trim)
-                .filter(|model| !model.is_empty())
-                .map(String::from)
-                .collect();
-            let api_key = self
-                .form
-                .connection_fields
-                .get(&format!("connection_{index}_api_key"))
-                .cloned();
-            connections.push(CompanyModelConnectionWrite::new(
-                provider,
-                api_key,
-                models,
-                self.form.default_model_provider == Some(index),
-            )?);
-        }
-        Ok(connections)
+        submitted_model_connections(
+            &self.form.connection_fields,
+            self.form.default_model_provider,
+        )
     }
+}
+
+/// The provider rows of a submitted model connection form, shared by the company settings form
+/// and a department's (Plan07 02A). Unknown connection fields are refused, removed rows skipped.
+pub(super) fn submitted_model_connections(
+    fields: &HashMap<String, String>,
+    default_model_provider: Option<usize>,
+) -> AppResult<Vec<CompanyModelConnectionWrite>> {
+    // `connection_fields` is a flattened catch-all, so an input named `connection_0_modles`
+    // would otherwise be dropped in silence and read as "this provider enabled no models".
+    // Anything claiming to be a connection field has to be one this loop actually reads.
+    for key in fields.keys() {
+        let Some(rest) = key.strip_prefix("connection_") else {
+            continue;
+        };
+        let recognized = rest.split_once('_').is_some_and(|(index, field)| {
+            index
+                .parse::<usize>()
+                .is_ok_and(|index| index < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS)
+                && matches!(field, "provider" | "models" | "api_key" | "remove")
+        });
+        if !recognized {
+            return Err(AppError::BadRequest(format!(
+                "Unrecognized model connection field '{key}'."
+            )));
+        }
+    }
+
+    let mut connections = Vec::new();
+    for index in 0..crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
+        if fields
+            .get(&format!("connection_{index}_remove"))
+            .is_some_and(|value| matches!(value.as_str(), "true" | "on"))
+        {
+            continue;
+        }
+        let provider = fields
+            .get(&format!("connection_{index}_provider"))
+            .map(String::as_str)
+            .unwrap_or_default()
+            .trim();
+        if provider.is_empty() {
+            continue;
+        }
+        let models = fields
+            .get(&format!("connection_{index}_models"))
+            .map(String::as_str)
+            .unwrap_or_default()
+            .split([',', '\n'])
+            .map(str::trim)
+            .filter(|model| !model.is_empty())
+            .map(String::from)
+            .collect();
+        let api_key = fields.get(&format!("connection_{index}_api_key")).cloned();
+        connections.push(CompanyModelConnectionWrite::new(
+            provider,
+            api_key,
+            models,
+            default_model_provider == Some(index),
+        )?);
+    }
+    Ok(connections)
 }
 
 impl Workspace {

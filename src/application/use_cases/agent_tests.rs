@@ -18,6 +18,10 @@ fn company_double(
         .with_memberships(members)
         .with_model_connections(
             vec![crate::entities::company::CompanyModelConnection {
+                id: uuid::Uuid::nil(),
+                unit_id: uuid::Uuid::nil(),
+                unit_name: "Root".into(),
+                in_root: true,
                 provider: "openai".into(),
                 models: vec!["gpt-4o".into()],
                 is_default: true,
@@ -780,15 +784,16 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
     );
     assert!(provisioned.warnings.is_empty());
 
-    // A definition published on a model this company has not enabled still gets created --
-    // pinned to the company default, because its desk answers on an explicit model
-    // (01DEP-P03-D3) -- and it says why its own model was dropped.
+    // A definition published on a model this company has not enabled still gets created, with
+    // its own model dropped and a warning saying why. Its desk answers on an explicit model
+    // (01DEP-P03-D3), so persistence pins its department's default inside the creating
+    // transaction (Plan07 02A.2); this double creates the write as handed over, unpinned.
     let pinned = use_cases
         .create_agent_from_library(owner_id, company_id, elsewhere.id, None)
         .await
         .expect("a pick whose model is unavailable here");
-    assert_eq!(pinned.agent.provider.as_deref(), Some("openai"));
-    assert_eq!(pinned.agent.model.as_deref(), Some("gpt-4o"));
+    assert_eq!(pinned.agent.provider, None);
+    assert_eq!(pinned.agent.model, None);
     assert_eq!(
         pinned
             .warnings
@@ -811,16 +816,11 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
         .create_agent_from_library(owner_id, company_id, unmodelled.id, None)
         .await
         .expect("a pick with no model of its own");
-    assert_eq!(defaulted.agent.provider.as_deref(), Some("openai"));
-    assert_eq!(defaulted.agent.model.as_deref(), Some("gpt-4o"));
-    assert_eq!(
-        defaulted
-            .warnings
-            .iter()
-            .map(|warning| warning.code.as_str())
-            .collect::<Vec<_>>(),
-        vec!["library_model_pinned"]
-    );
+    // Persistence pins it inside the creating transaction (Plan07 02A.2) and the use case then
+    // warns `library_model_pinned`; this double creates the write unpinned, so neither happens.
+    assert_eq!(defaulted.agent.provider, None);
+    assert_eq!(defaulted.agent.model, None);
+    assert!(defaulted.warnings.is_empty());
 
     // A company agent is not a library definition, so it cannot be picked as one.
     assert!(

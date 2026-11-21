@@ -1,0 +1,18 @@
+-- D6 period start formula under a non-UTC session time zone, at a local/UTC month boundary.
+SET TIME ZONE 'America/Los_Angeles';
+SET
+WITH t(at) AS (VALUES (timestamptz '2026-11-30 23:30:00-08'), (timestamptz '2026-12-01 00:30:00+09'))
+SELECT at AT TIME ZONE 'UTC' AS at_utc,
+  (date_trunc('month', at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS month_start_utc,
+  (date_trunc('day', at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS day_start_utc,
+  date_trunc('month', at, 'UTC') = (date_trunc('month', at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS same_as_3arg_form
+FROM t;
+       at_utc        |   month_start_utc   |    day_start_utc    | same_as_3arg_form 
+---------------------+---------------------+---------------------+-------------------
+ 2026-12-01 07:30:00 | 2026-12-01 00:00:00 | 2026-12-01 00:00:00 | t
+ 2026-11-30 15:30:00 | 2026-11-01 00:00:00 | 2026-11-30 00:00:00 | t
+(2 rows)
+
+-- bigint overflow of an un-cast tokens x price product within the table CHECK bounds
+SELECT 2147483647::bigint * 1000000000000::bigint;
+ERROR:  bigint out of range

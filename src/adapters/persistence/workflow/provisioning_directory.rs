@@ -39,8 +39,22 @@ pub(super) async fn list_on(
         fit
     };
     let mut models = Vec::new();
-    for (provider, model) in ready_models_on(tx, company).await? {
-        let entry = json!({"provider": provider, "model": model});
+    // Each model names the department that owns its connection: a created agent may use only its
+    // department's or one above it (Plan07 02A).
+    let ready: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT connection.provider, model.name, unit.name FROM company_model_connections AS connection \
+         JOIN departments AS unit ON unit.company_id = connection.company_id \
+          AND unit.id = connection.unit_id \
+         CROSS JOIN LATERAL unnest(connection.models) WITH ORDINALITY AS model(name, position) \
+         WHERE connection.company_id = $1 AND connection.api_key IS NOT NULL \
+         ORDER BY (unit.is_root AND connection.default_for_unit) DESC, connection.provider, \
+                  model.position",
+    )
+    .bind(company.as_uuid())
+    .fetch_all(&mut **tx)
+    .await?;
+    for (provider, model, unit) in ready {
+        let entry = json!({"provider": provider, "model": model, "department": unit});
         if models.len() == MAX_LISTED_MODELS || !fits(&entry) {
             truncated = true;
             break;

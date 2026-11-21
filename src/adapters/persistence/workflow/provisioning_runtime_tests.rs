@@ -190,10 +190,11 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
         .map(|agent| agent["slug"].as_str().unwrap())
         .collect();
     assert_eq!(listed, ["agent-builder", "assistant"]);
-    assert_eq!(
-        receipts[0]["models"],
-        json!([{"provider": SCRIPTED_PROVIDER, "model": SCRIPTED_MODEL}])
-    );
+    // Each model names the department owning its connection, here the root (Plan07 02A).
+    assert_eq!(receipts[0]["models"].as_array().unwrap().len(), 1);
+    assert_eq!(receipts[0]["models"][0]["provider"], SCRIPTED_PROVIDER);
+    assert_eq!(receipts[0]["models"][0]["model"], SCRIPTED_MODEL);
+    assert!(receipts[0]["models"][0]["department"].is_string());
     let created = &receipts[1];
     assert_eq!(created["agent"]["slug"], "helper", "{created}");
     assert_eq!(created["address"], d.address("helper"), "F051");

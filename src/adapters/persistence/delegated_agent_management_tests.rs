@@ -925,3 +925,573 @@ async fn unit_resource_selection_offers_follow_the_agent_reach() {
     assert!(choose(http[1]).await.is_err(), "a sibling's operation");
     choose(http[0]).await.unwrap();
 }
+
+fn model(provider: &str, model: &str, key: &str, is_default: bool) -> CompanyModelConnectionWrite {
+    CompanyModelConnectionWrite {
+        provider: provider.into(),
+        api_key: Some(key.into()),
+        models: vec![model.into()],
+        is_default,
+    }
+}
+
+fn unpinned(slug: &str) -> AgentWrite {
+    AgentWrite {
+        provider: None,
+        model: None,
+        ..write(slug)
+    }
+}
+
+impl ManagedAgents {
+    async fn connection(&self, provider: &str) -> crate::entities::company::CompanyModelConnection {
+        CompanyPersistence::list_model_connections(self.p(), self.d.f.company)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|connection| connection.provider.as_str() == provider)
+            .unwrap()
+    }
+    async fn create_as(
+        &self,
+        user: Uuid,
+        write: AgentWrite,
+        unit: Option<DepartmentId>,
+    ) -> AppResult<CreatedAgent> {
+        self.cases
+            .create_agent(
+                user,
+                self.d.f.company,
+                write,
+                unit.map(|department| AgentPlacement {
+                    department,
+                    role: None,
+                }),
+            )
+            .await
+    }
+}
+
+/// Plan07 02A.2/02A.3: an agent naming no model pins the nearest default from its department up
+/// (the root's when unplaced or when no department above has one); a later default change leaves
+/// it pinned; an explicit model outside its department's reach is refused.
+#[tokio::test]
+async fn unit_model_default_cascade_pins_the_nearest_default_and_stays_frozen() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let lead = m.d.f.member;
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        m.p(),
+        lead,
+        m.d.f.company,
+        m.d.unit.id.as_uuid(),
+        vec![model("anthropic", "claude-sales", "sales-key", true)],
+    )
+    .await
+    .unwrap();
+    let pinned = |created: &CreatedAgent| {
+        (
+            created.agent.provider.clone().unwrap(),
+            created.agent.model.clone().unwrap(),
+        )
+    };
+    let field = m
+        .create_as(lead, unpinned("field-agent"), Some(m.d.child.id))
+        .await
+        .unwrap();
+    assert_eq!(pinned(&field), ("anthropic".into(), "claude-sales".into()));
+    // A library copy naming no model pins its department's default inside the creating
+    // transaction too.
+    let definition = m
+        .cases
+        .create_library_agent(
+            &crate::entities::user::Caller::operator(m.d.f.owner),
+            unpinned("library-helper"),
+        )
+        .await
+        .unwrap();
+    let copied = m
+        .cases
+        .create_agent_from_library(
+            lead,
+            m.d.f.company,
+            definition.id,
+            Some(AgentPlacement {
+                department: m.d.child.id,
+                role: None,
+            }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        (
+            copied.agent.provider.as_deref(),
+            copied.agent.model.as_deref()
+        ),
+        (Some("anthropic"), Some("claude-sales"))
+    );
+    let rooted = m
+        .create_as(m.d.f.owner, unpinned("rooted-agent"), None)
+        .await
+        .unwrap();
+    assert_eq!(pinned(&rooted), ("openai".into(), "gpt-4o-mini".into()));
+    let support = m
+        .create_as(m.d.f.owner, unpinned("support-agent"), Some(m.d.sibling.id))
+        .await
+        .unwrap();
+    assert_eq!(pinned(&support), ("openai".into(), "gpt-4o-mini".into()));
+    // Sales makes another provider its default: the Field agent keeps its pinned model, a new one
+    // pins the new default.
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        m.p(),
+        lead,
+        m.d.f.company,
+        m.d.unit.id.as_uuid(),
+        vec![
+            CompanyModelConnectionWrite {
+                api_key: None,
+                ..model("anthropic", "claude-sales", "", false)
+            },
+            model("groq", "llama-sales", "groq-key", true),
+        ],
+    )
+    .await
+    .unwrap();
+    let kept = m
+        .p()
+        .load_capabilities(m.d.f.company, field.agent.id)
+        .await
+        .unwrap()
+        .unwrap()
+        .agent;
+    assert_eq!(
+        (kept.provider.as_deref(), kept.model.as_deref()),
+        (Some("anthropic"), Some("claude-sales"))
+    );
+    let later = m
+        .create_as(lead, unpinned("field-later"), Some(m.d.child.id))
+        .await
+        .unwrap();
+    assert_eq!(pinned(&later), ("groq".into(), "llama-sales".into()));
+    // Support cannot reach Sales's providers.
+    let refused = m
+        .create_as(
+            m.d.f.owner,
+            AgentWrite {
+                provider: Some("anthropic".into()),
+                model: Some("claude-sales".into()),
+                ..write("support-explicit")
+            },
+            Some(m.d.sibling.id),
+        )
+        .await;
+    assert!(
+        matches!(&refused, Err(AppError::BadRequest(message)) if message.contains("outside this agent's department")),
+        "{refused:?}"
+    );
+}
+
+/// Plan07 02A.1 with decisions a and g: a unit's managers replace only its own connections; a
+/// provider another unit owns is a conflict; the root keeps exactly one default, so its default
+/// cannot be moved away; a moved connection lands non-default; a department owning one cannot be
+/// deleted until it moves; the unit key is a real foreign key.
+#[tokio::test]
+async fn unit_model_default_authority_moves_and_department_delete() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let (company, owner, lead) = (m.d.f.company, m.d.f.owner, m.d.f.member);
+    let sales = m.d.unit.id.as_uuid();
+    let m = &m;
+    let replace = |user: Uuid, unit: Option<Uuid>, rows: Vec<CompanyModelConnectionWrite>| async move {
+        match unit {
+            Some(unit) => {
+                CompanyPersistence::replace_unit_model_connections_for_user(
+                    m.p(),
+                    user,
+                    company,
+                    unit,
+                    rows,
+                )
+                .await
+            }
+            None => {
+                CompanyPersistence::replace_model_connections_for_user(m.p(), user, company, rows)
+                    .await
+            }
+        }
+    };
+    let root_rows = || vec![model("openai", "gpt-4o-mini", "fixture-key", true)];
+    // The Sales lead does not manage the root; the Support lead does not manage Sales.
+    assert!(matches!(
+        replace(lead, None, root_rows()).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        replace(
+            m.d.sibling_lead,
+            Some(sales),
+            vec![model("groq", "g", "k", true)]
+        )
+        .await,
+        Err(AppError::NotFound(_))
+    ));
+    // The root's provider is not Sales's to rewrite.
+    let conflict = replace(
+        lead,
+        Some(sales),
+        vec![model("openai", "gpt-x", "other-key", false)],
+    )
+    .await;
+    assert!(
+        matches!(&conflict, Err(AppError::Conflict(message)) if message.contains("openai")),
+        "{conflict:?}"
+    );
+    // At most one default per department.
+    let cases = crate::use_cases::company::CompanyUseCases::new(Arc::new(m.p().clone()));
+    assert!(matches!(
+        cases
+            .replace_unit_model_connections(
+                lead,
+                company,
+                sales,
+                vec![
+                    model("groq", "g", "k", true),
+                    model("anthropic", "a", "k", true)
+                ],
+            )
+            .await,
+        Err(AppError::BadRequest(_))
+    ));
+    replace(
+        lead,
+        Some(sales),
+        vec![model("anthropic", "claude-sales", "sales-key", true)],
+    )
+    .await
+    .unwrap();
+    // The root's default cannot leave it while the root keeps another connection.
+    replace(
+        owner,
+        None,
+        vec![
+            CompanyModelConnectionWrite {
+                api_key: None,
+                ..model("openai", "gpt-4o-mini", "", true)
+            },
+            model("google", "gemini-root", "google-key", false),
+        ],
+    )
+    .await
+    .unwrap();
+    let openai = m.connection("openai").await;
+    assert!(matches!(
+        m.p()
+            .move_model_connection(owner, company, openai.id, sales)
+            .await,
+        Err(AppError::BadRequest(_))
+    ));
+    // Moved into the root, which has a default, Sales's default lands non-default.
+    let anthropic = m.connection("anthropic").await;
+    let root = m.p().test_root_unit(company).await;
+    let moved = m
+        .p()
+        .move_model_connection(owner, company, anthropic.id, root)
+        .await
+        .unwrap();
+    assert_eq!(moved.to.as_uuid(), root);
+    let anthropic = m.connection("anthropic").await;
+    assert_eq!(anthropic.unit_id, root);
+    assert!(!anthropic.is_default);
+    assert!(m.connection("openai").await.is_default);
+    // A department owning a connection is not deleted until it moves.
+    replace(
+        lead,
+        Some(m.d.child.id.as_uuid()),
+        vec![model("groq", "g", "field-key", false)],
+    )
+    .await
+    .unwrap();
+    // Its own desk goes first (Plan06 decision 9); then only the unit's resources hold it.
+    m.d.f.drop_desk(m.d.child.id).await;
+    let refused =
+        m.d.f
+            .use_cases
+            .delete_department(owner, company, m.d.child.id)
+            .await;
+    assert!(
+        matches!(&refused, Err(AppError::Conflict(message)) if message.contains("model connection groq")),
+        "{refused:?}"
+    );
+    let foreign = sqlx::query(
+        "UPDATE company_model_connections SET unit_id = gen_random_uuid() \
+         WHERE company_id = $1 AND provider = 'groq'",
+    )
+    .bind(company)
+    .execute(m.p().pool())
+    .await
+    .unwrap_err();
+    assert_eq!(
+        foreign.as_database_error().unwrap().code().as_deref(),
+        Some("23503")
+    );
+}
+
+/// Plan07 02A with decision d: an agent's model connection must stay in its reach; moved to a
+/// sibling, the agent's next publication is refused naming it, and the move lists the agent.
+#[tokio::test]
+async fn unit_model_default_reach_refuses_publication_after_a_move() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let (company, owner, lead) = (m.d.f.company, m.d.f.owner, m.d.f.member);
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        m.p(),
+        lead,
+        company,
+        m.d.unit.id.as_uuid(),
+        vec![model("anthropic", "claude-sales", "sales-key", true)],
+    )
+    .await
+    .unwrap();
+    let created = m
+        .create_as(lead, unpinned("sales-agent"), Some(m.d.unit.id))
+        .await
+        .unwrap();
+    let anthropic = m.connection("anthropic").await;
+    let moved = m
+        .p()
+        .move_model_connection(owner, company, anthropic.id, m.d.sibling.id.as_uuid())
+        .await
+        .unwrap();
+    assert!(
+        moved.uses.iter().any(|used| used.id == created.agent.id),
+        "{moved:?}"
+    );
+    let active = m
+        .p()
+        .active_agent_revision(m.scope(m.actor(), created.agent.id))
+        .await
+        .unwrap()
+        .unwrap();
+    let refused = m
+        .p()
+        .publish_agent(PublishAgent {
+            scope: m.scope(m.actor(), created.agent.id),
+            expected_draft_revision: created.agent.draft_revision,
+            expected_active_revision: Some(active.id),
+            key: AgentPublicationKey::parse("model-moved").unwrap(),
+        })
+        .await;
+    assert!(
+        matches!(&refused, Err(AppError::ResourceOutsideUnit(refusal))
+            if refusal.code() == "publication.resource_outside_unit"
+                && refusal.resource == anthropic.id),
+        "{:?}",
+        refused.err()
+    );
+}
+
+/// Plan07 G1 r2 D1: two leads adding the same provider to their sibling units at once — one is
+/// saved, the other is a conflict, and the saved key is never overwritten.
+#[tokio::test]
+async fn unit_model_default_competing_units_add_one_provider() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let company = m.d.f.company;
+    let m = &m;
+    let add = |user: Uuid, unit: Uuid, key: &'static str| async move {
+        CompanyPersistence::replace_unit_model_connections_for_user(
+            m.p(),
+            user,
+            company,
+            unit,
+            vec![model("groq", "llama", key, true)],
+        )
+        .await
+    };
+    let (sales, support) = tokio::join!(
+        add(m.d.f.member, m.d.unit.id.as_uuid(), "sales-key"),
+        add(m.d.sibling_lead, m.d.sibling.id.as_uuid(), "support-key")
+    );
+    let won = match (&sales, &support) {
+        (Ok(()), Err(AppError::Conflict(_))) => m.d.unit.id.as_uuid(),
+        (Err(AppError::Conflict(_)), Ok(())) => m.d.sibling.id.as_uuid(),
+        other => panic!("{other:?}"),
+    };
+    let groq = m.connection("groq").await;
+    assert_eq!(groq.unit_id, won);
+    let key = CompanyPersistence::model_api_key(m.p(), company, &"groq".into())
+        .await
+        .unwrap();
+    let expected = if won == m.d.unit.id.as_uuid() {
+        "sales-key"
+    } else {
+        "support-key"
+    };
+    assert_eq!(key.as_deref(), Some(expected));
+}
+
+/// Plan07 02A.1/02A.2 with G1 r2 D1 (B1-F1): a move needs both units managed; the root's only
+/// connection may leave it, after which an unplaced creation finds no default anywhere and is
+/// refused; a connection moved into a root without a default becomes the company default.
+#[tokio::test]
+async fn unit_model_default_moves_and_an_empty_root() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let (company, owner, lead) = (m.d.f.company, m.d.f.owner, m.d.f.member);
+    let sales = m.d.unit.id.as_uuid();
+    let support = m.d.sibling.id.as_uuid();
+    let root = m.p().test_root_unit(company).await;
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        m.p(),
+        lead,
+        company,
+        sales,
+        vec![model("anthropic", "claude-sales", "sales-key", true)],
+    )
+    .await
+    .unwrap();
+    let (openai, anthropic) = (
+        m.connection("openai").await,
+        m.connection("anthropic").await,
+    );
+    // The Sales lead manages neither the root nor Support.
+    for (id, target) in [(openai.id, sales), (anthropic.id, support)] {
+        assert!(matches!(
+            m.p().move_model_connection(lead, company, id, target).await,
+            Err(AppError::NotFound(_))
+        ));
+    }
+    // The root's only connection may leave it; then no department up from the root has a
+    // default.
+    m.p()
+        .move_model_connection(owner, company, openai.id, support)
+        .await
+        .unwrap();
+    let refused = m.create_as(owner, unpinned("nowhere"), None).await;
+    assert!(
+        matches!(&refused, Err(AppError::BadRequest(message)) if message.contains("Add a model connection")),
+        "{refused:?}"
+    );
+    // Moved into the default-less root, Sales's default becomes the company default.
+    m.p()
+        .move_model_connection(owner, company, anthropic.id, root)
+        .await
+        .unwrap();
+    let anthropic = m.connection("anthropic").await;
+    assert!(anthropic.is_default && anthropic.in_root, "{anthropic:?}");
+    let rooted = m.create_as(owner, unpinned("rooted"), None).await.unwrap();
+    assert_eq!(rooted.agent.provider.as_deref(), Some("anthropic"));
+}
+
+/// Plan07 decision a (B1-F1): a root admin and a root lead replace the root's connections, a
+/// plain member gets not-found; a department's own default beats the one above it; an existing
+/// agent is offered only connections in its reach; a library copy whose model is outside its
+/// department falls back to the department's default.
+#[tokio::test]
+async fn unit_model_default_root_managers_own_defaults_offers_and_library_fallback() {
+    let Some(m) = ManagedAgents::new().await else {
+        return;
+    };
+    let (company, owner, lead) = (m.d.f.company, m.d.f.owner, m.d.f.member);
+    let root = m.p().test_root_unit(company).await;
+    let root_lead = m.p().test_unit_lead(company, root).await;
+    let (plain, _) = super::super::teammate(m.p().pool(), company, "member").await;
+    let rows = |key: &'static str| vec![model("openai", "gpt-4o-mini", key, true)];
+    for manager in [m.d.f.admin, root_lead] {
+        CompanyPersistence::replace_model_connections_for_user(
+            m.p(),
+            manager,
+            company,
+            rows("rotated-key"),
+        )
+        .await
+        .unwrap();
+    }
+    assert!(matches!(
+        CompanyPersistence::replace_model_connections_for_user(m.p(), plain, company, rows("x"))
+            .await,
+        Err(AppError::NotFound(_))
+    ));
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        m.p(),
+        lead,
+        company,
+        m.d.unit.id.as_uuid(),
+        vec![model("anthropic", "claude-sales", "sales-key", true)],
+    )
+    .await
+    .unwrap();
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        m.p(),
+        lead,
+        company,
+        m.d.child.id.as_uuid(),
+        vec![model("groq", "llama-field", "field-key", true)],
+    )
+    .await
+    .unwrap();
+    let field = m
+        .create_as(lead, unpinned("field-own"), Some(m.d.child.id))
+        .await
+        .unwrap();
+    assert_eq!(field.agent.provider.as_deref(), Some("groq"));
+    let support = m
+        .create_as(owner, unpinned("support-agent"), Some(m.d.sibling.id))
+        .await
+        .unwrap();
+    let cases = &m.cases;
+    let offered = |agent: Uuid| async move {
+        cases
+            .list_company_model_connections(owner, company, Some(agent))
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|connection| connection.provider.as_str().to_owned())
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    assert_eq!(
+        offered(support.agent.id).await,
+        ["openai".to_owned()].into()
+    );
+    assert_eq!(
+        offered(field.agent.id).await,
+        [
+            "anthropic".to_owned(),
+            "groq".to_owned(),
+            "openai".to_owned()
+        ]
+        .into()
+    );
+    // A library agent published on Sales's model, copied into Support, pins Support's default.
+    let definition = m
+        .cases
+        .create_library_agent(
+            &crate::entities::user::Caller::operator(owner),
+            AgentWrite {
+                provider: Some("anthropic".into()),
+                model: Some("claude-sales".into()),
+                ..write("library-sales")
+            },
+        )
+        .await
+        .unwrap();
+    let copied = m
+        .cases
+        .create_agent_from_library(
+            owner,
+            company,
+            definition.id,
+            Some(AgentPlacement {
+                department: m.d.sibling.id,
+                role: None,
+            }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(copied.agent.provider.as_deref(), Some("openai"));
+}

@@ -56,7 +56,7 @@ async fn native_for(f: AdmissionFixture, scope: ActivationRequest) -> NativeFixt
     )
     .unwrap();
     let fence = claim.fence;
-    sqlx::query("INSERT INTO company_model_connections(company_id,provider,api_key,models) VALUES($1,'openai','fixture-key','{fixture}')")
+    sqlx::query("INSERT INTO company_model_connections(company_id,unit_id,provider,api_key,models) VALUES($1,(SELECT id FROM departments WHERE company_id=$1 AND is_root),'openai','fixture-key','{fixture}')")
         .bind(scope.company.as_uuid())
         .execute(&f.persistence().pool)
         .await

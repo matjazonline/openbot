@@ -40,7 +40,7 @@ async fn request(p: &PostgresPersistence, path: CopyPath) -> CopyRequest {
     let library_agent = match path {
         CopyPath::Standalone => None,
         CopyPath::LibraryAgent => {
-            sqlx::query("INSERT INTO company_model_connections(company_id,provider,api_key,models,is_default) VALUES($1,'openai','fixture-key','{gpt-test}',true)")
+            sqlx::query("INSERT INTO company_model_connections(company_id,unit_id,provider,api_key,models,default_for_unit) VALUES($1,(SELECT id FROM departments WHERE company_id=$1 AND is_root),'openai','fixture-key','{gpt-test}',true)")
                 .bind(company).execute(p.pool()).await.unwrap();
             let mut input = agent_write("library-copy");
             input.skill_ids = vec![source.id];

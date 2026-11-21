@@ -67,6 +67,10 @@ pub fn router() -> Router<AppState> {
             put(assign_lead),
         )
         .route(
+            "/ui/companies/{company_id}/departments/{department_id}/models",
+            post(save_models),
+        )
+        .route(
             "/ui/companies/{company_id}/departments/{department_id}/lead/{principal_id}",
             delete(clear_lead),
         )
@@ -87,6 +91,8 @@ pub(super) enum DepartmentSelection {
 /// draws the same section under its tabs.
 pub(super) struct DepartmentSectionServices<'a> {
     pub departments: &'a DepartmentUseCases,
+    /// The selected department's own model connections, for its managers (Plan07 02A).
+    pub companies: &'a CompanyUseCases,
     pub knowledge: &'a crate::application::knowledge::KnowledgeLibrary,
     pub config: &'a AppConfig,
 }
@@ -101,6 +107,7 @@ pub(super) async fn department_section(
 ) -> AppResult<String> {
     let DepartmentSectionServices {
         departments,
+        companies,
         knowledge,
         config,
     } = services;
@@ -117,6 +124,18 @@ pub(super) async fn department_section(
         DepartmentSelection::Department { id, .. } => Some(
             departments
                 .department_view(user_id, company_id, *id)
+                .await?,
+        ),
+        _ => None,
+    };
+    let models = match &view {
+        Some(view) if managed.contains(&view.detail.department.id) => Some(
+            companies
+                .list_unit_model_connections(
+                    user_id,
+                    company_id,
+                    Some(view.detail.department.id.as_uuid()),
+                )
                 .await?,
         ),
         _ => None,
@@ -172,6 +191,7 @@ pub(super) async fn department_section(
                 pages::DepartmentKnowledge::ScopeLimit,
                 pages::DepartmentKnowledge::Documents,
             ),
+            models: models.as_deref(),
         },
     ))
 }
@@ -241,6 +261,7 @@ impl Workspace {
         department_section(
             DepartmentSectionServices {
                 departments: &self.department_use_cases,
+                companies: &self.company_use_cases,
                 knowledge: &self.knowledge,
                 config: &self.config,
             },
@@ -711,3 +732,62 @@ async fn clear_lead(
 #[cfg(test)]
 #[path = "ui_departments_tests.rs"]
 mod tests;
+
+/// The department model form as submitted: the same provider rows as the company settings form.
+#[derive(Debug, Deserialize)]
+struct DepartmentModelsForm {
+    default_model_provider: Option<usize>,
+    #[serde(flatten)]
+    connection_fields: std::collections::HashMap<String, String>,
+}
+
+/// POST /ui/companies/{company_id}/departments/{department_id}/models - Replace the
+/// department's own model connections (Plan07 02A): whoever manages the department.
+#[instrument(skip_all)]
+async fn save_models(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<DepartmentModelsForm>,
+) -> AppResult<Response> {
+    let access = workspace.readable(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    let saved = match super::ui_companies::submitted_model_connections(
+        &form.connection_fields,
+        form.default_model_provider,
+    ) {
+        Ok(connections) => {
+            workspace
+                .company_use_cases
+                .replace_unit_model_connections(
+                    workspace.user_id,
+                    company_id,
+                    department_id,
+                    connections,
+                )
+                .await
+        }
+        Err(error) => Err(error),
+    };
+    match saved {
+        Ok(()) => {
+            workspace
+                .saved(&access, Some(department), "Saved model connections.")
+                .await
+        }
+        Err(AppError::BadRequest(message) | AppError::Conflict(message)) => Ok(Html(
+            workspace
+                .section(
+                    &access,
+                    DepartmentSelection::Department {
+                        id: department,
+                        draft: None,
+                    },
+                    None,
+                    Some(&format!("Model connections not saved: {message}")),
+                )
+                .await?,
+        )
+        .into_response()),
+        Err(error) => Err(error),
+    }
+}

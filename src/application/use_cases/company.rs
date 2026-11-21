@@ -176,12 +176,38 @@ pub trait CompanyPersistence:
         provider: &ModelProvider,
     ) -> AppResult<Option<String>>;
 
+    /// Replace the root's own model connections (the company settings form).
     async fn replace_model_connections_for_user(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         connections: Vec<CompanyModelConnectionWrite>,
     ) -> AppResult<()>;
+
+    /// Replace one unit's own model connections (Plan07 02A): the caller must manage the unit.
+    async fn replace_unit_model_connections_for_user(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()>;
+
+    /// The ids of the model connections in `agent`'s own reach (Plan07 02A with decision d).
+    async fn model_connections_in_agent_reach(
+        &self,
+        company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Vec<Uuid>>;
+
+    /// Move a model connection to another unit; the caller must manage both (Plan07 01B.4, 02A).
+    async fn move_model_connection(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource>;
 }
 
 /// The caller's access to a company they can see at all.
@@ -278,14 +304,12 @@ pub struct CompanyUseCases {
 }
 
 impl CompanyUseCases {
+    /// The root's own connections: the company default lives there, so the set is never empty
+    /// and holds exactly one default.
     pub fn validate_model_connections(
         connections: &[CompanyModelConnectionWrite],
     ) -> AppResult<()> {
-        if connections.len() > MAX_COMPANY_MODEL_CONNECTIONS {
-            return Err(AppError::BadRequest(format!(
-                "A company may configure at most {MAX_COMPANY_MODEL_CONNECTIONS} model providers."
-            )));
-        }
+        Self::validate_model_connection_bounds(connections)?;
         // A replace is wholesale, so an empty set is a request to delete every stored credential
         // -- which reads to the caller as an ordinary save and leaves every agent unable to run.
         // Clearing the last provider is not something a save is allowed to mean.
@@ -298,6 +322,18 @@ impl CompanyUseCases {
             return Err(AppError::BadRequest(
                 "Exactly one configured model provider must be the company default.".into(),
             ));
+        }
+        Ok(())
+    }
+
+    /// Bounds every unit's replace shares: the count limit and one row per provider.
+    fn validate_model_connection_bounds(
+        connections: &[CompanyModelConnectionWrite],
+    ) -> AppResult<()> {
+        if connections.len() > MAX_COMPANY_MODEL_CONNECTIONS {
+            return Err(AppError::BadRequest(format!(
+                "A company may configure at most {MAX_COMPANY_MODEL_CONNECTIONS} model providers."
+            )));
         }
         let mut providers = std::collections::HashSet::new();
         if connections
@@ -447,25 +483,125 @@ impl CompanyUseCases {
         self.persistence.delete_for_user(user_id, id).await
     }
 
+    /// The model connections of the units this person manages (Plan07 decision a): root
+    /// managers see all; anyone managing no unit gets the usual not-found.
     pub async fn list_model_connections(
         &self,
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyModelConnection>> {
-        owned_company(self.persistence.as_ref(), user_id, company_id).await?;
-        self.persistence.list_model_connections(company_id).await
+        let company = crate::domain::workflow::CompanyId::new(company_id);
+        crate::application::ports::administration::require_management(
+            self.persistence.as_ref(),
+            user_id,
+            company,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
+        )
+        .await?;
+        let units: std::collections::HashSet<Uuid> = self
+            .persistence
+            .managed_units(user_id, company)
+            .await?
+            .into_iter()
+            .map(|unit| unit.as_uuid())
+            .collect();
+        Ok(self
+            .persistence
+            .list_model_connections(company_id)
+            .await?
+            .into_iter()
+            .filter(|connection| units.contains(&connection.unit_id))
+            .collect())
     }
 
+    /// One unit's own model connections, the root's when `unit` is `None`, for that unit's form:
+    /// whoever manages the unit (Plan07 decision a); anyone else gets the usual not-found.
+    pub async fn list_unit_model_connections(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit: Option<Uuid>,
+    ) -> AppResult<Vec<CompanyModelConnection>> {
+        let choices = self
+            .persistence
+            .managed_unit_choices(user_id, crate::domain::workflow::CompanyId::new(company_id))
+            .await?;
+        let unit = choices
+            .iter()
+            .find(|choice| match unit {
+                Some(unit) => choice.id.as_uuid() == unit,
+                None => choice.is_root,
+            })
+            .ok_or_else(company_not_found)?
+            .id
+            .as_uuid();
+        Ok(self
+            .persistence
+            .list_model_connections(company_id)
+            .await?
+            .into_iter()
+            .filter(|connection| connection.unit_id == unit)
+            .collect())
+    }
+
+    /// Move a model connection between units the caller manages (Plan07 02A).
+    pub async fn move_model_connection(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        self.persistence
+            .move_model_connection(user_id, company_id, id, target)
+            .await
+    }
+
+    /// Replace the root's own connections: whoever manages the root (Plan07 decision a), which
+    /// persistence checks under its locks.
     pub async fn replace_model_connections(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         connections: Vec<CompanyModelConnectionWrite>,
     ) -> AppResult<()> {
-        owned_company(self.persistence.as_ref(), user_id, company_id).await?;
         Self::validate_model_connections(&connections)?;
         self.persistence
             .replace_model_connections_for_user(user_id, company_id, connections)
+            .await
+    }
+
+    /// Replace one unit's own connections: whoever manages that unit. A unit may hold none and
+    /// marks at most one of its own as its default (Plan07 02A, decision g).
+    pub async fn replace_unit_model_connections(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()> {
+        // The root's own connections hold the company default whichever form saves them, so the
+        // root's department form is held to the settings form's rules (never empty, exactly one
+        // default); the company therefore always keeps a connection (G1 r2 D1).
+        let root = self
+            .persistence
+            .managed_unit_choices(user_id, crate::domain::workflow::CompanyId::new(company_id))
+            .await?
+            .iter()
+            .any(|choice| choice.is_root && choice.id.as_uuid() == unit_id);
+        if root {
+            Self::validate_model_connections(&connections)?;
+        } else {
+            Self::validate_model_connection_bounds(&connections)?;
+            if connections.iter().filter(|item| item.is_default).count() > 1 {
+                return Err(AppError::BadRequest(
+                    "A department may mark at most one of its model providers as its default."
+                        .into(),
+                ));
+            }
+        }
+        self.persistence
+            .replace_unit_model_connections_for_user(user_id, company_id, unit_id, connections)
             .await
     }
 }

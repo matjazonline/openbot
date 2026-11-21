@@ -85,6 +85,14 @@ pub(super) async fn capture_on(
         crate::app_error::UnitCheckStage::Publication,
     )
     .await?;
+    super::super::unit_resources::check_agent_model_reach_on(
+        tx,
+        scope.company,
+        scope.agent.as_uuid(),
+        model.as_ref(),
+        crate::app_error::UnitCheckStage::Publication,
+    )
+    .await?;
     let draft = AgentDraft {
         company_id: scope.company,
         agent_id: scope.agent,

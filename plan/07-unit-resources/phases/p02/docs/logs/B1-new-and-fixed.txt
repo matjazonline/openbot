@@ -1,0 +1,20 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.68s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 8 tests
+test application::use_cases::agent::tests::a_library_pick_is_copied_into_the_company_with_a_model_it_can_run ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_native_only_needs_no_hosted_connection ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_authority_moves_and_department_delete ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_reach_refuses_publication_after_a_move ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_competing_units_add_one_provider ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_cascade_pins_the_nearest_default_and_stays_frozen ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refusals_are_tool_errors ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4949 filtered out; finished in 3.87s
+

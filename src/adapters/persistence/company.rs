@@ -333,122 +333,263 @@ impl CompanyPersistence for PostgresPersistence {
         company_id: Uuid,
         connections: Vec<CompanyModelConnectionWrite>,
     ) -> AppResult<()> {
-        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
-        let owned = sqlx::query_scalar::<_, Uuid>(
-            "SELECT id FROM companies WHERE id = $1 AND user_id = $2 FOR UPDATE",
+        replace_unit_model_connections(self, user_id, company_id, None, connections).await
+    }
+
+    async fn replace_unit_model_connections_for_user(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()> {
+        replace_unit_model_connections(self, user_id, company_id, Some(unit_id), connections).await
+    }
+
+    async fn model_connections_in_agent_reach(
+        &self,
+        company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Vec<Uuid>> {
+        Ok(sqlx::query_scalar(
+            "SELECT id FROM company_model_connections \
+             WHERE company_id = $1 AND agent_reaches($1, $2, unit_id)",
         )
         .bind(company_id)
-        .bind(user_id)
-        .fetch_optional(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        if owned.is_none() {
-            return Err(crate::use_cases::company::company_not_found());
-        }
+        .bind(agent_id)
+        .fetch_all(&self.pool)
+        .await?)
+    }
 
-        sqlx::query(
-            "UPDATE company_model_connections SET is_default = FALSE WHERE company_id = $1 AND is_default",
+    async fn move_model_connection(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        let mut tx = self.pool.begin().await?;
+        let moved = super::unit_resources::move_resource_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::application::ports::unit_resources::UnitResourceKind::ModelConnection,
+            id,
+            crate::entities::department::DepartmentId::new(target),
         )
-        .bind(company_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
+        .await?;
+        tx.commit().await?;
+        Ok(moved)
+    }
+}
 
-        for connection in &connections {
-            let encrypted_api_key = self.encrypt_credential(connection.api_key.as_deref())?;
-            let models: Vec<String> = connection
-                .models
-                .iter()
-                .map(|model| model.as_str().to_string())
-                .collect();
-            let changed = match encrypted_api_key {
-                Some(api_key) => sqlx::query(
-                    r#"INSERT INTO company_model_connections
-                           (company_id, provider, api_key, models, is_default)
-                       VALUES ($1, $2, $3, $4, $5)
-                       ON CONFLICT (company_id, provider) DO UPDATE
-                       SET api_key = EXCLUDED.api_key, models = EXCLUDED.models,
-                           is_default = EXCLUDED.is_default, updated_at = CURRENT_TIMESTAMP"#,
-                )
-                .bind(company_id)
-                .bind(connection.provider.as_str())
-                .bind(api_key)
-                .bind(&models)
-                .bind(connection.is_default)
-                .execute(&mut *transaction)
-                .await
-                .map_err(AppError::from)?
-                .rows_affected(),
-                None => sqlx::query(
-                    r#"UPDATE company_model_connections
-                       SET models = $3, is_default = $4, updated_at = CURRENT_TIMESTAMP
-                       WHERE company_id = $1 AND provider = $2"#,
-                )
-                .bind(company_id)
-                .bind(connection.provider.as_str())
-                .bind(&models)
-                .bind(connection.is_default)
-                .execute(&mut *transaction)
-                .await
-                .map_err(AppError::from)?
-                .rows_affected(),
-            };
-            if changed == 0 {
-                return Err(AppError::BadRequest(format!(
+/// Replace the model connections of one unit, the root when `unit` is `None` (Plan07 02A,
+/// decisions a and g): whoever manages the unit, under the company and person locks every
+/// replace and move takes. Other units' rows are untouched; a provider another unit owns is a
+/// conflict, never an overwrite of its key.
+async fn replace_unit_model_connections(
+    persistence: &PostgresPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+    unit: Option<Uuid>,
+    connections: Vec<CompanyModelConnectionWrite>,
+) -> AppResult<()> {
+    let company = crate::domain::workflow::CompanyId::new(company_id);
+    let actor = crate::application::workflow::WorkflowActor::authenticated(user_id)?;
+    let mut transaction = persistence.pool.begin().await.map_err(AppError::from)?;
+    super::workflow::authority::authorize_person_with_locks(
+        &mut transaction,
+        company,
+        actor,
+        super::workflow::row_locks::RowLocks::Wait,
+    )
+    .await
+    .map_err(|error| match error {
+        AppError::NotFound(_) => crate::use_cases::company::company_not_found(),
+        other => other,
+    })?;
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1 AND is_root")
+            .bind(company_id)
+            .fetch_one(&mut *transaction)
+            .await?;
+    // A department's form may empty its own unit, but never the company's last connection.
+    let named = unit.is_some();
+    let unit = unit.unwrap_or(root);
+    super::administration::management_role_on(
+        &mut transaction,
+        user_id,
+        company,
+        crate::application::ports::administration::ManagementTarget::Unit(
+            crate::entities::department::DepartmentId::new(unit),
+        ),
+    )
+    .await?
+    .ok_or_else(crate::use_cases::company::company_not_found)?;
+
+    sqlx::query(
+        "UPDATE company_model_connections SET default_for_unit = FALSE \
+         WHERE company_id = $1 AND unit_id = $2 AND default_for_unit",
+    )
+    .bind(company_id)
+    .bind(unit)
+    .execute(&mut *transaction)
+    .await?;
+
+    for connection in &connections {
+        let encrypted_api_key = persistence.encrypt_credential(connection.api_key.as_deref())?;
+        let models: Vec<String> = connection
+            .models
+            .iter()
+            .map(|model| model.as_str().to_string())
+            .collect();
+        let changed = match encrypted_api_key {
+            // Updates only a row this unit owns: another unit's provider is never rewritten.
+            Some(api_key) => sqlx::query(
+                r#"INSERT INTO company_model_connections
+                       (company_id, unit_id, provider, api_key, models, default_for_unit)
+                   VALUES ($1, $2, $3, $4, $5, $6)
+                   ON CONFLICT (company_id, provider) DO UPDATE
+                   SET api_key = EXCLUDED.api_key, models = EXCLUDED.models,
+                       default_for_unit = EXCLUDED.default_for_unit, updated_at = CURRENT_TIMESTAMP
+                   WHERE company_model_connections.unit_id = EXCLUDED.unit_id"#,
+            )
+            .bind(company_id)
+            .bind(unit)
+            .bind(connection.provider.as_str())
+            .bind(api_key)
+            .bind(&models)
+            .bind(connection.is_default)
+            .execute(&mut *transaction)
+            .await?
+            .rows_affected(),
+            None => sqlx::query(
+                r#"UPDATE company_model_connections
+                   SET models = $4, default_for_unit = $5, updated_at = CURRENT_TIMESTAMP
+                   WHERE company_id = $1 AND unit_id = $2 AND provider = $3"#,
+            )
+            .bind(company_id)
+            .bind(unit)
+            .bind(connection.provider.as_str())
+            .bind(&models)
+            .bind(connection.is_default)
+            .execute(&mut *transaction)
+            .await?
+            .rows_affected(),
+        };
+        if changed == 0 {
+            let owner: Option<String> = sqlx::query_scalar(
+                "SELECT department.name FROM company_model_connections AS connection \
+                 JOIN departments AS department ON department.company_id = connection.company_id \
+                  AND department.id = connection.unit_id \
+                 WHERE connection.company_id = $1 AND connection.provider = $2 \
+                   AND connection.unit_id <> $3",
+            )
+            .bind(company_id)
+            .bind(connection.provider.as_str())
+            .bind(unit)
+            .fetch_optional(&mut *transaction)
+            .await?;
+            return Err(match owner {
+                Some(owner) => AppError::Conflict(format!(
+                    "Provider '{}' is configured by the department {owner}. Edit it there, or move \
+                     it here.",
+                    connection.provider
+                )),
+                None => AppError::BadRequest(format!(
                     "An API key is required when adding provider '{}'.",
                     connection.provider
-                )));
-            }
+                )),
+            });
         }
-
-        let retained: Vec<String> = connections
-            .iter()
-            .map(|connection| connection.provider.as_str().to_string())
-            .collect();
-        sqlx::query(
-            "DELETE FROM company_model_connections WHERE company_id = $1 AND NOT (provider = ANY($2))",
-        )
-        .bind(company_id)
-        .bind(&retained)
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-
-        // Agents are validated against the connections when *they* are written; this is the other
-        // direction. Narrowing a `models` list or dropping a provider out from under a pinned
-        // agent would otherwise commit cleanly and only surface much later, per run, as
-        // "Model 'x' is not enabled for provider 'y'" on a task that had been working. The check
-        // runs inside the transaction, so a refusal rolls the whole replace back.
-        let orphaned: Vec<String> = sqlx::query_scalar(
-            r#"SELECT agent.name
-               FROM agents AS agent
-               WHERE agent.company_id = $1
-                 AND agent.provider IS NOT NULL
-                 AND NOT EXISTS (
-                     SELECT 1 FROM company_model_connections AS connection
-                     WHERE connection.company_id = agent.company_id
-                       AND connection.provider = lower(btrim(agent.provider))
-                       AND agent.model = ANY(connection.models)
-                 )
-               ORDER BY agent.name
-               LIMIT $2"#,
-        )
-        .bind(company_id)
-        .bind(i64::try_from(MAX_REPORTED_ORPHANED_AGENTS).unwrap_or(i64::MAX))
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        if !orphaned.is_empty() {
-            return Err(AppError::BadRequest(format!(
-                "{} still {} a model this change removes. Point {} at an enabled model first.",
-                orphaned.join(", "),
-                if orphaned.len() == 1 { "uses" } else { "use" },
-                if orphaned.len() == 1 { "it" } else { "them" },
-            )));
-        }
-
-        transaction.commit().await.map_err(AppError::from)
     }
+
+    let retained: Vec<String> = connections
+        .iter()
+        .map(|connection| connection.provider.as_str().to_string())
+        .collect();
+    sqlx::query(
+        "DELETE FROM company_model_connections \
+         WHERE company_id = $1 AND unit_id = $2 AND NOT (provider = ANY($3))",
+    )
+    .bind(company_id)
+    .bind(unit)
+    .bind(&retained)
+    .execute(&mut *transaction)
+    .await?;
+
+    check_model_connection_invariants_on(&mut transaction, company_id, root).await?;
+    if named {
+        let remaining: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM company_model_connections WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        if remaining == 0 {
+            return Err(AppError::BadRequest(
+                "A company must keep at least one model provider configured.".into(),
+            ));
+        }
+    }
+
+    // Agents are validated against the connections when *they* are written; this is the other
+    // direction. Narrowing a `models` list or dropping a provider out from under a pinned
+    // agent would otherwise commit cleanly and only surface much later, per run, as
+    // "Model 'x' is not enabled for provider 'y'" on a task that had been working. The check
+    // runs inside the transaction, so a refusal rolls the whole replace back.
+    let orphaned: Vec<String> = sqlx::query_scalar(
+        r#"SELECT agent.name
+           FROM agents AS agent
+           WHERE agent.company_id = $1
+             AND agent.provider IS NOT NULL
+             AND NOT EXISTS (
+                 SELECT 1 FROM company_model_connections AS connection
+                 WHERE connection.company_id = agent.company_id
+                   AND connection.provider = lower(btrim(agent.provider))
+                   AND agent.model = ANY(connection.models)
+             )
+           ORDER BY agent.name
+           LIMIT $2"#,
+    )
+    .bind(company_id)
+    .bind(i64::try_from(MAX_REPORTED_ORPHANED_AGENTS).unwrap_or(i64::MAX))
+    .fetch_all(&mut *transaction)
+    .await?;
+    if !orphaned.is_empty() {
+        return Err(AppError::BadRequest(format!(
+            "{} still {} a model this change removes. Point {} at an enabled model first.",
+            orphaned.join(", "),
+            if orphaned.len() == 1 { "uses" } else { "use" },
+            if orphaned.len() == 1 { "it" } else { "them" },
+        )));
+    }
+
+    transaction.commit().await.map_err(AppError::from)
+}
+
+/// The root holds exactly one default whenever it holds a connection (Plan07 G1 r2 D1); checked
+/// after every replace and move. A replace never empties the root's own form (the use case
+/// refuses that), as before.
+pub(super) async fn check_model_connection_invariants_on(
+    db: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    root: Uuid,
+) -> AppResult<()> {
+    let (root_connections, root_defaults): (i64, i64) = sqlx::query_as(
+        "SELECT count(*), count(*) FILTER (WHERE default_for_unit) \
+         FROM company_model_connections WHERE company_id = $1 AND unit_id = $2",
+    )
+    .bind(company_id)
+    .bind(root)
+    .fetch_one(&mut *db)
+    .await?;
+    if root_connections > 0 && root_defaults != 1 {
+        return Err(AppError::BadRequest(
+            "Exactly one of the company's own model providers must be the company default.".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -463,11 +604,16 @@ pub(crate) async fn model_connections_on(
     db: &mut sqlx::PgConnection,
     company_id: Uuid,
 ) -> AppResult<Vec<CompanyModelConnection>> {
-    let rows = sqlx::query_as::<_, (String, Vec<String>, bool, bool)>(
-        r#"SELECT provider, models, is_default, (api_key IS NOT NULL) AS has_api_key
-               FROM company_model_connections
-               WHERE company_id = $1
-               ORDER BY is_default DESC, provider"#,
+    // The root's default first, then each unit's own (Plan07 02A).
+    let rows = sqlx::query_as::<_, (Uuid, Uuid, String, bool, String, Vec<String>, bool, bool)>(
+        r#"SELECT connection.id, connection.unit_id, unit.name, unit.is_root, connection.provider,
+                  connection.models, connection.default_for_unit,
+                  (connection.api_key IS NOT NULL) AS has_api_key
+               FROM company_model_connections AS connection
+               JOIN departments AS unit
+                 ON unit.company_id = connection.company_id AND unit.id = connection.unit_id
+               WHERE connection.company_id = $1
+               ORDER BY (unit.is_root AND connection.default_for_unit) DESC, connection.provider"#,
     )
     .bind(company_id)
     .fetch_all(db)
@@ -477,11 +623,17 @@ pub(crate) async fn model_connections_on(
     Ok(rows
         .into_iter()
         .map(
-            |(provider, models, is_default, has_api_key)| CompanyModelConnection {
-                provider: ModelProvider::from(provider),
-                models: models.into_iter().map(ModelName::from).collect(),
-                is_default,
-                has_api_key,
+            |(id, unit_id, unit_name, in_root, provider, models, is_default, has_api_key)| {
+                CompanyModelConnection {
+                    id,
+                    unit_id,
+                    unit_name,
+                    in_root,
+                    provider: ModelProvider::from(provider),
+                    models: models.into_iter().map(ModelName::from).collect(),
+                    is_default,
+                    has_api_key,
+                }
             },
         )
         .collect())

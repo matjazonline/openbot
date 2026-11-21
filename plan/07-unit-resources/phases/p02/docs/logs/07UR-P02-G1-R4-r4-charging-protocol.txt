@@ -1,0 +1,201 @@
+PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit
+== 3a: charge commits, then the unit is deleted
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.111 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-00000000000a'
+[settlement] UPDATE 1
+[settlement] Time: 0.592 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 2.688 ms
+DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d1'
+DELETE 1
+  unit  | period | spent | rows 
+--------+--------+-------+------
+ parent | day    |   100 |    1
+ parent | month  |   100 |    1
+ root   | day    |   100 |    1
+ root   | month  |   100 |    1
+(4 rows)
+
+== 3b: delete commits, then a call recorded on the deleted unit settles
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.101 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-00000000000b'
+[settlement] UPDATE 1
+[settlement] Time: 0.480 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 1.858 ms
+  unit  | period | spent | rows 
+--------+--------+-------+------
+ parent | day    |   100 |    1
+ parent | month  |   100 |    1
+ root   | day    |  1100 |    1
+ root   | month  |  1100 |    1
+(4 rows)
+
+
+== 3c (between): delete executed (its trigger removed the unit's rows) but not committed while the settlement commits
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.136 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-00000000000c'
+[settlement] UPDATE 1
+[settlement] Time: 0.785 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 593.106 ms
+[delete] BEGIN
+[delete] BEGIN
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d2'
+[delete] DELETE 1
+[delete] SELECT pg_sleep(1.0)
+[delete]  pg_sleep 
+[delete] ----------
+[delete]  
+[delete] (1 row)
+[delete] 
+[delete] COMMIT
+[delete] COMMIT
+   unit    | period | spent | rows 
+-----------+--------+-------+------
+ ORPHAN d2 | day    | 10000 |    1
+ ORPHAN d2 | month  | 10000 |    1
+ parent    | day    | 10100 |    1
+ parent    | month  | 10100 |    1
+ root      | day    | 11100 |    1
+ root      | month  | 11100 |    1
+(6 rows)
+
+
+== 3d (between, other order): the settlement's commit holds the unit's rows while the delete runs
+[delete] timing on
+[delete] Timing is on.
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d3'
+[delete] DELETE 1
+[delete] Time: 552.608 ms
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.094 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-00000000000d'
+[settlement] UPDATE 1
+[settlement] Time: 0.481 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 1004.917 ms (00:01.005)
+   unit    | period | spent  | rows 
+-----------+--------+--------+------
+ ORPHAN d2 | day    |  10000 |    1
+ ORPHAN d2 | month  |  10000 |    1
+ parent    | day    | 110100 |    1
+ parent    | month  | 110100 |    1
+ root      | day    | 111100 |    1
+ root      | month  | 111100 |    1
+(6 rows)
+
+
+== 5: a department row held FOR UPDATE (member change in progress) while a settlement in its subtree commits
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.233 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='50000000-0000-0000-0000-000000000001'
+[settlement] UPDATE 1
+[settlement] Time: 1.200 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 3.960 ms
+
+== 6: delete vs settlement vs another charge holding the unit's month row (delete visits rows in heap order: month before day)
+[plan] Delete on unit_spend
+[plan]   ->  Index Scan using unit_spend_pkey on unit_spend
+[plan]         Index Cond: ((company_id = '00000000-0000-0000-0000-000000000001'::uuid) AND (unit_id = '00000000-0000-0000-0000-0000000000d5'::uuid))
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.276 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='60000000-0000-0000-0000-000000000001'
+[settlement] UPDATE 1
+[settlement] Time: 1.384 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 543.004 ms
+[delete] timing on
+[delete] Timing is on.
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d5'
+[delete] DELETE 1
+[delete] Time: 767.764 ms
+[other charge] BEGIN
+[other charge] BEGIN
+[other charge] SELECT period FROM unit_spend WHERE unit_id='00000000-0000-0000-0000-0000000000d5' AND period='month' FOR UPDATE
+[other charge]  period 
+[other charge] --------
+[other charge]  month
+[other charge] (1 row)
+[other charge] SELECT pg_sleep(1.0)
+[other charge]  pg_sleep 
+[other charge] ----------
+[other charge] (1 row)
+[other charge] COMMIT
+[other charge] COMMIT
+   unit    | period | spent  | rows 
+-----------+--------+--------+------
+ ORPHAN d2 | day    |  10000 |    1
+ ORPHAN d2 | month  |  10000 |    1
+ ORPHAN d5 | day    |      7 |    1
+ ORPHAN d5 | month  |      7 |    1
+ parent    | day    | 110110 |    1
+ parent    | month  | 110110 |    1
+ root      | day    | 111110 |    1
+ root      | month  | 111110 |    1
+ unit d4   | day    |      3 |    1
+ unit d4   | month  |      3 |    1
+(10 rows)
+
+
+== 4: 16 concurrent settlements on sibling units
+  16 exit 0
+ period | root_total | expected 
+--------+------------+----------
+ day    |        136 |      136
+ month  |        136 |      136
+(2 rows)
+
+== saturation
+UPDATE usage_calls SET settled_at=now() WHERE request_id='70000000-0000-0000-0000-000000000001'
+UPDATE 1
+root day total: 9223372036854775807
+== company teardown removes totals
+BEGIN
+BEGIN
+DELETE FROM usage_calls
+DELETE 23
+DELETE FROM unit_spend WHERE false
+DELETE 0
+ALTER TABLE departments DROP CONSTRAINT departments_company_id_parent_id_fkey
+ALTER TABLE
+DELETE FROM departments
+DELETE 20
+DELETE FROM companies
+DELETE 1
+SELECT count(*) AS unit_spend_rows FROM unit_spend
+ unit_spend_rows 
+-----------------
+               0
+(1 row)
+
+ROLLBACK
+ROLLBACK

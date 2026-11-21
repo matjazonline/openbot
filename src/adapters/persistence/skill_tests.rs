@@ -476,8 +476,8 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
     // A company agent answers its own desk on an explicit model (01DEP-P03-D3): the copy takes
     // the company default.
     sqlx::query(
-        "INSERT INTO company_model_connections(company_id, provider, api_key, models, is_default) \
-         VALUES ($1, 'openai', 'fixture-key', '{gpt-test}', true)",
+        "INSERT INTO company_model_connections(company_id, unit_id, provider, api_key, models, default_for_unit) \
+         VALUES ($1, (SELECT id FROM departments WHERE company_id=$1 AND is_root), 'openai', 'fixture-key', '{gpt-test}', true)",
     )
     .bind(company_id)
     .execute(persistence.pool())

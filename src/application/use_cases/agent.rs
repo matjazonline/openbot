@@ -233,21 +233,6 @@ pub(crate) fn model_allowed(
         .any(|connection| connection.provider == provider && connection.models.contains(&model))
 }
 
-/// The model an agent pinned to the company default runs on: the default connection's first
-/// model, when the connection has a key. A workflow runs an agent only on an explicit model.
-pub fn pinned_default_model(
-    connections: &[crate::entities::company::CompanyModelConnection],
-) -> Option<(String, String)> {
-    let connection = connections
-        .iter()
-        .find(|connection| connection.is_default && connection.has_api_key)?;
-    let model = connection.models.first()?;
-    Some((
-        connection.provider.as_str().to_owned(),
-        model.as_str().to_owned(),
-    ))
-}
-
 /// One library definition as a company agent write: every stored field, with the provenance left
 /// for [`AgentUseCases::create_agent_from_library`] to stamp with whoever picked it. Its workflow
 /// tool grants are copied with its skills, in the creating transaction.
@@ -367,15 +352,31 @@ impl AgentUseCases {
         model_preparation::validate_model_selection(&connections, write)
     }
 
+    /// The model connections an author may choose: for an existing agent, those in its own reach
+    /// (Plan07 02A with decision d); for a new one, all of them, checked against its department
+    /// when it is created.
     pub async fn list_company_model_connections(
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        agent_id: Option<Uuid>,
     ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
         self.verify_authoring(user_id, company_id).await?;
-        self.company_persistence
+        let connections = self
+            .company_persistence
             .list_model_connections(company_id)
-            .await
+            .await?;
+        let Some(agent_id) = agent_id else {
+            return Ok(connections);
+        };
+        let reached = self
+            .company_persistence
+            .model_connections_in_agent_reach(company_id, agent_id)
+            .await?;
+        Ok(connections
+            .into_iter()
+            .filter(|connection| reached.contains(&connection.id))
+            .collect())
     }
 
     /// Create a company agent with its default desk at its slug, placed in `placement` when one
@@ -477,7 +478,7 @@ impl AgentUseCases {
             warnings.push(ProvisioningWarning {
                 code: "library_model_pinned".into(),
                 message: format!(
-                    "'{}' answers its desk, which needs an explicit model, so it was created on the company's default: {provider} {model}.",
+                    "'{}' answers its desk, which needs an explicit model, so it was created on its department's default: {provider} {model}.",
                     definition.name
                 ),
             });

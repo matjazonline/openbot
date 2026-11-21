@@ -532,7 +532,13 @@ fn company_fields(draft: &CompanyDraft<'_>) -> String {
 }
 
 fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
-    let mut rows = draft.model_connections.clone();
+    unit_model_connection_fields(&draft.model_connections)
+}
+
+/// The provider rows of a model connection form, plus one blank row while below the bound; the
+/// company settings form (the root's connections) and a department's form (Plan07 02A) share it.
+pub fn unit_model_connection_fields(rows: &[CompanyModelConnectionDraft]) -> String {
+    let mut rows = rows.to_vec();
     if rows.len() < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
         rows.push(CompanyModelConnectionDraft {
             is_default: rows.is_empty(),
@@ -596,6 +602,27 @@ fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
         .collect()
 }
 
+/// Stored connections as the form rows see them.
+pub fn model_connection_drafts(
+    connections: &[CompanyModelConnection],
+) -> Vec<CompanyModelConnectionDraft> {
+    connections
+        .iter()
+        .map(|connection| CompanyModelConnectionDraft {
+            provider: connection.provider.to_string(),
+            models: connection
+                .models
+                .iter()
+                .map(ModelName::as_str)
+                .collect::<Vec<_>>()
+                .join(", "),
+            is_default: connection.is_default,
+            has_api_key: connection.has_api_key,
+            remove: false,
+        })
+        .collect()
+}
+
 /// A stored company as the form sees it.
 fn stored_draft<'a>(
     company: &'a Company,
@@ -606,20 +633,6 @@ fn stored_draft<'a>(
         slug: &company.slug,
         avatar_url: company.avatar_url.as_deref().unwrap_or(""),
         default_add_3rd_party: company.channel_defaults.add_3rd_party,
-        model_connections: connections
-            .iter()
-            .map(|connection| CompanyModelConnectionDraft {
-                provider: connection.provider.to_string(),
-                models: connection
-                    .models
-                    .iter()
-                    .map(ModelName::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                is_default: connection.is_default,
-                has_api_key: connection.has_api_key,
-                remove: false,
-            })
-            .collect(),
+        model_connections: model_connection_drafts(connections),
     }
 }

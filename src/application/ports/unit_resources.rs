@@ -9,6 +9,8 @@ pub enum UnitResourceKind {
     Skill,
     McpConnection,
     HttpConnection,
+    /// A company model connection (Plan07 02A), one per provider.
+    ModelConnection,
 }
 
 impl UnitResourceKind {
@@ -18,6 +20,7 @@ impl UnitResourceKind {
             Self::Skill => "skill",
             Self::McpConnection => "mcp",
             Self::HttpConnection => "http",
+            Self::ModelConnection => "model",
         }
     }
 }

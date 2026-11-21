@@ -876,26 +876,39 @@ fn company_model_selection(fields: &AgentFields<'_>, id_prefix: &str) -> String 
     let draft = fields.draft;
     let (blank_choice, help) = match fields.agent_id {
         None => (
-            "Company default",
-            "Leave both blank to use the company's default model for the new agent's direct workflow. Creating an agent requires a model connection with an API key.",
+            "Default for its department",
+            "Leave both blank to pin the default model of the agent's department, or of the nearest department above it, for its direct workflow. Creating an agent requires a model connection with an API key.",
         ),
         Some(_) => (
             "No hosted model",
             "Leave both blank for native profiles. Hosted workflows require an explicit provider/model pair; invalid pairs are refused on save.",
         ),
     };
+    // The company default is the root's; a department's own default is not the company's
+    // (Plan07 02A).
+    let company_default = connections
+        .iter()
+        .find(|connection| connection.is_default && connection.in_root)
+        .map(|connection| connection.id);
     let provider_options: String = connections
         .iter()
         .map(|connection| {
             format!(
-                r#"<option value="{provider}"{selected}>{provider}{default}</option>"#,
+                r#"<option value="{provider}"{selected}>{provider}{unit}{default}</option>"#,
                 provider = escape_html_attr(connection.provider.as_str()),
+                // Which department owns it: an agent may use only its own department's or one
+                // above it (Plan07 02A).
+                unit = if connection.in_root || connection.unit_name.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {}", escape_html_attr(&connection.unit_name))
+                },
                 selected = if connection.provider.as_str() == draft.provider {
                     " selected"
                 } else {
                     ""
                 },
-                default = if connection.is_default {
+                default = if Some(connection.id) == company_default {
                     " (default)"
                 } else {
                     ""
