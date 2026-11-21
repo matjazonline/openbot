@@ -582,6 +582,28 @@ User decision (e) taken on F5 (coordination r6). Every actionable finding addres
 | decision (e) | desk slot test (lead binding, admission, action; root-owned refused) | PASS; reconciliation `lock_resource` by inspection |
 | D11 formats | agent publication / preparation / checkpoint suites on fresh databases | PASS except the deferred Doop 8 vs 7 |
 
+## B3 (decision f, on accepted B2 0594a70a, 2026-11-21)
+- User decision (f) on optional finding 07UR-P01-B2-F9 replaces (e) (coordination r7): any run
+  whose desk reaches an HTTP/MCP connection may use it, whoever its run-as actor is (still a
+  current company member). Configuring/deleting/moving stays with the unit's managers.
+- Change: `workflow::resources::authorize_use_on` — connection → `authorize_person_with_locks`
+  (membership and its row locks, so a removed member's run is still refused); messaging/JEV →
+  root management, unchanged. Same callers as B2 (inspect, reconciliation `lock_resource`,
+  `http_for_action`, `mcp_use`). F9's other points: offers listing ancestor connections and an
+  agent's own tool calls now match what use allows; the reconciliation command entry stays
+  root-only (run administration, not connection use).
+- Test: `unit_resource_selection_desk_slot_connection_follows_desk_reach_and_is_shared_below`
+  (renamed; the Billing lead now binds a root-owned connection on a Billing desk — the
+  discriminating case against (e)); removed-member refusal stays covered by
+  `vault_google_e2e_stalled_refresh_rechecks_disconnect_membership_rebind_and_operation`.
+- Checks (openbot_p07_b2r2): `unit_resource` 38 passed (logs/B3-unit-resource.txt; a first run
+  without DATABASE_URL in the shell failed all 38 instantly and was rerun); focused authority
+  group `http_tests mcp vault action_ binding reconcil ui_workflow authoring` 1361 passed, 0
+  failed (logs/B3-focused.txt); fmt and clippy -D warnings clean. No SQL macro or schema change.
+- Frozen: base/HEAD 0594a70a + working tree, digest
+  c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892, exclusions unchanged
+  (logs/B3-author-freeze.snapshot.txt); manifest logs/07UR-P01-B3-R1.evidence.json.
+
 ## Status
 - G1 r1 frozen at digest c2d338160c48d4d2eabaa84b5bd5fa5cd389b58d2a93db85478eb2e05fb9ac33 (HEAD
   cc545881; exclusions as above). B (Opus 5.5, model opus / effort xhigh as for Plan06's reviewer)
@@ -621,3 +643,10 @@ User decision (e) taken on F5 (coordination r6). Every actionable finding addres
   is p03's. trail check: 3 keyword matches on the unit FK block (definition-creation authority,
   cascade ordering, agent-tool edges) — not those mechanisms; B2 checks agent-tool edges.
   Committed locally (not pushed).
+- **B3 accepted in phase** 2026-11-21: B PASS 07UR-P01-B3-R1 at
+  c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892; root re-digest identical
+  (logs/B3-root-acceptance.snapshot.txt); coordination r7. B2-F9 resolved by decision (f).
+  Optional 07UR-P01-B3-F1 (an action run as a plain member, and after that member's removal)
+  carried to p03's final gate. Committed locally. **p01 complete in phase** (not integrated;
+  full gate in p03).
+

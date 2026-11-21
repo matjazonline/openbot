@@ -56,39 +56,34 @@ pub(super) fn steps_using(source: &str, slot: Option<&str>, tool: &str) -> Strin
     }
 }
 
-/// Who may use a runtime resource for a binding or a run's action (Plan07 decision e): an HTTP
-/// or MCP connection belongs to whoever manages its unit, as its configuration does; the
-/// company's messaging and JEV resources stay with root management.
+/// Who may use a runtime resource for a binding or a run's action (Plan07 decision f): an HTTP
+/// or MCP connection may be used by any current company member, since which runs reach it is
+/// judged from their desk (readiness, admission and runtime resolution); the company's messaging
+/// and JEV resources stay with root management.
 pub(super) async fn authorize_use_on(
     db: &mut PgConnection,
     company: CompanyId,
     actor: WorkflowActor,
     id: Uuid,
 ) -> AppResult<()> {
-    use crate::application::ports::unit_resources::UnitResourceKind;
-    let kind: Option<String> = sqlx::query_scalar(
-        "SELECT kind FROM (SELECT 'http' AS kind FROM workflow_http_connections \
-         WHERE company_id=$1 AND id=$2 UNION ALL SELECT 'mcp' FROM company_mcp_connections \
-         WHERE company_id=$1 AND id=$2 AND deleted_at IS NULL) AS owned LIMIT 1",
+    let connection: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_http_connections WHERE company_id=$1 AND id=$2) \
+         OR EXISTS(SELECT 1 FROM company_mcp_connections WHERE company_id=$1 AND id=$2 \
+         AND deleted_at IS NULL)",
     )
     .bind(company.as_uuid())
     .bind(id)
-    .fetch_optional(&mut *db)
+    .fetch_one(&mut *db)
     .await?;
-    let kind = match kind.as_deref() {
-        Some("http") => UnitResourceKind::HttpConnection,
-        Some("mcp") => UnitResourceKind::McpConnection,
-        _ => {
-            return authority::authorize_company(db, company, actor)
-                .await
-                .map(|_| ());
-        }
-    };
-    crate::adapters::persistence::unit_resources::authorize_resource_on(
-        db, actor, company, kind, id,
-    )
-    .await
-    .map(|_| ())
+    if connection {
+        authority::authorize_person_with_locks(db, company, actor, super::row_locks::RowLocks::Wait)
+            .await
+            .map(|_| ())
+    } else {
+        authority::authorize_company(db, company, actor)
+            .await
+            .map(|_| ())
+    }
 }
 
 #[async_trait]

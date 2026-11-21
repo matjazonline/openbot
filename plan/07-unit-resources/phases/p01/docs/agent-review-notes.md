@@ -484,3 +484,54 @@
   the stand-in column made the recheck direct. The user decision on F5 was taken rather than
   deferred, which removed the largest open question. No instruction change supported beyond the
   candidates already recorded in B2-F1/F2.
+
+## 07UR-P01-B3-R1 (2026-11-21, batch review of B3)
+
+### Identity
+
+- Round 07UR-P01-B3-R1; workflow implement-opus-reviewed-2_4; batch B3 (user decision (f)
+  replacing (e)), batch review. Reviewer Claude Fable (claude-fable-5-2, medium); phase
+  07UR-P01; worktree /Users/mac02/orca/workspaces/openbot/plan06, branch plan07; review base and
+  HEAD 0594a70ac048198542368cab5be5af2c46a796bc (B2), B3 = working tree (3 source files). Digest
+  c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892 (same exclusions) confirmed
+  before and after. Coordination revision 7, no notices; rechecked before returning.
+- Evidence: author manifest logs/07UR-P01-B3-R1.evidence.json validated (3 PASS). Reviewer run
+  logs/B3-R1-reviewer-focused.txt (sha256 046a2ed5…b96c): `cargo test --locked --offline --lib
+  -- unit_resource vault_google_e2e_stalled_refresh_rechecks_disconnect_membership binding_tests
+  mcp_api` on fresh migrated openbot_p07_b3r_1 (+ `_test`), Node 24, SQLX_OFFLINE=true — 104
+  passed, 0 failed (38 `unit_resource`); databases dropped.
+
+### Coverage and evidence
+
+- Read the whole delta: `authorize_use_on` (connection → `authorize_person_with_locks`; anything
+  else → `authorize_company`), the comment in reconciliation resources, the renamed test.
+- Membership: `authorize_person_with_locks` needs the company row, a `department_members` row
+  with `membership_of` facts and a person principal, else NotFound — a removed member is refused
+  (inspection; see 07UR-P01-B3-F1).
+- Desk reach without the actor check (inspection of the B2 paths, unchanged in B3): binding save
+  and activation (`save_binding_on` → `check_readiness` with the association reach, slots and
+  unslotted), channel-reply configuration, admission preflight, closure and replay, runtime
+  unslotted resolution from the run's scope rows; slotted actions use the run's admitted
+  resources and agent tools the agent-reach check at admission, both by the D9 rule that an
+  admitted run is not stopped by a later move. `inspect` is reached only from binding readiness,
+  action authorization on a run's frozen target and reconciliation; no route inspects an
+  arbitrary id. Tested: Support desk still refused with `binding.resource_outside_unit`.
+- Not widened (inspection): configuration, move and delete (`authorize_resource_on`,
+  `lock_edit_on`, untouched); reconciliation command entry and run controls
+  (`authorize_company`, untouched); messaging (`MessageActionAuthority`) and JEV / other ids
+  (else branch → root management); a deleted MCP connection falls to the root branch and then
+  reads as missing.
+- Inspected, not re-run: author's focused group (1361 passed), clippy.
+
+### Outcome
+
+- **PASS for B3 at digest c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892**
+  (coordination revision 7; decisions (a), (b), (d), (f)). No actionable findings. Optional
+  07UR-P01-B3-F1 (no direct action-time test of the membership boundary). 07UR-P01-B2-F9 recorded
+  as resolved by decision (f).
+
+### Process and instruction feedback
+
+- Batch size fitted the change. An optional review observation (B2-F9) led to a user decision
+  that reversed the previous round's rule within a day; keeping the rule in one helper
+  (`authorize_use_on`) made that a three-file change. No instruction change supported.

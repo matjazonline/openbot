@@ -1,0 +1,12 @@
+base:   0594a70ac048198542368cab5be5af2c46a796bc
+digest: c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892
+files:
+  .trail/learnings/2026-11-19-a-local-check-sh-run-can-mac02.md
+  .trail/learnings/2026-11-20-a-resource-lost-after-a-native-mac02.md
+  .trail/learnings/2026-11-20-check-an-agent-s-resource-reach-mac02.md
+  plan/06-delegated-administration/phases/p01/docs/logs/B1-accepted-source.snapshot.tar
+  plan/06-delegated-administration/phases/p01/docs/logs/B2-accepted-source.snapshot.tar
+  plan/06-delegated-administration/phases/p01/docs/logs/B3-frozen-source.snapshot.tar
+  src/adapters/persistence/workflow/action_reconciliation/resources.rs
+  src/adapters/persistence/workflow/http_tests.rs
+  src/adapters/persistence/workflow/resources.rs

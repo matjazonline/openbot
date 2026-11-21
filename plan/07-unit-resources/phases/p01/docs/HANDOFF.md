@@ -8,14 +8,13 @@
   G1 and B1 were reviewed by an Opus 5.5/xhigh B (a42fa3c1931ec8e75, session 1, not reachable).
 - Worktree /Users/mac02/orca/workspaces/openbot/plan06 (directory named after Plan06), branch
   plan07, phase start cc545881, B1 commit aa22b1b0 (HEAD). Not pushed.
-- Coordination: plan/07-unit-resources/COORDINATION.md revision 6 (this session writes it). User
-  decisions (a)–(d) unchanged; (e) added 2026-11-21 (connection use by its unit's managers). No
+- Coordination: plan/07-unit-resources/COORDINATION.md revision 7 (this session writes it). User
+  decisions (a)–(d) unchanged; (e) added and then replaced by (f) 2026-11-21 (any run in reach may use a connection). No
   cross-phase notices.
 - Preserved untracked files, not part of Plan07 (user declined to commit both learnings):
   .trail/learnings/2026-11-19-a-local-check-sh-run-can-mac02.md,
   .trail/learnings/2026-11-20-check-an-agent-s-resource-reach-mac02.md; and
-  .trail/learnings/2026-11-20-a-resource-lost-after-a-native-mac02.md (commit not yet answered;
-  left out of the B2 commit),
+  .trail/learnings/2026-11-20-a-resource-lost-after-a-native-mac02.md (user declined too),
   plan/06-delegated-administration/phases/p01/docs/logs/B{1,2}-accepted-source.snapshot.tar,
   B3-frozen-source.snapshot.tar.
 
@@ -50,5 +49,6 @@
   before. No deployment or shared/production database reset.
 
 ## Next
-1. User answer on F9 (refine decision e or keep it); a refinement is a follow-up p01 batch.
+1. p01 complete in phase: B3 (decision f) accepted (B PASS 07UR-P01-B3-R1) and committed
+   locally. Carry optional 07UR-P01-B3-F1 to p03. The three learnings stay local (user).
 2. Start p02 (doc 02) with its own records under phases/p02/docs, then p03, then push to main.

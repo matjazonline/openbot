@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan06/plan/07-unit-resources/COORDINATION.md
 - Writer: Claude Code root (Opus 5.5/xhigh, user-confirmed), session b36d9dc4-495e-4131-9804-05ebcc381915, then 73d846ee-63bd-49f3-bbdf-7f3d92fcce54 (from B2), worktree /Users/mac02/orca/workspaces/openbot/plan06 (branch plan07)
-- Revision: 6
+- Revision: 7
 
 ## Plan-wide instructions
 
@@ -36,6 +36,12 @@
   the connection's unit (its lead or anyone above), in addition to the desk-reach check; the
   company's messaging and JEV resources stay with root management. Replaces root management as
   the run actor's requirement for connections.
+- User decision (f), 2026-11-21 (asked on optional review finding 07UR-P01-B2-F9), **replaces
+  (e)**: any run whose desk reaches an HTTP or MCP connection may use it, whoever its run-as
+  actor is (the actor must still be a current company member); binding save and every run action
+  no longer require managing the connection's unit or the root. Configuring, deleting and moving
+  a connection still belong to its unit's managers (decision a); messaging and JEV keep root
+  management. Moving a connection up therefore shares it with every desk below.
 - Inherited: Plan05 Doop deferral (05SC-C001/04RU-C005) stays visible and unfixed; Plan06
   authorization conventions (404 for what the caller does not manage, 403 inside their authority).
 - Plan08 p01 exists unmerged on branch plan08_ph1 (6c63f292, base 8fdb892b; Codex root session
@@ -46,7 +52,7 @@
 
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
-| p01 (doc 01 ownership and selection): B1 accepted in phase (B PASS 07UR-P01-B1-R3 at 2849d92a…), committed locally (aa22b1b0); B2 accepted in phase (B PASS 07UR-P01-B2-R2 at 9179c26d…), committed locally; p01 complete in phase pending the user's answer on optional F9 | Claude root/A; Opus B (G1, B1), Fable B (B2 on) | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
+| p01 (doc 01 ownership and selection): B1 accepted in phase (B PASS 07UR-P01-B1-R3 at 2849d92a…), committed locally (aa22b1b0); B2 accepted in phase (B PASS 07UR-P01-B2-R2 at 9179c26d…), committed locally; B3 (decision f) accepted (B PASS 07UR-P01-B3-R1); p01 complete in phase, committed locally; optional 07UR-P01-B3-F1 carried to p03 | Claude root/A; Opus B (G1, B1), Fable B (B2 on) | /Users/mac02/orca/workspaces/openbot/plan06 | phases/p01/docs/{TASK,HANDOFF}.md |
 
 ## Cross-phase notices
 

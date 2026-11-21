@@ -145,3 +145,15 @@
 - Optional open (non-blocking): 07UR-P01-B2-F9 (consequences of decision (e): root-owned
   connections unusable by a lead's run, offers list them, agent tool calls depend on the run
   actor, reconciliation entry root-only).
+
+## B3 batch review — round 07UR-P01-B3-R1 (2026-11-21)
+
+- Reviewer B: Claude Fable (claude-fable-5-2, medium). Artifact: HEAD 0594a70a (B2) + working
+  tree, digest c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892 (same
+  exclusions); coordination revision 7 (user decision (f) replaces (e)), no notices.
+- Outcome: **PASS for B3 at digest c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892.**
+- Notes: [07UR-P01-B3-R1](agent-review-notes.md#07ur-p01-b3-r1-2026-11-21-batch-review-of-b3).
+- Reviewer check: logs/B3-R1-reviewer-focused.txt (104 passed, 0 failed; 38 unit_resource).
+- 07UR-P01-B2-F9: resolved by decision (f) (reconciliation entry stays root-only by disposition).
+- Optional open (non-blocking): 07UR-P01-B3-F1 (no direct action-time test of a non-manager
+  member and of a removed member; suggested for p03).

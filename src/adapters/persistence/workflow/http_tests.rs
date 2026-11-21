@@ -1042,13 +1042,13 @@ async fn unit_resource_selection_desk_routes_an_unslotted_operation_within_its_r
     );
 }
 
-/// Plan07 01B.3/D8 and decision e (B2-F4, F5): a slot connection owned by Billing is usable on a
-/// Billing desk by a Billing lead, who manages its unit but not the root, through binding save,
-/// admission and the action; the lead cannot use a root-owned connection; the Billing connection
-/// is refused on a Support desk with `binding.resource_outside_unit`, and once moved up to the
-/// root it is selectable there.
+/// Plan07 01B.3/D8 and decision f (B2-F4, F5, F9): a slot connection owned by Billing is usable
+/// on a Billing desk by a Billing lead, who does not manage the root, through binding save,
+/// admission and the action; a root-owned connection is shared with that desk too; the Billing
+/// connection is refused on a Support desk with `binding.resource_outside_unit`, and once moved
+/// up to the root it is selectable there.
 #[tokio::test]
-async fn unit_resource_selection_desk_slot_connection_follows_desk_reach_and_unit_managers() {
+async fn unit_resource_selection_desk_slot_connection_follows_desk_reach_and_is_shared_below() {
     let (origin, server) =
         server("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\n{\"ok\":true}").await;
     let mut fixture = Fixture::new().await;
@@ -1086,18 +1086,16 @@ async fn unit_resource_selection_desk_slot_connection_follows_desk_reach_and_uni
         actor,
         binding: WorkflowBindingId::new(Uuid::new_v4()),
     };
-    let refused = bindings
+    // Moved up is shared: the lead may bind the root's connection on a Billing desk.
+    bindings
         .configure(configure(
             target(lead),
             billing_desk,
             version,
             Some(rooted.id),
         ))
-        .await;
-    assert!(
-        refused.is_err(),
-        "the lead does not manage the root's connection"
-    );
+        .await
+        .unwrap();
     let led = target(lead);
     let state = bindings
         .configure(configure(led, billing_desk, version, Some(connection.id)))

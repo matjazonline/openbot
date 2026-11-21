@@ -758,3 +758,23 @@ plan/07-unit-resources/phases/p01/docs, plan/07-unit-resources/COORDINATION.md);
 - **Suggested:** confirm (1) and (3) are intended, or narrow offers / add an admission-time actor
   check in a later phase; record the answer in the plan.
 - **Resolution history:** 2026-11-21 open (optional).
+  2026-11-21 review 07UR-P01-B3-R1 (digest c7bc9c12…1892, coordination r7): **resolved by user decision (f)**, which replaces (e). Points (1)–(3) no longer hold: `authorize_use_on` asks only company membership for an HTTP/MCP connection, so a root-owned connection is usable on a lead's desk (asserted by the renamed desk slot test), offers match use, and an agent's tool call no longer depends on the run actor's management. Point (4) (reconciliation command entry root-only) stays by the author's recorded disposition: run administration, not connection use.
+
+## 07UR-P01-B3-F1 — No direct test of the membership boundary at action time (optional)
+
+- **Context:** 2026-11-21; workflow implement-opus-reviewed-2_4; [TASK.md](TASK.md),
+  [REVIEW.md](REVIEW.md); batch B3, batch review, round 07UR-P01-B3-R1; reviewer Claude Fable
+  (claude-fable-5-2, medium); phase 07UR-P01; worktree
+  /Users/mac02/orca/workspaces/openbot/plan06; HEAD 0594a70a + working tree, digest
+  c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892; coordination r7.
+- **Classification:** optional suggestion; low; verification.
+- **Evidence:** decision (f) is discriminated from (e) at binding save only (the Billing lead
+  binds a root-owned connection); the action in that test uses Billing's connection, which (e)
+  also allowed, and no test runs an action as a plain member who manages nothing. The cited
+  removed-member coverage (`vault_google_e2e_stalled_refresh_…_membership_…`) is a Vault
+  integration refresh path, not a plain connection through `http_for_action`/`mcp_use`. All four
+  callers share `authorize_use_on`, whose membership branch is `authorize_person_with_locks`
+  (missing membership row → NotFound), so the behavior is established by inspection.
+- **Suggested:** in p03's integration checks, run one action as a non-manager member and one
+  after that member is removed.
+- **Resolution history:** 2026-11-21 open (optional).
