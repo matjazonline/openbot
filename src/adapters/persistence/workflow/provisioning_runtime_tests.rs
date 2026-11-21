@@ -9,6 +9,9 @@ use crate::application::workflow::provisioning::*;
 #[path = "provisioning_requester_lock_tests.rs"]
 mod requester_locks;
 
+#[path = "delegated_builder_runtime_tests.rs"]
+mod delegated_builder;
+
 #[path = "channel_reply_native_runtime_tests.rs"]
 mod channel_reply_native_runtime_tests;
 
@@ -58,7 +61,7 @@ async fn builder(d: &Deployment) -> Uuid {
 /// A verified company member with `role`, whose address is theirs.
 async fn person(d: &Deployment, role: &str) -> (Uuid, String) {
     let (user, email) = verified_member(&d.fixture).await;
-    sqlx::query("UPDATE company_members SET role = $2 WHERE user_id = $1")
+    sqlx::query("WITH cleared AS (DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.root_user_id = $1 AND $2::text='member') INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.root_user_id = $1 AND $2::text='admin' ON CONFLICT DO NOTHING")
         .bind(user)
         .bind(role)
         .execute(d.p().pool())
@@ -187,10 +190,11 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
         .map(|agent| agent["slug"].as_str().unwrap())
         .collect();
     assert_eq!(listed, ["agent-builder", "assistant"]);
-    assert_eq!(
-        receipts[0]["models"],
-        json!([{"provider": SCRIPTED_PROVIDER, "model": SCRIPTED_MODEL}])
-    );
+    // Each model names the department owning its connection, here the root (Plan07 02A).
+    assert_eq!(receipts[0]["models"].as_array().unwrap().len(), 1);
+    assert_eq!(receipts[0]["models"][0]["provider"], SCRIPTED_PROVIDER);
+    assert_eq!(receipts[0]["models"][0]["model"], SCRIPTED_MODEL);
+    assert!(receipts[0]["models"][0]["department"].is_string());
     let created = &receipts[1];
     assert_eq!(created["agent"]["slug"], "helper", "{created}");
     assert_eq!(created["address"], d.address("helper"), "F051");
@@ -722,7 +726,22 @@ async fn department_lead_desk_answers_through_its_current_lead() {
     .fetch_one(p.pool())
     .await
     .unwrap();
-    let (_, email) = person(&d, "admin").await;
+    let (sender, email) = person(&d, "admin").await;
+    let principal =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+            .bind(company.as_uuid())
+            .bind(sender)
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    departments
+        .add_member(
+            scope,
+            department.id,
+            crate::entities::transport::PrincipalId::new(principal),
+        )
+        .await
+        .unwrap();
     write(
         &d,
         &email,
@@ -894,7 +913,22 @@ async fn department_context_reaches_the_lead_on_its_department_desk() {
     .fetch_one(p.pool())
     .await
     .unwrap();
-    let (_, email) = person(&d, "admin").await;
+    let (sender, email) = person(&d, "admin").await;
+    let principal =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+            .bind(company.as_uuid())
+            .bind(sender)
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    departments
+        .add_member(
+            scope,
+            department.id,
+            crate::entities::transport::PrincipalId::new(principal),
+        )
+        .await
+        .unwrap();
     write(
         &d,
         &email,
@@ -912,6 +946,7 @@ async fn department_context_reaches_the_lead_on_its_department_desk() {
          You answer as this department's lead.\n\
          Desks around this department:\n\
          - This department's desk: {}\n\
+         - Parent department Workflow tests (workflow-tests): no address\n\
          - Agent helper (helper): {}\n\
          - Agent ops-lead (ops-lead, lead): {}\n\n",
         d.address("ops"),

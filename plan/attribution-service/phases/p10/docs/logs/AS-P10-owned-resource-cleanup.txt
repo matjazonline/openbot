@@ -1,0 +1,21 @@
+waiting for server to shut down.... done
+server stopped
+as-final-postgres-fb07042291b6444983511ac71f79fe92
+time="2026-11-16T20:28:55+01:00" level=info msg="stopping colima [profile=as-attribution-integration]"
+time="2026-11-16T20:28:55+01:00" level=info msg="stopping ..." context=docker
+Stopping 'docker.service', but its triggering units are still active:
+docker.socket
+colima-as-attribution-integration
+time="2026-11-16T20:28:56+01:00" level=info msg="stopping ..." context=vm
+time="2026-11-16T20:28:56+01:00" level=info msg="Sending SIGINT to hostagent process 74320"
+time="2026-11-16T20:28:56+01:00" level=info msg="Waiting for the host agent and the driver processes to shut down"
+time="2026-11-16T20:28:56+01:00" level=info msg="[hostagent] Received SIGINT, shutting down the host agent"
+time="2026-11-16T20:28:56+01:00" level=info msg="[hostagent] Shutting down the host agent"
+time="2026-11-16T20:28:56+01:00" level=info msg="[hostagent] Stopping forwarding `/var/run/docker.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/docker.sock` (host)"
+time="2026-11-16T20:28:56+01:00" level=info msg="[hostagent] Stopping forwarding `/var/run/containerd/containerd.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/containerd.sock` (host)"
+time="2026-11-16T20:28:56+01:00" level=info msg="[hostagent] Unmounting disk `colima-as-attribution-integration`"
+time="2026-11-16T20:28:56+01:00" level=info msg="[hostagent] Shutting down VZ"
+time="2026-11-16T20:28:56+01:00" level=info msg="[hostagent] [VZ] - vm state change: stopped"
+time="2026-11-16T20:28:56+01:00" level=info msg="Waiting for the instance to shut down"
+time="2026-11-16T20:28:57+01:00" level=info msg="The instance colima-as-attribution-integration has shut down"
+time="2026-11-16T20:28:57+01:00" level=info msg=done

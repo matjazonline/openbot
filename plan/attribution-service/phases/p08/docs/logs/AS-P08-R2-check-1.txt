@@ -1,0 +1,2 @@
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 4.46s

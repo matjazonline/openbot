@@ -1,0 +1,41 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 5.58s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 7 tests
+test application::catalog::tests::attribution_links_product_clear_has_distinct_normalized_content ... ok
+test application::catalog::tests::attribution_links_reserved_parameter_and_canonical_expansion_bound ... ok
+
+thread 'adapters::identity::http_tests::catalog_tests::attribution_redirect_concurrent_distinct_ids_and_latency_budget' (22827784) panicked at src/adapters/identity/../catalog/http_tests.rs:33:5:
+/v1/stores: 403 Forbidden {"code":"forbidden","correlation_id":"2d4e38f4-45b0-4778-b188-5618569e09bd","message":"Access denied"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::identity::http_tests::catalog_tests::attribution_links_http_roles_scope_retry_and_competing_claimants' (22827783) panicked at src/adapters/identity/../catalog/http_tests.rs:33:5:
+/v1/stores: 403 Forbidden {"code":"forbidden","correlation_id":"7adc7a66-77f6-43b7-a2d2-78b70d4a76b4","message":"Access denied"}
+
+thread 'adapters::identity::http_tests::catalog_tests::attribution_redirect_headers_head_classification_and_immutable_history' (22827785) panicked at src/adapters/identity/../catalog/http_tests.rs:33:5:
+/v1/stores: 403 Forbidden {"code":"forbidden","correlation_id":"7e6cb9fd-eca5-4743-b7f7-c0caddf89af7","message":"Access denied"}
+
+thread 'adapters::identity::http_tests::catalog_tests::attribution_redirect_storage_rejection_and_freshness_fail_closed' (22827786) panicked at src/adapters/identity/../catalog/http_tests.rs:33:5:
+/v1/stores: 403 Forbidden {"code":"forbidden","correlation_id":"8b35f4f7-6532-4466-b5e6-f50ad719177d","message":"Access denied"}
+
+thread 'adapters::identity::http_tests::catalog_tests::attribution_links_destination_and_parent_eligibility' (22827782) panicked at src/adapters/identity/../catalog/http_tests.rs:33:5:
+/v1/stores: 403 Forbidden {"code":"forbidden","correlation_id":"092f0616-8fcf-413d-83b4-545fd1ca4897","message":"Access denied"}
+test adapters::identity::http_tests::catalog_tests::attribution_links_http_roles_scope_retry_and_competing_claimants ... FAILED
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_concurrent_distinct_ids_and_latency_budget ... FAILED
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_headers_head_classification_and_immutable_history ... FAILED
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_storage_rejection_and_freshness_fail_closed ... FAILED
+test adapters::identity::http_tests::catalog_tests::attribution_links_destination_and_parent_eligibility ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::catalog_tests::attribution_links_destination_and_parent_eligibility
+    adapters::identity::http_tests::catalog_tests::attribution_links_http_roles_scope_retry_and_competing_claimants
+    adapters::identity::http_tests::catalog_tests::attribution_redirect_concurrent_distinct_ids_and_latency_budget
+    adapters::identity::http_tests::catalog_tests::attribution_redirect_headers_head_classification_and_immutable_history
+    adapters::identity::http_tests::catalog_tests::attribution_redirect_storage_rejection_and_freshness_fail_closed
+
+test result: FAILED. 2 passed; 5 failed; 0 ignored; 0 measured; 55 filtered out; finished in 0.80s
+
+error: test failed, to rerun pass `--lib`

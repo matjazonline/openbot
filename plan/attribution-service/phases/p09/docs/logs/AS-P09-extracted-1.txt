@@ -1,0 +1,31 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (200.906042ms)
++ cargo sqlx prepare --check -- --locked --offline --all-targets
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_ceq74viw/attribution)
+error: couldn't create a temp dir: No space left on device (os error 28) at path "/tmp/as-attribution-target/debug/deps/rmetaLjfbBo"
+
+error: could not compile `attribution_service` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: `cargo check` failed with status: exit status: 101
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_ceq74viw/attribution/scripts/verify.py", line 51, in <module>
+    main()
+    ~~~~^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_ceq74viw/attribution/scripts/verify.py", line 32, in main
+    run("cargo", "sqlx", "prepare", "--check", "--", "--locked", "--offline", "--all-targets", env=online)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_ceq74viw/attribution/scripts/verify.py", line 15, in run
+    result = subprocess.run(args, cwd=ROOT, env=env, check=True, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '('cargo', 'sqlx', 'prepare', '--check', '--', '--locked', '--offline', '--all-targets')' returned non-zero exit status 1.
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/extracted-build.py", line 19, in <module>
+    subprocess.run([sys.executable, "scripts/verify.py", mode], cwd=isolated, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/private/tmp/as-p02-contract-clean/bin/python', 'scripts/verify.py', 'foundation']' returned non-zero exit status 1.

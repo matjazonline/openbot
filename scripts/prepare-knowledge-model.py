@@ -6,10 +6,10 @@ import json
 import os
 import platform
 import shutil
-import tarfile
 import tempfile
 import time
 import urllib.request
+import zipfile
 from pathlib import Path
 
 MANIFEST = Path(__file__).resolve().parent.parent / "assets/knowledge/model-manifest.json"
@@ -58,7 +58,7 @@ def stage_file(stage, item, cache_path=None):
 
 
 def stage_runtime(stage, runtime, cache):
-    archive = stage / "runtime.tgz"
+    archive = stage / "runtime.zip"
     source = cache / "archives" / runtime["archive_url"].rsplit("/", 1)[-1] if cache else None
     archive_item = {"size": runtime["archive_size"], "sha256": runtime["archive_sha256"]}
     if source and verified(source, archive_item):
@@ -67,19 +67,20 @@ def stage_runtime(stage, runtime, cache):
         download(runtime["archive_url"], archive, archive_item["size"], archive_item["sha256"])
     expected = {item["archive_path"]: item for item in runtime["files"]}
     found = set()
-    with tarfile.open(archive, "r:gz") as bundle:
-        for entry in bundle:
-            # Only exact manifest-listed regular files. Never follow links or extract paths.
-            relative = entry.name.partition("/")[2]
+    with zipfile.ZipFile(archive) as bundle:
+        for entry in bundle.infolist():
+            # Only exact manifest-listed members, read as stored bytes: zip members are never
+            # followed as links or extracted by path, and every file is checksummed below.
+            relative = entry.filename
             item = expected.get(relative)
             if not item:
                 continue
-            if relative in found or not entry.isfile() or entry.size != item["size"]:
+            if relative in found or entry.file_size != item["size"]:
                 raise ValueError("Invalid runtime archive member: " + relative)
             found.add(relative)
             destination = stage / item["path"]
             destination.parent.mkdir(parents=True, exist_ok=True)
-            with bundle.extractfile(entry) as source_file, destination.open("wb") as output:
+            with bundle.open(entry) as source_file, destination.open("wb") as output:
                 shutil.copyfileobj(source_file, output, 64 * 1024)
             if not verified(destination, item):
                 raise ValueError("Runtime artifact checksum mismatch: " + relative)

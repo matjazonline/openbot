@@ -1,0 +1,132 @@
+--- B1/src/adapters/persistence/workflow/schedule_configuration_authority_tests.rs
++++ B2/src/adapters/persistence/workflow/schedule_configuration_authority_tests.rs
+@@ -0,0 +1,129 @@
++//! Preserve ordinary-member refusals while separating configuration from conversation View.
++use super::*;
++
++async fn refuse_member(s: &Schedules, schedule: &ChannelSchedule, plain: Uuid) {
++    let uc = &s.use_cases;
++    let results = vec![
++        uc.create_schedule(plain, s.company(), s.channel, s.write("New", s.binding))
++            .await
++            .map(drop),
++        uc.update_schedule(
++            plain,
++            s.company(),
++            schedule.id,
++            s.channel,
++            s.write("Edited", s.binding),
++        )
++        .await
++        .map(drop),
++        uc.toggle_schedule(plain, s.company(), schedule.id, false)
++            .await,
++        uc.trigger_schedule_now(plain, s.company(), schedule.id, "k")
++            .await
++            .map(drop),
++        uc.list_schedule_runs(plain, s.company(), schedule.id, 0, 10)
++            .await
++            .map(drop),
++        uc.list_channel_schedules(plain, s.company(), s.channel)
++            .await
++            .map(drop),
++        uc.delete_schedule(plain, s.company(), schedule.id).await,
++    ];
++    for result in results {
++        assert!(matches!(result, Err(AppError::NotFound(_))), "{result:?}");
++    }
++    assert_eq!(
++        uc.get_schedule(plain, s.company(), schedule.id)
++            .await
++            .unwrap(),
++        None
++    );
++    assert!(matches!(
++        uc.list_company_schedules(plain, s.company()).await,
++        Err(AppError::NotFound(_))
++    ));
++}
++
++#[tokio::test]
++async fn schedule_management_separates_configuration_from_human_view() {
++    let s = Schedules::new().await;
++    let schedule = s.schedule("Hourly").await;
++    let plain = member(&s.fixture, "member").await;
++    let admin = member(&s.fixture, "admin").await;
++    refuse_member(&s, &schedule, plain).await;
++    allowlist(s.pool(), s.channel).await;
++    let uc = &s.use_cases;
++    let created = uc
++        .create_schedule(admin, s.company(), s.channel, s.write("New", s.binding))
++        .await
++        .unwrap();
++    let updated = uc
++        .update_schedule(
++            admin,
++            s.company(),
++            schedule.id,
++            s.channel,
++            s.write("Edited", s.binding),
++        )
++        .await
++        .unwrap();
++    assert_eq!(updated.name, "Edited");
++    uc.toggle_schedule(admin, s.company(), schedule.id, false)
++        .await
++        .unwrap();
++    assert!(
++        !uc.get_schedule(admin, s.company(), schedule.id)
++            .await
++            .unwrap()
++            .unwrap()
++            .enabled
++    );
++    let listed = uc
++        .list_channel_schedules(admin, s.company(), s.channel)
++        .await
++        .unwrap();
++    assert_eq!(listed.len(), 2);
++    assert_eq!(
++        uc.list_company_schedules(admin, s.company())
++            .await
++            .unwrap()
++            .len(),
++        2
++    );
++    assert!(matches!(
++        uc.trigger_schedule_now(admin, s.company(), schedule.id, "private")
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        uc.list_schedule_runs(admin, s.company(), schedule.id, 0, 10)
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    let actor = WorkflowActor::authenticated(admin).unwrap();
++    s.p()
++        .set_enabled(actor, s.fixture.target.company, schedule.id, true)
++        .await
++        .unwrap();
++    assert!(matches!(
++        s.p()
++            .capture_now(
++                actor,
++                s.fixture.target.company,
++                schedule.id,
++                "direct-private"
++            )
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(s.occurrences(schedule.id).await.is_empty());
++    uc.delete_schedule(admin, s.company(), schedule.id)
++        .await
++        .unwrap();
++    let owner_list = uc
++        .list_company_schedules(s.owner(), s.company())
++        .await
++        .unwrap();
++    assert_eq!(owner_list.len(), 1);
++    assert_eq!(owner_list[0].id, created.id);
++}

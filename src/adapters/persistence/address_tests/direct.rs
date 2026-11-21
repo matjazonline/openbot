@@ -54,7 +54,7 @@ async fn direct_thread_policy_sql_matches_domain_for_live_and_archived_targets()
     f.join(teammate, &name).await;
     let (admin, name) = account(&f.persistence, "direct_admin").await;
     f.join(admin, &name).await;
-    sqlx::query("UPDATE company_members SET role = 'admin' WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.company_id = $1 AND member.root_user_id = $2 ON CONFLICT DO NOTHING")
         .bind(f.company.id)
         .bind(admin)
         .execute(f.pool())
@@ -85,7 +85,11 @@ async fn direct_thread_policy_sql_matches_domain_for_live_and_archived_targets()
     ] {
         if retired {
             f.persistence
-                .remove_member(f.company.id, member)
+                .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                    actor_id: f.company.user_id,
+                    company_id: f.company.id,
+                    member_user_id: member,
+                })
                 .await
                 .unwrap();
         } else if target == agent {
@@ -138,7 +142,11 @@ async fn direct_thread_personal_ownership_survives_removal_rejoin_and_email_reus
     let stored = principal(&f, original).await;
     assert_eq!(stored.historical_person_user_id, Some(user));
     f.persistence
-        .remove_member(f.company.id, user)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.company.user_id,
+            company_id: f.company.id,
+            member_user_id: user,
+        })
         .await
         .unwrap();
     let archived = principal(&f, original).await;
@@ -299,7 +307,11 @@ async fn direct_competing_personal_rejoin_claimants_restore_one_lifetime_target(
     let old_email = email_of(f.pool(), user).await;
     let original = f.join(user, &name).await;
     f.persistence
-        .remove_member(f.company.id, user)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.company.user_id,
+            company_id: f.company.id,
+            member_user_id: user,
+        })
         .await
         .unwrap();
     let email = EmailAddress::from(format!(
@@ -307,11 +319,12 @@ async fn direct_competing_personal_rejoin_claimants_restore_one_lifetime_target(
         Uuid::new_v4().simple()
     ));
     rejoin::change_email(&f, user, &email).await;
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',1)")
-        .bind(Uuid::new_v4()).bind(f.company.id).bind(user).execute(f.pool()).await.unwrap();
     let mut first = f.pool().begin().await.unwrap();
     lock_rejoin_prefix(&mut first, f.company.id, user).await;
     let one = create_person_principal_on(&mut first, f.company.id, user, &name, &email)
+        .await
+        .unwrap();
+    root_membership_on(&mut first, f.company.id, one)
         .await
         .unwrap();
     let pool = f.pool().clone();
@@ -320,6 +333,9 @@ async fn direct_competing_personal_rejoin_claimants_restore_one_lifetime_target(
         let mut transaction = pool.begin().await.unwrap();
         lock_rejoin_prefix(&mut transaction, company, user).await;
         let id = create_person_principal_on(&mut transaction, company, user, &name, &email)
+            .await
+            .unwrap();
+        root_membership_on(&mut transaction, company, id)
             .await
             .unwrap();
         transaction.commit().await.unwrap();

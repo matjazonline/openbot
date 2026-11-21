@@ -1,0 +1,25 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 49s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 12 tests
+test application::workflow::memory_recall::tests::memory_preparation_recall_budget_shares ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_absent_or_ambiguous_placement_is_readonly_root ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_overlapping_report_and_chain_is_one_unit_with_both_relations ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_chain_local_writes_and_only_the_acting_leads_direct_children ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_depth_cycle_chain_metadata_and_read_budget_fail_early ... ok
+test application::workflow::memory_tools::runtime::tests::memory_scope_tool_arguments_parse_strictly_with_documented_defaults ... ok
+test application::workflow::memory_tools::builtin::tests::memory_access_level_save_sources_are_distinct_level_ordered_and_bounded ... ok
+test application::workflow::memory_tools::runtime::tests::memory_access_level_bounded_hits_record_exactly_what_is_shown ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_seal_refuses_updates_deletes_late_rows_and_missing_or_foreign_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_competing_append_and_seal_share_the_run_mutex ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::memory_scope_admission_step_own_uses_the_captured_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_freezes_per_actor_reports_and_retained_labels ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 4750 filtered out; finished in 3.12s
+

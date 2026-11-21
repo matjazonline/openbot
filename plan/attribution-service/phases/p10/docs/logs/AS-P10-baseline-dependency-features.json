@@ -1,0 +1,34 @@
+{
+  "baseline_metadata_sha256": "7cf7eb6651e591a706399a212fe60a0bd4488d3a80c8adf9ccd6fc4109cabea0",
+  "current_metadata_sha256": "4b61af98e64dd64aee8bc92acc553c5de231f2e029497e6a3194c0b2c0f7ee3f",
+  "changes": [
+    {
+      "package": "oauth2@5.0.0 registry+https://github.com/rust-lang/crates.io-index",
+      "before": null,
+      "after": []
+    },
+    {
+      "package": "subtle@2.6.1 registry+https://github.com/rust-lang/crates.io-index",
+      "before": [
+        "i128"
+      ],
+      "after": [
+        "default",
+        "i128",
+        "std"
+      ]
+    },
+    {
+      "package": "url@2.5.8 registry+https://github.com/rust-lang/crates.io-index",
+      "before": [
+        "default",
+        "std"
+      ],
+      "after": [
+        "default",
+        "serde",
+        "std"
+      ]
+    }
+  ]
+}

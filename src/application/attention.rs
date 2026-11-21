@@ -22,7 +22,7 @@ use crate::entities::user::Viewer;
 use crate::use_cases::channel::ChannelReaders;
 use crate::use_cases::channel::readable_channels;
 use crate::use_cases::company::CompanyPersistence;
-use crate::use_cases::company::company_forbidden;
+use crate::use_cases::company::company_not_found;
 use crate::use_cases::company::readable_company;
 use crate::use_cases::participant::ParticipantPersistence;
 
@@ -122,13 +122,13 @@ impl AttentionUseCases {
             visible_channel_ids: visible.iter().map(|channel| channel.id).collect(),
             desk_departments: visible
                 .iter()
-                .map(|channel| (channel.id, channel.department_id))
+                .map(|channel| (channel.id, Some(channel.department_id)))
                 .collect(),
         })
     }
 
-    /// One page of the queue. The team view is the managers'; an ordinary member can see the
-    /// company, so asking for it is a refusal (`Forbidden`) rather than a not-found.
+    /// One page of the queue. The team view is company administration (Plan06 U4/U5): anyone
+    /// else asking for it is told nothing, the same as a stranger (02A.4).
     pub async fn list(
         &self,
         viewer: &Viewer,
@@ -136,11 +136,9 @@ impl AttentionUseCases {
         request: AttentionListRequest<'_>,
     ) -> AppResult<AttentionListing> {
         let context = self.read_context(viewer, company_id).await?;
-        let manager = context.access.membership.manages_company_operations();
+        let manager = context.access.membership.administers_company();
         if request.view == AttentionView::TeamWork && !manager {
-            return Err(company_forbidden(
-                "Only the company owner or an admin can see the team's work.",
-            ));
+            return Err(company_not_found());
         }
         // A one-department view reads only that department's visible desks, and no
         // company-associated items, which belong to no desk.
@@ -180,17 +178,15 @@ impl AttentionUseCases {
         })
     }
 
-    /// The company's operational summary, for its owner and admins; a member is refused.
+    /// The company's operational summary, for its owner and admins; anyone else is told nothing.
     pub async fn operational_summary(
         &self,
         viewer: &Viewer,
         company_id: Uuid,
     ) -> AppResult<OperationalSummary> {
         let context = self.read_context(viewer, company_id).await?;
-        if !context.access.membership.manages_company_operations() {
-            return Err(company_forbidden(
-                "Only the company owner or an admin can see the operational summary.",
-            ));
+        if !context.access.membership.administers_company() {
+            return Err(company_not_found());
         }
         let started = Instant::now();
         let summary = self

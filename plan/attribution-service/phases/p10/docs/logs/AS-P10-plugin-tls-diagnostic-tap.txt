@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: bundle transport uses trusted TLS and live identity with exact maximum streaming bytes
+not ok 1 - bundle transport uses trusted TLS and live identity with exact maximum streaming bytes
+  ---
+  duration_ms: 19.593209
+  type: 'test'
+  location: '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:783:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The module '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+    was compiled against a different Node.js version using
+    NODE_MODULE_VERSION 147. This version of Node.js requires
+    NODE_MODULE_VERSION 137. Please try re-compiling or re-installing
+    the module (for instance, using `npm rebuild` or `npm install`).
+  code: 'ERR_DLOPEN_FAILED'
+  stack: |-
+    Object..node (node:internal/modules/cjs/loader:2087:18)
+    Module.load (node:internal/modules/cjs/loader:1651:32)
+    Module._load (node:internal/modules/cjs/loader:1443:12)
+    wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    Module.require (node:internal/modules/cjs/loader:1674:12)
+    require (node:internal/modules/helpers:157:16)
+    bindings (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/bindings/bindings.js:112:48)
+    new Database (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/better-sqlite3/lib/database.js:48:64)
+    open (file:///private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:717:16)
+    fixture (file:///private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:723:19)
+  ...
+# Subtest: bundle transport refuses redirects, revoked authority, corrupt digests and oversized declared bodies
+not ok 2 - bundle transport refuses redirects, revoked authority, corrupt digests and oversized declared bodies
+  ---
+  duration_ms: 5.248
+  type: 'test'
+  location: '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:821:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The module '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+    was compiled against a different Node.js version using
+    NODE_MODULE_VERSION 147. This version of Node.js requires
+    NODE_MODULE_VERSION 137. Please try re-compiling or re-installing
+    the module (for instance, using `npm rebuild` or `npm install`).
+  code: 'ERR_DLOPEN_FAILED'
+  stack: |-
+    Object..node (node:internal/modules/cjs/loader:2087:18)
+    Module.load (node:internal/modules/cjs/loader:1651:32)
+    Module._load (node:internal/modules/cjs/loader:1443:12)
+    wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    Module.require (node:internal/modules/cjs/loader:1674:12)
+    require (node:internal/modules/helpers:157:16)
+    bindings (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/bindings/bindings.js:112:48)
+    new Database (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/better-sqlite3/lib/database.js:48:64)
+    open (file:///private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:717:16)
+    fixture (file:///private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:723:19)
+  ...
+# Subtest: bundle body cancellation closes the active request and joins promptly
+not ok 3 - bundle body cancellation closes the active request and joins promptly
+  ---
+  duration_ms: 3.21725
+  type: 'test'
+  location: '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:862:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The module '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+    was compiled against a different Node.js version using
+    NODE_MODULE_VERSION 147. This version of Node.js requires
+    NODE_MODULE_VERSION 137. Please try re-compiling or re-installing
+    the module (for instance, using `npm rebuild` or `npm install`).
+  code: 'ERR_DLOPEN_FAILED'
+  stack: |-
+    Object..node (node:internal/modules/cjs/loader:2087:18)
+    Module.load (node:internal/modules/cjs/loader:1651:32)
+    Module._load (node:internal/modules/cjs/loader:1443:12)
+    wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    Module.require (node:internal/modules/cjs/loader:1674:12)
+    require (node:internal/modules/helpers:157:16)
+    bindings (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/bindings/bindings.js:112:48)
+    new Database (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/better-sqlite3/lib/database.js:48:64)
+    open (file:///private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:717:16)
+    fixture (file:///private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:723:19)
+  ...
+
+Fixture process stayed alive after failed tests for25s; terminating this diagnostic group.
+# Interrupted while running: build-tests/bundle-transport.test.js at /private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/build-tests/bundle-transport.test.js:1:1

@@ -1,0 +1,31 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0425]: cannot find type `AgentId` in module `crate::entities::agent`
+   --> src/adapters/persistence/workflow/run_scopes.rs:206:114
+    |
+206 | pub(super) async fn agent_principal_on(db: &mut PgConnection, company: CompanyId, agent: crate::entities::agent::AgentId) -> AppRes...
+    |                                                                                                                  ^^^^^^^
+    |
+   ::: src/domain/entities/agent.rs:9:1
+    |
+  9 | pub struct Agent {
+    | ---------------- similarly named struct `Agent` defined here
+    |
+help: a struct with a similar name exists
+    |
+206 - pub(super) async fn agent_principal_on(db: &mut PgConnection, company: CompanyId, agent: crate::entities::agent::AgentId) -> AppResult<PrincipalId> {
+206 + pub(super) async fn agent_principal_on(db: &mut PgConnection, company: CompanyId, agent: crate::entities::agent::Agent) -> AppResult<PrincipalId> {
+    |
+help: consider importing this struct
+    |
+  3 + use crate::entities::agent_capability::AgentId;
+    |
+help: if you import `AgentId`, refer to it directly
+    |
+206 - pub(super) async fn agent_principal_on(db: &mut PgConnection, company: CompanyId, agent: crate::entities::agent::AgentId) -> AppResult<PrincipalId> {
+206 + pub(super) async fn agent_principal_on(db: &mut PgConnection, company: CompanyId, agent: AgentId) -> AppResult<PrincipalId> {
+    |
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 1 previous error

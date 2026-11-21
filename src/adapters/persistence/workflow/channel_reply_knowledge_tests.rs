@@ -56,12 +56,14 @@ impl Classified {
         }
     }
     async fn lower_audience(&self) {
-        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-            .bind(self.finalization.scope.company.as_uuid())
-            .bind(self.recipient)
-            .execute(self.finalization.p.pool())
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+        )
+        .bind(self.finalization.scope.company.as_uuid())
+        .bind(self.recipient)
+        .execute(self.finalization.p.pool())
+        .await
+        .unwrap();
     }
 }
 

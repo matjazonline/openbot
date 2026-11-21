@@ -1,0 +1,736 @@
+tools: /private/tmp/claude-501/-Users-mac02-orca-workspaces-openbot-plan06/b36d9dc4-495e-4131-9804-05ebcc381915/scratchpad/toolshim/rg ripgrep 15.0.0 (rev 3a612f88b8); /private/tmp/claude-501/-Users-mac02-orca-workspaces-openbot-plan06/b36d9dc4-495e-4131-9804-05ebcc381915/scratchpad/toolshim/python3 Python 3.13.18
+
+==> Transport abstraction boundary
+runtime boundary gate regression tests passed
+transport boundary check passed
+
+==> Memory extracted service suite
+extracted: /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//memory-extracted.OvU5Gr/memory (--cached)
+
+==> Formatting
+
+==> Boundary (with poisoned-parent probe)
+boundary: ok (with poisoned-parent probe)
+
+==> Fetch locked dependencies
+
+==> Offline compilation
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling libc v0.2.190
+   Compiling serde v1.0.229
+   Compiling serde_core v1.0.229
+    Checking cfg-if v1.0.5
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling autocfg v1.5.1
+   Compiling version_check v0.9.5
+    Checking memchr v2.8.3
+    Checking itoa v1.0.18
+    Checking pin-project-lite v0.2.17
+    Checking once_cell v1.21.4
+    Checking futures-core v0.3.34
+   Compiling zmij v1.0.23
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_normalizer_data v2.3.0
+   Compiling zerocopy v0.8.56
+   Compiling generic-array v0.14.7
+   Compiling pkg-config v0.3.34
+   Compiling num-traits v0.2.19
+    Checking bytes v1.12.1
+    Checking stable_deref_trait v1.2.1
+    Checking futures-sink v0.3.34
+    Checking futures-channel v0.3.34
+   Compiling parking_lot_core v0.9.12
+   Compiling serde_json v1.0.151
+    Checking slab v0.4.12
+    Checking futures-task v0.3.34
+   Compiling fs_extra v1.3.0
+   Compiling dunce v1.0.5
+    Checking futures-io v0.3.34
+   Compiling getrandom v0.4.3
+    Checking rand_core v0.10.1
+    Checking litemap v0.8.3
+   Compiling syn v3.0.6
+   Compiling jobserver v0.1.35
+   Compiling syn v2.0.119
+    Checking errno v0.3.14
+    Checking mio v1.2.2
+    Checking socket2 v0.6.5
+    Checking getrandom v0.2.17
+   Compiling thiserror v2.0.21
+    Checking signal-hook-registry v1.4.8
+    Checking percent-encoding v2.3.2
+    Checking zeroize v1.9.0
+   Compiling cc v1.6.0
+    Checking log v0.4.34
+   Compiling crossbeam-utils v0.8.22
+    Checking subtle v2.6.1
+    Checking writeable v0.6.4
+   Compiling typenum v1.20.1
+    Checking core-foundation-sys v0.8.7
+   Compiling aws-lc-rs v1.18.1
+    Checking utf8_iter v1.0.4
+    Checking bitflags v2.13.2
+    Checking rustls-pki-types v1.15.1
+    Checking http v1.5.0
+    Checking tracing-core v0.1.36
+   Compiling cmake v0.1.58
+   Compiling crypto-common v0.1.7
+    Checking http-body v1.0.1
+   Compiling block-buffer v0.10.4
+    Checking untrusted v0.9.0
+   Compiling getrandom v0.3.4
+   Compiling digest v0.10.7
+    Checking num-integer v0.1.46
+   Compiling rustls v0.23.43
+    Checking equivalent v1.0.2
+    Checking form_urlencoded v1.2.2
+    Checking aho-corasick v1.1.4
+   Compiling crossbeam-epoch v0.9.21
+    Checking tower-service v0.3.3
+    Checking scopeguard v1.2.0
+    Checking base64 v0.22.1
+   Compiling ident_case v1.0.1
+   Compiling fnv v1.0.7
+   Compiling ring v0.17.14
+   Compiling aws-lc-sys v0.45.0
+   Compiling strsim v0.11.1
+    Checking regex-syntax v0.8.11
+    Checking allocator-api2 v0.2.21
+   Compiling lock_api v0.4.14
+    Checking uuid v1.27.0
+   Compiling darling_core v0.20.11
+   Compiling foldhash v0.1.5
+   Compiling synstructure v0.14.0
+    Checking ppv-lite86 v0.2.21
+   Compiling crossbeam-deque v0.8.8
+   Compiling tinyvec_macros v0.1.1
+   Compiling httparse v1.10.1
+    Checking regex-automata v0.4.18
+   Compiling ref-cast v1.0.27
+   Compiling hashbrown v0.15.5
+   Compiling tokio v1.53.2
+   Compiling tinyvec v1.12.0
+   Compiling iana-time-zone v0.1.65
+   Compiling webpki-roots v1.0.9
+   Compiling rand_core v0.6.4
+   Compiling tracing-attributes v0.1.31
+    Checking num-complex v0.4.6
+   Compiling cpufeatures v0.2.17
+   Compiling ahash v0.8.12
+   Compiling parking v2.2.1
+   Compiling serde_derive v1.0.229
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.6
+   Compiling displaydoc v0.2.7
+   Compiling tokio-macros v2.7.2
+   Compiling futures-macro v0.3.34
+   Compiling thiserror-impl v2.0.21
+    Checking tracing v0.1.44
+   Compiling darling_macro v0.20.11
+    Checking zerofrom v0.1.8
+    Checking futures-util v0.3.34
+   Compiling ref-cast-impl v1.0.27
+   Compiling rustversion v1.0.22
+   Compiling rayon-core v1.13.0
+    Checking yoke v0.8.3
+   Compiling hashbrown v0.17.1
+   Compiling crc-catalog v2.5.0
+    Checking zerovec v0.11.8
+    Checking zerotrie v0.2.5
+    Checking try-lock v0.2.5
+    Checking want v0.3.2
+   Compiling indexmap v2.14.1
+   Compiling tokio-stream v0.1.19
+    Checking tinystr v0.8.4
+    Checking potential_utf v0.1.6
+    Checking icu_locale_core v2.3.0
+    Checking icu_collections v2.3.0
+   Compiling crc v3.4.0
+    Checking smallvec v1.16.2
+    Checking either v1.17.0
+    Checking icu_provider v2.3.1
+    Checking chrono v0.4.45
+    Checking icu_normalizer v2.3.0
+    Checking icu_properties v2.3.0
+   Compiling parking_lot v0.12.5
+   Compiling futures-intrusive v0.5.0
+   Compiling darling v0.20.11
+   Compiling rand_chacha v0.3.1
+   Compiling event-listener v5.4.2
+   Compiling sha2 v0.10.9
+    Checking idna_adapter v1.2.2
+    Checking idna v1.1.0
+   Compiling crossbeam-queue v0.3.13
+   Compiling webpki-roots v0.26.11
+   Compiling unicode-normalization v0.1.25
+   Compiling hashlink v0.10.0
+   Compiling onig_sys v69.9.3
+    Checking url v2.5.8
+   Compiling hmac v0.12.1
+    Checking http-body-util v0.1.3
+   Compiling matrixmultiply v0.3.11
+    Checking sync_wrapper v1.0.2
+   Compiling unicode-bidi v0.3.18
+    Checking atomic-waker v1.1.2
+    Checking ryu v1.0.23
+   Compiling rustls-webpki v0.103.14
+    Checking tower-layer v0.3.3
+   Compiling unicode-properties v0.1.4
+    Checking pin-utils v0.1.0
+    Checking httpdate v1.0.3
+   Compiling rustix v1.1.4
+    Checking hyper v1.8.1
+   Compiling stringprep v0.1.5
+   Compiling hkdf v0.12.4
+   Compiling derive_builder_core v0.20.2
+   Compiling rand v0.8.7
+   Compiling atoi v2.0.0
+    Checking rand_core v0.9.5
+   Compiling md-5 v0.10.6
+   Compiling paste v1.0.15
+    Checking lazy_static v1.5.0
+    Checking rawpointer v0.2.1
+   Compiling pastey v0.2.3
+   Compiling whoami v1.6.1
+   Compiling byteorder v1.5.0
+   Compiling home v0.5.12
+   Compiling esaxx-rs v0.1.10
+   Compiling hex v0.4.3
+    Checking minimal-lexical v0.2.1
+    Checking ipnet v2.12.2
+   Compiling ort-sys v2.0.0-rc.13
+   Compiling dotenvy v0.15.7
+   Compiling derive_builder_macro v0.20.2
+    Checking hyper-util v0.1.20
+    Checking nom v7.1.3
+    Checking castaway v0.2.4
+    Checking rand_chacha v0.9.0
+    Checking rayon v1.12.0
+    Checking tower v0.5.3
+    Checking itertools v0.14.0
+    Checking regex v1.13.1
+   Compiling monostate-impl v0.1.18
+   Compiling serde_derive_internals v0.30.0
+    Checking core-foundation v0.10.1
+    Checking security-framework-sys v2.17.0
+   Compiling macro_rules_attribute-proc_macro v0.2.3
+    Checking fastrand v2.5.0
+    Checking foldhash v0.2.0
+    Checking base64 v0.13.1
+    Checking static_assertions v1.1.0
+   Compiling heck v0.5.0
+    Checking unicode-segmentation v1.13.3
+    Checking compact_str v0.9.1
+    Checking tempfile v3.27.0
+    Checking hashbrown v0.16.1
+   Compiling sqlx-core v0.8.6
+    Checking macro_rules_attribute v0.2.3
+    Checking monostate v0.1.18
+    Checking spm_precompiled v0.1.4
+    Checking security-framework v3.7.0
+    Checking ndarray v0.17.2
+    Checking rand v0.9.5
+   Compiling schemars_derive v1.2.2
+    Checking rayon-cond v0.4.0
+    Checking derive_builder v0.20.2
+    Checking unicode-normalization-alignments v0.1.12
+    Checking dary_heap v0.3.9
+    Checking futures-executor v0.3.34
+    Checking num-bigint v0.4.8
+    Checking chacha20 v0.10.2
+    Checking libloading v0.9.0
+   Compiling rmcp v1.8.0
+    Checking mime v0.3.17
+   Compiling anyhow v1.0.104
+    Checking unicode_categories v0.1.1
+    Checking daachorse v3.0.3
+    Checking dyn-clone v1.0.20
+    Checking axum-core v0.5.6
+    Checking rand v0.10.3
+    Checking futures v0.3.34
+    Checking safetensors v0.8.0
+    Checking tower-http v0.6.11
+    Checking num-rational v0.4.2
+    Checking sharded-slab v0.1.7
+    Checking serde_urlencoded v0.7.1
+    Checking sse-stream v0.2.5
+    Checking tokio-util v0.7.19
+    Checking schemars v1.2.2
+    Checking tracing-serde v0.2.0
+    Checking matchers v0.2.0
+   Compiling async-trait v0.1.92
+    Checking num-iter v0.1.45
+   Compiling sqlx-postgres v0.8.6
+    Checking serde_path_to_error v0.1.20
+    Checking thread_local v1.1.9
+    Checking bit-vec v0.8.0
+    Checking matchit v0.8.4
+    Checking nu-ansi-term v0.50.3
+    Checking borrow-or-share v0.2.4
+    Checking bit-set v0.8.0
+    Checking fluent-uri v0.3.2
+    Checking num v0.4.3
+    Checking tracing-subscriber v0.3.22
+    Checking axum v0.8.8
+    Checking vsimd v0.8.0
+    Checking outref v0.5.2
+    Checking fancy-regex v0.16.2
+    Checking fraction v0.15.4
+    Checking referencing v0.33.0
+    Checking uuid-simd v0.8.0
+    Checking email_address v0.2.9
+    Checking ort v2.0.0-rc.13
+    Checking bytecount v0.6.9
+    Checking num-cmp v0.1.0
+    Checking jsonschema v0.33.0
+    Checking onig v6.5.3
+   Compiling sqlx-macros-core v0.8.6
+    Checking tokenizers v0.23.2
+   Compiling sqlx-macros v0.8.6
+    Checking fastembed v7.1.1
+    Checking tokio-rustls v0.26.6
+    Checking rustls-platform-verifier v0.7.1
+    Checking hyper-rustls v0.27.10
+    Checking reqwest v0.13.4
+    Checking sqlx v0.8.6
+    Checking memory-service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/memory-extracted.OvU5Gr/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.59s
+
+==> Clippy
+    Checking memory-service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/memory-extracted.OvU5Gr/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.29s
+
+==> Migrations as the owner role
+Applied 1/migrate init (29.927417ms)
+
+==> SQLx metadata matches the schema
+    Checking memory-service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/memory-extracted.OvU5Gr/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.50s
+
+==> Model manifest
+manifest ok: intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384
+
+==> Model artifacts (sizes and SHA-256)
+model artifact missing or invalid: assets/model/runtime/ThirdPartyNotices.txt
+model artifact missing or invalid: assets/model/runtime/LICENSE
+model artifact missing or invalid: assets/model/runtime/libonnxruntime.1.24.4.dylib
+
+==> Memory standalone journey
+standalone-journey: building the extracted copy in /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//memory-journey.JbBKVQ/memory
+the service exited during startup
+--- service log (last 40 lines) ---
+{"timestamp":"2026-11-19T21:48:25.140953Z","level":"ERROR","fields":{"message":"memory service failed","error":"the embedding model is unavailable: model artifact missing or invalid at /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//memory-journey.JbBKVQ/memory/assets/model/runtime/ThirdPartyNotices.txt; run scripts/prepare-model.py --download (build network only) and point MEMORY_MODEL_DIR at the prepared directory: No such file or directory (os error 2)"},"target":"memory_service"}
+
+==> Attribution extracted service and contracts
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (27.216833ms)
++ cargo sqlx prepare --check -- --locked --offline --all-targets
+    Checking aws-lc-sys v0.47.0
+    Checking ring v0.17.14
+    Checking aws-lc-rs v1.19.0
+    Checking rustls-webpki v0.103.17
+    Checking rustls v0.23.46
+    Checking sqlx-core v0.8.6
+    Checking tokio-rustls v0.26.6
+    Checking rustls-platform-verifier v0.7.1
+    Checking hyper-rustls v0.27.10
+    Checking reqwest v0.13.4
+    Checking sqlx-postgres v0.8.6
+    Checking sqlx v0.8.6
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_hqgquezt/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 8.30s
++ cargo fmt --all -- --check
++ cargo check --locked --offline --all-targets
+    Finished `dev` profile [unoptimized] target(s) in 0.14s
++ cargo clippy --locked --offline --all-targets -- -D warnings
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_hqgquezt/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 5.04s
++ /opt/homebrew/opt/python@3.13/bin/python3.13 scripts/boundary.py
+attribution boundary passed: resolved dependencies, source/assets/config, owned SQL
++ /opt/homebrew/opt/python@3.13/bin/python3.13 scripts/test_boundary.py
+test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source (__main__.BoundaryTests.test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source) ... ok
+test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected (__main__.BoundaryTests.test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected) ... ok
+test_attribution_boundary_foreign_sql_is_rejected (__main__.BoundaryTests.test_attribution_boundary_foreign_sql_is_rejected) ... ok
+test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout (__main__.BoundaryTests.test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout) ... ok
+test_attribution_boundary_local_source_and_owned_sql_pass (__main__.BoundaryTests.test_attribution_boundary_local_source_and_owned_sql_pass) ... ok
+test_attribution_boundary_locking_and_separate_ctes_keep_table_checks (__main__.BoundaryTests.test_attribution_boundary_locking_and_separate_ctes_keep_table_checks) ... ok
+test_attribution_boundary_materialized_ctes_and_lateral_keep_nested_checks (__main__.BoundaryTests.test_attribution_boundary_materialized_ctes_and_lateral_keep_nested_checks) ... ok
+test_attribution_boundary_private_import_and_parent_asset_are_rejected (__main__.BoundaryTests.test_attribution_boundary_private_import_and_parent_asset_are_rejected) ... ok
+test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers (__main__.BoundaryTests.test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers) ... ok
+test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency (__main__.BoundaryTests.test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency) ... ok
+test_attribution_boundary_unpinned_git_is_rejected (__main__.BoundaryTests.test_attribution_boundary_unpinned_git_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.046s
+
+OK
++ cargo test --locked --offline --all-targets -- --list
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_hqgquezt/attribution)
+    Finished `test` profile [unoptimized] target(s) in 7.88s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+     Running unittests src/main.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-04d745e2849fd972)
+adapters::http::tests::attribution_startup_body_and_error_boundaries_are_safe_and_correlated: test
+adapters::http::tests::attribution_startup_competing_requests_are_bounded_and_health_stays_cheap: test
+adapters::http::tests::attribution_startup_readiness_assets_and_shutdown_use_the_own_database: test
+adapters::http::tests::attribution_startup_request_deadline_cancels_handler_and_returns_slot: test
+adapters::http::tests::attribution_startup_safe_html_errors_preserve_redaction_and_headers: test
+adapters::identity::authority_tests::attribution_company_access_maximum_unicode_page_and_hard_response_budget: test
+adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids: test
+adapters::identity::http_tests::attribution_company_lifecycle_body_limit_follows_header_authentication: test
+adapters::identity::http_tests::attribution_company_lifecycle_reconciliation_repairs_missed_delete_and_records_denial: test
+adapters::identity::http_tests::attribution_company_lifecycle_shutdown_cancels_inflight_status_and_joins: test
+adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation: test
+adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout: test
+adapters::identity::http_tests::boundary_tests::attribution_company_lifecycle_cold_expired_evicted_and_concurrent_access: test
+adapters::identity::http_tests::boundary_tests::attribution_company_lifecycle_operator_signal_survives_restart_and_repair: test
+adapters::identity::http_tests::boundary_tests::attribution_session_html_recovers_expiry_and_revoke_but_preserves_api_and_outage_errors: test
+adapters::identity::http_tests::boundary_tests::attribution_sso_callback_rejects_unbound_browser_and_limits_login: test
+adapters::identity::http_tests::catalog_tests::attribution_links_destination_and_parent_eligibility: test
+adapters::identity::http_tests::catalog_tests::attribution_links_existing_foreign_dimensions_never_cross_scope: test
+adapters::identity::http_tests::catalog_tests::attribution_links_http_roles_scope_retry_and_competing_claimants: test
+adapters::identity::http_tests::catalog_tests::attribution_links_merchant_scope_principal_collision_and_revoke_before_replay: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_client_disconnect_after_real_commit_is_durable: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_competing_disable_serializes_both_orders: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_concurrent_distinct_ids_and_latency_budget: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_headers_head_classification_and_immutable_history: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_public_admission_competing_requests_and_recovery: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_storage_rejection_and_freshness_fail_closed: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_tenant_admission_competing_requests_and_recovery: test
+adapters::identity::http_tests::catalog_tests::attribution_redirect_unknown_commit_outcome_retains_row_without_location: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_bounds_unicode_keysets_filters_and_invalid_queries: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_clocks_half_open_dst_and_refund_only_negative_net: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_ledger_independent_counts_money_and_product_bases: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_scope_roles_keys_and_foreign_filters: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_dashboard_pages_details_escaping_roles_and_exports: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_export_limit_formula_and_numeric_overflow: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_representative_plan_and_timeout: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_export_parsed_currency_and_product_semantics: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_ledger_reasons_observations_full_refund_and_frozen_dimensions: test
+adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry: test
+adapters::identity::http_tests::commerce_tests::attribution_merchant_ingress_competing_event_retries_and_conflicting_envelopes: test
+adapters::identity::http_tests::commerce_tests::attribution_order_paid_business_identity_immutable_lines_and_checkout: test
+adapters::identity::http_tests::commerce_tests::attribution_reconciliation_refund_before_paid_and_cancellation_converge: test
+adapters::identity::http_tests::commerce_tests::attribution_refund_independent_business_identity_and_exact_balances: test
+adapters::identity::http_tests::commerce_tests::e2e_tests::attribution_e2e_two_ads_business_retries_refunds_and_product_reports: test
+adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_atomic_failure_and_real_commit_ack_loss: test
+adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_auth_before_body_and_strict_money: test
+adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_original_horizon_survives_pruning: test
+adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_order_competing_business_facts_count_once: test
+adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_policy_frozen_checkout_reasons_and_exact_window: test
+adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_competing_balances_money_only_and_units_only: test
+adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_currencies_unknown_line_time_and_atomic_rejection: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_cleanup_and_store_disable_compete_with_settlement: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_competing_claims_crash_recovery_and_stale_token: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_current_tenant_and_refund_window_rechecked: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_deadline_attempts_manual_retry_and_receipt: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_final_lease_fence_rolls_back_financial_effect: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_pending_refund_identity_and_ingress_age: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_poison_company_does_not_fill_claim_batch: test
+adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_shutdown_leases_recover_and_backoff: test
+adapters::identity::http_tests::commerce_tests::restore_tests::attribution_recovery_real_dump_restore_auth_ledger_pending_and_isolation: test
+adapters::identity::http_tests::commerce_tests::retention_tests::attribution_limits_operational_signals_never_capture_request_secrets: test
+adapters::identity::http_tests::commerce_tests::retention_tests::attribution_recovery_retention_competing_claims_poison_and_cancellation: test
+adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_deleted_tenant_chunks_keep_terminal_fence: test
+adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_pending_unresolved_leased_evidence_survives_competing_settlement: test
+adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_raw_prune_preserves_frozen_money_and_rejects_old_delivery: test
+adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_retirement_hides_all_financial_surfaces_before_chunks: test
+adapters::identity::http_tests::commerce_tests::scope_tests::attribution_order_and_event_lists_scope_all_objects_for_multi_company_member: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_auth_classes_scope_expiry_store_and_company: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_competing_revoke_and_use_serializes_both_orders: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_competing_store_disable_and_use_recheck_both_orders: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_expiry_overlap_and_expired_metadata_replay: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_header_auth_precedes_body_and_freshness_fails_closed: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_logout_and_authority_recheck_before_replay: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_once_replay_rotation_revocation_and_hash_only: test
+adapters::identity::http_tests::setup_tests::attribution_credentials_replay_after_original_payload_expiry: test
+adapters::identity::http_tests::setup_tests::attribution_destination_competing_verification_and_revocation: test
+adapters::identity::http_tests::setup_tests::attribution_destination_verification_expiry_revoke_and_exact_scope: test
+adapters::identity::http_tests::setup_tests::attribution_installation_concurrent_receipts_conflicts_and_pruned_horizon: test
+adapters::identity::http_tests::setup_tests::attribution_installation_http_roles_csrf_strict_json_and_limits: test
+adapters::identity::http_tests::setup_tests::attribution_installation_runtime_shapes_and_rejected_nullable_payloads: test
+adapters::identity::http_tests::setup_tests::attribution_installation_scope_keysets_and_foreign_constraints: test
+adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres: test
+adapters::identity::http_tests::website_tests::attribution_checkout_handoff_and_observation_existing_cross_store_evidence_rejected: test
+adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze: test
+adapters::identity::http_tests::website_tests::attribution_checkout_handoff_exact_window_precision_reasons_and_ties: test
+adapters::identity::http_tests::website_tests::attribution_checkout_handoff_headers_authenticate_before_body_and_limits: test
+adapters::identity::http_tests::website_tests::attribution_checkout_handoff_latest_eligible_immutable_concurrent_and_scope: test
+adapters::identity::http_tests::website_tests::attribution_website_event_and_checkout_unknown_commit_outcomes_replay_once: test
+adapters::identity::http_tests::website_tests::attribution_website_event_competing_browser_overload_exposes_cors_and_retry_after: test
+adapters::identity::http_tests::website_tests::attribution_website_event_competing_installation_disable_serializes_both_orders: test
+adapters::identity::http_tests::website_tests::attribution_website_event_competing_retries_conflict_and_pruned_horizon: test
+adapters::identity::http_tests::website_tests::attribution_website_event_current_installation_domain_and_company_before_replay: test
+adapters::identity::http_tests::website_tests::attribution_website_event_pixel_durable_gif_head_and_retry_timestamp: test
+adapters::identity::http_tests::website_tests::attribution_website_event_public_admission_competitors_release_and_health: test
+adapters::identity::http_tests::website_tests::attribution_website_event_strict_types_scope_origins_and_cors: test
+adapters::identity::tests::attribution_company_lifecycle_competing_delivery_and_provision_never_revive_delete: test
+adapters::identity::tests::attribution_company_lifecycle_equal_version_competitors_conflict: test
+adapters::identity::tests::attribution_company_lifecycle_freshness_rejects_clock_rollback_and_cold_process: test
+adapters::identity::tests::attribution_company_lifecycle_lost_reconciliation_lease_cannot_store_observation: test
+adapters::identity::tests::attribution_company_lifecycle_reconciliation_fences_and_poison_backoff: test
+adapters::identity::tests::attribution_company_lifecycle_stale_observations_and_deliveries_cannot_refresh: test
+adapters::identity::tests::attribution_company_lifecycle_waiting_writer_rechecks_expiry_and_suspension: test
+adapters::identity::tests::attribution_session_encryption_rotation_and_return_paths: test
+adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted: test
+adapters::identity::tests::attribution_sso_login_binding_and_competing_consumers: test
+adapters::postgres::tests::attribution_startup_migration_checksum_failure_is_not_ready_success: test
+adapters::postgres::tests::attribution_startup_refuses_foreign_schema_and_privileged_role: test
+adapters::postgres::tests::attribution_storage_boundary_fresh_nonprivileged_database_migrates: test
+adapters::postgres::tests::attribution_storage_boundary_other_role_cannot_connect_or_read: test
+adapters::retention::cutoff_tests::attribution_retention_exact_cutoffs_and_protected_delivery_evidence: test
+adapters::setup::tests::attribution_credentials_tenant_admission_is_bounded_and_releases: test
+adapters::setup::tests::attribution_destination_dns_transport_all_addresses_and_timeout: test
+adapters::setup::tests::attribution_destination_special_ranges_and_public_addresses: test
+application::catalog::tests::attribution_links_product_clear_has_distinct_normalized_content: test
+application::catalog::tests::attribution_links_reserved_parameter_and_canonical_expansion_bound: test
+application::setup::tests::attribution_destination_exact_idna_and_unsafe_urls: test
+infra::config::tests::attribution_retention_config_requires_explicit_protocol_safe_horizons: test
+infra::config::tests::attribution_startup_loopback_development_and_stock_budgets: test
+infra::config::tests::attribution_startup_rejects_bad_config_without_echoing_secrets: test
+infra::connection::tests::attribution_startup_competing_connections_wait_for_owned_slot: test
+infra::connection::tests::attribution_startup_connection_lifetime_bounds_slow_progress: test
+infra::connection::tests::attribution_startup_forced_shutdown_wakes_blocked_io: test
+infra::connection::tests::attribution_startup_idle_connection_times_out: test
+infra::identity::tests::attribution_session_configuration_rejects_incomplete_and_cross_class_credentials: test
+
+123 tests, 0 benchmarks
+0 tests, 0 benchmarks
+Selected 123 tests for all targets
++ cargo test --locked --offline --all-targets --no-run
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+  Executable unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+  Executable unittests src/main.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-04d745e2849fd972)
++ bash scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected; test PostgreSQL at 127.0.0.1:55407 reachable
+    Finished `test` profile [unoptimized] target(s) in 0.12s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 123 tests
+test adapters::http::tests::attribution_startup_safe_html_errors_preserve_redaction_and_headers ... ok
+test adapters::http::tests::attribution_startup_body_and_error_boundaries_are_safe_and_correlated ... ok
+test adapters::http::tests::attribution_startup_request_deadline_cancels_handler_and_returns_slot ... ok
+test adapters::http::tests::attribution_startup_competing_requests_are_bounded_and_health_stays_cheap ... ok
+test adapters::identity::authority_tests::attribution_company_access_maximum_unicode_page_and_hard_response_budget ... ok
+test adapters::http::tests::attribution_startup_readiness_assets_and_shutdown_use_the_own_database ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_company_lifecycle_operator_signal_survives_restart_and_repair ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_destination_and_parent_eligibility ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_body_limit_follows_header_authentication ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_reconciliation_repairs_missed_delete_and_records_denial ... ok
+test adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_shutdown_cancels_inflight_status_and_joins ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_sso_callback_rejects_unbound_browser_and_limits_login ... ok
+test adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_merchant_scope_principal_collision_and_revoke_before_replay ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_concurrent_distinct_ids_and_latency_budget ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_http_roles_scope_retry_and_competing_claimants ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_public_admission_competing_requests_and_recovery ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_client_disconnect_after_real_commit_is_durable ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_existing_foreign_dimensions_never_cross_scope ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_headers_head_classification_and_immutable_history ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_storage_rejection_and_freshness_fail_closed ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_unknown_commit_outcome_retains_row_without_location ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_competing_disable_serializes_both_orders ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_clocks_half_open_dst_and_refund_only_negative_net ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_tenant_admission_competing_requests_and_recovery ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry ... ignored, Requires pinned Playwright Chromium; CI and final gate run explicitly
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_scope_roles_keys_and_foreign_filters ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_bounds_unicode_keysets_filters_and_invalid_queries ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_ledger_independent_counts_money_and_product_bases ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_dashboard_pages_details_escaping_roles_and_exports ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_merchant_ingress_competing_event_retries_and_conflicting_envelopes ... ok
+test adapters::identity::http_tests::commerce_tests::e2e_tests::attribution_e2e_two_ads_business_retries_refunds_and_product_reports ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_reconciliation_refund_before_paid_and_cancellation_converge ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_ledger_reasons_observations_full_refund_and_frozen_dimensions ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_order_paid_business_identity_immutable_lines_and_checkout ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_export_parsed_currency_and_product_semantics ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_company_lifecycle_cold_expired_evicted_and_concurrent_access ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_refund_independent_business_identity_and_exact_balances ... ok
+test adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_original_horizon_survives_pruning ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_auth_before_body_and_strict_money ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_competing_balances_money_only_and_units_only ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_currencies_unknown_line_time_and_atomic_rejection ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_atomic_failure_and_real_commit_ack_loss ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_competing_claims_crash_recovery_and_stale_token ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_order_competing_business_facts_count_once ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_cleanup_and_store_disable_compete_with_settlement ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_policy_frozen_checkout_reasons_and_exact_window ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_session_html_recovers_expiry_and_revoke_but_preserves_api_and_outage_errors ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_pending_refund_identity_and_ingress_age ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_limits_operational_signals_never_capture_request_secrets ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_deadline_attempts_manual_retry_and_receipt ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_final_lease_fence_rolls_back_financial_effect ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_recovery_retention_competing_claims_poison_and_cancellation ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_shutdown_leases_recover_and_backoff ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_poison_company_does_not_fill_claim_batch ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_current_tenant_and_refund_window_rechecked ... ok
+test adapters::identity::http_tests::commerce_tests::restore_tests::attribution_recovery_real_dump_restore_auth_ledger_pending_and_isolation ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_deleted_tenant_chunks_keep_terminal_fence ... ok
+test adapters::identity::http_tests::commerce_tests::scope_tests::attribution_order_and_event_lists_scope_all_objects_for_multi_company_member ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_raw_prune_preserves_frozen_money_and_rejects_old_delivery ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_competing_store_disable_and_use_recheck_both_orders ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_expiry_overlap_and_expired_metadata_replay ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_competing_revoke_and_use_serializes_both_orders ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_retirement_hides_all_financial_surfaces_before_chunks ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_auth_classes_scope_expiry_store_and_company ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_representative_plan_and_timeout ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_export_limit_formula_and_numeric_overflow ... ok
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... ignored, Requires pinned Playwright Chromium; CI and the final gate run explicitly
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_pending_unresolved_leased_evidence_survives_competing_settlement ... ok
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze ... ignored, Requires pinned Playwright Chromium; CI and final gate run explicitly
+test adapters::identity::http_tests::setup_tests::attribution_installation_http_roles_csrf_strict_json_and_limits ... ok
+test adapters::identity::http_tests::setup_tests::attribution_installation_runtime_shapes_and_rejected_nullable_payloads ... ok
+test adapters::identity::http_tests::setup_tests::attribution_destination_verification_expiry_revoke_and_exact_scope ... ok
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_and_observation_existing_cross_store_evidence_rejected ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_logout_and_authority_recheck_before_replay ... ok
+test adapters::identity::http_tests::setup_tests::attribution_installation_concurrent_receipts_conflicts_and_pruned_horizon ... ok
+test adapters::identity::http_tests::setup_tests::attribution_destination_competing_verification_and_revocation ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_once_replay_rotation_revocation_and_hash_only ... ok
+test adapters::identity::http_tests::setup_tests::attribution_installation_scope_keysets_and_foreign_constraints ... ok
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_exact_window_precision_reasons_and_ties ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_competing_browser_overload_exposes_cors_and_retry_after ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_pixel_durable_gif_head_and_retry_timestamp ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_public_admission_competitors_release_and_health ... ok
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_latest_eligible_immutable_concurrent_and_scope ... ok
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_headers_authenticate_before_body_and_limits ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_current_installation_domain_and_company_before_replay ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_competing_retries_conflict_and_pruned_horizon ... ok
+test adapters::identity::tests::attribution_company_lifecycle_equal_version_competitors_conflict ... ok
+test adapters::identity::tests::attribution_session_encryption_rotation_and_return_paths ... ok
+test adapters::identity::tests::attribution_company_lifecycle_stale_observations_and_deliveries_cannot_refresh ... ok
+test adapters::identity::tests::attribution_company_lifecycle_waiting_writer_rechecks_expiry_and_suspension ... ok
+test adapters::identity::tests::attribution_company_lifecycle_lost_reconciliation_lease_cannot_store_observation ... ok
+test adapters::identity::tests::attribution_company_lifecycle_competing_delivery_and_provision_never_revive_delete ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_strict_types_scope_origins_and_cors ... ok
+test adapters::identity::tests::attribution_company_lifecycle_reconciliation_fences_and_poison_backoff ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_competing_installation_disable_serializes_both_orders ... ok
+test adapters::setup::tests::attribution_credentials_tenant_admission_is_bounded_and_releases ... ok
+test adapters::identity::tests::attribution_company_lifecycle_freshness_rejects_clock_rollback_and_cold_process ... ok
+test adapters::identity::http_tests::website_tests::attribution_website_event_and_checkout_unknown_commit_outcomes_replay_once ... ok
+test application::catalog::tests::attribution_links_product_clear_has_distinct_normalized_content ... ok
+test adapters::setup::tests::attribution_destination_special_ranges_and_public_addresses ... ok
+test application::catalog::tests::attribution_links_reserved_parameter_and_canonical_expansion_bound ... ok
+test application::setup::tests::attribution_destination_exact_idna_and_unsafe_urls ... ok
+test infra::config::tests::attribution_startup_loopback_development_and_stock_budgets ... ok
+test infra::config::tests::attribution_retention_config_requires_explicit_protocol_safe_horizons ... ok
+test infra::config::tests::attribution_startup_rejects_bad_config_without_echoing_secrets ... ok
+test infra::connection::tests::attribution_startup_competing_connections_wait_for_owned_slot ... ok
+test infra::connection::tests::attribution_startup_forced_shutdown_wakes_blocked_io ... ok
+test infra::connection::tests::attribution_startup_idle_connection_times_out ... ok
+test infra::identity::tests::attribution_session_configuration_rejects_incomplete_and_cross_class_credentials ... ok
+test infra::connection::tests::attribution_startup_connection_lifetime_bounds_slow_progress ... ok
+test adapters::postgres::tests::attribution_startup_refuses_foreign_schema_and_privileged_role ... ok
+test adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted ... ok
+test adapters::postgres::tests::attribution_startup_migration_checksum_failure_is_not_ready_success ... ok
+test adapters::postgres::tests::attribution_storage_boundary_fresh_nonprivileged_database_migrates ... ok
+test adapters::identity::tests::attribution_sso_login_binding_and_competing_consumers ... ok
+test adapters::retention::cutoff_tests::attribution_retention_exact_cutoffs_and_protected_delivery_evidence ... ok
+test adapters::postgres::tests::attribution_storage_boundary_other_role_cannot_connect_or_read ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_header_auth_precedes_body_and_freshness_fails_closed ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_replay_after_original_payload_expiry ... ok
+test adapters::setup::tests::attribution_destination_dns_transport_all_addresses_and_timeout ... ok
+
+test result: ok. 120 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 10.77s
+
+     Running unittests src/main.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-04d745e2849fd972)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
++ bash scripts/check-contracts.sh
+/Users/mac02/orca/workspaces/openbot/plan06/tmp/attribution-contract-env/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+test_attribution_contract_ad_product_update_preserves_absent_and_clear (__main__.AttributionContracts) ... ok
+test_attribution_contract_both_openapi_documents_validate (__main__.AttributionContracts) ... ok
+test_attribution_contract_bounds_and_errors_are_declared_for_all_routes (__main__.AttributionContracts) ... ok
+test_attribution_contract_every_management_mutation_has_a_retry_identity (__main__.AttributionContracts) ... ok
+test_attribution_contract_examples_match_wire_schemas (__main__.AttributionContracts) ... ok
+test_attribution_contract_identity_pkce_and_credential_classes (__main__.AttributionContracts) ... ok
+test_attribution_contract_lost_key_response_replays_metadata_without_secret (__main__.AttributionContracts) ... ok
+test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant (__main__.AttributionContracts) ... ok
+test_attribution_contract_money_currency_and_collection_bounds (__main__.AttributionContracts) ... ok
+test_attribution_contract_pixel_retry_clock_and_explicit_head (__main__.AttributionContracts) ... ok
+test_attribution_contract_public_observations_cannot_describe_sales (__main__.AttributionContracts) ... ok
+test_attribution_contract_refund_business_identity_example_is_discriminating (__main__.AttributionContracts) ... ok
+test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds (__main__.AttributionContracts) ... ok
+test_attribution_contract_sdk_integrity_matches_pinned_asset (__main__.AttributionContracts) ... ok
+test_attribution_contract_two_ad_product_refund_ledger_reconciles (__main__.AttributionContracts) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.630s
+
+OK
++ node --check assets/app.js
++ node --check assets/setup.js
++ node --check assets/reports.js
++ node --check assets/sdk-1.0.0.js
++ node --check browser/setup.mjs
++ node --check browser/website.mjs
++ node --check browser/reports.mjs
++ node --check browser/topology.mjs
++ cargo test --locked --offline --lib attribution_setup_browser_ -- --ignored --list
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres: test
+
+1 test, 0 benchmarks
++ bash scripts/test-network-isolation.sh cargo test --locked --offline --lib attribution_setup_browser_ -- --ignored --nocapture
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected; test PostgreSQL at 127.0.0.1:55407 reachable
+    Finished `test` profile [unoptimized] target(s) in 0.12s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+PASS: setup and catalog browser journey (12 checks): store forms, escaping, DNS proof, public installation, secret once, rotation/revoke, domain/install status, live member view, campaigns/ads/links, lost-response stable retry, product edit, real tracked browser navigation
+
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 122 filtered out; finished in 2.52s
+
++ cargo test --locked --offline --lib attribution_checkout_handoff_browser_ -- --ignored --list
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze: test
+
+1 test, 0 benchmarks
++ bash scripts/test-network-isolation.sh cargo test --locked --offline --lib attribution_checkout_handoff_browser_ -- --ignored --nocapture
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected; test PostgreSQL at 127.0.0.1:55407 reachable
+    Finished `test` profile [unoptimized] target(s) in 0.12s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+PASS: website SDK and merchant cart journey: consent, AdA/AdB, URL removal, return history, exact retry, viewport duration, immutable server checkout, multiple tabs, competing before-read and before-cleanup writes persist after navigation, withdrawal, no-reference visit, blocked storage, invalid candidate fallbacks, history expiry/bound, cancelled retries, privacy (11 observed browser attempts)
+
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 122 filtered out; finished in 9.74s
+
++ cargo test --locked --offline --lib attribution_dashboard_browser_ -- --ignored --list
+    Finished `test` profile [unoptimized] target(s) in 0.13s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry: test
+
+1 test, 0 benchmarks
++ bash scripts/test-network-isolation.sh cargo test --locked --offline --lib attribution_dashboard_browser_ -- --ignored --nocapture
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected; test PostgreSQL at 127.0.0.1:55407 reachable
+    Finished `test` profile [unoptimized] target(s) in 0.12s
+     Running unittests src/lib.rs (/Users/mac02/orca/workspaces/openbot/plan06/services/attribution/target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+PASS: dashboard Chromium journey: independent API/ledger totals, responsive table, keyboard filters, product escaping, CSV download, DST/empty/error states, order/refund details, live roles, CSRF, stable lost-response retry, navigation and tenant isolation
+
+test adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 122 filtered out; finished in 1.24s
+
+standalone service copy passed
+
+==> Summary
+PASS 9s  Transport abstraction boundary
+FAIL 97s  Memory extracted service suite
+FAIL 49s  Memory standalone journey
+PASS 51s  Attribution extracted service and contracts

@@ -144,7 +144,7 @@ async fn agent_setup_source(
     .unwrap();
     if let Some(instructions) = skill {
         let skill_id = Uuid::new_v4();
-        sqlx::query("INSERT INTO skills(id,company_id,slug,name,description,instructions,created_by,required_tools) VALUES($1,$2,'support','Support','Support policy',$3,'{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}','{registered.request}')")
+        sqlx::query("INSERT INTO skills(id,company_id,slug,name,description,instructions,created_by,required_tools,unit_id) VALUES($1,$2,'support','Support','Support policy',$3,'{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}','{registered.request}',(SELECT id FROM departments WHERE company_id=$2 AND is_root))")
             .bind(skill_id).bind(company.as_uuid()).bind(instructions).execute(p.pool()).await.unwrap();
         sqlx::query(
             "INSERT INTO agent_skills(company_id,agent_id,skill_id,position) VALUES($1,$2,$3,0)",
@@ -447,13 +447,20 @@ async fn workflow_agent_capability_writers_preserve_unsupplied_lists() {
     let skill = SkillPersistence::create_company(
         p,
         company,
+        p.test_root_unit(company).await,
         write(Some(vec![TypeName::parse("registered.request").unwrap()])),
     )
     .await
     .unwrap();
-    SkillPersistence::update_company(p, company, skill.id, write(None))
-        .await
-        .unwrap();
+    SkillPersistence::update_company(
+        p,
+        company,
+        p.test_root_unit(company).await,
+        skill.id,
+        write(None),
+    )
+    .await
+    .unwrap();
     let required: Vec<String> = sqlx::query_scalar("SELECT required_tools FROM skills WHERE id=$1")
         .bind(skill.id)
         .fetch_one(p.pool())
@@ -740,6 +747,7 @@ async fn protected_connection(fixture: &Fixture, origin: &str) -> HttpConnection
         .create_http(
             company,
             actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse(origin).unwrap(),
                 bearer: true,

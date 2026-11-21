@@ -1,6 +1,7 @@
 //! Shared skill-library editor for company owners and platform operators.
 
 use super::*;
+use crate::application::ports::administration::ManagedUnit;
 use crate::entities::skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill, SkillSummary};
 
 #[derive(Debug, Clone, Default)]
@@ -10,11 +11,14 @@ pub struct SkillDraft {
     pub name: String,
     pub description: String,
     pub instructions: String,
+    /// The owning unit of a stored skill, or the one chosen for a new company skill.
+    pub unit_id: Option<Uuid>,
 }
 
 impl SkillDraft {
     pub fn stored(skill: &Skill) -> Self {
         Self {
+            unit_id: skill.unit_id,
             id: Some(skill.id),
             slug: skill.slug.to_string(),
             name: skill.name.clone(),
@@ -34,6 +38,10 @@ pub struct SkillSection<'a> {
     pub error: Option<&'a str>,
     pub notice: Option<&'a str>,
     pub editable: bool,
+    /// The units this person manages (company skills); empty for the operator library.
+    pub units: &'a [ManagedUnit],
+    /// The unit a new company skill gets unless another is chosen.
+    pub default_unit: Option<Uuid>,
 }
 
 pub fn company_skills_section(section: &SkillSection<'_>) -> String {
@@ -41,7 +49,7 @@ pub fn company_skills_section(section: &SkillSection<'_>) -> String {
         return r##"<div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             <div class="rounded-box border border-base-300 bg-base-200 p-5">
                 <h3 class="font-semibold">Company skills</h3>
-                <p class="mt-1 text-sm opacity-70">Only the company owner can edit these settings.</p>
+                <p class="mt-1 text-sm opacity-70">Only a department's managers can edit its skills.</p>
             </div>
         </div>"##
             .to_string();
@@ -68,7 +76,12 @@ pub fn company_skills_section(section: &SkillSection<'_>) -> String {
         browse = browse_button(section.company_id),
         list = skill_list(section),
         pagination = pagination(section.previous_url, section.next_url),
-        editor = skill_editor_fragment(section.company_id, &draft),
+        editor = skill_editor_fragment(
+            section.company_id,
+            &draft,
+            section.units,
+            section.default_unit
+        ),
     )
 }
 
@@ -153,7 +166,26 @@ fn skill_url(company_id: Option<Uuid>, skill_id: Option<Uuid>) -> String {
     }
 }
 
-pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> String {
+pub fn skill_editor_fragment(
+    company_id: Option<Uuid>,
+    draft: &SkillDraft,
+    units: &[ManagedUnit],
+    default_unit: Option<Uuid>,
+) -> String {
+    // A new company skill names its unit; a stored one moves with its own form.
+    let unit = match (company_id, draft.id) {
+        (Some(_), None) => unit_picker(units, draft.unit_id.or(default_unit)),
+        _ => String::new(),
+    };
+    let unit_move = match (company_id, draft.id) {
+        (Some(_), Some(skill_id)) => unit_move_form(
+            &format!("{}/move", skill_url(company_id, Some(skill_id))),
+            Some("#skill-library-section"),
+            units,
+            draft.unit_id,
+        ),
+        _ => String::new(),
+    };
     let save_url = skill_url(company_id, draft.id);
     let method = if draft.id.is_some() { "put" } else { "post" };
     let title = if draft.id.is_some() {
@@ -181,6 +213,7 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
                 <label class="form-control"><span class="label text-xs opacity-70">Slug</span>
                     <input class="input w-full font-mono" name="slug" required maxlength="80" value="{slug}"></label>
             </div>
+            {unit}
             <label class="form-control"><span class="label text-xs opacity-70">Description</span>
                 <textarea class="textarea w-full" name="description" maxlength="500" required>{description}</textarea></label>
             <label class="form-control"><span class="label text-xs opacity-70">Instructions</span>
@@ -205,8 +238,12 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
         instructions = escape_html_text(&draft.instructions),
         max_instructions = MAX_SKILL_INSTRUCTIONS_BYTES,
         base_url = skill_url(company_id, None),
+        unit = unit,
     );
-    format!("{editor}{}", skill_bundle_editor(company_id, draft.id))
+    format!(
+        "{editor}{unit_move}{}",
+        skill_bundle_editor(company_id, draft.id)
+    )
 }
 
 fn skill_bundle_editor(company: Option<Uuid>, id: Option<Uuid>) -> String {
@@ -268,7 +305,12 @@ pub fn skill_bundle_files(skill: &Skill) -> String {
     html
 }
 
-pub fn library_skill_browser(company_id: Uuid, skills: &[SkillSummary]) -> String {
+pub fn library_skill_browser(
+    company_id: Uuid,
+    skills: &[SkillSummary],
+    units: &[ManagedUnit],
+    default_unit: Option<Uuid>,
+) -> String {
     if skills.is_empty() {
         return r#"<p class="mt-3 text-sm opacity-60">The global skill library is empty.</p>"#
             .to_string();
@@ -278,7 +320,7 @@ pub fn library_skill_browser(company_id: Uuid, skills: &[SkillSummary]) -> Strin
         .map(|skill| {
             format!(
                 r##"<form class="mt-2 flex items-center gap-3 rounded-box border border-base-300 p-3"
-                    hx-post="/ui/companies/{company_id}/skills/from-library"
+                    hx-post="/ui/companies/{company_id}/skills/from-library" hx-include="#skill-copy-unit select"
                     hx-target="#skill-library-section" hx-swap="outerHTML" hx-disabled-elt="find button">
                     <input type="hidden" name="skill_id" value="{id}">
                     <span class="min-w-0 flex-1"><strong class="block truncate">{name}</strong>
@@ -294,7 +336,9 @@ pub fn library_skill_browser(company_id: Uuid, skills: &[SkillSummary]) -> Strin
         })
         .collect::<String>();
     format!(
-        r#"<div class="mt-3"><h4 class="text-sm font-semibold">Global library</h4>{rows}</div>"#
+        r#"<div class="mt-3"><h4 class="text-sm font-semibold">Global library</h4>
+            <div id="skill-copy-unit">{picker}</div>{rows}</div>"#,
+        picker = unit_picker(units, default_unit),
     )
 }
 
@@ -308,7 +352,7 @@ mod tests {
             instructions: ["</textarea><scr", "ipt>alert(1)</scr", "ipt>"].concat(),
             ..SkillDraft::default()
         };
-        let html = skill_editor_fragment(Some(Uuid::nil()), &draft);
+        let html = skill_editor_fragment(Some(Uuid::nil()), &draft, &[], None);
         assert!(!html.contains(&["<scr", "ipt>"].concat()));
         // The whole form has honest `</textarea></label>` closes; only the injected one must not appear.
         assert!(!html.contains(&["</textarea><scr", "ipt>"].concat()));

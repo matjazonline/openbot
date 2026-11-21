@@ -1,0 +1,27 @@
+{
+  "kind": "paid",
+  "event_id": "payment-1",
+  "order_id": "order-1",
+  "occurred_at": "2026-11-15T12:05:00Z",
+  "order_created_at": "2026-11-15T12:00:00Z",
+  "paid_at": "2026-11-15T12:05:00Z",
+  "checkout_id": "checkout-1",
+  "currency": "EUR",
+  "lines": [
+    {
+      "line_id": "line-x",
+      "product_id": "product-x",
+      "quantity": 2,
+      "merchandise_amount": 2400
+    },
+    {
+      "line_id": "line-y",
+      "product_id": "product-y",
+      "quantity": 1,
+      "merchandise_amount": 3500
+    }
+  ],
+  "merchandise_amount": 5900,
+  "tax_amount": 1180,
+  "shipping_amount": 500
+}

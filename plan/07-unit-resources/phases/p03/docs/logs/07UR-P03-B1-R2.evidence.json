@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "round": "07UR-P03-B1-R2",
+  "artifact": "1cbaafd74a01ad78dc18d66bfea5864cb033e0833ff01de1673146ac06f9c66a",
+  "checks": [
+    {
+      "criteria": [
+        "P03-B1-F1 startup notes listed once (main.rs unittests)"
+      ],
+      "command": "cargo test --locked --offline --bins",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-bins.txt",
+          "sha256": "22a9a31a3c8cc2935a7133254357348759093bd7a380739cdaa04325bb19a0a6"
+        }
+      ]
+    }
+  ]
+}

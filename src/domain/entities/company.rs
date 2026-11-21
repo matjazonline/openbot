@@ -24,8 +24,16 @@ impl Default for CompanyChannelDefaults {
 /// Credentials are deliberately loaded through the narrow persistence method only at execution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompanyModelConnection {
+    pub id: Uuid,
+    /// The unit that owns it (Plan07 02A); the root by default.
+    pub unit_id: Uuid,
+    /// That unit's name, for labelling choices.
+    pub unit_name: String,
+    /// Whether that unit is the root: the root's default is the company default.
+    pub in_root: bool,
     pub provider: ModelProvider,
     pub models: Vec<ModelName>,
+    /// The default of its own unit; the root's default is the company default.
     pub is_default: bool,
     pub has_api_key: bool,
 }
@@ -52,6 +60,9 @@ pub struct CompanyAccess {
     pub company: Company,
     pub membership: CompanyMembership,
     pub access_level: crate::entities::access_level::AccessLevel,
+    /// Whether the person manages at least one unit (`any_unit_management_role`). A rendering
+    /// hint for navigation only; every management action checks its own target.
+    pub administers_units: bool,
 }
 
 #[cfg(test)]

@@ -51,7 +51,7 @@ impl ThreadActivityReader for PostgresPersistence {
         let Some(access) = self.access_context_for_user(company, viewer).await? else {
             return Ok(Default::default());
         };
-        if !access.membership.manages_company_operations() {
+        if !access.membership.administers_company() {
             return Ok(Default::default());
         }
         let runs: Vec<(Uuid, Option<Uuid>)> = sqlx::query_as(

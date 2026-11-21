@@ -9,7 +9,7 @@ use crate::application::{
 };
 use crate::entities::mcp::{CompanyMcpConnection, McpAuth, McpEndpoint};
 use crate::use_cases::{
-    company::{CompanyPersistence, CompanyUseCases, CompanyWrite},
+    company::{CompanyPersistence, CompanyWrite},
     mcp::{McpConnectionWrite, McpPersistence, McpUseCases},
     user::UserPersistence,
 };
@@ -92,6 +92,7 @@ async fn connections(
         .create_http(
             CompanyId::new(company),
             WorkflowActor::authenticated(owner).unwrap(),
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://example.test").unwrap(),
                 bearer: false,
@@ -102,6 +103,7 @@ async fn connections(
     let mcp = p
         .create_mcp_connection(
             company,
+            p.test_root_unit(company).await,
             McpConnectionWrite {
                 slug: "server".into(),
                 endpoint: "https://example.test/mcp".to_string().try_into().unwrap(),
@@ -129,7 +131,6 @@ impl Fixture {
         let shared = Arc::new(p.clone());
         let s = ConnectionServices {
             workflow: crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).services(),
-            company_use_cases: Arc::new(CompanyUseCases::new(shared.clone())),
             mcp_use_cases: Arc::new(McpUseCases::new(
                 shared.clone(),
                 shared.clone(),
@@ -170,8 +171,15 @@ impl Fixture {
             .create_user(&key, &format!("{key}@example.test"), "hash")
             .await
             .unwrap();
-        sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'admin',$4::smallint)").bind(Uuid::new_v4()).bind(self.company).bind(user.id).bind(level).execute(self.p.pool()).await.unwrap();
-        sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'admin')").bind(Uuid::new_v4()).bind(self.company).bind(user.id).execute(self.p.pool()).await.unwrap();
+        crate::adapters::persistence::test_support::insert_root_member(
+            self.p.pool(),
+            crate::domain::workflow::CompanyId::new(self.company),
+            user.id,
+            crate::entities::company_member::CompanyAccessRole::Admin,
+            crate::entities::access_level::AccessLevel::try_from(level).unwrap(),
+        )
+        .await;
+
         user.id
     }
 }
@@ -426,7 +434,7 @@ fn knowledge_run_level_connection_payloads_are_strict_bounded_and_forms_keep_pro
             .command(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4())
             .is_err()
     );
-    let actor = LevelActor {
+    let actor = crate::entities::access_level::LevelActor {
         membership: crate::entities::company_member::CompanyMembership::Admin,
         access_level: AccessLevel::L3,
     };
@@ -451,21 +459,21 @@ async fn knowledge_run_level_race_live_admin_demotion_precedes_connection_level_
         .execute(&mut *demotion)
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=1 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.company)
-        .bind(admin)
-        .execute(&mut *demotion)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=1 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.company)
+    .bind(admin)
+    .execute(&mut *demotion)
+    .await
+    .unwrap();
     let command = draft(1, 3).command(admin, f.company, f.http.id).unwrap();
     let p = f.p.clone();
     let writer = tokio::spawn(async move { p.set_http_level(command).await });
     tokio::task::yield_now().await;
     demotion.commit().await.unwrap();
-    assert!(matches!(
-        writer.await.unwrap(),
-        Err(AppError::BadRequest(_))
-    ));
+    // A level above the actor's own is a refusal inside their authority: 403 (Plan07, Plan06 F10).
+    assert!(matches!(writer.await.unwrap(), Err(AppError::Forbidden(_))));
     let current =
         f.p.list_http(
             CompanyId::new(f.company),

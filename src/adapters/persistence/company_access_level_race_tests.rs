@@ -15,12 +15,14 @@ async fn access_level_demotion_committed_first_refuses_a_waiting_assignment() {
         .execute(&mut *demotion)
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.company_id)
-        .bind(f.admin.id)
-        .execute(&mut *demotion)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.company_id)
+    .bind(f.admin.id)
+    .execute(&mut *demotion)
+    .await
+    .unwrap();
     let p = f.persistence.clone();
     let change = f.change(f.admin.id, f.member.id, AccessLevel::L4);
     let assignment = tokio::spawn(async move { p.set_member_access_level(change).await });
@@ -36,9 +38,9 @@ async fn access_level_demotion_committed_first_refuses_a_waiting_assignment() {
 async fn pause_member_write(f: &Fixture, user: Uuid) -> sqlx::Transaction<'_, sqlx::Postgres> {
     // A real SQL trigger pauses the actual writer after it acquired its authority locks.
     sqlx::query(&format!(r#"CREATE FUNCTION pause_level_write() RETURNS trigger LANGUAGE plpgsql AS $$
-        BEGIN IF NEW.user_id='{user}'::uuid THEN PERFORM pg_advisory_xact_lock(91827); END IF; RETURN NEW; END $$"#))
+        BEGIN IF NEW.root_user_id='{user}'::uuid THEN PERFORM pg_advisory_xact_lock(91827); END IF; RETURN NEW; END $$"#))
         .execute(&f.pool).await.unwrap();
-    sqlx::query("CREATE TRIGGER pause_level_write BEFORE INSERT OR UPDATE ON company_members FOR EACH ROW EXECUTE FUNCTION pause_level_write()")
+    sqlx::query("CREATE TRIGGER pause_level_write BEFORE INSERT OR UPDATE ON department_members FOR EACH ROW EXECUTE FUNCTION pause_level_write()")
         .execute(&f.pool).await.unwrap();
     let mut gate = f.pool.begin().await.unwrap();
     sqlx::query("SELECT pg_advisory_xact_lock(91827)")
@@ -87,20 +89,6 @@ async fn access_level_owner_loss_is_rechecked_after_a_waiting_invite_write() {
         .execute(&mut *transfer)
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
-        .bind(f.company_id)
-        .bind(f.owner.id)
-        .execute(&mut *transfer)
-        .await
-        .unwrap();
-    sqlx::query(
-        "UPDATE company_members SET role='owner',access_level=9 WHERE company_id=$1 AND user_id=$2",
-    )
-    .bind(f.company_id)
-    .bind(f.admin.id)
-    .execute(&mut *transfer)
-    .await
-    .unwrap();
     sqlx::query("UPDATE companies SET user_id=$2 WHERE id=$1")
         .bind(f.company_id)
         .bind(f.admin.id)

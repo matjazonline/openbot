@@ -1,0 +1,13 @@
+Source start/end: a03abfeaf183952cbbf5c178939823e441b9355fcc2e151618527ee2d18d1a4d
+HEAD: 2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+Branch: attribution-service
+Decision AS-P05-D1/r1 SHA256 unchanged: PASS
+Coordination revision11 pinned byte equality: PASS
+AS-C001/r1, AS-C002/r1, AS-C003/r1, AS-C004/r1 active and unchanged
+git diff --check: PASS
+AS-P05-B1-R1-reviewer-browser.txt: be61ba46aa09ab5bc74968c0d1a21ea723dd063d3245d7f9e4023b90d75ea7bd
+AS-P05-B1-R1-reviewer-catalog.txt: 8385cea52f09a443cc7ccb0b7a95e3f7568f2eafc43e8cd5f06a2fc10e3ace57
+AS-P05-B1-R1-reviewer-end.snapshot.txt: e69382477a8e920657cb7467e1e4a80b067400a7451841525634199c8379df16
+AS-P05-B1-R1-reviewer-manifest.txt: 4271aa052d0353f9bfc1b419c6802161f583b673c65bbe304b8fbc51c0785834
+AS-P05-B1-R1-reviewer-setup.txt: b803003f9ca88fa2a26a266444097888b4caf146eeeb3730cb6bf0300258aa4d
+AS-P05-B1-R1-reviewer-start.snapshot.txt: e69382477a8e920657cb7467e1e4a80b067400a7451841525634199c8379df16

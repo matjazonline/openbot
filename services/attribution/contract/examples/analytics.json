@@ -1,0 +1,46 @@
+{
+  "start": "2026-11-15T00:00:00Z",
+  "end": "2026-11-17T00:00:00Z",
+  "timezone": "Europe/Berlin",
+  "groups": [
+    {
+      "group": null,
+      "raw_clicks": 0,
+      "eligible_clicks": 0,
+      "image_loads": 0,
+      "landing_page_loads": 0,
+      "visible_placements": 0,
+      "attributed_paid_orders": 0,
+      "unattributed_paid_orders": 1,
+      "period_conversion_rate": null,
+      "rate_denominator": "eligible_clicks_in_period",
+      "currencies": [
+        {
+          "currency": "EUR",
+          "paid_orders": 1,
+          "attributed_paid_orders": 0,
+          "sold_units": 2,
+          "returned_units": 0,
+          "merchandise_amount": 5000,
+          "refunded_merchandise_amount": 1000,
+          "net_merchandise_amount": 4000,
+          "tax_amount": 1000,
+          "shipping_amount": 0,
+          "refunded_tax_amount": 200,
+          "refunded_shipping_amount": 0,
+          "refunds": 2
+        }
+      ],
+      "unattributed_reasons": {
+        "missing": 0,
+        "no_consent": 1,
+        "expired": 0,
+        "future": 0,
+        "bot": 0,
+        "foreign_or_missing": 0,
+        "evidence_unavailable": 0
+      }
+    }
+  ],
+  "next_cursor": null
+}

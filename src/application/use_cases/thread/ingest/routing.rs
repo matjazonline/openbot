@@ -833,9 +833,8 @@ impl ThreadUseCases {
             if !channel.enabled || !channel.participant_access(context).authorized {
                 continue;
             }
-            let owner: Option<(usize, String)> = channel
-                .department_id
-                .and_then(|id| order.get(&id))
+            let owner: Option<(usize, String)> = order
+                .get(&channel.department_id)
                 .map(|(rank, name)| (*rank, name.clone()));
             entries.push((
                 owner.as_ref().map_or(usize::MAX, |(rank, _)| *rank),

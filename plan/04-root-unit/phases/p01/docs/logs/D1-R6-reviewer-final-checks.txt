@@ -1,0 +1,1 @@
+PASS: sourced-environment entry/final snapshots byte-identical; exact HEAD8fdb892b6e279ed0c09150e2336bbdc7462f877d, artifact4ac1d9d0fcc475a8acff950a3d2a6f8c6558fcbf6c66b18cdeee45937f3cec4e, decision49bbf4167eb083a476c2d556c205e17b7710452cb02ee50d2e36ffc69f6cde9b and coordination1 pins match. No reviewer runtime. No whitespace check claimed.

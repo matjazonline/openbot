@@ -246,8 +246,9 @@ async fn authorize_settings(
     sqlx::query("SET LOCAL statement_timeout = '20s'")
         .execute(&mut **tx)
         .await?;
-    authority::authorize_company(tx, company, actor).await?;
-    association::authorize_association(tx, company, actor, RelatedAssociation::inbox(target)).await
+    management::authorize_association_on(tx, company, actor, RelatedAssociation::inbox(target))
+        .await?;
+    Ok(())
 }
 
 async fn validate_reviewers(
@@ -302,8 +303,7 @@ async fn selected_on(
         return Err(conflict());
     }
     let configuration = &state.configuration;
-    authority::authorize_company(tx, request.company, configuration.run_as()).await?;
-    association::authorize_association(
+    management::authorize_association_on(
         tx,
         request.company,
         configuration.run_as(),
@@ -311,7 +311,22 @@ async fn selected_on(
     )
     .await?;
     bindings::verify_selection(tx, configuration).await?;
-    resources::check_readiness(tx, configuration.as_ref().into()).await?;
+    let reach = resources::association_reach_on(
+        tx,
+        request.company,
+        RelatedAssociation::inbox(request.target),
+    )
+    .await?;
+    resources::check_readiness(
+        tx,
+        resources::ReadinessSelection::of(
+            configuration.as_ref(),
+            reach,
+            // Choosing a responder is a configuration write (B2-F8).
+            crate::app_error::UnitCheckStage::Binding,
+        ),
+    )
+    .await?;
     selection.contract.validate(
         configuration
             .bundle()

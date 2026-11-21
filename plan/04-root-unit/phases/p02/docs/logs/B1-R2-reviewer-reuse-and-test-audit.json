@@ -1,0 +1,54 @@
+{
+  "unchanged_production_blob_checks": [
+    {
+      "file": "migrations/20260817000000_init_schema.sql",
+      "R1_inspected_blob_prefix": "d90162f8",
+      "current_blob": "d90162f8205851024c007726d127cbbcedf83c7f",
+      "unchanged": true
+    },
+    {
+      "file": "src/domain/entities/channel.rs",
+      "R1_inspected_blob_prefix": "e460bbdf",
+      "current_blob": "e460bbdf35b67857a8c470b06c19aee7f8f44b84",
+      "unchanged": true
+    },
+    {
+      "file": "src/adapters/persistence/channel.rs",
+      "R1_inspected_blob_prefix": "a1099780",
+      "current_blob": "a1099780a1bd9a4a2eeb328175389087f035e1a9",
+      "unchanged": true
+    },
+    {
+      "file": "src/adapters/persistence/channel_edit.rs",
+      "R1_inspected_blob_prefix": "b1dbaed7",
+      "current_blob": "b1dbaed7711477c5dd4e63ef7c5a296468671aab",
+      "unchanged": true
+    },
+    {
+      "file": "src/adapters/persistence/department_desks.rs",
+      "R1_inspected_blob_prefix": "4311f28f",
+      "current_blob": "4311f28fe59b68f9f91a7a2dcd840180577e5042",
+      "unchanged": true
+    },
+    {
+      "file": "src/adapters/persistence/workflow/provisioning_department.rs",
+      "R1_inspected_blob_prefix": "d1347953",
+      "current_blob": "d1347953e1198ca9adf60818c458773e82b7fda1",
+      "unchanged": true
+    },
+    {
+      "file": "src/adapters/persistence/workflow/role_binding.rs",
+      "R1_inspected_blob_prefix": "1fb2fe53",
+      "current_blob": "1fb2fe539bef09fc5b8ce8f3ed460ac3582a89b8",
+      "unchanged": true
+    },
+    {
+      "file": "src/adapters/persistence/local_agents/management/mod.rs",
+      "R1_inspected_blob_prefix": "5f0ca47f",
+      "current_blob": "5f0ca47f568aac7bfacbfb96f2671fcf5ca68eaf",
+      "unchanged": true
+    }
+  ],
+  "exact_HTTP21_successful_lines": true,
+  "new_classic_test_successful_lines": true
+}

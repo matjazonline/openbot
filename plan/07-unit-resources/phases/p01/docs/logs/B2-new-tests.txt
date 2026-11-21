@@ -1,0 +1,69 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 37s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 56 tests
+test adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input ... ok
+test adapters::http::routes::ui_companies::skills_tests::unit_resource_skills_tab_renders_editable_for_unit_managers_and_read_only_for_members ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_move_needs_both_units_and_changes_only_the_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_schema_keys_checks_and_default_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_move_lists_the_agents_whose_active_revision_uses_a_skill ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_selection_offers_follow_the_agent_reach ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_library_agent_copies_skills_into_its_placement_or_the_root ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_schema_delete_names_what_to_move_and_teardown_keeps_working ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_skills_tab_and_agent_authoring_reads ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_move_counts_but_does_not_name_unmanaged_uses ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_authority_root_lead_level_ceiling_refresh_and_placed_defaults ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_authority_each_write_follows_the_resource_unit ... ok
+test application::workflow::message_admission::knowledge_tests::knowledge_run_level_stamped_trigger_refusal_settles_instead_of_retrying ... ok
+test application::workflow::message_admission::tests::message_admission_classifies_by_producing_condition ... ok
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_five_examples_compile_and_execute_without_production_effects ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_native_review_reject_completes_suppressed_and_edit_is_the_response ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_child_suppression_does_not_suppress_the_root ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_invalid_mapping_is_refused_and_question_approval_is_distinct ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_missing_human_script_has_typed_wait_preview ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_seals_mapping_and_policy_and_previews_output ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_suppression_skips_projection_for_valid_empty_values ... ok
+test application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script ... ok
+test application::workflow::sample::tests::department_lead_fixture_runs_as_a_sample ... ok
+test adapters::persistence::workflow::tests::binding_tests::unit_resource_move_lists_active_bindings_of_the_current_configuration ... ok
+test application::workflow::sample::tests::gmail_tests::vault_authoring_gmail_examples_compile_and_execute_only_scripted_effects ... ok
+test application::workflow::sample::tests::gmail_tests::vault_authoring_reviewed_mime_is_valid_base64url_and_keeps_reply_headers ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_actual_agent_identity_separates_streams ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_exact_pair_limit_reports_only_recent_complete_suffix ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_model_only_step_has_no_logical_seed ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_oversized_newest_pair_stops_before_older_pair ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_repeated_calls_keep_exact_local_pairs_and_current_input_separate ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_same_agent_child_has_its_own_ephemeral_branch ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata ... ok
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... ok
+test application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly ... ok
+test application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation ... ok
+test application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply ... ok
+test application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope ... ok
+test adapters::persistence::workflow::tests::binding_tests::unit_resource_selection_binding_and_admission_refuse_a_slot_connection_out_of_reach ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::unit_resource_selection_admission_agent_uses_current_units_and_placement ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::unit_resource_selection_publication_agent_refuses_out_of_reach_resources ... ok
+test adapters::persistence::workflow::tests::http_tests::unit_resource_authority_http_operation_register_needs_the_connection_unit ... ok
+test adapters::persistence::workflow::tests::http_tests::unit_resource_selection_offers_follow_definition_and_author_reach ... ok
+test adapters::persistence::workflow::tests::http_tests::unit_resource_selection_unslotted_http_resolution_is_judged_within_reach ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::unit_resource_authority_vault_binding_needs_the_connection_unit ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::unit_resource_authority_mcp_operation_register_needs_the_connection_unit ... ok
+test adapters::persistence::workflow::tests::schedule_tests::unit_resource_selection_refusal_settles_a_schedule_occurrence ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::unit_resource_competing_move_and_agent_publication_in_both_orders ... ok
+
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 4881 filtered out; finished in 13.15s
+

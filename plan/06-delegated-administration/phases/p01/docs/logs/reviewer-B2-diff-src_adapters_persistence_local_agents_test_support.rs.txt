@@ -1,0 +1,18 @@
+--- B1/src/adapters/persistence/local_agents/test_support.rs
++++ B2/src/adapters/persistence/local_agents/test_support.rs
+@@ -1,5 +1,5 @@
+ use super::*;
+-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
++use crate::application::ports::channel::ChannelWrite;
+ use crate::{
+     adapters::persistence::test_support::{OwnDatabase, own_database},
+     use_cases::{
+@@ -179,7 +179,7 @@
+     }
+ 
+     pub async fn conversation(&self, company: Uuid) -> Uuid {
+-        let channel = ChannelPersistence::create(
++        let channel = crate::adapters::persistence::test_support::create_channel(
+             self.persistence.as_ref(),
+             company,
+             ChannelWrite {

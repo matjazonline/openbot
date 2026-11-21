@@ -82,8 +82,18 @@ pub(super) async fn authorize_source_on(
     root: &RootReply,
 ) -> AppResult<()> {
     let actor = WorkflowActor::authenticated(root.actor_id)?;
-    message::current_message_on(db, scope.company, actor, MessageKind::Reply).await?;
-    association::authorize_association(
+    message::current_message_on(
+        db,
+        ActionScope {
+            company: scope.company,
+            run: scope.run,
+            execution: scope.execution,
+        },
+        actor,
+        MessageKind::Reply,
+    )
+    .await?;
+    management::authorize_association_on(
         db,
         scope.company,
         actor,
@@ -92,7 +102,8 @@ pub(super) async fn authorize_source_on(
             thread_id: RelatedThreadId::new(root.thread_id),
         },
     )
-    .await
+    .await?;
+    Ok(())
 }
 
 pub(super) async fn policy_current_on(

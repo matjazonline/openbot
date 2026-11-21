@@ -14,8 +14,8 @@ impl Fixture {
     /// A published agent of `company` on an enabled model connection.
     pub(super) async fn model_agent(&self, company: Uuid, slug: &str) -> Uuid {
         sqlx::query(
-            "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
-             VALUES ($1, 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
+            "INSERT INTO company_model_connections(company_id, unit_id, provider, api_key, models) \
+             VALUES ($1, (SELECT id FROM departments WHERE company_id=$1 AND is_root), 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
         )
         .bind(company)
         .execute(self.persistence.pool())
@@ -411,7 +411,7 @@ async fn run_top_level_lists_a_parent_once_and_rolls_up_its_child() {
     source["steps"]["start"]["child_version_id"] = json!(child_version.to_string());
     let (_, parent_version) = f.published(owner, company, source).await;
 
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         company,
         ChannelWrite {

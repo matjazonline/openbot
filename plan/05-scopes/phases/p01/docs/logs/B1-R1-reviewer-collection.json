@@ -1,0 +1,13 @@
+{
+  "before": 4762,
+  "after": 4768,
+  "removed": [],
+  "added": [
+    "adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_existing_principal_upsert_and_delete_compete_in_both_orders",
+    "adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_principal_creation_and_rollback_are_atomic",
+    "adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_units_create_reparent_membership_retire_and_recreate",
+    "adapters::persistence::memory::scope_owner_tests::memory_scope_shape_delivery_retains_target_and_subject_provenance",
+    "adapters::persistence::memory::scope_owner_tests::memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_owners",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::memory_scope_admission_step_own_uses_the_captured_department"
+  ]
+}

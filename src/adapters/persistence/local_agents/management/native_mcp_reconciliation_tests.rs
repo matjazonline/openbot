@@ -165,6 +165,13 @@ async fn revoke_original(f: &McpSetup) {
         .execute(&f.s.f.database.pool)
         .await
         .unwrap();
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        &f.s.f.database.pool,
+        f.s.f.company,
+        f.s.f.member,
+        crate::entities::company_member::CompanyAccessRole::Member,
+    )
+    .await;
     sqlx::query("DELETE FROM principals WHERE company_id=$1 AND user_id=$2")
         .bind(f.s.f.company)
         .bind(f.s.f.owner)
@@ -186,12 +193,14 @@ async fn exercise(proof: Proof) {
         Some(ledger.clone()),
     );
     // The operator must independently have the current role and sufficient knowledge.
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.s.f.company)
-        .bind(f.s.f.admin)
-        .execute(&f.s.f.database.pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.s.f.company)
+    .bind(f.s.f.admin)
+    .execute(&f.s.f.database.pool)
+    .await
+    .unwrap();
     assert!(
         Box::pin(service.reconcile(&command, &CancellationToken::new(), Duration::from_secs(5)))
             .await
@@ -204,12 +213,14 @@ async fn exercise(proof: Proof) {
             .is_err()
     );
     assert_eq!(ledger.calls.load(Ordering::SeqCst), 0);
-    sqlx::query("UPDATE company_members SET access_level=9 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.s.f.company)
-        .bind(f.s.f.admin)
-        .execute(&f.s.f.database.pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=9 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.s.f.company)
+    .bind(f.s.f.admin)
+    .execute(&f.s.f.database.pool)
+    .await
+    .unwrap();
     command.actor = WorkflowActor::authenticated(f.s.f.admin).unwrap();
     let historical = PostgresActionReconciliation::new(p.clone(), CompanyReconciliationResources);
     historical

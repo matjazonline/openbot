@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# 07UR-P02-G1-R3: the r3 charging protocol (deferred constraint trigger; chain FOR KEY SHARE by id
+# before the totals upsert; a missing unit charges the root; saturating sum) on a reduced schema.
+set -u
+L="$1"; DB=openbot_p07_p02g_r3
+p() { psql -h 127.0.0.1 -p 55407 -U mac02 -X "$@"; }
+C=00000000-0000-0000-0000-000000000001
+p -d postgres -qc "DROP DATABASE IF EXISTS $DB" 2>/dev/null; p -d postgres -qc "CREATE DATABASE $DB"
+p -d $DB -q -v ON_ERROR_STOP=1 <<SQL
+CREATE TABLE departments (company_id uuid NOT NULL, id uuid PRIMARY KEY, parent_id uuid, is_root boolean NOT NULL DEFAULT false,
+  UNIQUE (company_id, id), FOREIGN KEY (company_id, parent_id) REFERENCES departments(company_id, id));
+CREATE TABLE unit_spend (company_id uuid NOT NULL, unit_id uuid NOT NULL, period text NOT NULL, period_start timestamptz NOT NULL,
+  spent_micros bigint NOT NULL DEFAULT 0 CHECK (spent_micros >= 0), PRIMARY KEY (company_id, unit_id, period, period_start),
+  FOREIGN KEY (company_id, unit_id) REFERENCES departments(company_id, id) ON DELETE CASCADE);
+-- usage rows: recorded unit id without FK (D5 r2); cost stands in for the priced cost.
+CREATE TABLE usage_calls (company_id uuid NOT NULL, request_id uuid PRIMARY KEY, unit_id uuid NOT NULL,
+  requested_at timestamptz NOT NULL DEFAULT statement_timestamp(), cost bigint NOT NULL, note text, settled_at timestamptz);
+-- Same shape as guard_model_usage_update (init_schema.sql:11499-11510).
+CREATE FUNCTION guard_usage_update() RETURNS trigger LANGUAGE plpgsql AS \$\$
+BEGIN
+  IF (to_jsonb(NEW) - ARRAY['settled_at']) IS DISTINCT FROM (to_jsonb(OLD) - ARRAY['settled_at'])
+     OR (OLD.settled_at IS NOT NULL AND NEW IS DISTINCT FROM OLD) THEN
+    RAISE EXCEPTION 'model usage identity and settled usage are immutable' USING ERRCODE='23514';
+  END IF; RETURN NEW;
+END \$\$;
+CREATE TRIGGER usage_immutable BEFORE UPDATE ON usage_calls FOR EACH ROW EXECUTE FUNCTION guard_usage_update();
+CREATE FUNCTION charge_settled_call() RETURNS trigger LANGUAGE plpgsql AS \$\$
+DECLARE chain uuid[]; held uuid[]; root uuid; pause text;
+BEGIN
+  -- (1) resolve the chain upward, then lock it FOR KEY SHARE ordered by id
+  WITH RECURSIVE up(id, parent_id, depth) AS (
+      SELECT id, parent_id, 1 FROM departments WHERE company_id = NEW.company_id AND id = NEW.unit_id
+      UNION ALL SELECT d.id, d.parent_id, up.depth + 1 FROM departments AS d JOIN up ON d.id = up.parent_id
+      WHERE d.company_id = NEW.company_id AND up.depth < 8)
+  SELECT array_agg(id) INTO chain FROM up;
+  SELECT array_agg(id ORDER BY id) INTO held FROM (SELECT id FROM departments
+      WHERE company_id = NEW.company_id AND id = ANY(COALESCE(chain, '{}')) ORDER BY id FOR KEY SHARE) AS locked;
+  -- (2) the unit is gone: the root alone
+  IF held IS NULL OR NOT (NEW.unit_id = ANY(held)) THEN
+    SELECT id INTO root FROM departments WHERE company_id = NEW.company_id AND is_root FOR KEY SHARE;
+    held := ARRAY[root];
+  END IF;
+  pause := current_setting('test.charge_pause', true);
+  IF pause IS NOT NULL AND pause <> '' THEN PERFORM pg_sleep(pause::float); END IF;
+  -- (3) upsert ordered by (unit, period), saturating
+  INSERT INTO unit_spend(company_id, unit_id, period, period_start, spent_micros)
+  SELECT NEW.company_id, unit, period.name, period.start, NEW.cost
+  FROM unnest(held) AS unit, (VALUES ('day', date_trunc('day', NEW.requested_at, 'UTC')),
+                                     ('month', date_trunc('month', NEW.requested_at, 'UTC'))) AS period(name, start)
+  ORDER BY unit, period.name
+  ON CONFLICT (company_id, unit_id, period, period_start) DO UPDATE
+     SET spent_micros = LEAST(unit_spend.spent_micros::numeric + EXCLUDED.spent_micros, 9223372036854775807)::bigint;
+  RETURN NULL;
+END \$\$;
+CREATE CONSTRAINT TRIGGER usage_charge AFTER UPDATE OF settled_at ON usage_calls
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+  WHEN (OLD.settled_at IS NULL AND NEW.settled_at IS NOT NULL) EXECUTE FUNCTION charge_settled_call();
+-- tree: root r > parent p > leaves d1..d3; siblings s01..s16 under r
+INSERT INTO departments VALUES ('$C','00000000-0000-0000-0000-0000000000a0',NULL,true);
+INSERT INTO departments VALUES ('$C','00000000-0000-0000-0000-0000000000b0','00000000-0000-0000-0000-0000000000a0',false);
+INSERT INTO departments SELECT '$C', ('00000000-0000-0000-0000-0000000000d'||n)::uuid, '00000000-0000-0000-0000-0000000000b0', false FROM generate_series(1,3) n;
+INSERT INTO departments SELECT '$C', ('00000000-0000-0000-0000-0000000001'||lpad(n::text,2,'0'))::uuid, '00000000-0000-0000-0000-0000000000a0', false FROM generate_series(1,16) n;
+SQL
+U() { echo "00000000-0000-0000-0000-0000000000$1"; }
+call() { p -d $DB -qAtc "INSERT INTO usage_calls(company_id,request_id,unit_id,cost,requested_at) VALUES ('$C','$1','$2',$3,'$4') "; }
+totals() { p -d $DB -c "SELECT CASE unit_id WHEN '$(U a0)' THEN 'root' WHEN '$(U b0)' THEN 'parent' WHEN '$(U d1)' THEN 'd1' WHEN '$(U d2)' THEN 'd2' WHEN '$(U d3)' THEN 'd3' ELSE 'sibling' END AS unit, period, sum(spent_micros) AS spent, count(*) AS rows FROM unit_spend GROUP BY 1,2 ORDER BY 1,2"; }
+{
+p -d $DB -Atc "SELECT version()"
+echo "== T1 deferral: charged at COMMIT, once per qualifying row; a non-qualifying update charges nothing"
+call 10000000-0000-0000-0000-000000000001 "$(U d1)" 5 '2026-11-21 10:00+00'
+call 10000000-0000-0000-0000-000000000002 "$(U d1)" 7 '2026-11-21 10:00+00'
+p -d $DB -a -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id IN ('10000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002')" \
+  -c "SELECT count(*) AS totals_rows_before_commit FROM unit_spend" -c "COMMIT"
+p -d $DB -a -c "UPDATE usage_calls SET settled_at=settled_at WHERE request_id='10000000-0000-0000-0000-000000000001'"
+totals
+echo "== T2 NEW is the committed row: a settled row cannot change later in the same transaction (guard)"
+call 10000000-0000-0000-0000-000000000003 "$(U d1)" 11 '2026-11-21 10:00+00'
+p -d $DB -a -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='10000000-0000-0000-0000-000000000003'" \
+  -c "UPDATE usage_calls SET note='later' WHERE request_id='10000000-0000-0000-0000-000000000003'" -c "COMMIT" 2>&1
+p -d $DB -Atc "SELECT 'call 3 settled after aborted txn: '||(settled_at IS NOT NULL) FROM usage_calls WHERE request_id='10000000-0000-0000-0000-000000000003'"
+echo "== T3 a failure inside the deferred charge fails only that COMMIT and rolls the settlement back"
+p -d $DB -qc "CREATE TABLE fail_switch(on_ boolean)"; p -d $DB -qc "INSERT INTO fail_switch VALUES (true)"
+p -d $DB -qc "CREATE FUNCTION fail_charge() RETURNS trigger LANGUAGE plpgsql AS \$\$ BEGIN IF (SELECT on_ FROM fail_switch) THEN RAISE EXCEPTION 'charge failed (test)'; END IF; RETURN NULL; END \$\$"
+p -d $DB -qc "CREATE CONSTRAINT TRIGGER usage_charge_fail AFTER UPDATE OF settled_at ON usage_calls DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (OLD.settled_at IS NULL AND NEW.settled_at IS NOT NULL) EXECUTE FUNCTION fail_charge()"
+p -d $DB -a -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='10000000-0000-0000-0000-000000000003'" -c "SELECT 'statement ok before commit' AS state" -c "COMMIT" 2>&1
+p -d $DB -Atc "SELECT 'call 3 settled after failed commit: '||(settled_at IS NOT NULL) FROM usage_calls WHERE request_id='10000000-0000-0000-0000-000000000003'"
+p -d $DB -qc "DROP TRIGGER usage_charge_fail ON usage_calls"
+totals
+echo
+echo "== 3a: charge committing (paused after its locks) while a delete of its unit is attempted"
+call 20000000-0000-0000-0000-000000000001 "$(U d3)" 100 '2026-11-21 10:00+00'
+( p -d $DB -a -c "SET test.charge_pause='1.5'" -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='20000000-0000-0000-0000-000000000001'" -c '\timing on' -c "COMMIT" > "$L.s" 2>&1 ) &
+sleep 0.5
+p -d $DB -a -c '\timing on' -c "BEGIN" -c "SELECT id FROM departments WHERE id='$(U d3)' FOR UPDATE" -c "DELETE FROM departments WHERE id='$(U d3)'" -c "COMMIT" 2>&1 | sed 's/^/[delete] /'
+wait; sed 's/^/[settlement] /' "$L.s"
+totals
+echo
+echo "== 3b: delete holds its unit FOR UPDATE, then deletes (cascading existing totals); the settlement commits meanwhile"
+call 30000000-0000-0000-0000-000000000001 "$(U d2)" 1000 '2026-11-21 10:00+00'
+p -d $DB -qc "INSERT INTO unit_spend VALUES ('$C','$(U d2)','day','2026-11-21+00',1)"
+( p -d $DB -a -c "BEGIN" -c "SELECT id FROM departments WHERE id='$(U d2)' FOR UPDATE" -c "SELECT pg_sleep(1.5)" -c "DELETE FROM departments WHERE id='$(U d2)'" -c "COMMIT" > "$L.d" 2>&1 ) &
+sleep 0.5
+p -d $DB -a -c '\timing on' -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-000000000001'" -c "COMMIT" 2>&1 | sed 's/^/[settlement] /'
+wait; sed 's/^/[delete] /' "$L.d"
+totals
+echo
+echo "== 3b': delete commits first, then a call recorded on the deleted unit settles"
+call 30000000-0000-0000-0000-000000000002 "$(U d2)" 10000 '2026-11-21 10:00+00'
+p -d $DB -a -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-000000000002'"
+totals
+echo
+echo "== 5: a department write holding the root row FOR UPDATE (as lock_department_on does) stalls a child unit's settlement commit"
+call 50000000-0000-0000-0000-000000000001 "$(U d1)" 3 '2026-11-21 10:00+00'
+( p -d $DB -a -c "BEGIN" -c "SELECT id FROM departments WHERE id='$(U a0)' FOR UPDATE" -c "SELECT pg_sleep(1.5)" -c "COMMIT" > "$L.e" 2>&1 ) &
+sleep 0.3
+p -d $DB -a -c '\timing on' -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='50000000-0000-0000-0000-000000000001'" -c "COMMIT" 2>&1 | sed 's/^/[settlement] /'
+wait
+echo
+echo "== 4: 16 concurrent settlements on sibling units of one company"
+p -d $DB -qc "DELETE FROM unit_spend"
+for n in $(seq -w 1 16); do call "40000000-0000-0000-0000-0000000000$n" "00000000-0000-0000-0000-0000000001$n" "$((10#$n))" '2026-11-21 10:00+00'; done
+for n in $(seq -w 1 16); do ( p -d $DB -qAt -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='40000000-0000-0000-0000-0000000000$n'" -c "COMMIT" > "$L.c$n" 2>&1; echo "exit $?" >> "$L.c$n" ) & done
+wait
+cat "$L".c* | sort | uniq -c
+p -d $DB -c "SELECT period, spent_micros AS root_total, (SELECT sum(cost) FROM usage_calls WHERE request_id::text LIKE '40000000%') AS expected FROM unit_spend WHERE unit_id='$(U a0)' ORDER BY period"
+echo
+echo "== saturation"
+p -d $DB -qc "UPDATE unit_spend SET spent_micros=9223372036854775800 WHERE unit_id='$(U a0)' AND period='day'"
+call 60000000-0000-0000-0000-000000000001 "$(U a0)" 100 '2026-11-21 10:00+00'
+p -d $DB -a -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='60000000-0000-0000-0000-000000000001'"
+p -d $DB -Atc "SELECT 'root day total: '||spent_micros FROM unit_spend WHERE unit_id='$(U a0)' AND period='day'"
+} > "$L" 2>&1
+rm -f "$L".s "$L".d "$L".e "$L".c*; p -d postgres -qc "DROP DATABASE $DB"

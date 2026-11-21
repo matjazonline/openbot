@@ -10,6 +10,9 @@ mod hitl;
 #[path = "channel_reply_e2e_recovery_tests.rs"]
 mod recovery;
 
+#[path = "delegated_administration_runtime_tests.rs"]
+mod delegated_administration;
+
 #[path = "agent_history_channel_tests.rs"]
 mod history;
 

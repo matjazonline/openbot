@@ -17,6 +17,7 @@ fn definition() -> ResolvedAgentDefinition {
             max_output_tokens: 1000,
         }),
         tools: vec![ResolvedAgentTool {
+            unit_id: None,
             binding: AgentToolBinding::builtin(AgentBuiltinTool::SearchKnowledge),
             input_schema: json!({"type":"object","additionalProperties":false}),
             output_schema: json!({"type":"object"}),
@@ -121,6 +122,7 @@ fn autonomous_agent_contract_skills_require_local_aliases_without_granting_tools
     value.skills.push(ResolvedAgentSkill {
         assignment_id: AgentSkillAssignmentId::new(Uuid::new_v4()),
         skill: SkillSnapshot {
+            unit_id: uuid::Uuid::nil(),
             description: "Skill instructions".into(),
             files: Vec::new(),
             company_id: value.company_id,

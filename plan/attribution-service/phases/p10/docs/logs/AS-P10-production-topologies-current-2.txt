@@ -1,0 +1,81 @@
+{"application": "ob", "base_image": "sha256:3878bace5965db7bac94bda67d8b02a9a254472445c594da7643fbcf5f63a4e0", "trusted_image": "sha256:f779e9358a821a9202d8867172554a7389b14bf784960ff2b2bdf3224cae6129"}
+{"application": "as", "base_image": "sha256:5930cc9c26d6352632305eb09f2c59400fcfc521a465b78a320d6e8e1b060d8b", "trusted_image": "sha256:eab6c8b361500f184b8cafbf8c3f2ae7ac3b18387919a93aa9be1c5e4f91cc90"}
+Topology: containers
+Fixture diagnostic obdb: 2026-11-16 17:25:39.880 UTC [87] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-11-16 17:25:39.985 UTC [1] LOG:  starting PostgreSQL 18.3 (Debian 18.3-1.pgdg12+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-11-16 17:25:39.989 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-16 17:25:39.989 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-16 17:25:39.995 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 17:25:40.004 UTC [112] LOG:  database system was shut down at 2026-11-16 17:25:39 UTC
+2026-11-16 17:25:40.010 UTC [1] LOG:  database system is ready to accept connections
+
+Fixture diagnostic asdb: 2026-11-16 17:25:42.841 UTC [81] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-11-16 17:25:42.967 UTC [1] LOG:  starting PostgreSQL 18.3 (Debian 18.3-1.pgdg12+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-11-16 17:25:42.968 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-16 17:25:42.968 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-16 17:25:42.973 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 17:25:42.985 UTC [107] LOG:  database system was shut down at 2026-11-16 17:25:42 UTC
+2026-11-16 17:25:42.992 UTC [1] LOG:  database system is ready to accept connections
+
+Fixture diagnostic gateway: 2026/11/16 17:25:46 [notice] 8#8: gracefully shutting down
+2026/11/16 17:25:46 [notice] 6#6: gracefully shutting down
+2026/11/16 17:25:46 [notice] 9#9: gracefully shutting down
+2026/11/16 17:25:46 [notice] 9#9: exiting
+2026/11/16 17:25:46 [notice] 6#6: exiting
+2026/11/16 17:25:46 [notice] 9#9: exit
+2026/11/16 17:25:46 [notice] 6#6: exit
+2026/11/16 17:25:46 [notice] 7#7: gracefully shutting down
+2026/11/16 17:25:46 [notice] 7#7: exiting
+2026/11/16 17:25:46 [notice] 8#8: exiting
+2026/11/16 17:25:46 [notice] 8#8: exit
+2026/11/16 17:25:46 [notice] 7#7: exit
+
+Fixture diagnostic ob:   [2m2026-11-16T17:26:38.365664Z[0m [32m INFO[0m  [32mGauge recorded, [1;32mmetric[0m[32m: inbound_events_oldest_ready_age_seconds, [1;32mvalue[0m[32m: 0.0, [1;32mlabels[0m[32m: [][0m
+    [2;3mat[0m src/adapters/monitoring/tracing_monitor.rs:61
+
+  [2m2026-11-16T17:26:38.367052Z[0m [32m INFO[0m  [32mGauge recorded, [1;32mmetric[0m[32m: stuck_work, [1;32mvalue[0m[32m: 0.0, [1;32mlabels[0m[32m: [("kind", "delivery_dead_lettered")][0m
+    [2;3mat[0m src/adapters/monitoring/tracing_monitor.rs:61
+
+  [2m2026-11-16T17:26:38.367258Z[0m [32m INFO[0m  [32mGauge recorded, [1;32mmetric[0m[32m: stuck_work, [1;32mvalue[0m[32m: 0.0, [1;32mlabels[0m[32m: [("kind", "delivery_overdue")][0m
+    [2;3mat[0m src/adapters/monitoring/tracing_monitor.rs:61
+
+  [2m2026-11-16T17:26:38.367264Z[0m [32m INFO[0m  [32mGauge recorded, [1;32mmetric[0m[32m: stuck_work, [1;32mvalue[0m[32m: 0.0, [1;32mlabels[0m[32m: [("kind", "delivery_unconfirmed")][0m
+    [2;3mat[0m src/adapters/monitoring/tracing_monitor.rs:61
+
+
+Fixture diagnostic as: {"timestamp":"2026-11-16T17:26:16.711618Z","level":"INFO","fields":{"message":"company status healthy","component":"attribution_company_status_health","available":true,"expired":false,"reconciliation_failed":false},"target":"attribution_service::adapters::identity::worker"}
+{"timestamp":"2026-11-16T17:26:21.710102Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:26:26.707197Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:26:31.709233Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:26:36.714580Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:26:41.708627Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:26:46.708044Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:26:46.709744Z","level":"INFO","fields":{"message":"company status healthy","component":"attribution_company_status_health","available":true,"expired":false,"reconciliation_failed":false},"target":"attribution_service::adapters::identity::worker"}
+{"timestamp":"2026-11-16T17:26:51.709252Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:26:56.709496Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:27:01.707813Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+{"timestamp":"2026-11-16T17:27:06.711164Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 325, in <module>
+    main()
+    ~~~~^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 313, in main
+    f.start(); f.boundaries(); f.browser()
+    ~~~~~~~^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 159, in start
+    self.wait_http(self.openbot.removeprefix("https://"), "/login")
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 108, in wait_http
+    raise RuntimeError("readiness deadline: " + self.stage)
+RuntimeError: readiness deadline: actual applications and TLS readiness

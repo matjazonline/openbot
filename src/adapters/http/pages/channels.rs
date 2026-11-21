@@ -3,90 +3,25 @@
 use super::*;
 use crate::entities::department::Department;
 
-pub(crate) fn render_spam_disabled_warning(
-    spam_scan_enabled: bool,
-    initial_disabled: bool,
-) -> String {
-    if spam_scan_enabled {
-        String::new()
-    } else {
-        let (box_class, checkbox_attr) = if initial_disabled {
-            ("opacity-40 pointer-events-none grayscale", "disabled")
-        } else {
-            ("", "")
-        };
-        format!(
-            r#"
-        <div class="spam-disabled-box p-3 bg-warning/10 border border-warning/40 rounded-lg text-base-content text-xs space-y-2 transition-all duration-200 {box_class}">
-            <div class="font-semibold flex items-center gap-1.5 text-base-content">
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-                Spam scanning is disabled in server configuration
-            </div>
-            <div>Desks without participant email restrictions will receive incoming emails without spam filtering.</div>
-            <label class="flex items-center gap-2 cursor-pointer mt-1 font-medium text-base-content">
-                <input type="checkbox" name="confirm_spam_disabled" value="true" {checkbox_attr} class="rounded bg-base-200 border-base-300 text-base-content focus:ring-warning">
-                <span>I am aware that spam scanning is disabled and confirm saving without participant restrictions.</span>
-            </label>
-        </div>
-        "#
-        )
-    }
-}
-
-/// The create-channel form: explicit slug, participants and per-channel settings. It makes a
-/// plain channel; what answers it is a workflow binding (p08 D4.7).
-fn advanced_channel_form(
-    company_id: Uuid,
-    slug: &crate::entities::value_objects::CompanySlug,
-    app_domain_name: &str,
-    spam_warning_html: &str,
-) -> String {
+/// Both page shells submit the same required-owner/Public contract.
+fn advanced_channel_form(page: &ChannelsPage<'_>) -> String {
+    let draft = super::channel_settings::ChannelDraft::default();
+    let fields = super::channel_settings::channel_fields(&super::channel_settings::ChannelFields {
+        company: page.company,
+        app_domain_name: page.app_domain_name,
+        draft: &draft,
+        spam_scan_enabled: page.spam_scan_enabled,
+        departments: page.departments,
+    });
     format!(
-        r##"            <form id="advanced-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4" data-company-id="{company_id}"
+        r##"<form id="advanced-channel-form" hx-post="/companies/{company_id}/channels" hx-target="#channel-list" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']" class="space-y-4" data-company-id="{company_id}"
                 data-after-request="reset-and-collapse" data-card="channel-form-card" data-toggle="channel-form-toggle">
-                <input type="hidden" name="enabled" value="true">
-                <input type="hidden" name="add_3rd_party" value="true">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="channel_name" class="block text-xs font-medium text-base-content/80 mb-1">Desk Name</label>
-                        <input type="text" id="channel_name" name="name" required
-                            data-input="slugify" data-slug-target="channel_slug"
-                            class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-success"
-                            placeholder="Inbound Email Handler">
-                    </div>
-                    <div>
-                        <label for="channel_slug" class="block text-xs font-medium text-base-content/80 mb-1">Slug (@{slug}.{app_domain_name})</label>
-                        <input type="text" id="channel_slug" name="slug" required
-                            class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-success font-mono"
-                            placeholder="inbound-email-handler">
-                    </div>
-                </div>
-
-                <div>
-                    <label for="channel_alias_slugs" class="block text-xs font-medium text-base-content/80 mb-1">Alias Slugs (Optional)</label>
-                    <input type="text" id="channel_alias_slugs" name="alias_slugs"
-                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-success font-mono"
-                        placeholder="sales, help, contact">
-                    <p class="text-[11px] text-base-content/70 mt-1">Comma-separated extra addresses at <code class="text-primary">@{slug}.{app_domain_name}</code>. Replies go back out from the address the mail arrived on.</p>
-                </div>
-
-                <div>
-                    <label for="participant_emails" class="block text-xs font-medium text-base-content/80 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
-                    <input type="text" id="participant_emails" name="participant_emails" data-company-id="{company_id}" data-input="spam-warning" autocomplete="off"
-                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-success"
-                        placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
-                    <p class="text-[11px] text-base-content/70 mt-1">Leave blank for Company Team members. Use <code class="text-primary">@public</code> to allow anyone, or specify email addresses.</p>
-                </div>
-                {spam_warning_html}
-                <div class="flex justify-end">
-                    <button type="submit"
-                        class="px-5 py-2 bg-success hover:bg-success/90 text-success-content text-sm font-semibold rounded-lg shadow-md shadow-success/20 transition cursor-pointer">
-                        Create Desk
-                    </button>
-                </div>
-            </form>"##
+            {fields}
+            <div class="flex justify-end">
+                <button type="submit" class="btn btn-success">Create Desk</button>
+            </div>
+        </form>"##,
+        company_id = page.company.id,
     )
 }
 
@@ -115,19 +50,12 @@ pub fn channels_page(page: &ChannelsPage<'_>) -> String {
     let ChannelsPage {
         company,
         app_domain_name,
-        spam_scan_enabled,
         focus,
         ..
     } = *page;
 
     let list_html = focused_channel_list(page);
-    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, true);
-    let advanced_form = advanced_channel_form(
-        company.id,
-        &company.slug,
-        app_domain_name,
-        &spam_warning_html,
-    );
+    let advanced_form = advanced_channel_form(page);
     let (card_hidden, card_expanded) = if focus.create_form_open {
         ("", "true")
     } else {
@@ -203,6 +131,7 @@ fn focused_channel_list(page: &ChannelsPage<'_>) -> String {
                     page.company,
                     page.app_domain_name,
                     channel,
+                    page.departments,
                     page.spam_scan_enabled,
                 )
             } else {
@@ -219,7 +148,7 @@ fn focused_channel_list(page: &ChannelsPage<'_>) -> String {
 
 /// The name of the department that owns `channel`, when it is one of `departments`.
 pub fn department_name<'d>(departments: &'d [Department], channel: &Channel) -> Option<&'d str> {
-    let owner = channel.department_id?;
+    let owner = channel.department_id;
     departments
         .iter()
         .find(|department| department.id == owner)
@@ -476,97 +405,29 @@ pub fn channel_edit_fragment(
     company: &Company,
     app_domain_name: &str,
     channel: &Channel,
+    departments: &[Department],
     spam_scan_enabled: bool,
 ) -> String {
-    let emails_str = match &channel.participant_emails {
-        Some(emails) => emails.join(", "),
-        None => String::new(),
-    };
-    let alias_slugs_str = super::channel_settings::stored_alias_slugs(channel);
-    let is_public = channel
-        .participant_emails
-        .as_ref()
-        .map(|emails| {
-            emails
-                .iter()
-                .any(|e| e.trim().eq_ignore_ascii_case("@public"))
-        })
-        .unwrap_or(false);
-    let spam_warning_html = render_spam_disabled_warning(spam_scan_enabled, !is_public);
-
+    let participants = super::channel_settings::stored_participants(channel);
+    let aliases = super::channel_settings::stored_alias_slugs(channel);
+    let draft = super::channel_settings::stored_channel_draft(channel, &participants, &aliases);
+    let fields = super::channel_settings::channel_fields(&super::channel_settings::ChannelFields {
+        company,
+        app_domain_name,
+        draft: &draft,
+        spam_scan_enabled,
+        departments,
+    });
     format!(
-        r##"
-        <form id="channel-{channel_id}" hx-put="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" data-company-id="{company_id}"
+        r##"<form id="channel-{channel_id}" hx-put="/companies/{company_id}/channels/{channel_id}" hx-target="#channel-{channel_id}" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']" data-company-id="{company_id}"
             class="bg-base-100 border border-success/40 rounded-xl p-4 md:p-5 space-y-4 shadow-lg">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-medium text-base-content/80 mb-1">Desk Name</label>
-                    <input type="text" name="name" value="{name}" required data-input="slugify"
-                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-success">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-base-content/80 mb-1">Slug (@{company_slug}.{app_domain_name})</label>
-                    <input type="text" name="slug" value="{slug}" required
-                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-success font-mono">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-medium text-base-content/80 mb-1">Alias Slugs (Optional)</label>
-                <input type="text" name="alias_slugs" value="{alias_slugs_str}"
-                    class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-success font-mono"
-                    placeholder="sales, help, contact">
-                <p class="text-[11px] text-base-content/70 mt-1">Comma-separated extra addresses at <code class="text-primary">@{company_slug}.{app_domain_name}</code>. Replies go back out from the address the mail arrived on.</p>
-            </div>
-
-            <div>
-                <label class="block text-xs font-medium text-base-content/80 mb-1">Participant Emails (Optional - Defaults to Company Team)</label>
-                <input type="text" name="participant_emails" value="{emails_str}" data-company-id="{company_id}" data-input="spam-warning" autocomplete="off"
-                    class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-success"
-                    placeholder="Leave blank for Company Team, @public for open access, or comma-separated emails">
-                <p class="text-[11px] text-base-content/70 mt-1">Leave blank for Company Team members. Use <code class="text-primary">@public</code> to allow anyone, or specify email addresses.</p>
-            </div>
-            <div>
-                <label class="flex items-start gap-2.5 cursor-pointer">
-                    <input type="checkbox" name="enabled" value="true" {enabled_checked}
-                        class="mt-0.5 rounded bg-base-200 border-base-300 text-base-content focus:ring-success">
-                    <span class="text-xs text-base-content/80">
-                        <span class="font-medium">Desk enabled</span>
-                        <span class="block text-[11px] text-base-content/70">Unticking this keeps the desk and its threads, but mail to its address bounces back to the sender.</span>
-                    </span>
-                </label>
-            </div>
-            <div>
-                <label class="flex items-start gap-2.5 cursor-pointer">
-                    <input type="checkbox" name="add_3rd_party" value="true" {add_3rd_party_checked}
-                        class="mt-0.5 rounded bg-base-200 border-base-300 text-base-content focus:ring-success">
-                    <span class="text-xs text-base-content/80">
-                        <span class="font-medium">Add CC'd outsiders to threads</span>
-                        <span class="block text-[11px] text-base-content/70">Unticking this keeps the desk internal: people outside your team are never added to a thread and are never copied on the agent's reply.</span>
-                    </span>
-                </label>
-            </div>
-            {spam_warning_html}
+            {fields}
             <div class="flex items-center justify-end gap-2">
-                <button type="button" hx-get="/companies/{company_id}/channels/{channel_id}/cancel" hx-target="#channel-{channel_id}" hx-swap="outerHTML"
-                    class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
-                    Cancel
-                </button>
-                <button type="submit"
-                    class="px-4 py-1.5 text-xs font-semibold bg-success hover:bg-success/90 text-success-content rounded-lg transition cursor-pointer">
-                    Save Changes
-                </button>
+                <button type="button" hx-get="/companies/{company_id}/channels/{channel_id}/cancel" hx-target="#channel-{channel_id}" hx-swap="outerHTML" class="btn btn-sm">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-success">Save Changes</button>
             </div>
-        </form>
-        "##,
+        </form>"##,
         channel_id = channel.id,
         company_id = company.id,
-        name = escape_html_attr(&channel.name),
-        slug = escape_html_attr(&channel.slug),
-        enabled_checked = if channel.enabled { "checked" } else { "" },
-        add_3rd_party_checked = if channel.add_3rd_party { "checked" } else { "" },
-        company_slug = escape_html_text(&company.slug),
-        app_domain_name = escape_html_text(app_domain_name),
-        emails_str = escape_html_attr(&emails_str),
     )
 }

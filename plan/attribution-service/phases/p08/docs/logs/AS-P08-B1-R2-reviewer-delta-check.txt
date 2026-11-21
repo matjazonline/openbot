@@ -1,0 +1,2 @@
+R1 files changed by correction: ['services/attribution/REPORTING.md', 'services/attribution/contract/attribution.openapi.json', 'services/attribution/src/adapters/analytics/bounds_tests.rs', 'services/attribution/src/adapters/analytics/dashboard.rs', 'services/attribution/src/adapters/analytics/export.rs', 'services/attribution/src/adapters/analytics/http.rs']
+Full source comparison to p07: same35 paths plus new CSV parser; unaffected R1 hashes unchanged. Coordination23 matches retained R1 pin. PASS.

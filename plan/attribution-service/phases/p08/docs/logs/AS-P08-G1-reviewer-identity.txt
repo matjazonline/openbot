@@ -1,0 +1,7 @@
+AS-P08-G1.snapshot.txt 2712efab34ac16d2a2d368b4d83909d04b57b6e93eaf0740ef8262d6fbfd091d PASS
+AS-P08-G1-reviewer-start.snapshot.txt 2712efab34ac16d2a2d368b4d83909d04b57b6e93eaf0740ef8262d6fbfd091d PASS
+AS-P08-G1-reviewer-end.snapshot.txt 2712efab34ac16d2a2d368b4d83909d04b57b6e93eaf0740ef8262d6fbfd091d PASS
+Decision AS-P08-D1/r1: 69dcc8f4b01b904e3b89352ba1c9d2b498baef6740e7b145ebda6c56651b6a2f
+Main coordination22 pin equals: 944c863c8e323d27498446585ded7aa09847632596ff8761146c7c38bb7b4630
+HEAD/start/base: 6e55258cbbdc7633940805f366fb17fe240f02aa
+git diff --check: PASS

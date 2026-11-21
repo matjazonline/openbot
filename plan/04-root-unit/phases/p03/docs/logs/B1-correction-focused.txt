@@ -1,0 +1,176 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 04s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 141 tests
+test adapters::http::routes::onboarding::tests::onboarding_pages_render_each_step ... ok
+test adapters::persistence::account_identity::tests::account_email_change_with_an_unparseable_old_address_and_no_company_succeeds ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set ... ok
+test adapters::persistence::account_identity::tests::account_email_change_refuses_an_address_another_person_holds ... ok
+test adapters::persistence::account_identity::tests::account_email_change_old_address_is_adopted_by_its_next_owner ... ok
+test adapters::persistence::agent::retire_tests::agent_retire_keeps_messages_participants_and_threads ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes ... ok
+test adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address ... ok
+test adapters::persistence::account_identity::tests::account_email_change_confirmed_moves_trust_in_every_company ... ok
+test adapters::persistence::account_identity::tests::account_email_change_bypass_moves_trust_in_every_company ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval ... ok
+test adapters::persistence::account_identity::tests::account_email_change_races_invite_acceptance ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection ... ok
+test adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... ok
+test adapters::persistence::account_identity::tests::account_email_change_races_inbound_observation ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are_not_discovery ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_without_workflow_freezes_remote_name_policy_and_alias ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision ... ok
+test adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_native_only_needs_no_hosted_connection ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_identical_keys_return_one_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_publishers_choose_one_without_partial_state ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_preview_and_publish_without_a_workflow ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_request_result_is_immutable_and_company_owned ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_result_cannot_reference_another_agent_or_company ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_replay_returns_original_after_newer_activation ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_validation_failure_preserves_active_and_history ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_revoke_deactivate_and_delete_preserve_frozen_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_native_permissions_round_trip_freeze_and_library_copy ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion ... ok
+test adapters::http::routes::onboarding::tests::agent_direct_address_onboarding_completion_reads_back_the_principal ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_holds_draft_and_shared_text_until_commit ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture ... ok
+test adapters::persistence::agent::retire_tests::agent_retire_company_delete_still_removes_everything ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_draft_edit_first_refuses_stale_expected_state ... ok
+test adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_names_the_department_on_a_resubmission ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... ok
+test adapters::persistence::onboarding::tests::department_lead_desk_onboarding_address_collision_with_an_agent_is_rejected ... ok
+test adapters::persistence::onboarding::tests::onboarding_cancellation_drops_provider_and_releases_company_lock ... ok
+
+thread 'adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored' (29103078) panicked at src/adapters/persistence/thread/inbound_tests.rs:676:5:
+assertion `left == right` failed
+  left: (false, 2)
+ right: (false, 1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored ... FAILED
+test adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_that_fails_at_the_intent_leaves_no_thread_message_or_mapping ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_that_fails_at_the_threads_writes_nothing_either ... ok
+test adapters::persistence::thread::inbound_tests::a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding ... ok
+test adapters::persistence::thread::inbound_tests::a_redelivery_returns_the_first_delivery_and_enqueues_nothing_further ... ok
+test adapters::persistence::thread::inbound_tests::a_repeated_key_with_changed_content_is_a_collision_rather_than_a_rewrite ... ok
+test adapters::persistence::thread::inbound_tests::a_reply_observed_before_its_root_wins_the_provider_thread_mapping ... ok
+test adapters::persistence::onboarding::tests::onboarding_library_model_lookup_failure_remains_an_infrastructure_error ... ok
+
+thread 'adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it' (29103147) panicked at src/adapters/persistence/thread/inbound_tests.rs:718:5:
+assertion `left == right` failed
+  left: (true, 1)
+ right: (true, 0)
+test adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it ... FAILED
+test adapters::persistence::thread::inbound_tests::a_stored_event_key_reused_with_a_different_body_is_a_collision ... ok
+test adapters::persistence::thread::inbound_tests::an_association_through_another_channels_binding_names_the_first_bad_pair ... ok
+test adapters::persistence::thread::inbound_tests::an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once ... ok
+test adapters::persistence::thread::inbound_tests::authored_identity_cannot_belong_to_a_different_author_principal ... ok
+test adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_creates_a_fresh_principal ... ok
+test adapters::persistence::thread::inbound_tests::concurrent_different_messages_sharing_a_new_thread_key_open_one_thread ... ok
+test adapters::persistence::onboarding::tests::onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_command ... ok
+test adapters::persistence::onboarding::tests::onboarding_one_connection_progresses_with_real_custom_library_and_competitor ... ok
+test adapters::persistence::onboarding::tests::onboarding_provider_failure_releases_transaction_for_retry ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_custom_competitors_wait_for_company_and_generate_once ... ok
+test adapters::persistence::thread::inbound_tests::inconsistent_multi_binding_message_mappings_are_a_typed_collision ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_agent_rename_is_fresh ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::an_intent_records_disposition_policy_origin_and_relay_trace ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::each_association_gets_one_intent_and_redelivery_adds_none ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::intent_rows_cannot_reach_across_tenants ... ok
+test adapters::persistence::thread::inbound_tests::slack_participant_intents_persist_with_explicit_roles_and_no_email_projection ... ok
+test adapters::persistence::onboarding::tests::onboarding_second_principal_workflow_error_rolls_back_every_effect ... ok
+test adapters::persistence::thread::inbound_tests::two_concurrent_deliveries_of_one_message_produce_one_of_everything ... ok
+test adapters::persistence::thread::inbound_tests::a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message ... ok
+test adapters::persistence::thread::inbound_tests::application_ingress_keeps_identity_locks_and_cannot_fabricate_system_authorship ... ok
+test adapters::persistence::onboarding::tests::onboarding_selection_is_bounded_and_custom_fields_are_paired ... ok
+test adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_ingress_first_keeps_the_agent_and_direct_history ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_retirement_first_refuses_ingress_atomically ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::direct_competing_company_delete_waits_for_ingress_then_cascades_every_direct_effect ... ok
+test adapters::persistence::onboarding::tests::onboarding_prompt_and_operation_timeouts_cancel_and_allow_retry ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::direct_competing_ingress_waits_for_company_delete_then_refuses_without_effects ... ok
+test adapters::persistence::thread::inbound_tests::lease_loss_at_final_commit_rolls_back_every_canonical_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_sql_scope_actor_and_current_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_run_lock_wait_cannot_cross_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_changed_arguments_need_new_call_and_context_changes_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_competing_step_and_tool_prepare_one_intent_restart_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_numeric_jsonb_roundtrip_preserves_digest_and_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_schema_fk_immutable_and_cancelled_new_intent_fail_closed ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::business_member_tests::workflow_reviewer_principal_visible_ordinary_member_parks_and_submits_business_decision ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::security_email_identity_unverified_reviewer_loses_restricted_decision_access ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_delete_preserves_settled_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_nonmember_and_removed_membership_are_hidden ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_blocks_actual_removal_until_notice_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_principal_conversion_before_submit_refuses ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_removal_before_park_settles_unavailable ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_submission_blocks_actual_removal_until_commit ... ok
+proof_expiry_dispatch before_enter=false
+proof_expiry_dispatch elapsed=19.580167ms result=Ok("Ok") calls=0 before={"attempt":{"attempt":2,"generation":"95c087e5-10b5-4e3e-ba1e-4b21a6499c61","id":"3cc5ccc9-e91c-42a8-b250-bcd3fac5d5aa","status":"processing","worker":"228d061d-c6dd-4740-bef4-8cf09d0a2306"},"conflicts":0,"consumptions":0,"entries":1,"execution":{"completed_at":null},"job":{"expires_at":"2026-11-17T09:51:22.969026+00:00","generation":"95c087e5-10b5-4e3e-ba1e-4b21a6499c61","lease_live":true,"retry_count":1,"status":"processing","worker":"228d061d-c6dd-4740-bef4-8cf09d0a2306"},"observed_at":"2026-11-17T09:51:21.722757+00:00","proofs":[{"disposition":"final_not_applied","expired":true,"grant_eligible":true,"id":"b9e932fe-0b46-40f5-9750-29a066231572","valid_until":"2026-11-17T09:51:21.425127+00:00"}],"receipts":0,"requested":{"attempt":2,"generation":"95c087e5-10b5-4e3e-ba1e-4b21a6499c61","worker":"228d061d-c6dd-4740-bef4-8cf09d0a2306"},"run":{"deadline":"2026-11-18T09:51:19.690383+00:00","deadline_live":true,"revision":13,"state":"running"}} after={"attempt":{"attempt":2,"generation":"95c087e5-10b5-4e3e-ba1e-4b21a6499c61","id":"3cc5ccc9-e91c-42a8-b250-bcd3fac5d5aa","status":"processing","worker":"228d061d-c6dd-4740-bef4-8cf09d0a2306"},"conflicts":0,"consumptions":0,"entries":1,"execution":{"completed_at":null},"job":{"expires_at":"2026-11-17T09:51:22.969026+00:00","generation":"95c087e5-10b5-4e3e-ba1e-4b21a6499c61","lease_live":true,"retry_count":1,"status":"processing","worker":"228d061d-c6dd-4740-bef4-8cf09d0a2306"},"observed_at":"2026-11-17T09:51:21.745054+00:00","proofs":[{"disposition":"final_not_applied","expired":true,"grant_eligible":true,"id":"b9e932fe-0b46-40f5-9750-29a066231572","valid_until":"2026-11-17T09:51:21.425127+00:00"}],"receipts":0,"requested":{"attempt":2,"generation":"95c087e5-10b5-4e3e-ba1e-4b21a6499c61","worker":"228d061d-c6dd-4740-bef4-8cf09d0a2306"},"run":{"deadline":"2026-11-18T09:51:19.690383+00:00","deadline_live":true,"revision":13,"state":"running"}}
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::clock_tests::workflow_action_reconciliation_proof_expiry_while_settlement_waits_for_run_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_revocation_serializes_in_both_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_competing_commands_claimants_loss_and_fresh_coverage ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_park_loses_to_inflight_member_removal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_new_consumed_entry_applied_recovery_is_legitimate ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_production_removal_preserves_open_and_settled_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_cancel_commit_crossing_lease_expiry_preserves_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_visibility_revocation_serializes_in_both_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_direct_retry_without_receipt_fails_own_guard ... ok
+proof_expiry_dispatch before_enter=true
+proof_expiry_dispatch elapsed=17.893042ms result=Ok("Ok") calls=0 before={"attempt":{"attempt":2,"generation":"f6d596cb-40f7-41a7-83b9-c352b03825d2","id":"93fa1d3d-681d-4832-b375-e24a564aaa1f","status":"processing","worker":"77f76433-4423-4796-9d21-bf8115d5361f"},"conflicts":0,"consumptions":1,"entries":2,"execution":{"completed_at":null},"job":{"expires_at":"2026-11-17T09:51:31.336352+00:00","generation":"f6d596cb-40f7-41a7-83b9-c352b03825d2","lease_live":true,"retry_count":1,"status":"processing","worker":"77f76433-4423-4796-9d21-bf8115d5361f"},"observed_at":"2026-11-17T09:51:30.029584+00:00","proofs":[{"disposition":"final_not_applied","expired":true,"grant_eligible":true,"id":"40c68513-c2fc-46aa-a223-3f9a26b33677","valid_until":"2026-11-17T09:51:29.778908+00:00"}],"receipts":0,"requested":{"attempt":2,"generation":"f6d596cb-40f7-41a7-83b9-c352b03825d2","worker":"77f76433-4423-4796-9d21-bf8115d5361f"},"run":{"deadline":"2026-11-18T09:51:28.039761+00:00","deadline_live":true,"revision":13,"state":"running"}} after={"attempt":{"attempt":2,"generation":"f6d596cb-40f7-41a7-83b9-c352b03825d2","id":"93fa1d3d-681d-4832-b375-e24a564aaa1f","status":"processing","worker":"77f76433-4423-4796-9d21-bf8115d5361f"},"conflicts":0,"consumptions":1,"entries":2,"execution":{"completed_at":null},"job":{"expires_at":"2026-11-17T09:51:31.336352+00:00","generation":"f6d596cb-40f7-41a7-83b9-c352b03825d2","lease_live":true,"retry_count":1,"status":"processing","worker":"77f76433-4423-4796-9d21-bf8115d5361f"},"observed_at":"2026-11-17T09:51:30.048494+00:00","proofs":[{"disposition":"final_not_applied","expired":true,"grant_eligible":true,"id":"40c68513-c2fc-46aa-a223-3f9a26b33677","valid_until":"2026-11-17T09:51:29.778908+00:00"}],"receipts":0,"requested":{"attempt":2,"generation":"f6d596cb-40f7-41a7-83b9-c352b03825d2","worker":"77f76433-4423-4796-9d21-bf8115d5361f"},"run":{"deadline":"2026-11-18T09:51:28.039761+00:00","deadline_live":true,"revision":13,"state":"running"}}
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::clock_tests::workflow_action_reconciliation_proof_expiry_reservation_enter_and_successful_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_cancel_first_competing_resume_refuses_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_resume_first_competing_cancel_preserves_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_material_transitions_and_heartbeat_noops ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_foreign_scope_and_conflicting_authorized_actor_run_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_ordinary_retry_owner_cascade_keeps_witness_updates_guarded ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_owner_cascade_removes_immutable_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_provider_barrier_competes_with_delayed_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_and_child_creation_both_deterministic_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_competing_open_and_execution_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::jsonb_row_context_checkpoint_reports_persisted_id_and_preserves_neighbor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_deferred_failure_rolls_back_open_and_debit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_fence_and_actor_revocation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_claim_competitors_have_one_owner_and_disposition ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_deferred_faults_roll_back_complete_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_failure_competitors_close_attempt_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_resume_competitors_preserve_event_and_notification ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::clock_tests::workflow_action_reconciliation_proof_verifier_budget_ceiling_cancel_and_drop_are_owned ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::workflow_harness_owner_store_new_claim_retains_checkpoint_and_debits_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_wait_and_retry_deferred_faults_roll_back_complete_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_forged_cancellation_retirement_fails_own_guard ... ok
+
+failures:
+
+failures:
+    adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored
+    adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it
+
+test result: FAILED. 139 passed; 2 failed; 0 ignored; 0 measured; 4608 filtered out; finished in 72.13s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,60 @@
+PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit
+== Case 1: a settlement charges a unit whose department delete is in flight and commits (FK race)
+[settlement] INSERT INTO unit_spend VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d2','day','2026-11-21+00',7) ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=unit_spend.spent_micros+EXCLUDED.spent_micros
+[settlement] ERROR:  insert or update on table "unit_spend" violates foreign key constraint "unit_spend_company_id_unit_id_fkey"
+[settlement] DETAIL:  Key (company_id, unit_id)=(00000000-0000-0000-0000-000000000001, 00000000-0000-0000-0000-0000000000d2) is not present in table "departments".
+[delete] BEGIN
+[delete] BEGIN
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d2'
+[delete] DELETE 1
+[delete] SELECT pg_sleep(1.5)
+[delete]  pg_sleep 
+[delete] ----------
+[delete]  
+[delete] (1 row)
+[delete] 
+[delete] COMMIT
+[delete] COMMIT
+
+== Case 2: a settlement updates the unit's existing day row, then inserts its new month row, while the department delete holds the department row and then deletes it (deadlock)
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] INSERT INTO unit_spend VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d1','day','2026-11-21+00',7) ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=unit_spend.spent_micros+EXCLUDED.spent_micros
+[settlement] INSERT 0 1
+[settlement] INSERT INTO unit_spend VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d1','month','2026-11-01+00',7) ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=unit_spend.spent_micros+EXCLUDED.spent_micros
+[settlement] ERROR:  deadlock detected
+[settlement] DETAIL:  Process 53321 waits for ShareLock on transaction 1455239; blocked by process 53315.
+[settlement] Process 53315 waits for ShareLock on transaction 1455240; blocked by process 53321.
+[settlement] HINT:  See server log for query details.
+[settlement] CONTEXT:  while locking tuple (0,1) in relation "departments"
+[settlement] SQL statement "SELECT 1 FROM ONLY "public"."departments" x WHERE "company_id" OPERATOR(pg_catalog.=) $1 AND "id" OPERATOR(pg_catalog.=) $2 FOR KEY SHARE OF x"
+[settlement] COMMIT
+[settlement] ROLLBACK
+[delete] BEGIN
+[delete] BEGIN
+[delete] SELECT id FROM departments WHERE id='00000000-0000-0000-0000-0000000000d1' FOR UPDATE
+[delete]                   id                  
+[delete] --------------------------------------
+[delete]  00000000-0000-0000-0000-0000000000d1
+[delete] (1 row)
+[delete] 
+[delete] SELECT pg_sleep(1.5)
+[delete]  pg_sleep 
+[delete] ----------
+[delete]  
+[delete] (1 row)
+[delete] 
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d1'
+[delete] DELETE 1
+[delete] COMMIT
+[delete] COMMIT
+
+== Remaining rows
+ id 
+----
+(0 rows)
+
+ unit_id | period | spent_micros 
+---------+--------+--------------
+(0 rows)
+

@@ -1,0 +1,254 @@
+--- B2/src/application/use_cases/agent.rs
++++ B3/src/application/use_cases/agent.rs
+@@ -6,11 +6,14 @@
+ 
+ use crate::{
+     app_error::{AppError, AppResult},
+-    application::workflow::WorkflowActor,
++    application::{
++        use_cases::administration::{ManagementRole, ManagementTarget, require_management},
++        workflow::WorkflowActor,
++    },
+     domain::workflow::CompanyId,
+     entities::{
+         agent::{Agent, MAX_AGENT_SKILLS},
+-        company::Company,
++        agent_capability::AgentId,
+         creation::CreationProvenance,
+         department::{DepartmentId, DepartmentRole},
+         user::{Caller, Viewer},
+@@ -20,12 +23,12 @@
+     use_cases::{
+         caller::require_operator,
+         channel::{SlugKind, validate_slug},
+-        company::{CompanyPersistence, managed_company},
++        company::CompanyPersistence,
+     },
+ };
+ 
+ /// An agent belonging to another company is reported exactly like a missing one, so an id probe
+-/// cannot tell a foreign agent from a nonexistent one. See [`managed_company`].
++/// cannot tell a foreign agent from a nonexistent one. See [`crate::use_cases::company::managed_company`].
+ pub fn agent_not_found() -> AppError {
+     AppError::NotFound("Agent not found in this company.".into())
+ }
+@@ -122,10 +125,23 @@
+ 
+     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
+ 
++    async fn list_managed_agents(
++        &self,
++        actor: WorkflowActor,
++        company: CompanyId,
++    ) -> AppResult<Vec<Agent>>;
++
+     async fn list_library(&self) -> AppResult<Vec<Agent>>;
+ 
++    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
++
++    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()>;
++
++    /// Bare fixture mutation. Production company changes use scoped draft commands.
++    #[cfg(test)]
+     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
+ 
++    #[cfg(test)]
+     async fn delete(&self, id: Uuid) -> AppResult<()>;
+ }
+ 
+@@ -135,6 +151,12 @@
+ pub struct AgentPlacement {
+     pub department: DepartmentId,
+     pub role: Option<DepartmentRole>,
++}
++
++pub(crate) fn placement_target(placement: Option<AgentPlacement>) -> ManagementTarget {
++    placement.map_or(ManagementTarget::Root, |placement| {
++        ManagementTarget::Unit(placement.department)
++    })
+ }
+ 
+ /// A company agent and its directly addressable principal.
+@@ -306,9 +328,26 @@
+         })
+     }
+ 
+-    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
+-        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+-        Ok(())
++    fn verify_manager(
++        &self,
++        user_id: Uuid,
++        company_id: Uuid,
++        target: ManagementTarget,
++    ) -> impl std::future::Future<Output = AppResult<ManagementRole>> + Send + '_ {
++        require_management(
++            self.company_persistence.as_ref(),
++            user_id,
++            CompanyId::new(company_id),
++            target,
++        )
++    }
++
++    fn verify_company_manager(
++        &self,
++        user_id: Uuid,
++        company_id: Uuid,
++    ) -> impl std::future::Future<Output = AppResult<ManagementRole>> + Send + '_ {
++        self.verify_manager(user_id, company_id, ManagementTarget::Root)
+     }
+ 
+     async fn validate_model_selection(
+@@ -347,8 +386,8 @@
+         write: AgentWrite,
+         placement: Option<AgentPlacement>,
+     ) -> AppResult<CreatedAgent> {
+-        let (_, write) = self
+-            .prepared_agent_write(user_id, company_id, write)
++        let write = self
++            .prepared_agent_write(user_id, company_id, write, placement_target(placement))
+             .await?;
+         info!(%company_id, "Creating agent");
+         self.company_agents()?
+@@ -371,10 +410,8 @@
+         company_id: Uuid,
+         write: AgentWrite,
+     ) -> AppResult<AgentWrite> {
+-        let (_, write) = self
+-            .prepared_agent_write(user_id, company_id, write)
+-            .await?;
+-        Ok(write)
++        self.prepared_agent_write(user_id, company_id, write, ManagementTarget::AnyUnit)
++            .await
+     }
+ 
+     /// The company a new agent belongs to, and the write itself normalized and checked.
+@@ -386,15 +423,15 @@
+         user_id: Uuid,
+         company_id: Uuid,
+         mut write: AgentWrite,
+-    ) -> AppResult<(Company, AgentWrite)> {
+-        let company =
+-            managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
++        target: ManagementTarget,
++    ) -> AppResult<AgentWrite> {
++        self.verify_manager(user_id, company_id, target).await?;
+         write.created_by = Some(CreationProvenance::user(user_id));
+         write.normalize()?;
+         self.spam_scanning
+             .check_public_ingress(write.open_to_public, write.confirm_spam_disabled)?;
+         self.validate_model_selection(company_id, &write).await?;
+-        Ok((company, write))
++        Ok(write)
+     }
+ 
+     /// Create one company agent from a global library definition, with its default desk like
+@@ -410,7 +447,8 @@
+         library_agent_id: Uuid,
+         placement: Option<AgentPlacement>,
+     ) -> AppResult<ProvisionedAgent> {
+-        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
++        self.verify_manager(user_id, company_id, placement_target(placement))
++            .await?;
+         let definition = self
+             .get_library_agent(library_agent_id)
+             .await?
+@@ -451,8 +489,14 @@
+         user_id: Uuid,
+         company_id: Uuid,
+     ) -> AppResult<Vec<Agent>> {
+-        self.verify_company_manager(user_id, company_id).await?;
+-        self.agent_persistence.list_by_company_id(company_id).await
++        self.verify_manager(user_id, company_id, ManagementTarget::AnyUnit)
++            .await?;
++        self.agent_persistence
++            .list_managed_agents(
++                WorkflowActor::authenticated(user_id)?,
++                CompanyId::new(company_id),
++            )
++            .await
+     }
+ 
+     pub async fn list_library_agents(&self) -> AppResult<Vec<Agent>> {
+@@ -515,7 +559,9 @@
+             .await?
+             .ok_or_else(agent_not_found)?;
+         write.normalize()?;
+-        self.agent_persistence.update(agent_id, write).await
++        self.agent_persistence
++            .update_library_agent(agent_id, write)
++            .await
+     }
+ 
+     /// Operator only.
+@@ -524,7 +570,7 @@
+         self.get_library_agent(agent_id)
+             .await?
+             .ok_or_else(agent_not_found)?;
+-        self.agent_persistence.delete(agent_id).await
++        self.agent_persistence.delete_library_agent(agent_id).await
+     }
+ 
+     #[instrument(skip_all)]
+@@ -534,13 +580,21 @@
+         company_id: Uuid,
+         agent_id: Uuid,
+     ) -> AppResult<Option<Agent>> {
+-        self.verify_company_manager(user_id, company_id).await?;
+         let agent = self.agent_persistence.get_by_id(agent_id).await?;
+         if let Some(ref ag) = agent
+             && ag.company_id != Some(company_id)
+         {
+             return Ok(None);
+         }
++        if agent.is_none() {
++            return Ok(None);
++        }
++        self.verify_manager(
++            user_id,
++            company_id,
++            ManagementTarget::Agent(AgentId::new(agent_id)),
++        )
++        .await?;
+         Ok(agent)
+     }
+ 
+@@ -587,7 +641,8 @@
+             tools,
+         } = request;
+         let agent_id = agent.as_uuid();
+-        self.verify_company_manager(user_id, company_id).await?;
++        self.verify_manager(user_id, company_id, ManagementTarget::Agent(agent))
++            .await?;
+ 
+         let stored = self
+             .agent_persistence
+@@ -627,7 +682,12 @@
+         company_id: Uuid,
+         agent_id: Uuid,
+     ) -> AppResult<()> {
+-        self.verify_company_manager(user_id, company_id).await?;
++        self.verify_manager(
++            user_id,
++            company_id,
++            ManagementTarget::Agent(AgentId::new(agent_id)),
++        )
++        .await?;
+ 
+         let agent = self
+             .agent_persistence
+@@ -640,7 +700,13 @@
+         }
+ 
+         info!("Deleting agent {} for company {}", agent_id, company_id);
+-        self.agent_persistence.delete(agent_id).await
++        self.draft_persistence
++            .delete_company_agent(crate::application::agent::AgentPublicationScope {
++                company: CompanyId::new(company_id),
++                actor: WorkflowActor::authenticated(user_id)?,
++                agent: AgentId::new(agent_id),
++            })
++            .await
+     }
+ 
+     #[instrument(skip_all)]

@@ -136,6 +136,7 @@ async fn jev_runtime_corrupt_credential_is_terminal_and_optional_agent_usage_rep
             grouping: UsageGrouping::Model,
             agent: None,
             workflow: None,
+            unit: None,
         })
         .await
         .unwrap();

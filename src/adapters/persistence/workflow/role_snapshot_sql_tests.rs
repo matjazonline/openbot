@@ -41,7 +41,7 @@ async fn workflow_role_admission_sql_refusal_codes_and_bounded_payload_match_eve
                 json!({"step":""}),
                 json!({"step":"x".repeat(129)}),
                 json!({"kind":"unknown"}),
-                json!({"role":"owner"}),
+                json!({"role":"unknown"}),
                 json!({"principals":[Uuid::new_v4()]}),
             ] {
                 let mut invalid = payload.clone();
@@ -212,19 +212,24 @@ async fn workflow_role_admission_retained_department_refuses_delete_with_a_histo
         })
         .await
         .unwrap();
+    let root = crate::entities::department::DepartmentId::new(
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(f.company().as_uuid())
+            .fetch_one(f.p().pool())
+            .await
+            .unwrap(),
+    );
     ChannelPersistence::update(
         f.p(),
         ChannelUpdate {
+            actor: binding.target.actor,
             company_id: f.company().as_uuid(),
             channel_id: f.channel,
             write: ChannelWrite {
                 name: "Role intake".into(),
                 slug: "role-intake".into(),
                 enabled: true,
-                ownership: Some(ChannelOwnershipWrite {
-                    department_id: Some(None),
-                    members_only: Some(false),
-                }),
+                department_id: Some(root),
                 ..Default::default()
             },
         },
@@ -246,16 +251,14 @@ async fn workflow_role_admission_retained_department_refuses_delete_with_a_histo
         ChannelPersistence::update(
             f.p(),
             ChannelUpdate {
+                actor: binding.target.actor,
                 company_id: f.company().as_uuid(),
                 channel_id: desk,
                 write: ChannelWrite {
                     name: current.name,
                     slug: current.slug.to_string(),
                     enabled: current.enabled,
-                    ownership: Some(ChannelOwnershipWrite {
-                        department_id: Some(None),
-                        members_only: Some(false),
-                    }),
+                    department_id: Some(root),
                     ..Default::default()
                 },
             },

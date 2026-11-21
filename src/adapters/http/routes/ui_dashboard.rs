@@ -115,6 +115,8 @@ struct Dashboard {
     runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
     runtime_identity: MachineIdentity,
     monitoring: Arc<dyn MonitoringService>,
+    /// Spend counted toward department caps (Plan07 02C).
+    usage: Arc<dyn crate::services::model_usage::ModelUsageStore>,
     config: Arc<AppConfig>,
     user_id: Uuid,
     /// The signed-in account, loaded once for the shell.
@@ -150,6 +152,7 @@ impl FromRequestParts<AppState> for Dashboard {
             runtime_metrics: state.runtime_metrics.clone(),
             runtime_identity: state.runtime_identity.clone(),
             monitoring: state.monitoring.clone(),
+            usage: state.model_usage.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -210,6 +213,8 @@ impl DashboardScope {
                                 crate::entities::access_level::AccessLevel::PUBLIC,
                                 |access| access.access_level,
                             ),
+                            administers_units: managed_access
+                                .is_some_and(|access| access.administers_units),
                             company,
                         }
                     }),
@@ -290,6 +295,8 @@ struct Reading {
     runtime: Option<RuntimeMetricSnapshot>,
     query_health: Option<DatabaseQueryHealth>,
     machine: MachineIdentity,
+    /// A company view's spend by department; `None` for the rollup or a viewer who manages none.
+    unit_spend: Option<(Vec<crate::services::model_usage::UnitBudgetStatus>, bool)>,
 }
 
 impl Dashboard {
@@ -313,6 +320,22 @@ impl Dashboard {
             query_health: load_query_health(self.database_query_health.as_ref(), operator, company)
                 .await,
             machine: self.runtime_identity.clone(),
+            unit_spend: match company {
+                Some(company) => match self
+                    .usage
+                    .unit_spend(crate::services::model_usage::UsageScope {
+                        company,
+                        actor: self.user_id,
+                    })
+                    .await
+                {
+                    Ok(spend) => Some(spend),
+                    // An operator looking at a company they manage nothing in.
+                    Err(AppError::NotFound(_)) => None,
+                    Err(error) => return Err(error),
+                },
+                None => None,
+            },
         })
     }
 }
@@ -366,6 +389,10 @@ fn render(
         machine: &reading.machine,
         departments: &scope.departments,
         department: scope.department,
+        unit_spend: reading
+            .unit_spend
+            .as_ref()
+            .map(|(spend, cut)| (spend.as_slice(), *cut)),
     })
 }
 

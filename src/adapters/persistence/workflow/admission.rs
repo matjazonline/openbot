@@ -30,14 +30,22 @@ impl WorkflowAdmission for PostgresPersistence {
                 .execute(&mut *tx)
                 .await?;
         }
-        authority::authorize_company(&mut tx, command.company_id(), command.actor()).await?;
-        association::authorize_association(
+        management::authorize_association_on(
             &mut tx,
             command.company_id(),
             command.actor(),
             command.association(),
         )
         .await?;
+        if !matches!(command.admission_claim(), Some(AdmissionClaim::Message(_))) {
+            association::authorize_association(
+                &mut tx,
+                command.company_id(),
+                command.actor(),
+                command.association(),
+            )
+            .await?;
+        }
         admission_source::authorize(&mut tx, command).await?;
         if !claim_holds(&mut tx, command).await? {
             tx.rollback().await?;
@@ -63,7 +71,18 @@ impl WorkflowAdmission for PostgresPersistence {
             return Ok(AdmissionResult::Stale);
         }
         authorize_token_reviewers(&mut tx, command).await?;
-        resources::check_readiness(&mut tx, command.binding().as_ref().into()).await?;
+        let reach =
+            resources::association_reach_on(&mut tx, command.company_id(), command.association())
+                .await?;
+        resources::check_readiness(
+            &mut tx,
+            resources::ReadinessSelection::of(
+                command.binding().as_ref(),
+                reach,
+                crate::app_error::UnitCheckStage::Admission,
+            ),
+        )
+        .await?;
         if let Err(error) = admission_write::create(&mut tx, command, &source).await {
             if let AppError::WorkflowRole(refusal) = &error {
                 if !admission_refusal::record_on(&mut tx, command, &source, refusal).await? {

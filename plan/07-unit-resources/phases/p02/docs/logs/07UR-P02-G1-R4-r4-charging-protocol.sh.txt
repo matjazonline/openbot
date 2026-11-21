@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# 07UR-P02-G1-R4: the r4 charging protocol on a reduced schema: deferred constraint trigger, no
+# department locks, no unit_spend FK to departments, AFTER DELETE ON departments removes the
+# unit's totals; a unit not found charges the root; numeric saturating sum.
+set -u
+L="$1"; DB=openbot_p07_p02g_r4
+p() { psql -h 127.0.0.1 -p 55407 -U mac02 -X "$@"; }
+C=00000000-0000-0000-0000-000000000001
+U() { echo "00000000-0000-0000-0000-0000000000$1"; }
+p -d postgres -qc "DROP DATABASE IF EXISTS $DB" 2>/dev/null; p -d postgres -qc "CREATE DATABASE $DB"
+p -d $DB -q -v ON_ERROR_STOP=1 <<SQL
+CREATE TABLE companies (id uuid PRIMARY KEY);
+INSERT INTO companies VALUES ('$C');
+CREATE TABLE departments (company_id uuid NOT NULL REFERENCES companies(id), id uuid PRIMARY KEY, parent_id uuid, is_root boolean NOT NULL DEFAULT false,
+  UNIQUE (company_id, id), FOREIGN KEY (company_id, parent_id) REFERENCES departments(company_id, id));
+CREATE TABLE unit_spend (company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE, unit_id uuid NOT NULL, period text NOT NULL,
+  period_start timestamptz NOT NULL, spent_micros bigint NOT NULL DEFAULT 0 CHECK (spent_micros >= 0),
+  PRIMARY KEY (company_id, unit_id, period, period_start));
+CREATE FUNCTION remove_unit_spend() RETURNS trigger LANGUAGE plpgsql AS \$\$
+BEGIN DELETE FROM unit_spend WHERE company_id = OLD.company_id AND unit_id = OLD.id; RETURN NULL; END \$\$;
+CREATE TRIGGER departments_remove_spend AFTER DELETE ON departments FOR EACH ROW EXECUTE FUNCTION remove_unit_spend();
+CREATE TABLE usage_calls (company_id uuid NOT NULL, request_id uuid PRIMARY KEY, unit_id uuid NOT NULL,
+  requested_at timestamptz NOT NULL DEFAULT statement_timestamp(), cost bigint NOT NULL, settled_at timestamptz);
+CREATE FUNCTION charge_settled_call() RETURNS trigger LANGUAGE plpgsql AS \$\$
+DECLARE chain uuid[];
+BEGIN
+  WITH RECURSIVE up(id, parent_id, depth) AS (
+      SELECT id, parent_id, 1 FROM departments WHERE company_id = NEW.company_id AND id = NEW.unit_id
+      UNION ALL SELECT d.id, d.parent_id, up.depth + 1 FROM departments AS d JOIN up ON d.id = up.parent_id
+      WHERE d.company_id = NEW.company_id AND up.depth < 8)
+  SELECT array_agg(id) INTO chain FROM up;
+  IF chain IS NULL THEN
+    SELECT ARRAY[id] INTO chain FROM departments WHERE company_id = NEW.company_id AND is_root;
+  END IF;
+  INSERT INTO unit_spend(company_id, unit_id, period, period_start, spent_micros)
+  SELECT NEW.company_id, unit, period.name, period.start, NEW.cost
+  FROM unnest(chain) AS unit, (VALUES ('day', date_trunc('day', NEW.requested_at, 'UTC')),
+                                      ('month', date_trunc('month', NEW.requested_at, 'UTC'))) AS period(name, start)
+  ORDER BY unit, period.name
+  ON CONFLICT (company_id, unit_id, period, period_start) DO UPDATE
+     SET spent_micros = LEAST(unit_spend.spent_micros::numeric + EXCLUDED.spent_micros, 9223372036854775807)::bigint;
+  RETURN NULL;
+END \$\$;
+CREATE CONSTRAINT TRIGGER usage_charge AFTER UPDATE OF settled_at ON usage_calls
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+  WHEN (OLD.settled_at IS NULL AND NEW.settled_at IS NOT NULL) EXECUTE FUNCTION charge_settled_call();
+INSERT INTO departments VALUES ('$C','$(U a0)',NULL,true);
+INSERT INTO departments VALUES ('$C','$(U b0)','$(U a0)',false);
+INSERT INTO departments SELECT '$C', ('00000000-0000-0000-0000-0000000000d'||n)::uuid, '$(U b0)', false FROM generate_series(1,6) n;
+INSERT INTO departments SELECT '$C', ('00000000-0000-0000-0000-0000000001'||lpad(n::text,2,'0'))::uuid, '$(U a0)', false FROM generate_series(1,16) n;
+SQL
+call() { p -d $DB -qAtc "INSERT INTO usage_calls(company_id,request_id,unit_id,cost,requested_at) VALUES ('$C','$1','$2',$3,'$4')"; }
+settle() { p -d $DB -a -c '\timing on' -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='$1'" -c "COMMIT" 2>&1; }
+totals() { p -d $DB -c "SELECT CASE unit_id WHEN '$(U a0)' THEN 'root' WHEN '$(U b0)' THEN 'parent' ELSE (SELECT CASE WHEN EXISTS (SELECT 1 FROM departments WHERE id=unit_id) THEN 'unit '||right(unit_id::text,2) ELSE 'ORPHAN '||right(unit_id::text,2) END) END AS unit, period, sum(spent_micros) AS spent, count(*) AS rows FROM unit_spend GROUP BY 1,2 ORDER BY 1,2"; }
+seed() { p -d $DB -qc "INSERT INTO unit_spend VALUES ('$C','$1','month','2026-11-01+00',1),('$C','$1','day','2026-11-21+00',1)"; }  # month row first in heap order
+{
+p -d $DB -Atc "SELECT version()"
+echo "== 3a: charge commits, then the unit is deleted"
+call 30000000-0000-0000-0000-00000000000a "$(U d1)" 100 '2026-11-21 10:00+00'
+settle 30000000-0000-0000-0000-00000000000a | sed 's/^/[settlement] /'
+p -d $DB -a -c "DELETE FROM departments WHERE id='$(U d1)'"
+totals
+echo "== 3b: delete commits, then a call recorded on the deleted unit settles"
+call 30000000-0000-0000-0000-00000000000b "$(U d1)" 1000 '2026-11-21 10:00+00'
+settle 30000000-0000-0000-0000-00000000000b | sed 's/^/[settlement] /'
+totals
+echo
+echo "== 3c (between): delete executed (its trigger removed the unit's rows) but not committed while the settlement commits"
+seed "$(U d2)"
+call 30000000-0000-0000-0000-00000000000c "$(U d2)" 10000 '2026-11-21 10:00+00'
+( p -d $DB -a -c "BEGIN" -c "DELETE FROM departments WHERE id='$(U d2)'" -c "SELECT pg_sleep(1.0)" -c "COMMIT" > "$L.d" 2>&1 ) &
+sleep 0.4
+settle 30000000-0000-0000-0000-00000000000c | sed 's/^/[settlement] /'
+wait; sed 's/^/[delete] /' "$L.d"
+totals
+echo
+echo "== 3d (between, other order): the settlement's commit holds the unit's rows while the delete runs"
+p -d $DB -qc "CREATE TABLE pause(on_ boolean)"; p -d $DB -qc "INSERT INTO pause VALUES (true)"
+p -d $DB -qc "CREATE FUNCTION pause_after_charge() RETURNS trigger LANGUAGE plpgsql AS \$\$ BEGIN IF (SELECT on_ FROM pause) THEN PERFORM pg_sleep(1.0); END IF; RETURN NULL; END \$\$"
+p -d $DB -qc "CREATE CONSTRAINT TRIGGER zz_pause AFTER UPDATE OF settled_at ON usage_calls DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (OLD.settled_at IS NULL AND NEW.settled_at IS NOT NULL) EXECUTE FUNCTION pause_after_charge()"
+seed "$(U d3)"
+call 30000000-0000-0000-0000-00000000000d "$(U d3)" 100000 '2026-11-21 10:00+00'
+( settle 30000000-0000-0000-0000-00000000000d > "$L.s" ) &
+sleep 0.4
+p -d $DB -a -c '\timing on' -c "DELETE FROM departments WHERE id='$(U d3)'" 2>&1 | sed 's/^/[delete] /'
+wait; sed 's/^/[settlement] /' "$L.s"
+p -d $DB -qc "UPDATE pause SET on_=false"
+totals
+echo
+echo "== 5: a department row held FOR UPDATE (member change in progress) while a settlement in its subtree commits"
+call 50000000-0000-0000-0000-000000000001 "$(U d4)" 3 '2026-11-21 10:00+00'
+( p -d $DB -a -c "BEGIN" -c "SELECT id FROM departments WHERE id IN ('$(U a0)','$(U b0)','$(U d4)') FOR UPDATE" -c "SELECT pg_sleep(1.5)" -c "COMMIT" > "$L.e" 2>&1 ) &
+sleep 0.3
+settle 50000000-0000-0000-0000-000000000001 | sed 's/^/[settlement] /'
+wait
+echo
+echo "== 6: delete vs settlement vs another charge holding the unit's month row (delete visits rows in heap order: month before day)"
+seed "$(U d5)"
+call 60000000-0000-0000-0000-000000000001 "$(U d5)" 7 '2026-11-21 10:00+00'
+p -d $DB -Atc "EXPLAIN (COSTS OFF) DELETE FROM unit_spend WHERE company_id='$C' AND unit_id='$(U d5)'" | sed 's/^/[plan] /'
+( p -d $DB -a -c "BEGIN" -c "SELECT period FROM unit_spend WHERE unit_id='$(U d5)' AND period='month' FOR UPDATE" -c "SELECT pg_sleep(1.0)" -c "COMMIT" > "$L.z" 2>&1 ) &
+sleep 0.2
+( p -d $DB -a -c '\timing on' -c "DELETE FROM departments WHERE id='$(U d5)'" > "$L.x" 2>&1 ) &
+sleep 0.2
+settle 60000000-0000-0000-0000-000000000001 | sed 's/^/[settlement] /'
+wait; sed 's/^/[delete] /' "$L.x"; sed 's/^/[other charge] /' "$L.z" | grep -v '^\[other charge\] *$'
+totals
+echo
+echo "== 4: 16 concurrent settlements on sibling units"
+p -d $DB -qc "DELETE FROM unit_spend"
+for n in $(seq -w 1 16); do call "40000000-0000-0000-0000-0000000000$n" "00000000-0000-0000-0000-0000000001$n" "$((10#$n))" '2026-11-21 10:00+00'; done
+for n in $(seq -w 1 16); do ( p -d $DB -qAt -c "BEGIN" -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='40000000-0000-0000-0000-0000000000$n'" -c "COMMIT" > "$L.c$n" 2>&1; echo "exit $?" >> "$L.c$n" ) & done
+wait; cat "$L".c* | sort | uniq -c
+p -d $DB -c "SELECT period, spent_micros AS root_total, 136 AS expected FROM unit_spend WHERE unit_id='$(U a0)' ORDER BY period"
+echo "== saturation"
+p -d $DB -qc "UPDATE unit_spend SET spent_micros=9223372036854775800 WHERE unit_id='$(U a0)' AND period='day'"
+call 70000000-0000-0000-0000-000000000001 "$(U a0)" 100 '2026-11-21 10:00+00'
+p -d $DB -a -c "UPDATE usage_calls SET settled_at=now() WHERE request_id='70000000-0000-0000-0000-000000000001'"
+p -d $DB -Atc "SELECT 'root day total: '||spent_micros FROM unit_spend WHERE unit_id='$(U a0)' AND period='day'"
+echo "== company teardown removes totals"
+p -d $DB -a -c "BEGIN" -c "DELETE FROM usage_calls" -c "DELETE FROM unit_spend WHERE false" -c "ALTER TABLE departments DROP CONSTRAINT departments_company_id_parent_id_fkey" -c "DELETE FROM departments" -c "DELETE FROM companies" -c "SELECT count(*) AS unit_spend_rows FROM unit_spend" -c "ROLLBACK"
+} > "$L" 2>&1
+rm -f "$L".d "$L".s "$L".e "$L".x "$L".z "$L".c*; p -d postgres -qc "DROP DATABASE $DB"

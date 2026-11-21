@@ -63,12 +63,12 @@ async fn cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_f
     };
     let withdrawal = async {
         barrier.wait().await;
-        sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-            .bind(c.f.company)
-            .bind(c.f.admin)
-            .execute(&c.f.database.pool)
-            .await
-            .unwrap();
+        crate::adapters::persistence::test_support::revoke_membership_now(
+            &c.f.database.pool,
+            c.f.company,
+            c.f.admin,
+        )
+        .await;
     };
     let (delivery, ()) = tokio::join!(delivery, withdrawal);
     let state:(Option<String>,Option<DateTime<Utc>>)=sqlx::query_as("SELECT outcome,delivery_attempted_at FROM local_agent_operations WHERE company_id=$1 AND id=$2")

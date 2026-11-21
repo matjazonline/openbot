@@ -159,15 +159,14 @@ async fn assistant_channel_route_maps_results_and_refusals() {
         .await
         .unwrap()
         .id;
-    sqlx::query(
-        "INSERT INTO company_members(id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    crate::adapters::persistence::test_support::insert_root_member(
+        f.persistence.pool(),
+        crate::domain::workflow::CompanyId::new(f.company),
+        member,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(f.company)
-    .bind(member)
-    .execute(f.persistence.pool())
-    .await
-    .unwrap();
+    .await;
     assert_eq!(
         f.post(member, body("k4", "support", "member-desk")).await.0,
         StatusCode::NOT_FOUND

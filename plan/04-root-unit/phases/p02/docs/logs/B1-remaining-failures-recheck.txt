@@ -1,0 +1,81 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 9 tests
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider ... FAILED
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places ... FAILED
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level ... FAILED
+test adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed ... FAILED
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message ... FAILED
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use ... FAILED
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed ... FAILED
+
+failures:
+
+---- adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider stdout ----
+
+thread 'adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider' (28610120) panicked at src/adapters/persistence/address_tests/rejoin.rs:288:5:
+assertion `left == right` failed
+  left: 6
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places stdout ----
+
+thread 'adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places' (28610118) panicked at src/adapters/persistence/address_tests/rejoin.rs:243:5:
+assertion `left == right` failed
+  left: 6
+ right: 2
+
+---- adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level' (28610126) panicked at src/adapters/persistence/workflow/knowledge_message_tests.rs:128:90:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23505", message: "duplicate key value violates unique constraint \"participant_identities_qualified_key\"", detail: Some("Key (company_id, transport, namespace, subject)=(cd12d45d-4bc6-4bdd-b9a7-257da14d8c75, email, email, 59ed98d4b195467da18084b6fb5030c2@example.test) already exists."), hint: None, position: None, where: None, schema: Some("public"), table: Some("participant_identities"), column: None, data_type: None, constraint: Some("participant_identities_qualified_key"), file: Some("nbtinsert.c"), line: Some(673), routine: Some("_bt_check_unique") })
+
+---- adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed' (28610121) panicked at src/adapters/persistence/local_agents/management/tests.rs:159:5:
+assertion failed: matches!(p.delete_profile(s.f.owner, s.f.company, s.profile.id).await,
+    Err(AppError::Conflict(_)))
+
+---- adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message' (28610125) panicked at src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs:30:123:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23505", message: "duplicate key value violates unique constraint \"participant_identities_qualified_key\"", detail: Some("Key (company_id, transport, namespace, subject)=(18ea3b77-cb0d-4ac9-a86c-536b07c626a1, email, email, bdacbc09ef524bf29c4f4218c8ae1d22@example.test) already exists."), hint: None, position: None, where: None, schema: Some("public"), table: Some("participant_identities"), column: None, data_type: None, constraint: Some("participant_identities_qualified_key"), file: Some("nbtinsert.c"), line: Some(673), routine: Some("_bt_check_unique") })
+
+---- adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal stdout ----
+
+thread 'adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal' (28610122) panicked at src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs:71:14:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "40P01", message: "deadlock detected", detail: Some("Process 37932 waits for ShareLock on transaction 999058; blocked by process 37933.\nProcess 37933 waits for ShareLock on transaction 999056; blocked by process 37932."), hint: Some("See server log for query details."), position: None, where: Some("while locking tuple (0,1) in relation \"companies\"\nSQL statement \"SELECT company.user_id                    FROM public.companies AS company\n    WHERE company.id = tenant FOR NO KEY UPDATE\"\nPL/pgSQL function guard_root_roles() line 8 at SQL statement\nSQL statement \"DELETE FROM public.department_roles AS holder\n     WHERE holder.company_id = NEW.company_id AND holder.principal_id = NEW.id\"\nPL/pgSQL function department_principal_demoted() line 6 at SQL statement"), schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("deadlock.c"), line: Some(1138), routine: Some("DeadLockReport") })
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use' (28610123) panicked at src/adapters/persistence/workflow/agent_history_identity_tests.rs:155:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"department_members\" violates foreign key constraint \"companies_owner_member_fk\" on table \"companies\"", detail: Some("Key (company_id, root_user_id)=(b065ea50-fafd-4bb3-9406-2dfe8818fab2, 9239ef15-1cf4-4617-a38d-d30d7b71cee0) is still referenced from table \"companies\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("companies"), column: None, data_type: None, constraint: Some("companies_owner_member_fk"), file: Some("ri_triggers.c"), line: Some(2865), routine: Some("ri_ReportViolation") })
+
+---- adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed' (28610124) panicked at src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs:30:123:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23505", message: "duplicate key value violates unique constraint \"participant_identities_qualified_key\"", detail: Some("Key (company_id, transport, namespace, subject)=(82c85dd3-7034-44fd-a120-249a54026616, email, email, 129f0725ca284bf4a35c4bc5401e0119@example.test) already exists."), hint: None, position: None, where: None, schema: Some("public"), table: Some("participant_identities"), column: None, data_type: None, constraint: Some("participant_identities_qualified_key"), file: Some("nbtinsert.c"), line: Some(673), routine: Some("_bt_check_unique") })
+
+
+failures:
+    adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places
+    adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider
+    adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed
+    adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use
+    adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed
+    adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message
+    adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level
+
+test result: FAILED. 1 passed; 8 failed; 0 ignored; 0 measured; 4737 filtered out; finished in 3.59s
+
+error: test failed, to rerun pass `--lib`

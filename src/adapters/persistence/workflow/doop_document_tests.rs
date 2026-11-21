@@ -80,7 +80,7 @@ async fn guide_skills(f: &Fixture) -> Vec<Uuid> {
     let mut ids = Vec::new();
     for (index, instructions) in GUIDES.iter().enumerate() {
         let skill = SkillManagementPersistence::create_company(
-            &f.persistence, f.target.company.as_uuid(), SkillWrite {
+            &f.persistence, f.target.company.as_uuid(), f.persistence.test_root_unit(f.target.company.as_uuid()).await, SkillWrite {
                 files: None,
                 slug: format!("doop-document-guide-{}", index + 1),
                 name: format!("Doop document guide {}/3", index + 1),

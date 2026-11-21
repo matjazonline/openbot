@@ -14,8 +14,9 @@ impl PublicationDirectory for StepBuiltinPublicationDirectory {
         draft: &CompanyWorkflowDraft,
     ) -> AppResult<PublicationDependencies> {
         tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            let mut tx = self.persistence.pool().begin().await?;
-            super::authority::authorize_company(&mut tx, draft.company(), actor).await?;
+            let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
+            management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
+                .await?;
             tx.commit().await?;
             dependencies(draft.company())
         })

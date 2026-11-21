@@ -7,3 +7,6 @@ integrations/doop/document-guide-1.md whitespace=-blank-at-eof
 integrations/doop/document-guide-2.md whitespace=-blank-at-eof
 # Verification artifacts retain exact bytes, including spacing covered by evidence hashes.
 plan/03-principal-addresses/phases/p04/docs/logs/** -text -whitespace
+plan/04-root-unit/phases/p02/docs/logs/** -text -whitespace
+plan/04-root-unit/phases/p03/docs/logs/** -text -whitespace
+plan/05-scopes/phases/*/docs/logs/** -text -whitespace

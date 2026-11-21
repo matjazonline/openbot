@@ -72,22 +72,18 @@ fn revoking(
     )
 }
 
-/// The run actor (the owner) loses owner and admin authority: ownership moves to the recipient in
-/// one script, demoting the old owner row before promoting the new one (one owner row at a time).
+/// Ownership moves to the recipient; the root owner mirror follows in the same transaction.
 fn demote(setup: &Setup) -> String {
     let company = setup.scope().company.as_uuid();
     format!(
-        "UPDATE company_members SET role='member' WHERE company_id='{company}' AND user_id='{owner}'; \
-         UPDATE company_members SET role='owner', access_level=9 WHERE company_id='{company}' AND user_id='{user}'; \
-         UPDATE companies SET user_id='{user}' WHERE id='{company}'",
-        user = setup.user,
-        owner = setup.owner,
+        "UPDATE companies SET user_id='{user}' WHERE id='{company}'",
+        user = setup.user
     )
 }
 
 fn unseat(setup: &Setup) -> String {
     format!(
-        "DELETE FROM company_members WHERE company_id='{}' AND user_id='{}'",
+        "UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id='{}' AND user_id='{}'",
         setup.scope().company.as_uuid(),
         setup.user
     )

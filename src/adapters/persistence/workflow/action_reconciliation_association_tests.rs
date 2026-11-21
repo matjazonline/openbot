@@ -2,7 +2,6 @@
 use super::proof_tests::all_tables;
 use super::*;
 use crate::adapters::persistence::workflow::tests::admission_tests::admission_history_tests::Conversation;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::{
     RelatedChannelId, RelatedThreadId, WorkflowAuthorization, WorkflowOperation,
@@ -83,11 +82,11 @@ async fn associated(kind: AssociationKind) -> Associated {
         .execute(f.persistence().pool())
         .await
         .unwrap();
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(conversation.channel)
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        f.persistence().pool(),
+        conversation.channel,
+    )
+    .await;
     sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) SELECT $1,$2,id,'view','configured_allowlist' FROM principals WHERE company_id=$1 AND user_id=$3")
         .bind(scope.company.as_uuid()).bind(conversation.channel).bind(admin.user_id()).execute(f.persistence().pool()).await.unwrap();
     let verifier = Arc::new(ObservedVerifier::new(ledger(&f, &request).await));
@@ -127,7 +126,7 @@ async fn foreign_associations(f: &AdmissionFixture) -> ForeignAssociations {
     )
     .await
     .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         f.persistence(),
         foreign.id,
         ChannelWrite {

@@ -1,0 +1,44 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 57s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 30 tests
+test adapters::http::routes::channel::authorization_tests::delegated::delegated_admin_desk_json_routes_allow_the_unit_lead_and_hide_siblings_and_foreign_ids ... ok
+test adapters::http::routes::channel::authorization_tests::delegated::delegated_admin_schedule_json_routes_scope_configuration_to_the_desk_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::boundaries::delegated_admin_unit_lead_cannot_inspect_root_owned_resources ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::manages_unit_collection_entry_never_grants_an_individual_target ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_persistence_refuses_every_sibling_write ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_desk_crud_follows_the_managed_subtree_without_conversation_view ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_desk_persistence_checks_current_destination_and_foreign_ownership ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_parent_member_and_role_boundaries ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_agent_placements_use_any_managed_unit_and_no_unit_uses_root ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_reaches_the_eighth_level_and_rejects_a_ninth ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_refuses_sibling_and_foreign_writers ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_hides_foreign_ids_in_the_local_scope ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_desk_edit_holds_authority_until_commit ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_configuration_and_lists_follow_managed_units_without_view ... ok
+test adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_current_person_hierarchy_and_tenant_matrix ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_agent_lead_transitions_configure_without_conversation_access ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::boundaries::delegated_admin_direct_nested_writers_hide_siblings_and_foreign_targets ... ok
+test adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_role_removal_precedes_a_desk_edit ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_competing_lead_removal_precedes_a_locked_management_write ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_competing_role_removal_precedes_schedule_configuration ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_run_inspection_and_initiation_require_current_human_view ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::delegated_schedule::delegated_admin_schedule_claim_requires_human_view_before_both_admission_boundaries ... ok
+test adapters::persistence::workflow::tests::schedule_tests::configuration_authority::schedule_management_separates_configuration_from_human_view ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_current_model_source ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_initial_preparation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_current_model_authority_fences_grant_removal ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_model_source_never_borrows_owned_reply_proof_for_other_runs ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_reply_missing_agent_grant_never_enters_the_provider ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 4747 filtered out; finished in 13.36s
+

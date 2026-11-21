@@ -1,0 +1,5 @@
+≈ tailwindcss v4.1.12
+
+/*! 🌼 daisyUI 5.0.50 */
+Done in 255ms
+Generated CSS is current: PASS

@@ -9,7 +9,6 @@ use crate::adapters::persistence::{
     PostgresPersistence,
     test_support::{OwnDatabase, own_database},
 };
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::registry;
 use crate::infra::config::AppConfig;
@@ -73,27 +72,15 @@ pub(super) async fn teammate(p: &PostgresPersistence, company: Uuid, role: &str)
         .await
         .unwrap()
         .id;
-    sqlx::query(
-        "INSERT INTO company_members(id, company_id, user_id, role) VALUES ($1, $2, $3, $4)",
+    crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(company),
+        user,
+        (role).parse().expect("fixture role"),
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(company)
-    .bind(user)
-    .bind(role)
-    .execute(p.pool())
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO principals(id, company_id, kind, user_id, display_label) \
-         VALUES ($1, $2, 'person', $3, $4)",
-    )
-    .bind(Uuid::new_v4())
-    .bind(company)
-    .bind(user)
-    .bind(role)
-    .execute(p.pool())
-    .await
-    .unwrap();
+    .await;
+
     user
 }
 
@@ -402,3 +389,6 @@ mod run_filter_tests;
 mod tenancy_tests;
 #[path = "tool_tests.rs"]
 mod tool_tests;
+
+#[path = "delegated_definition_tests.rs"]
+mod delegated_definitions;

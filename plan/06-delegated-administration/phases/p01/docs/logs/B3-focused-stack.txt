@@ -1,0 +1,21 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+running the test suite with a 2048 KiB thread stack
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 8 tests
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_agent_lead_transitions_configure_without_conversation_access ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_library_copy_uses_managed_placement_and_root_when_unplaced ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_persistence_refuses_sibling_foreign_agent_and_library_bypasses ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate ... ok
+test adapters::http::routes::agent::api_tests::delegated::delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::construction::delegated_admin_agent_creation_rolls_back_early_membership_and_publications_on_final_grant_failure ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::delegated_builder::delegated_admin_builder_uses_actual_lead_requester_for_creation_listing_and_root_desk_refusal ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4802 filtered out; finished in 17.66s

@@ -1,0 +1,41 @@
+PROBE before source line 39
+PROBE before source line 42
+PROBE before source line 43
+PROBE before source line 46
+PROBE before source line 51
+PROBE before source line 52
+PROBE before source line 53
+PROBE before source line 54
+PROBE before source line 56
+PROBE before source line 59
+PROBE before source line 61
+PROBE before source line 62
+PROBE before source line 61
+PROBE before source line 62
+PROBE before source line 70
+PROBE before source line 73
+PROBE before source line 76
+PROBE before source line 78
+PROBE before source line 79
+PROBE before source line 80
+PROBE before source line 22
+PROBE before source line 24
+PROBE before source line 83
+PROBE before source line 84
+PROBE before source line 85
+PROBE before source line 88
+PROBE before source line 89
+PROBE before source line 91
+PROBE before source line 22
+PROBE before source line 24
+PROBE before source line 92
+PROBE before source line 95
+✔ library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable (569.803459ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 749.566625

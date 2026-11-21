@@ -1,0 +1,49 @@
+Library discovery: 4782 -> 4810; added 28; removed 0
+ADDED:
+adapters::http::routes::agent::api_tests::delegated::delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets
+adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_capture_uses_existing_authority_before_creation_permission
+adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_prepared_writers_recheck_current_binding_authority
+adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_old_binding_revisions_confer_no_authority
+adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_sibling_foreign_missing_and_agent_writes_hide_revision_conflicts
+adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_unbound_crud_uses_the_recorded_creating_unit
+adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds
+adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_ownership_is_immutable_tenant_scoped_and_root_defaulted
+adapters::http::routes::workflows::tests::delegated_definitions::manages_unit_definition_uses_any_active_binding_and_recorded_unit_only_when_unbound
+adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_binding_deactivation_precedes_definition_publication
+adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_binding_deactivation
+adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_role_removal
+adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_role_removal_precedes_definition_publication
+adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_follows_active_bindings_without_adopting_ownership
+adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_requires_current_target_authority
+adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_existing_create_collisions_require_current_management
+adapters::persistence::department::tests::delegated_administration::agents::construction::delegated_admin_agent_creation_rolls_back_early_membership_and_publications_on_final_grant_failure
+adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view
+adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_library_copy_uses_managed_placement_and_root_when_unplaced
+adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate
+adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_persistence_refuses_sibling_foreign_agent_and_library_bypasses
+adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_construction_finishes_before_role_removal
+adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_deletion_precedes_role_removal
+adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_draft_write_precedes_role_removal
+adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_construction
+adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_deletion
+adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_draft_write
+adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::delegated_builder::delegated_admin_builder_uses_actual_lead_requester_for_creation_listing_and_root_desk_refusal
+REMOVED:
+B3-definitions-focused-initial.txt: failed 1; failed names absent from current PASS []
+adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds
+B3-delegated-corrected-v2.txt: failed 3; failed names absent from current PASS []
+adapters::http::routes::agent::api_tests::delegated::delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets
+adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view
+adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate
+B3-delegated-final.txt: failed 1; failed names absent from current PASS []
+adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::delegated_builder::delegated_admin_builder_uses_actual_lead_requester_for_creation_listing_and_root_desk_refusal
+B3-affected-interfaces.txt: failed 9; failed names absent from current PASS []
+adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path
+adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department
+adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences
+adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry
+adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches
+adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once
+adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer
+adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once
+adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::delegated_builder::delegated_admin_builder_uses_actual_lead_requester_for_creation_listing_and_root_desk_refusal

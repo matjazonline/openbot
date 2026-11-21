@@ -1,0 +1,37 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (30.561459ms)
++ cargo sqlx prepare --check -- --locked --offline --all-targets
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 4.29s
++ cargo fmt --all -- --check
++ cargo check --locked --offline --all-targets
+    Finished `dev` profile [unoptimized] target(s) in 0.14s
++ /private/tmp/as-p02-contract-clean/bin/python scripts/boundary.py
+SQL table outside owned migrations/catalog: data in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: data in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: lateral in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: lateral in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: lateral in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: lateral in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: lateral in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: lateral in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: lateral in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: facts in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: groups in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: page in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: data in src/adapters/analytics/query.rs
+SQL table outside owned migrations/catalog: joined in src/adapters/analytics/query.rs
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 51, in <module>
+    main()
+    ~~~~^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 37, in main
+    run(sys.executable, "scripts/boundary.py", env=offline)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 15, in run
+    result = subprocess.run(args, cwd=ROOT, env=env, check=True, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '('/private/tmp/as-p02-contract-clean/bin/python', 'scripts/boundary.py')' returned non-zero exit status 1.

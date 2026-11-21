@@ -1,0 +1,103 @@
+--- B2/src/adapters/persistence/agent.rs
++++ B3/src/adapters/persistence/agent.rs
+@@ -271,6 +271,7 @@
+ }
+ 
+ /// Save an agent's settings and capabilities in one transaction.
++#[cfg(test)]
+ pub(crate) async fn update_agent(
+     persistence: &PostgresPersistence,
+     id: Uuid,
+@@ -469,6 +470,35 @@
+         db_list.into_iter().map(TryInto::try_into).collect()
+     }
+ 
++    async fn list_managed_agents(
++        &self,
++        actor: crate::application::workflow::WorkflowActor,
++        company: crate::domain::workflow::CompanyId,
++    ) -> AppResult<Vec<Agent>> {
++        let mut tx = super::workflow::management::begin(self, company, actor).await?;
++        super::workflow::management::authorize_target_on(
++            &mut tx,
++            company,
++            actor,
++            crate::application::use_cases::administration::ManagementTarget::AnyUnit,
++        )
++        .await?;
++        let rows: Vec<AgentDb> = sqlx::query_as(&format!(
++            "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.company_id=$1 \
++             AND agent_management_role($2,$1,agent.id) IS NOT NULL ORDER BY agent.name,agent.id"
++        ))
++        .bind(company.as_uuid())
++        .bind(actor.user_id())
++        .fetch_all(&mut *tx)
++        .await?;
++        let agents = rows
++            .into_iter()
++            .map(Agent::try_from)
++            .collect::<AppResult<Vec<_>>>()?;
++        tx.commit().await?;
++        Ok(agents)
++    }
++
+     async fn list_library(&self) -> AppResult<Vec<Agent>> {
+         let rows = sqlx::query_as::<_, AgentDb>(&format!(
+             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.company_id IS NULL \
+@@ -480,6 +510,39 @@
+         rows.into_iter().map(TryInto::try_into).collect()
+     }
+ 
++    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
++        let mut tx = self.pool.begin().await?;
++        sqlx::query_scalar::<_, Uuid>(
++            "SELECT id FROM agents WHERE id=$1 AND company_id IS NULL FOR UPDATE",
++        )
++        .bind(id)
++        .fetch_optional(&mut *tx)
++        .await?
++        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
++        let db = update_agent_on(&mut tx, None, id, &write).await?;
++        tx.commit()
++            .await
++            .map_err(super::agent_capability::relationship_error)?;
++        db.try_into()
++    }
++
++    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()> {
++        let mut tx = self.pool.begin().await?;
++        sqlx::query_scalar::<_, Uuid>(
++            "SELECT id FROM agents WHERE id=$1 AND company_id IS NULL FOR UPDATE",
++        )
++        .bind(id)
++        .fetch_optional(&mut *tx)
++        .await?
++        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
++        let locks = lock_agent_delete_on(&mut tx, id)
++            .await?
++            .ok_or_else(crate::use_cases::agent::agent_not_found)?;
++        finish_agent_delete_on(&mut tx, locks).await?;
++        tx.commit().await.map_err(agent_delete_error)
++    }
++
++    #[cfg(test)]
+     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
+         update_agent(self, id, write).await
+     }
+@@ -487,6 +550,7 @@
+     /// Retire the agent: its principal becomes an outsider and keeps everything it wrote and took
+     /// part in, then the agent row goes. The database refuses a delete that would take history
+     /// with it, so this is the only way an agent that has spoken can be deleted.
++    #[cfg(test)]
+     async fn delete(&self, id: Uuid) -> AppResult<()> {
+         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+         let Some(locks) = lock_agent_delete_on(&mut transaction, id).await? else {
+@@ -636,7 +700,7 @@
+ }
+ 
+ /// Name what still holds an agent instead of reporting every refusal as one cause.
+-fn agent_delete_error(error: sqlx::Error) -> AppError {
++pub(super) fn agent_delete_error(error: sqlx::Error) -> AppError {
+     let constraint = error
+         .as_database_error()
+         .and_then(|database| database.constraint())

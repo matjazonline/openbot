@@ -23,7 +23,7 @@ use crate::{
         pages,
         routes::{
             schedule::{UiScheduleForm, run_now_key},
-            ui::{load_account, load_managed_company, workspace_user},
+            ui::{load_account, load_administered_company, workspace_user},
         },
     },
     app_error::{AppError, AppResult},
@@ -132,7 +132,7 @@ impl SchedulesWorkspace {
         &self,
         company_id: Option<Uuid>,
     ) -> AppResult<(Vec<Company>, Option<CompanyAccess>)> {
-        load_managed_company(&self.company_use_cases, self.user_id, company_id).await
+        load_administered_company(&self.company_use_cases, self.user_id, company_id).await
     }
 
     /// The workflow bindings a schedule may name, and the listed ones already do.
@@ -243,15 +243,11 @@ async fn schedules_page(
     let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
     let (companies, company) = workspace.scoped_company(query.company_id).await?;
-    let Some(CompanyAccess {
-        company,
-        membership,
-        ..
-    }) = company
-    else {
+    let Some(access) = company else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
-    let workspace_user = workspace_user.with_company_membership(membership);
+    let workspace_user = workspace_user.with_company_access(&access);
+    let CompanyAccess { company, .. } = access;
 
     let schedules = workspace
         .schedule_use_cases
@@ -260,7 +256,7 @@ async fn schedules_page(
 
     let channels = workspace
         .channel_use_cases
-        .list_company_channels(workspace.user_id, company.id)
+        .list_managed_channels(workspace.user_id, company.id)
         .await?;
 
     let bindings = workspace.bindings(company.id).await?;
@@ -374,7 +370,7 @@ async fn create_pane(
 
     let channels = workspace
         .channel_use_cases
-        .list_company_channels(workspace.user_id, company.id)
+        .list_managed_channels(workspace.user_id, company.id)
         .await?;
 
     let bindings = workspace.bindings(company.id).await?;
@@ -409,7 +405,7 @@ async fn edit_schedule_pane(
 
     let channels = workspace
         .channel_use_cases
-        .list_company_channels(workspace.user_id, company.id)
+        .list_managed_channels(workspace.user_id, company.id)
         .await?;
 
     let bindings = workspace.bindings(company.id).await?;
@@ -688,6 +684,7 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: CompanyMembership::Admin,
+            administers_units: CompanyMembership::Admin.administers_company(),
         }
     }
 

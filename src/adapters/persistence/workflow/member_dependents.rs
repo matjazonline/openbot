@@ -9,7 +9,7 @@ pub(crate) async fn prelock_account_companies_on(
 ) -> AppResult<Vec<CompanyId>> {
     let companies: Vec<Uuid> = sqlx::query_scalar(
         "SELECT company.id FROM companies AS company WHERE company.user_id=$1 \
-         OR EXISTS (SELECT 1 FROM company_members AS member WHERE member.company_id=company.id AND member.user_id=$1) \
+         OR EXISTS (SELECT 1 FROM membership_of($1, company.id) AS member WHERE true) \
          OR EXISTS (SELECT 1 FROM principals AS principal WHERE principal.company_id=company.id AND principal.user_id=$1 AND principal.kind='person') \
          ORDER BY company.id FOR NO KEY UPDATE",
     )

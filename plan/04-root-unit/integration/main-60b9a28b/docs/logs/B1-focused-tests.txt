@@ -1,0 +1,184 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling subtle v2.6.1
+   Compiling url v2.5.8
+   Compiling digest v0.10.7
+   Compiling rustls v0.23.31
+   Compiling ff v0.13.1
+   Compiling sec1 v0.7.3
+   Compiling crypto-bigint v0.5.5
+   Compiling password-hash v0.5.0
+   Compiling group v0.13.0
+   Compiling sqlx-core v0.8.6
+   Compiling tower-http v0.6.11
+   Compiling hickory-proto v0.24.4
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling sha1 v0.10.6
+   Compiling signature v2.2.0
+   Compiling md-5 v0.10.6
+   Compiling blake2 v0.10.6
+   Compiling pbkdf2 v0.12.2
+   Compiling rfc6979 v0.4.0
+   Compiling tungstenite v0.26.2
+   Compiling hkdf v0.12.4
+   Compiling oauth2 v5.0.0
+   Compiling ammonia v4.1.4
+   Compiling zip v2.4.2
+   Compiling argon2 v0.5.3
+   Compiling elliptic-curve v0.13.8
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling tokio-tungstenite v0.26.2
+   Compiling axum v0.8.4
+   Compiling p256 v0.13.2
+   Compiling sqlx-postgres v0.8.6
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling hyper-rustls v0.27.9
+   Compiling lettre v0.11.23
+   Compiling hickory-resolver v0.24.4
+   Compiling reqwest v0.13.4
+   Compiling mail-auth v0.6.1
+   Compiling axum-extra v0.10.1
+   Compiling rig-core v0.42.0
+   Compiling rmcp v1.8.0
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling rig-agent v0.42.0
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 17s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 56 tests
+test adapters::http::pages::tests::knowledge_views::knowledge_view_placeholder_contains_only_safe_attribution_and_position ... ok
+test adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation ... ok
+test adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members ... ok
+test adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure ... ok
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate ... ok
+test adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope ... ok
+test adapters::http::routes::user::attribution_browser_tests::attribution_sso_browser_real_openbot_password_and_existing_session ... ignored, requires built standalone attribution binary and pinned Playwright; required integration gate
+test adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes ... ok
+test adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden ... ok
+test adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see ... ok
+test adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys ... ok
+test adapters::persistence::attribution::tests::attribution_company_access_current_membership_roles_and_security_revision ... ok
+test adapters::persistence::attribution::tests::attribution_company_lifecycle_outbox_competitors_fences_poison_and_exhaustion ... ok
+test adapters::persistence::attribution::tests::attribution_company_lifecycle_owning_deletions_commit_and_rollback_atomically ... ok
+test adapters::persistence::attribution::tests::attribution_sso_code_binding_competing_redeemers_and_parent_revocation ... ok
+test adapters::persistence::attribution::tests::http_contract::access_tests::attribution_company_access_competing_root_admin_status_writes_have_one_winner ... ok
+test adapters::persistence::attribution::tests::http_contract::access_tests::attribution_company_access_real_multi_company_pagination_tracks_membership ... ok
+test adapters::persistence::attribution::tests::http_contract::access_tests::attribution_company_access_real_roles_downgrade_removal_and_foreign_status_writes ... ok
+test adapters::persistence::attribution::tests::http_contract::attribution_company_lifecycle_http_cookie_csrf_and_version_guard ... ok
+test adapters::persistence::attribution::tests::http_contract::attribution_sso_http_pkce_replay_expiry_and_credential_classes ... ok
+test adapters::persistence::attribution::tests::http_contract::attribution_sso_http_authentication_precedes_parsing_and_rejects_callback_injection ... ok
+test adapters::persistence::attribution::tests::worker_tests::attribution_company_lifecycle_delivery_shutdown_and_lost_ack_recover_durably ... ok
+test adapters::persistence::attribution::tests::worker_tests::attribution_company_lifecycle_operator_signal_survives_restart_and_resolves ... ok
+test adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_consumed_new_entry_is_legitimate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_covered_old_entry_breaches_finality ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_unattributed_preserves_unresolved_provenance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_zero_entry_marker_breaches_finality ... ok
+native_coverage target=membership mode=rejected state=23514 message=invalid workflow action evidence provenance
+native_diagnostic rollback_quiescent owner=22054 observer=22055 database=open_bots_own_7416c7644d9a40c7a3fcf4199ce53416
+native_coverage target=membership mode=rejected selected_flush=true ordinary_commit=false
+native_coverage target=marker mode=rejected state=23514 message=invalid workflow action evidence provenance
+native_diagnostic rollback_quiescent owner=22089 observer=22088 database=open_bots_own_7bb5aa8e2cd9446fbc5c2d8ea7adaf43
+native_coverage target=marker mode=rejected selected_flush=true ordinary_commit=false
+native_coverage target=missing mode=rejected state=23514 message=invalid workflow action evidence provenance
+native_diagnostic rollback_quiescent owner=22120 observer=22119 database=open_bots_own_16e290dc3bd04e2f82a261b013cea840
+native_coverage target=missing mode=rejected selected_flush=true ordinary_commit=false
+native_attribution cell=remote_accepted state=PZ001 constraint= message=native diagnostic probe accepted
+native_diagnostic rollback_quiescent owner=22152 observer=22150 database=open_bots_own_869ef59a94b74e88b7c79ec69c7cadaa
+native_attribution cell=remote_accepted immediate_accepted=true ordinary_commit=false
+native_attribution cell=orphan state=23503 constraint=workflow_action_applied_request_scope message=insert or update on table "workflow_action_evidence" violates foreign key constraint "workflow_action_applied_request_scope"
+native_diagnostic rollback_quiescent owner=22187 observer=22184 database=open_bots_own_1528e3aaa2bb4670848e7df1eb70db74
+native_attribution cell=orphan immediate_accepted=false ordinary_commit=false
+native_attribution cell=invalid state=23514 constraint=workflow_action_applied_request_shape message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_applied_request_shape"
+native_diagnostic rollback_quiescent owner=22217 observer=22216 database=open_bots_own_7aaa6f607a90424db0f8266b592dcc9b
+native_attribution cell=invalid immediate_accepted=false ordinary_commit=false
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::root_department_company_and_account_teardown_remove_tree_documents_and_direct_native_history ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_current_revocation_errors_policy_and_approval ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_exact_frozen_connection_slot ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_frozen_provenance_ceiling_and_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::thread_attribution_links_require_access_to_the_producing_run ... ok
+test infra::attribution::tests::attribution_session_registration_is_complete_and_credentials_are_separate ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_sql_evidence_attribution_shape_rejects_forgeries ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_lookup_timeouts_fail_closed ... ok
+Foreign local-call source refused by workflow_local_agent_calls_company_id_run_id_execution_id__fkey; the dispatch peer was not isolated by this probe
+native_coverage target=membership mode=accepted state= message=
+native_diagnostic rollback_quiescent owner=22450 observer=22448 database=open_bots_own_08b1d060e5764430947954202cf35a93
+native_coverage target=membership mode=accepted selected_flush=true ordinary_commit=false
+native_coverage target=marker mode=accepted state= message=
+native_diagnostic rollback_quiescent owner=22576 observer=22575 database=open_bots_own_9b7c3c9c009e4f7f95c873c47a0ac360
+native_coverage target=marker mode=accepted selected_flush=true ordinary_commit=false
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::native_coverage_tests::workflow_action_reconciliation_native_coverage_marker_nonempty ... ok
+native_coverage target=missing mode=accepted state= message=
+native_diagnostic rollback_quiescent owner=22183 observer=22682 database=open_bots_own_27ea9191c6674b0eb2c3e8e4b1990cf8
+native_coverage target=missing mode=accepted selected_flush=true ordinary_commit=false
+native_attribution cell=marker_accepted state=PZ001 constraint= message=native diagnostic probe accepted
+native_diagnostic rollback_quiescent owner=22731 observer=22729 database=open_bots_own_8d090c69a93b4e2e9045101d91c4d132
+native_attribution cell=marker_accepted immediate_accepted=true ordinary_commit=false
+native_attribution cell=foreign state=23503 constraint=workflow_action_applied_request_scope message=insert or update on table "workflow_action_evidence" violates foreign key constraint "workflow_action_applied_request_scope"
+native_diagnostic rollback_quiescent owner=22235 observer=22769 database=open_bots_own_997fa8299c9849e6bdb1fd16d86b064d
+native_attribution cell=foreign immediate_accepted=false ordinary_commit=false
+native_attribution cell=missing_entry state=23514 constraint=workflow_action_applied_request_shape message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_applied_request_shape"
+native_diagnostic rollback_quiescent owner=22806 observer=22803 database=open_bots_own_e1822786516e4902b326d50ee5bc9e84
+native_attribution cell=missing_entry immediate_accepted=false ordinary_commit=false
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::root_department_company_and_account_teardown_remove_tree_documents_and_refusal_history ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::root_department_company_and_account_teardown_remove_populated_message_identity_and_action_history ... ok
+native_coverage target=membership mode=positive selected_flush=true ordinary_commit=true
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::native_coverage_tests::workflow_action_reconciliation_native_coverage_applied_membership ... ok
+native_coverage target=missing mode=positive selected_flush=true ordinary_commit=true
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::native_coverage_tests::workflow_action_reconciliation_native_coverage_unknown_missing ... ok
+native_attribution cell=unattributed_accepted state=PZ001 constraint= message=native diagnostic probe accepted
+native_diagnostic rollback_quiescent owner=22942 observer=22939 database=open_bots_own_d80b12e5bfd14ae88904ff60afa8c61b
+native_attribution cell=unattributed_accepted immediate_accepted=true ordinary_commit=false
+native_attribution cell=missing_attribution state=23514 constraint=workflow_guard:workflow_action_applied_request_guard message=applied evidence requires request attribution
+native_diagnostic rollback_quiescent owner=22973 observer=22971 database=open_bots_own_9a8180b2a25c40e6bdd925a5e05cfc51
+native_attribution cell=missing_attribution immediate_accepted=false ordinary_commit=false
+Foreign local-call source refused by workflow_local_agent_calls_company_id_run_id_execution_id__fkey; the dispatch peer was not isolated by this probe
+native_attribution cell=marker_entry state=23514 constraint=workflow_action_applied_request_shape message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_applied_request_shape"
+native_diagnostic rollback_quiescent owner=22993 observer=22855 database=open_bots_own_92f02014334e48069b2c402bf2f8f721
+native_attribution cell=marker_entry immediate_accepted=false ordinary_commit=false
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::root_department_company_and_account_teardown_remove_tree_documents_and_native_history ... ok
+native_attribution cell=unknown_accepted state=PZ001 constraint= message=native diagnostic probe accepted
+native_diagnostic rollback_quiescent owner=23060 observer=22989 database=open_bots_own_6a15567717fb47e09a4d1cb46ac4984d
+native_attribution cell=unknown_accepted immediate_accepted=true ordinary_commit=false
+native_attribution cell=null_with_entry state=23514 constraint=workflow_guard:workflow_action_applied_request_guard message=applied evidence requires request attribution
+native_diagnostic rollback_quiescent owner=23093 observer=23091 database=open_bots_own_bfd6c9b1e60244f79b559a0adcf67485
+native_attribution cell=null_with_entry immediate_accepted=false ordinary_commit=false
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::workflow_action_reconciliation_native_attribution_scope_and_before ... ok
+native_attribution cell=unattributed_entry state=23514 constraint=workflow_action_applied_request_shape message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_applied_request_shape"
+native_diagnostic rollback_quiescent owner=23120 observer=23121 database=open_bots_own_017828174bad49359b139f9e21e686e0
+native_attribution cell=unattributed_entry immediate_accepted=false ordinary_commit=false
+native_attribution cell=final_accepted state=PZ001 constraint= message=native diagnostic probe accepted
+native_diagnostic rollback_quiescent owner=23141 observer=23138 database=open_bots_own_ba8c94cfc6ef415bab0f9e55c139c13c
+native_attribution cell=final_accepted immediate_accepted=true ordinary_commit=false
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::workflow_action_reconciliation_native_attribution_accepted_calibrations ... ok
+native_attribution cell=unknown_attributed state=23514 constraint=workflow_action_applied_request_shape message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_applied_request_shape"
+native_diagnostic rollback_quiescent owner=23168 observer=23165 database=open_bots_own_03bd46d9fc5f4f37806c51c007265d25
+native_attribution cell=unknown_attributed immediate_accepted=false ordinary_commit=false
+native_attribution cell=final_attributed state=23514 constraint=workflow_action_applied_request_shape message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_applied_request_shape"
+native_diagnostic rollback_quiescent owner=23208 observer=23206 database=open_bots_own_6a0c7cf6c4294db89e4b60ea7d2f662c
+native_attribution cell=final_attributed immediate_accepted=false ordinary_commit=false
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::workflow_action_reconciliation_native_attribution_shape ... ok
+
+test result: ok. 55 passed; 0 failed; 1 ignored; 0 measured; 4682 filtered out; finished in 58.46s
+

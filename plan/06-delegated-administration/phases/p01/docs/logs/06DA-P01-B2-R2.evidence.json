@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B2-R2",
+  "artifact": "f90321fd26058d076596f6a266282ef5a72ff8d4c099acb523594d4af7972d0c",
+  "checks": [
+    {
+      "criteria": [
+        "B2-F1",
+        "B2-F2",
+        "DESK",
+        "SCHEDULE",
+        "BINDING",
+        "PRIVACY",
+        "RACES"
+      ],
+      "command": "TEST_DATABASE_URL=<owned-b2> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_admin_ manages_unit_ binding_tests schedule_ channel_edit::tests inbound_tests application::use_cases::channel::tests address_resolution_tests binding_configuration_does_not_grant_conversation_view",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-focused.txt",
+          "sha256": "a5bd095a3294f72f21b8f76d4236aefdba2a8d5d28a0fb8e75dc8bbbe15a44f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "COMPILATION"
+      ],
+      "command": "SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-offline.txt",
+          "sha256": "bcb74884a78099501f6bfc31de29d15aae4eb48dcd18d5c99bdde44d75b90089"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CLIPPY"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-clippy.txt",
+          "sha256": "af28130947915cc27edc9f05264f96c723243634a035a2e4ca7e3231842ed6df"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REACHABILITY"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --test source_modules",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-source-modules.txt",
+          "sha256": "4fe7a27f198c803986343bdc99babca74d62debf31a0bef154932d1c38fb1906"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "SQLX"
+      ],
+      "command": "DATABASE_URL=<owned-b2> SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-sqlx-prepare.txt",
+          "sha256": "29c975e246d6efe154fb395008c21f6ad7b0c552c7cb02f78e1cf7debfe120d2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FRESH-SCHEMA-UNCHANGED"
+      ],
+      "command": "DATABASE_URL=<owned-b2> cargo sqlx migrate run",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-migration.txt",
+          "sha256": "de2ca57a00bfe56aa57abffd2d3f98c0ff7cd3ed457e3e47be528b5b0907306d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FORMAT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "WHITESPACE"
+      ],
+      "command": "git diff --check",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "DISCOVERY"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib -- --list",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-after-tests.txt",
+          "sha256": "111b4f93ce2dd5b843683de041240b26f7d731eded8ecae97fcc593f9c82c876"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "LEARNING-SCAN-RAW-RESULT"
+      ],
+      "command": "trail check",
+      "fixture": "Owned PostgreSQL18 openbot_p06_b2 port55406 where required; unchanged schema migration reused, correction/reuse dispositions in TASK",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-R2-trail-check.txt",
+          "sha256": "7c808c7882818358e2985b1c89932130a575f423cee4960a0a5449f10dda75bd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "WHOLE-PLAN-FINAL-GATE"
+      ],
+      "command": "scripts/check.sh and repository final checks",
+      "fixture": "Awaiting accepted Plan05/ph03 and remaining Plan06 scope",
+      "status": "NOT EXERCISED",
+      "reason": "User requests stop at Plan05/ph03 prerequisite; B2 is partial p01 only."
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+PASS complete inventory: 167 accepted p08 paths; 38 p09 delta paths; all 144 unaffected paths byte-equal to main p08 baseline; changed preimages match archive; new files accounted for.

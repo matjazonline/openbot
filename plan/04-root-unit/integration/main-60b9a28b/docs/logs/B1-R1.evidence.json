@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "round": "04RU-MAIN-B1-R1",
+  "artifact": "09f2972f563e400b3553eb64d1a834d9cf942ab944d130180463f2410d22c4a8",
+  "checks": [
+    {
+      "criteria": [
+        "I1",
+        "I2",
+        "I3",
+        "I4"
+      ],
+      "command": "bash scripts/test-network-isolation.sh cargo test --locked --offline --lib -- attribution_ root_department_company_and_account_teardown_ authorization_tests --nocapture",
+      "fixture": "Owned PostgreSQL18 pa04_m01_schema1/core1_test; isolated own databases per fixture; task Cargo target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-tests.txt",
+          "sha256": "5b14b6883b1cc0e6ca87d38bc3510e6632a914d791ca3bec01cb218eb5687148"
+        },
+        {
+          "path": "logs/B1-http-authorization-selection-result.json",
+          "sha256": "4980ffb2a2c9bd52fd4acea14fc9aec5681c417c094cbb6b70d243ca174c0839"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "I4"
+      ],
+      "command": "Fresh combined init migration; SQLX_OFFLINE=false cargo sqlx prepare -- --locked --offline --all-targets",
+      "fixture": "Owned PostgreSQL18 pa04_m01_schema1/core1_test; isolated own databases per fixture; task Cargo target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migration.txt",
+          "sha256": "05a11ed95d8368341211b3129f47096fe6d8174a1c165835c1748b822924c488"
+        },
+        {
+          "path": "logs/B1-sqlx-prepare.txt",
+          "sha256": "dbceed92c2aa1f15eb6374897b986784b90b3c702f2d5cb706a836a76dccfde8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "I1",
+        "I4"
+      ],
+      "command": "Unchanged retained source_modules checker --nocapture; exact old-table rg inventory; current libtest --list versus accepted p01",
+      "fixture": "Owned PostgreSQL18 pa04_m01_schema1/core1_test; isolated own databases per fixture; task Cargo target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-source-reachability.txt",
+          "sha256": "67192ca79505e500f01446297e8861e11ebb8af9d59bfc2b1fd46fefc7b94918"
+        },
+        {
+          "path": "logs/B1-old-table-inventory.txt",
+          "sha256": "2d7fecd0b938856722dffe34806dcfc971a565099a1d1941559949dc3f7c5690"
+        },
+        {
+          "path": "logs/B1-test-inventory.txt",
+          "sha256": "a9f30170b1d63fd83a496203fed25aa80451d2e208cb2dbb6841b93bb8946e28"
+        },
+        {
+          "path": "logs/B1-test-inventory-delta.txt",
+          "sha256": "dc3f2f7e5157b559e189eb752b8fa26af0dfb036e6ac82209fabdfada8c48886"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "I4"
+      ],
+      "command": "cargo fmt --all -- --check; implementation git diff --cached --check; trail build; trail check --base 60b9a28b",
+      "fixture": "Owned PostgreSQL18 pa04_m01_schema1/core1_test; isolated own databases per fixture; task Cargo target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-staged-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-trail-build.txt",
+          "sha256": "dca4e745377eaf467d8915d07edb1346ac3965a3a997804cdbcccb88ff661ab2"
+        },
+        {
+          "path": "logs/B1-trail-check-scoped.txt",
+          "sha256": "30b3c1337d05fdcc5a0cbfc5838ed9bb4dbc239dcf64e426d53087ea597eaa56"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "I4-LEARNING-CHECK-DISPOSITION"
+      ],
+      "command": "trail check (default whole branch comparison)",
+      "fixture": "Owned PostgreSQL18 pa04_m01_schema1/core1_test; isolated own databases per fixture; task Cargo target",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-trail-check.txt",
+          "sha256": "d0653877cc5eca5544b062337faa4b636d12d1d20ac111a335bb6dc438d2ba57"
+        }
+      ],
+      "disposition": "Lexical false positive l-2cfeeacd: browser localStorage cleanup learning matches unchanged accepted native-peer SQL comment at init_schema14090. No browser cleanup/localStorage protocol changes here. Record this rationale in commit message. Default scan caps branch diff at400KB; scoped integration-base check covers this complete small delta and passes. See TASK disposition; no source safety exception."
+    },
+    {
+      "criteria": [
+        "EXTERNAL-BROWSER-SSO"
+      ],
+      "command": "attribution_sso_browser_real_openbot_password_and_existing_session remains #[ignore] in default root suite",
+      "fixture": "Owned PostgreSQL18 pa04_m01_schema1/core1_test; isolated own databases per fixture; task Cargo target",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-focused-tests.txt",
+          "sha256": "5b14b6883b1cc0e6ca87d38bc3510e6632a914d791ca3bec01cb218eb5687148"
+        }
+      ],
+      "reason": "Requires built standalone attribution binary and pinned Playwright; final Plan04 integration gate remains required. Current bridge role/access/lifecycle behavior is exercised through real HTTP/persistence fixtures; no Chrome journey claimed."
+    }
+  ]
+}

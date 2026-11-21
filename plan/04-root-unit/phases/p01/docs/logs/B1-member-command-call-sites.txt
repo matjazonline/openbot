@@ -1,0 +1,95 @@
+src/application/ports/department.rs:90:    async fn remove_member(
+src/adapters/persistence/department.rs:709:    async fn remove_member(
+src/adapters/persistence/address_tests.rs:464:        .remove_member(f.company.id, erin)
+src/adapters/persistence/address_tests.rs:737:        tokio::spawn(async move { persistence.remove_member(company, kai).await })
+src/adapters/http/routes/ui_direct_tests.rs:276:        .remove_member(h.company_id, actor.user_id)
+src/adapters/http/routes/ui_direct_tests.rs:355:        .remove_member(h.company_id, actor.user_id)
+src/adapters/http/routes/ui_direct_tests.rs:495:        .remove_member(h.company_id, actor.user_id)
+src/adapters/http/routes/ui_departments.rs:563:async fn remove_member(
+src/adapters/http/routes/ui_departments.rs:571:        .remove_member(
+src/adapters/persistence/integrations/lifecycle_tests.rs:186:        .remove_member(company, user)
+src/adapters/persistence/company_invite.rs:509:    async fn update_member_role(
+src/adapters/persistence/company_invite.rs:545:    async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()> {
+src/adapters/persistence/department_desks_tests.rs:383:        .remove_member(f.owner, f.company, legal.id, f.member_principal)
+src/adapters/persistence/department_desks_tests.rs:531:        .remove_member(f.owner, f.company, audit.id, second)
+src/adapters/persistence/department_desks_tests.rs:617:    CompanyInvitePersistence::remove_member(&f.persistence, f.company, user)
+src/adapters/persistence/department_desks_tests.rs:788:                .remove_member(f.owner, f.company, unit.id, f.member_principal)
+src/adapters/http/routes/ui_departments_tests.rs:121:            remove_member(ws(), Path((company, department, principal))).await,
+src/adapters/http/routes/ui_departments_tests.rs:376:        remove_member(ws(), Path((company, sales.id.as_uuid(), member)))
+src/adapters/http/routes/ui_departments_tests.rs:523:        remove_member(ws(), Path((company, their_id, their_person))).await,
+src/adapters/http/routes/ui_departments_tests.rs:580:            remove_member(ws(), Path((company, mine_id, their_person)))
+src/adapters/http/routes/department.rs:216:        .remove_member(
+src/application/use_cases/department.rs:264:    pub async fn remove_member(
+src/application/use_cases/department.rs:274:            .remove_member(scope, department, principal)
+src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:426:        p.update_member_role(
+src/adapters/http/routes/ui_team.rs:509:async fn update_member_role(
+src/adapters/http/routes/ui_team.rs:544:async fn remove_member(
+src/adapters/http/routes/ui_direct_revocation_tests.rs:221:        .remove_member(s.h.company_id, s.actor.user_id)
+src/adapters/http/routes/ui_team_authorization_tests.rs:68:        update_member_role(
+src/adapters/http/routes/ui_team_authorization_tests.rs:76:        remove_member(make_workspace(), Path((company_id, f.member.id))).await,
+src/adapters/http/routes/ui_team_authorization_tests.rs:202:        remove_member(workspace(&f, f.owner.id), Path((f.company.id, f.owner.id))).await,
+src/adapters/http/routes/ui_team_authorization_tests.rs:208:        update_member_role(
+src/application/use_cases/company_invite_tests.rs:222:    async fn update_member_role(
+src/application/use_cases/company_invite_tests.rs:238:    async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()> {
+src/adapters/persistence/department_tests.rs:614:        .remove_member(f.owner, f.company, department.id, f.agent_principal)
+src/adapters/persistence/department_tests.rs:620:        .remove_member(f.owner, f.company, department.id, f.agent_principal)
+src/adapters/persistence/department_tests.rs:776:            uc.remove_member(user, company, department, f.member_principal)
+src/adapters/persistence/department_tests.rs:960:            p.remove_member(scope, department.id, f.agent_principal)
+src/adapters/persistence/department_tests.rs:1004:    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+src/adapters/persistence/company_tests.rs:164:    persistence.remove_member(company.id, member.0).await.ok();
+src/adapters/persistence/company_tests.rs:165:    persistence.remove_member(company.id, admin.0).await.ok();
+src/adapters/persistence/company_access_level_tests.rs:269:    p.remove_member(f.company_id, f.admin.id).await.unwrap();
+src/adapters/persistence/memory/tests.rs:424:    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+src/adapters/persistence/memory/tests.rs:724:        CompanyInvitePersistence::remove_member(&persistence, company, member).await
+src/adapters/persistence/memory/tests.rs:745:        CompanyInvitePersistence::remove_member(&persistence, company, admin).await
+src/adapters/persistence/memory/tests.rs:963:    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+src/adapters/persistence/department_lead_desk_tests.rs:527:    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.admin)
+src/adapters/persistence/company_invite_tests.rs:414:        .update_member_role(company.id, member.id, CompanyAccessRole::Member)
+src/adapters/persistence/company_invite_tests.rs:436:        .remove_member(company.id, member.id)
+src/adapters/persistence/company_invite_tests.rs:456:        .remove_member(company.id, owner.id)
+src/adapters/persistence/company_invite_tests.rs:552:        .remove_member(company.id, member.id)
+src/adapters/persistence/company_invite_tests.rs:556:        .remove_member(company.id, owner.id)
+src/adapters/persistence/address_tests/notification_race_tests.rs:98:        Box::pin(async move { Outcome::Retirement(store.remove_member(company, user).await) });
+src/adapters/persistence/address_tests/rejoin.rs:41:            .remove_member(fixture.company.id, user)
+src/adapters/persistence/address_tests/direct.rs:88:                .remove_member(f.company.id, member)
+src/adapters/persistence/address_tests/direct.rs:141:        .remove_member(f.company.id, user)
+src/adapters/persistence/address_tests/direct.rs:302:        .remove_member(f.company.id, user)
+src/adapters/persistence/address_tests/validation.rs:165:        .remove_member(f.company.id, other)
+src/adapters/persistence/address_tests/bindings.rs:83:        .remove_member(f.company.id, user)
+src/adapters/persistence/address_tests/notifications.rs:158:        .remove_member(f.company.id, user)
+src/adapters/persistence/address_tests/notifications.rs:215:        .remove_member(f.company.id, user)
+src/adapters/persistence/address_tests/identity_races.rs:170:                    .remove_member(company, user)
+src/adapters/persistence/department_retirement_audit_tests.rs:68:            .remove_member(self.departments.company, self.departments.member)
+src/adapters/persistence/department_retirement_audit_tests.rs:301:            .remove_member(f.departments.company, f.departments.member)
+src/adapters/persistence/delivery/tenant_tests.rs:233:        .remove_member(scope.company.id, leaving.user_id)
+src/adapters/persistence/delivery/tenant_tests.rs:286:        .remove_member(scope.company.id, owner.user_id)
+src/adapters/persistence/delivery/tenant_tests.rs:320:    let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+src/adapters/persistence/delivery/tenant_tests.rs:360:    let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+src/application/use_cases/company_invite.rs:97:    async fn update_member_role(
+src/application/use_cases/company_invite.rs:101:    async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+src/application/use_cases/company_invite.rs:335:            .remove_member(RemoveCompanyMember {
+src/application/use_cases/company_invite.rs:364:            .update_member_role(MemberRoleChange {
+src/adapters/persistence/workflow/escalation_command_tests.rs:108:        .update_member_role(f.scope.company.as_uuid(), actor, CompanyAccessRole::Member)
+src/adapters/persistence/workflow/escalation_command_tests.rs:162:        .remove_member(f.scope.company.as_uuid(), actor)
+src/adapters/persistence/workflow/escalation_command_tests.rs:209:        .remove_member(f.scope.company.as_uuid(), target_user)
+src/adapters/persistence/workflow/vault_tests/bindings.rs:284:    p.remove_member(company, user).await.unwrap();
+src/adapters/persistence/workflow/vault_tests/bindings.rs:302:    p.remove_member(company, user).await.unwrap();
+src/adapters/persistence/workflow/vault_tests/membership_race.rs:78:    let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+src/adapters/persistence/workflow/vault_tests/native_journeys.rs:299:            p.remove_member(company.as_uuid(), actor.user_id())
+src/adapters/persistence/workflow/follow_retirement_tests.rs:93:        .remove_member(f.scope.company.as_uuid(), f.people.users[0])
+src/adapters/persistence/workflow/escalation_person_tests.rs:166:        .remove_member(f.role.company().as_uuid(), f.users[0])
+src/adapters/persistence/workflow/escalation_person_tests.rs:192:            .remove_member(f.role.company().as_uuid(), *user)
+src/adapters/persistence/workflow/escalation_person_tests.rs:270:        .remove_member(f.role.company().as_uuid(), f.users[0])
+src/adapters/persistence/workflow/direct_workflow_read_tests.rs:100:    p.remove_member(private.company(), private.user)
+src/adapters/persistence/workflow/escalation_agent_tool_tests.rs:197:    crate::use_cases::company_invite::CompanyInvitePersistence::remove_member(
+src/adapters/persistence/workflow/escalation_attention_tests.rs:152:            .remove_member(f.scope.company.as_uuid(), *user)
+src/adapters/persistence/workflow/reviewer_principal_tests.rs:71:                .remove_member(f.scope.company.as_uuid(), f.users[0])
+src/adapters/persistence/workflow/role_reviewer_tests.rs:442:            .remove_member(f.role.company().as_uuid(), user)
+src/adapters/persistence/workflow/direct_role_binding_tests.rs:120:        .remove_member(
+src/adapters/persistence/workflow/reviewer_control_hint_tests.rs:76:        p.remove_member(f.command.company.as_uuid(), f.former)
+src/adapters/persistence/workflow/reviewer_control_hint_tests.rs:155:        .remove_member(f.fixture.scope.company.as_uuid(), f.former)
+src/adapters/persistence/workflow/decision_authority_tests.rs:288:            .remove_member(f.scope.company.as_uuid(), f.users[0])
+src/adapters/persistence/workflow/decision_authority_tests.rs:337:    let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+src/adapters/persistence/workflow/decision_authority_tests.rs:395:    let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+src/adapters/persistence/workflow/decision_authority_tests.rs:422:        .remove_member(f.scope.company.as_uuid(), f.users[0])
+src/adapters/persistence/workflow/direct_delivery_privacy_tests.rs:231:            .remove_member(f.s.fixture.target.company.as_uuid(), state.recipient)

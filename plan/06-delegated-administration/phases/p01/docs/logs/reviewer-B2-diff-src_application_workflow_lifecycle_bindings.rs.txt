@@ -1,0 +1,11 @@
+--- B1/src/application/workflow/lifecycle/bindings.rs
++++ B2/src/application/workflow/lifecycle/bindings.rs
+@@ -115,8 +115,6 @@
+     }
+ 
+     async fn load(&self, request: SetBindingActivity) -> LifecycleResult<BindingState> {
+-        self.authorize(request.target, RelatedAssociation::Company)
+-            .await?;
+         let state = self
+             .persistence
+             .binding(request.target.company, request.target.binding)

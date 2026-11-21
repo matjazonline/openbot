@@ -34,12 +34,17 @@ describes unit budgets beside the root budget. Name only behavior the code has.
 
 | Evidence | Status |
 | --- | --- |
-| 01 focused checks (schema, selection, competing) | Pending |
-| 02 focused checks (model default, budget, competing) | Pending |
-| Formatting, offline compilation, clippy and reachability | Pending |
-| Fresh migrations and SQLx metadata | Pending |
-| Database-backed full suite and network isolation | Pending |
-| Stack and lease budgets | Pending |
-| Docs, startup plan paths and graph refresh | Pending |
+| 01 focused checks (schema, selection, competing) | Passed (p01 B1–B3, accepted; phases/p01/docs) |
+| 02 focused checks (model default, budget, competing) | Passed (p02 B1–B3, accepted; phases/p02/docs) |
+| Formatting, offline compilation, clippy and reachability | Passed (final check.sh; source_modules 8 passed in the separate run) |
+| Fresh migrations and SQLx metadata | Passed (fresh-schema `cargo sqlx prepare`, `.sqlx` unchanged; check.sh migrations and metadata) |
+| Database-backed full suite and network isolation | Red only on the deferred Doop assertion (4948 passed, 1 failed); main.rs and reachability passed separately under the isolation guard; Linux network-isolation scope not exercised on macOS |
+| Stack and lease budgets | Lease passed; stack red only on the same deferred assertion, no overflow, threshold unchanged |
+| Docs, startup plan paths and graph refresh | Passed (03A accepted; startup list; `trail build`) |
+
+Other check.sh gates are recorded in phases/p03/docs/TASK.md: Docker image gates unavailable (no
+daemon); managed Doop deferred and red (05SC-C001/04RU-C005); the plugin package, Doop runner and
+attribution gates red in the full run and passing on rerun; the CSS gate fixed in 03B. Status:
+**accepted in phase, not declared complete** while those checks stay unavailable or red.
 
 Do not declare the implementation complete while a required check is unavailable.

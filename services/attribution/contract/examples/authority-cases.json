@@ -1,0 +1,126 @@
+{
+  "companies": [
+    {
+      "company_id": "11111111-1111-4111-8111-111111111111",
+      "stores": [
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+      ]
+    },
+    {
+      "company_id": "22222222-2222-4222-8222-222222222222",
+      "stores": [
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2"
+      ]
+    }
+  ],
+  "credential_classes": {
+    "openbot_session": {
+      "accepted_by": "OpenbotSession",
+      "not_accepted_by": [
+        "Session",
+        "StoreKey",
+        "Lifecycle"
+      ]
+    },
+    "attribution_session": {
+      "accepted_by": "Session",
+      "not_accepted_by": [
+        "StoreKey",
+        "Lifecycle"
+      ]
+    },
+    "identity_grant": {
+      "accepted_by": "IdentityGrant",
+      "not_accepted_by": [
+        "Client",
+        "StoreKey",
+        "Session"
+      ]
+    },
+    "confidential_client": {
+      "accepted_by": "Client",
+      "not_accepted_by": [
+        "IdentityGrant",
+        "StoreKey",
+        "Session"
+      ]
+    },
+    "store_key": {
+      "accepted_by": "StoreKey",
+      "not_accepted_by": [
+        "Session",
+        "IdentityGrant",
+        "Lifecycle"
+      ]
+    },
+    "public_installation": {
+      "accepted_by": null,
+      "not_accepted_by": [
+        "Session",
+        "StoreKey",
+        "IdentityGrant",
+        "Lifecycle"
+      ]
+    },
+    "lifecycle": {
+      "accepted_by": "Lifecycle",
+      "not_accepted_by": [
+        "StoreKey",
+        "Session",
+        "IdentityGrant"
+      ]
+    }
+  },
+  "roles": {
+    "owner": [
+      "read",
+      "links:manage",
+      "integrations:manage"
+    ],
+    "admin": [
+      "read",
+      "links:manage",
+      "integrations:manage"
+    ],
+    "member": [
+      "read"
+    ],
+    "none": []
+  },
+  "denials": [
+    {
+      "case": "member_creates_link",
+      "expected_status": 403
+    },
+    {
+      "case": "company_a_session_uses_company_b_store_under_active_a",
+      "expected_status": 404
+    },
+    {
+      "case": "actor_belongs_to_both_companies_but_requests_foreign_active_scope",
+      "expected_status": 404
+    },
+    {
+      "case": "store_a_key_submits_store_b",
+      "expected_status": 400
+    },
+    {
+      "case": "public_installation_submits_paid_event",
+      "expected_status": 401
+    },
+    {
+      "case": "client_secret_plus_arbitrary_user_id",
+      "expected_status": 400
+    },
+    {
+      "case": "identity_authority_unavailable",
+      "expected_status": 503
+    },
+    {
+      "case": "local_company_status_at_five_minutes",
+      "expected_status": 503
+    }
+  ]
+}

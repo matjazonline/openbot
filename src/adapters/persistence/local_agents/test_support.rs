@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::{
     adapters::persistence::test_support::{OwnDatabase, own_database},
     use_cases::{
@@ -83,11 +83,18 @@ impl Fixture {
         }
         for (user, role) in [(accounts[1], "admin"), (accounts[2], "member")] {
             let mut tx = database.pool.begin().await.unwrap();
-            sqlx::query("INSERT INTO company_members (id,company_id,user_id,role,access_level) VALUES ($1,$2,$3,$4,0)")
-                .bind(Uuid::new_v4()).bind(companies[0]).bind(user).bind(role).execute(&mut *tx).await.unwrap();
-            sqlx::query("INSERT INTO principals (id,company_id,kind,user_id,display_label) \
-                SELECT $1,$2,'person',$3,$4 WHERE NOT EXISTS(SELECT 1 FROM principals WHERE company_id=$2 AND user_id=$3 AND kind='person')")
-                .bind(Uuid::new_v4()).bind(companies[0]).bind(user).bind(role).execute(&mut *tx).await.unwrap();
+            crate::adapters::persistence::company::join_root_on(
+                &mut tx,
+                crate::adapters::persistence::company::RootJoin {
+                    company: crate::domain::workflow::CompanyId::new(companies[0]),
+                    user,
+                    role: (role).parse().expect("fixture role"),
+                    access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+                },
+            )
+            .await
+            .expect("fixture root member");
+
             tx.commit().await.unwrap();
         }
         let cases = Arc::new(LocalMachineUseCases::new(
@@ -172,7 +179,7 @@ impl Fixture {
     }
 
     pub async fn conversation(&self, company: Uuid) -> Uuid {
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             self.persistence.as_ref(),
             company,
             ChannelWrite {
@@ -250,6 +257,7 @@ pub(crate) async fn native_mcp_binding(
     let connection = p
         .create_mcp_connection(
             tenant,
+            p.test_root_unit(tenant).await,
             McpConnectionWrite {
                 slug: "native-crm".into(),
                 endpoint: endpoint.to_owned().try_into().unwrap(),

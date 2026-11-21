@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "round": "AS-P05-B1-R1",
+  "artifact": "a03abfeaf183952cbbf5c178939823e441b9355fcc2e151618527ee2d18d1a4d",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib catalog -- --nocapture",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-catalog-tests-5.txt",
+          "sha256": "5e676793a78050e635b57246955e115c74fd9e921130d64331feb3cf14ed9366"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8",
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_setup_browser_real_forms_and_postgres -- --ignored --nocapture",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-browser-3.txt",
+          "sha256": "6ba18663dfd9c307c23a6bc184b8c2a96ca5e0020b4ecaee0633909a8ceea670"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::identity::http_tests::setup_tests -- --nocapture",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-setup-2.txt",
+          "sha256": "ad1fd3bae6f2267575f4321121e8697aa9facdf951ca1078f20203b95c4d490b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::setup:: -- --nocapture",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-setup-domain-1.txt",
+          "sha256": "85c348ffec0be8bdd121a717b196ad1569279ac01fe7a3ca58ddddba7af291e8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --lib application::setup:: -- --nocapture",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-setup-normalization-1.txt",
+          "sha256": "694beefff62d76df59c311365f43cdce3a631483822202c48036a35f19ef2c8e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::identity:: -- --skip setup_tests --skip catalog_tests --nocapture",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-identity-1.txt",
+          "sha256": "1eab71f80ee7f1fa2e20d9675c77418dc6077288852e236a4fe75055d938b392"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "PYTHON=python3.13 scripts/verify.sh foundation",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-foundation-2.txt",
+          "sha256": "17edc0d7b27a21771cbb4e744c03a77c6e373331523cf44c52f99908d4119d53"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC9"
+      ],
+      "command": "/tmp/as-p02-contract-clean/bin/python services/attribution/contract/test_contracts.py",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-contract-3.txt",
+          "sha256": "982bfd7476dd2f2a451e6e98d62685faba584af0475fb1ac2f25dcd7701c15a6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "trail check",
+      "fixture": "Rust1.95.0; invocation-owned as_test_/as_verify_ PostgreSQL resources; local authority/DNS; browser local HTTPS fixture where applicable",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P05-trail-check-1.txt",
+          "sha256": "ee66a809725dd0d33160fac8a1fa55afd1f7971d6bf8c9a57c80b2596a489059"
+        }
+      ]
+    }
+  ]
+}

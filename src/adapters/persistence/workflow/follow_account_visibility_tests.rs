@@ -2,6 +2,15 @@ use super::*;
 use crate::entities::value_objects::EmailAddress;
 use crate::use_cases::user::{ExternalIdentity, LoginMethod, ProfileUpdate, UserPersistence};
 
+/// Reconcile without replacing the configured grant whose email proof is under test.
+async fn refresh_visibility(f: &FollowFixture) {
+    let current = ChannelPersistence::get_by_id(f.people.role.p(), f.people.role.channel)
+        .await
+        .unwrap()
+        .unwrap();
+    ownership(f, current.department_id).await;
+}
+
 async fn change_address(f: &FollowFixture) -> EmailAddress {
     let p = f.people.role.p();
     let user = UserPersistence::get_by_id(p, f.people.users[0])
@@ -39,7 +48,7 @@ fn claim<'a>(subject: &'a str, email: &'a EmailAddress) -> ExternalIdentity<'a> 
 #[tokio::test]
 async fn workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility()
 {
-    let f = Box::pin(fixture()).await;
+    let f = Box::pin(email_only_fixture()).await;
     let proposal = f.proposal().await;
     change_address(&f).await;
     assert!(
@@ -52,11 +61,11 @@ async fn workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_v
 
 #[tokio::test]
 async fn workflow_reviewer_follow_actual_external_link_repairs_current_verified_visibility() {
-    let f = Box::pin(fixture()).await;
+    let f = Box::pin(email_only_fixture()).await;
     let email = change_address(&f).await;
     // Synchronize through another real writer, isolating the link's repair obligation
     // even while the profile writer's missing refresh is independently under test.
-    edit(&f, None, None).await.unwrap();
+    refresh_visibility(&f).await;
     assert!(f.assignment().await.reviewers.is_empty());
     assert_eq!(state(&f).await["state"], "pending");
     let subject = format!("follow-link-{}", Uuid::new_v4().simple());
@@ -76,7 +85,7 @@ async fn workflow_reviewer_follow_actual_external_link_repairs_current_verified_
 
 #[tokio::test]
 async fn workflow_reviewer_follow_actual_external_login_repairs_only_current_address_proof() {
-    let f = Box::pin(fixture()).await;
+    let f = Box::pin(email_only_fixture()).await;
     let user = UserPersistence::get_by_id(f.people.role.p(), f.people.users[0])
         .await
         .unwrap()
@@ -90,7 +99,7 @@ async fn workflow_reviewer_follow_actual_external_login_repairs_only_current_add
         .await
         .unwrap();
     let email = change_address(&f).await;
-    edit(&f, None, None).await.unwrap();
+    refresh_visibility(&f).await;
     assert!(f.assignment().await.reviewers.is_empty());
     let p = f.people.role.p();
     let stale = p
@@ -119,7 +128,7 @@ async fn workflow_reviewer_follow_actual_external_login_repairs_only_current_add
 
 #[tokio::test]
 async fn workflow_reviewer_follow_competing_provider_links_have_one_current_proof_and_assignment() {
-    let f = Box::pin(fixture()).await;
+    let f = Box::pin(email_only_fixture()).await;
     let email = change_address(&f).await;
     let first = format!("first-{}", Uuid::new_v4().simple());
     let second = format!("second-{}", Uuid::new_v4().simple());
@@ -163,7 +172,7 @@ async fn workflow_reviewer_follow_competing_provider_links_have_one_current_proo
 #[tokio::test]
 async fn workflow_reviewer_follow_provider_link_refresh_failure_rolls_back_method_proof_and_assignment()
  {
-    let f = Box::pin(fixture()).await;
+    let f = Box::pin(email_only_fixture()).await;
     let email = change_address(&f).await;
     assert!(f.assignment().await.reviewers.is_empty());
     sqlx::raw_sql("CREATE FUNCTION account_follow_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected proof refresh failure'; END $$; \

@@ -2,7 +2,7 @@
 //! rather than read.
 //!
 //! The shell, the company scoping and the form parsing are all shared: chrome comes from
-//! [`crate::adapters::http::pages::ui_shell`], the company from [`super::ui::load_managed_company`],
+//! [`crate::adapters::http::pages::ui_shell`], the company from [`super::ui::load_administered_company`],
 //! and every field is parsed by the same helpers the classic Agents page uses, so the two UIs
 //! cannot drift on what a submitted agent means.
 
@@ -45,7 +45,7 @@ use crate::{
 use super::{
     agent::{AgentForm, AgentInstructionRequest, ModelOverrides, agent_write_from_instructions},
     channel::parse_agent_ids_form,
-    ui::{load_account, load_managed_company, workspace_user},
+    ui::{load_account, load_administered_company, workspace_user},
 };
 
 mod authoring;
@@ -149,12 +149,13 @@ impl FromRequestParts<AppState> for Workspace {
 }
 
 impl Workspace {
-    /// The company a request is scoped to, always picked from those the caller owns or administers
-    /// so a guessed `company_id` cannot reach another company's agents.
+    /// The company a request is scoped to: one in which the caller manages at least one unit, so
+    /// a guessed `company_id` cannot reach another company's agents. Each agent is then checked
+    /// against its own departments.
     async fn scoped_company(&self, company_id: Uuid) -> AppResult<Company> {
         Ok(self
             .company_use_cases
-            .managed_company(self.user_id, company_id)
+            .administered_company(self.user_id, company_id)
             .await?
             .company)
     }
@@ -181,21 +182,17 @@ async fn agents_page(
     let account_email = EmailAddress::from(account.email.as_str());
     let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
-    let (companies, company) = load_managed_company(
+    let (companies, company) = load_administered_company(
         &workspace.company_use_cases,
         workspace.user_id,
         query.company_id,
     )
     .await?;
-    let Some(CompanyAccess {
-        company,
-        membership,
-        ..
-    }) = company
-    else {
+    let Some(access) = company else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
-    let workspace_user = workspace_user.with_company_membership(membership);
+    let workspace_user = workspace_user.with_company_access(&access);
+    let CompanyAccess { company, .. } = access;
 
     let view = workspace.view(&company);
     let agents = view.agents().await?;
@@ -537,9 +534,10 @@ struct AgentSettingsView<'a> {
 impl AgentSettingsView<'_> {
     async fn model_connections(
         &self,
+        agent: Option<Uuid>,
     ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
         self.agent_use_cases
-            .list_company_model_connections(self.user_id, self.company.id)
+            .list_company_model_connections(self.user_id, self.company.id, agent)
             .await
     }
 
@@ -549,12 +547,17 @@ impl AgentSettingsView<'_> {
             .await
     }
 
-    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
+    /// The skills offered for `agent`, or for a new agent of this author (Plan07).
+    async fn skills(
+        &self,
+        agent: Option<Uuid>,
+    ) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
         Ok(self
             .skill_use_cases
-            .list_company_page(
+            .list_authoring_page(
                 self.user_id,
                 self.company.id,
+                agent,
                 SkillPageRequest {
                     before: None,
                     limit: MAX_SKILL_PAGE_SIZE,
@@ -589,9 +592,9 @@ impl AgentSettingsView<'_> {
     /// It loads its own model connections and library definitions the way [`Self::edit_pane`]
     /// does, so no caller has to fetch what only this pane reads.
     async fn create_pane(&self, form: CreateForm<'_>) -> AppResult<String> {
-        let model_connections = self.model_connections().await?;
+        let model_connections = self.model_connections(None).await?;
         let library_agents = self.agent_use_cases.list_library_agents().await?;
-        let mut skills = self.skills().await?;
+        let mut skills = self.skills(None).await?;
         for skill_id in &form.draft.skill_ids {
             if !skills.iter().any(|skill| skill.id == *skill_id)
                 && let Some(skill) = self
@@ -651,13 +654,13 @@ impl AgentSettingsView<'_> {
             .authoring_state(authoring::scope(self.user_id, self.company.id, agent.id)?)
             .await?;
         let agent = &authoring.agent;
-        let model_connections = self.model_connections().await?;
+        let model_connections = self.model_connections(Some(agent.id)).await?;
         let capabilities = self
             .skill_use_cases
             .company_agent_capabilities(self.user_id, self.company.id, agent.id)
             .await?
             .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
-        let mut skills = self.skills().await?;
+        let mut skills = self.skills(Some(agent.id)).await?;
         for selected in &capabilities.skills {
             if !skills.iter().any(|skill| skill.id == selected.id) {
                 skills.push(selected.into());

@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.51s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+running 14 tests
+test adapters::http::routes::ui_departments::tests::unit_model_default_department_card_saves_for_managers_only ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_authority_moves_and_department_delete ... ok
+test application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_root_managers_own_defaults_offers_and_library_fallback ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_model_default_a_department_form_keeps_the_last_connection ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_moves_and_an_empty_root ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::unit_model_default_agent_builder_model_follows_the_placement_reach ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_cascade_pins_the_nearest_default_and_stays_frozen ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_competing_units_add_one_provider ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_model_default_reach_refuses_publication_after_a_move ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::unit_model_default_admission_refuses_a_model_moved_out_of_reach ... ok
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 4949 filtered out; finished in 8.57s

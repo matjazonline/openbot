@@ -45,13 +45,29 @@ impl TeamAuthority {
     pub(super) fn member(&self, user_id: Uuid) -> Option<&LockedMember> {
         self.members.iter().find(|member| member.user_id == user_id)
     }
-    pub(super) fn require_owner(&self) -> AppResult<()> {
+    pub(in crate::adapters::persistence) fn require_owner(&self) -> AppResult<()> {
         if !self.actor.membership.is_owner() {
             return Err(AppError::Forbidden(
-                "Only the company owner may change invitations.".into(),
+                "Only the company owner may change company membership or administration.".into(),
             ));
         }
         Ok(())
+    }
+    /// The persistence recheck of the invitation rule: root admins write member invitations only.
+    pub(super) fn require_inviter(
+        &self,
+        roles: impl IntoIterator<Item = crate::entities::company_member::CompanyAccessRole>,
+    ) -> AppResult<()> {
+        if roles
+            .into_iter()
+            .all(|role| self.actor.membership.may_invite_as(role))
+        {
+            return Ok(());
+        }
+        Err(AppError::Forbidden(
+            "Admins manage member invitations; only the company owner may invite an administrator."
+                .into(),
+        ))
     }
     pub(super) fn assign(&self, current: LevelTarget, requested: AccessLevel) -> AppResult<()> {
         may_assign_level(self.actor, current, requested).map_err(level_error)
@@ -71,16 +87,20 @@ pub(in crate::adapters::persistence) fn database(error: sqlx::Error) -> AppError
 pub(in crate::adapters::persistence) async fn start(
     pool: &PgPool,
     scope: TeamScope,
+    target: Option<Uuid>,
 ) -> AppResult<Transaction<'_, Postgres>> {
     let mut transaction = pool.begin().await.map_err(database)?;
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
         .execute(&mut *transaction).await.map_err(database)?;
-    let actor: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE id=$1 FOR SHARE")
-        .bind(scope.actor_id)
-        .fetch_optional(&mut *transaction)
-        .await
-        .map_err(database)?;
-    if actor.is_none() {
+    let mut accounts = vec![scope.actor_id];
+    accounts.extend(target);
+    let locked: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM users WHERE id = ANY($1) ORDER BY id FOR SHARE")
+            .bind(accounts)
+            .fetch_all(&mut *transaction)
+            .await
+            .map_err(database)?;
+    if !locked.contains(&scope.actor_id) {
         return Err(AppError::NotFound("Company not found".into()));
     }
     Ok(transaction)
@@ -102,9 +122,31 @@ pub(in crate::adapters::persistence) async fn lock_team(
     if let Some(target) = target {
         users.push(target);
     }
+    sqlx::query(
+        "SELECT id FROM principals WHERE company_id = $1 AND user_id = ANY($2) \
+         ORDER BY id FOR UPDATE",
+    )
+    .bind(scope.company_id)
+    .bind(&users)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(database)?;
+    sqlx::query(
+        "SELECT id FROM department_members WHERE company_id = $1 AND root_user_id = ANY($2) \
+         ORDER BY root_user_id FOR UPDATE",
+    )
+    .bind(scope.company_id)
+    .bind(&users)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(database)?;
     let members = sqlx::query_as::<_, LockedMember>(
-        "SELECT user_id,role,access_level::smallint AS access_level FROM company_members WHERE company_id=$1 AND user_id=ANY($2) ORDER BY user_id FOR UPDATE")
-        .bind(scope.company_id).bind(users).fetch_all(&mut **tx).await.map_err(database)?;
+        "SELECT member.user_id, member.role, member.access_level::smallint AS access_level \
+         FROM principals AS principal \
+         JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true \
+         WHERE principal.company_id = $1 AND principal.user_id = ANY($2) ORDER BY principal.user_id",
+    )
+    .bind(scope.company_id).bind(users).fetch_all(&mut **tx).await.map_err(database)?;
     let actor = members
         .iter()
         .find(|member| member.user_id == scope.actor_id)
@@ -165,6 +207,46 @@ pub(super) async fn read_invite(
         .await
         .map_err(database)
 }
+/// The address's invitation as committed under the company lock. Every role and level writer
+/// holds that lock, so this read is stable for the rest of the transaction.
+pub(super) async fn read_invite_by_email(
+    tx: &mut Transaction<'_, Postgres>,
+    company: Uuid,
+    email: &str,
+) -> AppResult<Option<CompanyInviteDb>> {
+    sqlx::query_as(&format!("{INVITE_SELECT} AND invite.email=$2::citext"))
+        .bind(company)
+        .bind(email)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(database)
+}
+/// Accepting a member invitation demotes a current admin, so only the owner may address one.
+pub(super) async fn refuse_admin_address(
+    tx: &mut Transaction<'_, Postgres>,
+    team: &TeamAuthority,
+    company: Uuid,
+    email: &str,
+) -> AppResult<()> {
+    if team.actor.membership.is_owner() {
+        return Ok(());
+    }
+    let admin: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM users AS account CROSS JOIN LATERAL membership_of(account.id,$1) AS member
+         WHERE account.email=$2::citext AND member.role='admin')",
+    )
+    .bind(company)
+    .bind(email)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(database)?;
+    if admin {
+        return Err(AppError::Forbidden(
+            "Only the company owner may invite a current administrator.".into(),
+        ));
+    }
+    Ok(())
+}
 pub(super) async fn refuse_owner_address(
     tx: &mut Transaction<'_, Postgres>,
     owner: Uuid,
@@ -186,5 +268,5 @@ pub(super) async fn refuse_owner_address(
 pub(super) const MEMBER_SELECT: &str = "SELECT member.id,member.company_id,member.user_id,
     account.username::text AS username,account.email::text AS email,account.avatar_url,
     member.role,member.access_level::smallint AS access_level,member.created_at
-    FROM company_members AS member JOIN users AS account ON account.id=member.user_id
+    FROM membership_of($2, $1) AS member JOIN users AS account ON account.id=member.user_id
     WHERE member.company_id=$1 AND member.user_id=$2 AND member.role<>'owner'";

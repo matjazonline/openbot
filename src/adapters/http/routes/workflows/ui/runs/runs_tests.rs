@@ -272,9 +272,8 @@ impl Fixture {
     }
 
     async fn channel(&self, name: &str, slug: &str, restricted: bool) -> Uuid {
-        use crate::application::ports::channel::ChannelPersistence;
         use crate::application::ports::channel::ChannelWrite;
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &self.persistence,
             self.company,
             ChannelWrite {
@@ -288,11 +287,11 @@ impl Fixture {
         .unwrap()
         .id;
         if restricted {
-            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-                .bind(channel)
-                .execute(self.persistence.pool())
-                .await
-                .unwrap();
+            crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+                self.persistence.pool(),
+                channel,
+            )
+            .await;
         }
         channel
     }
@@ -874,14 +873,17 @@ async fn department_views_runs_department_scope_is_company_scoped() {
         Err(AppError::NotFound(_))
     ));
     let options = ui.scope_options(f.company).await.unwrap();
-    assert_eq!(
-        options
-            .departments
-            .iter()
-            .map(|option| option.id)
-            .collect::<Vec<_>>(),
-        [mine.id.as_uuid()]
-    );
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(f.company)
+            .fetch_one(f.persistence.pool())
+            .await
+            .unwrap();
+    let mut actual: Vec<_> = options.departments.iter().map(|option| option.id).collect();
+    let mut expected = vec![root, mine.id.as_uuid()];
+    actual.sort();
+    expected.sort();
+    assert_eq!(actual, expected);
     let html = waiting_workspace(
         f.ui(f.owner),
         WorkspaceQuery {

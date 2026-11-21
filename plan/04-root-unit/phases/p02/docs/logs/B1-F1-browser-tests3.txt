@@ -1,0 +1,36 @@
+✖ form feedback and another member’s team autocomplete stay text under production CSP (870.680625ms)
+✔ served team autocomplete renders account strings as text and keeps selection working (242.492833ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1055.981167
+
+✖ failing tests:
+
+test at scripts/tests/html-injection-browser.mjs:101:1
+✖ form feedback and another member’s team autocomplete stay text under production CSP (870.680625ms)
+  AssertionError [ERR_ASSERTION]: desk-classic-create/light
+  + actual - expected
+  
+    {
+  +   outlineOffset: '2px',
+  +   radius: '4px'
+  -   outlineOffset: '-1px',
+  -   radius: '8px'
+    }
+  
+      at verifyDeskAccessForms (file:///Users/mac02/orca/workspaces/openbot/plan03-04/scripts/tests/html-injection-browser.mjs:78:16)
+      at async TestContext.<anonymous> (file:///Users/mac02/orca/workspaces/openbot/plan03-04/scripts/tests/html-injection-browser.mjs:215:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { radius: '4px', outlineOffset: '2px' },
+    expected: { radius: '8px', outlineOffset: '-1px' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

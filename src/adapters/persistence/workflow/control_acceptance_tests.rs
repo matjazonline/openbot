@@ -355,20 +355,21 @@ async fn workflow_control_principal_revocation_and_authority_locks() {
     )
     .await
     .unwrap();
-    for table in ["principals", "company_members"] {
+    for statement in [
+        "DELETE FROM principals WHERE company_id=$1 AND user_id=$2",
+        "DELETE FROM department_members WHERE company_id=$1 AND root_user_id=$2",
+    ] {
         let mut contender = f.persistence().pool().begin().await.unwrap();
         sqlx::query("SET LOCAL lock_timeout='100ms'")
             .execute(&mut *contender)
             .await
             .unwrap();
-        let error = sqlx::query(&format!(
-            "DELETE FROM {table} WHERE company_id=$1 AND user_id=$2"
-        ))
-        .bind(scope.company.as_uuid())
-        .bind(cmd.actor.user_id())
-        .execute(&mut *contender)
-        .await
-        .unwrap_err();
+        let error = sqlx::query(statement)
+            .bind(scope.company.as_uuid())
+            .bind(cmd.actor.user_id())
+            .execute(&mut *contender)
+            .await
+            .unwrap_err();
         assert_eq!(
             error.as_database_error().unwrap().code().as_deref(),
             Some("55P03")
@@ -377,12 +378,12 @@ async fn workflow_control_principal_revocation_and_authority_locks() {
     }
     authority.rollback().await.unwrap();
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    sqlx::query("DELETE FROM principals WHERE company_id=$1 AND user_id=$2")
-        .bind(scope.company.as_uuid())
-        .bind(cmd.actor.user_id())
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership(
+        &mut tx,
+        scope.company.as_uuid(),
+        cmd.actor.user_id(),
+    )
+    .await;
     let revoke = async {
         tokio::time::sleep(Duration::from_millis(50)).await;
         tx.commit().await.unwrap();
@@ -406,14 +407,15 @@ async fn workflow_control_foreign_scope_and_conflicting_authorized_actor_run_key
         .await
         .unwrap();
     let user = f.persistence().get_by_email(&email).await.unwrap().unwrap();
-    sqlx::query("INSERT INTO company_members (id,company_id,user_id,role) VALUES (gen_random_uuid(),$1,$2,'admin')")
-        .bind(scope.company.as_uuid())
-        .bind(user.id)
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO principals (id,company_id,kind,user_id,display_label) VALUES ($1,$2,'person',$3,'Control admin') ON CONFLICT DO NOTHING")
-        .bind(Uuid::new_v4()).bind(scope.company.as_uuid()).bind(user.id).execute(f.persistence().pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        f.persistence().pool(),
+        crate::domain::workflow::CompanyId::new(scope.company.as_uuid()),
+        user.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
+
     let foreign = super::super::super::admission_source_tests::ForeignSource::new(&f).await;
     let parent =
         super::super::super::admission_source_tests::foreign_parent(&f, foreign.company).await;

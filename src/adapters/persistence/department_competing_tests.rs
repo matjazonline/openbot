@@ -44,13 +44,23 @@ async fn department_competing_reparents_never_form_a_cycle() {
             .any(|outcome| matches!(outcome, Err(AppError::BadRequest(_)))),
         "{outcomes:?}"
     );
-    let parents: Vec<Option<Uuid>> =
-        sqlx::query_scalar("SELECT parent_id FROM departments WHERE company_id = $1 ORDER BY slug")
-            .bind(f.company)
-            .fetch_all(f.pool())
-            .await
-            .unwrap();
-    assert_eq!(parents.iter().filter(|parent| parent.is_some()).count(), 1);
+    let parents: Vec<Option<Uuid>> = sqlx::query_scalar(
+        "SELECT parent_id FROM departments WHERE company_id = $1 AND NOT is_root ORDER BY slug",
+    )
+    .bind(f.company)
+    .fetch_all(f.pool())
+    .await
+    .unwrap();
+    assert_eq!(parents.len(), 2);
+    assert!(parents.iter().all(Option::is_some));
+    let root = f.root_id().await.as_uuid();
+    assert_eq!(
+        parents
+            .iter()
+            .filter(|parent| **parent == Some(root))
+            .count(),
+        1
+    );
 }
 
 #[tokio::test]
@@ -241,7 +251,7 @@ async fn department_competing_write_behind_an_admin_demotion_is_refused() {
     let f = Arc::new(Departments::on(database.pool.clone()).await);
     let mut demotion = hold_company(&f).await;
     sqlx::query(
-        "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+        "DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id = $1 AND member.root_user_id = $2",
     )
     .bind(f.company)
     .bind(f.admin)
@@ -260,10 +270,12 @@ async fn department_competing_write_behind_an_admin_demotion_is_refused() {
     demotion.commit().await.unwrap();
     let outcome = create.await.unwrap();
     assert!(matches!(outcome, Err(AppError::NotFound(_))), "{outcome:?}");
-    let created: i64 = sqlx::query_scalar("SELECT count(*) FROM departments WHERE company_id = $1")
-        .bind(f.company)
-        .fetch_one(f.pool())
-        .await
-        .unwrap();
+    let created: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM departments WHERE company_id = $1 AND NOT is_root",
+    )
+    .bind(f.company)
+    .fetch_one(f.pool())
+    .await
+    .unwrap();
     assert_eq!(created, 0);
 }

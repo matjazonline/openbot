@@ -11,6 +11,8 @@ impl IntoResponse for AppError {
         let error_kind = match &self {
             AppError::WorkflowRole(_) => "workflow_role",
             AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
+            AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
+            AppError::BudgetExhausted(_) => "budget_exhausted",
             AppError::KnowledgeRelease { .. } => "knowledge_release",
             AppError::Execution(_) => "execution",
             AppError::Database(_) => "database",
@@ -35,6 +37,16 @@ impl IntoResponse for AppError {
             AppError::WorkflowRole(refusal) => (
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({"code":refusal.kind.code(),"error":refusal.to_string(),"step":refusal.step,"role":refusal.role})),
+            ).into_response(),
+            AppError::BudgetExhausted(refusal) => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"code":refusal.code(),"error":refusal.to_string(),
+                    "unit":refusal.unit,"period":refusal.period})),
+            ).into_response(),
+            AppError::ResourceOutsideUnit(refusal) => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"code":refusal.code(),"error":refusal.to_string(),
+                    "kind":refusal.kind.code(),"resource":refusal.resource,"name":refusal.name})),
             ).into_response(),
             AppError::KnowledgeTrigger { .. } => (
                 StatusCode::BAD_REQUEST,
@@ -113,5 +125,27 @@ mod role_tests {
         assert_eq!(value["role"], "lead");
         assert_eq!(value.as_object().unwrap().len(), 4);
         assert!(value["error"].as_str().unwrap().contains("draft"));
+    }
+
+    /// Plan07 02B (07UR-P02-B2-F2): a cap refusal is a 400 naming the code, unit and period.
+    #[tokio::test]
+    async fn unit_budget_http_refusal_is_a_bounded_named_bad_request() {
+        let unit = uuid::Uuid::new_v4();
+        let response = AppError::BudgetExhausted(crate::app_error::BudgetExhausted {
+            unit,
+            name: "Sales".into(),
+            period: "month",
+        })
+        .into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["code"], "budget.unit_exhausted");
+        assert_eq!(value["unit"], unit.to_string());
+        assert_eq!(value["period"], "month");
+        assert_eq!(value.as_object().unwrap().len(), 4);
+        assert!(value["error"].as_str().unwrap().contains("Sales"));
     }
 }

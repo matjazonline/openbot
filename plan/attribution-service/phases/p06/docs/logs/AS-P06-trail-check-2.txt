@@ -1,0 +1,122 @@
+checking 23 changed files against 14 learnings and 2 skills
+
+● plan/attribution-service/01-application-boundaries-and-contracts.md:109
+  brings back committed click, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The service returned 302 and committed its click, but
+  Chromium tried public DNS and failed with ERR_NAME_NOT_RESOLVED.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:113
+  brings back local test merchant, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:114
+  brings back native account company, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:165
+  brings back first test case, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:165
+  brings back real passed without, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 16: Timing out an unprivileged shim after real deletion
+  passed without proving that privileged work stopped.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:166
+  brings back check exist role, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:168
+  brings back explicit check without, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Replacing that wrapping label with an explicit
+  association made the complete eight-check journey pass, without
+  loosening the locator or bypassing the form.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:169
+  brings back file protocol failure, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 16: A six-file MCP cleanup counterfactual passing did not
+  establish a cleanup protocol cause for a Doop provider-lifetime
+  failure.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:89
+  brings back local test passed, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:89
+  brings back journey check service, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Do not weaken the journey into only checking an href
+  or mock the service redirect.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:93
+  brings back first actual test, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:93
+  brings back real deletion passed, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 16: Timing out an unprivileged shim after real deletion
+  passed without proving that privileged work stopped.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:98
+  brings back openbot persistence boundary, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 14: A literal like `<escalation-{id}@openbot.invalid>`
+  built in persistence breaks the transport boundary in two ways: it
+  is a synthetic `.invalid` identity, and it is an RFC id made outside
+  the email adapter.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:100
+  brings back source helper company, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:102
+  brings back browser journey exact, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The setup browser journey repeatedly timed out on
+  getByLabel("Verified domain", {exact:true}) after DNS verification
+  had succeeded.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:111
+  brings back pass establish failure, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 16: A six-file MCP cleanup counterfactual passing did not
+  establish a cleanup protocol cause for a Doop provider-lifetime
+  failure.
+● plan/attribution-service/04-merchant-setup-and-api-credentials.md:63
+  brings back setup browser domain, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The setup browser journey repeatedly timed out on
+  getByLabel("Verified domain", {exact:true}) after DNS verification
+  had succeeded.
+● plan/attribution-service/04-merchant-setup-and-api-credentials.md:63
+  brings back hash cache contract, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 16: Raw-byte hashing and a durable/global cache would
+  change the contract and were unnecessary.
+● plan/attribution-service/04-merchant-setup-and-api-credentials.md:65
+  brings back local key two, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● plan/attribution-service/04-merchant-setup-and-api-credentials.md:65
+  brings back actual compet test, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r16-1e58fa36, not merged yet
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+
+· no conflicts · 20 worth a look
+
+🔀 trail · Cloudroom's branch codex/plan03-p04-ci-f059f498-20261115 also changes Cargo.lock, Cargo.toml and 1 more (pushed Nov 15)
+🔀 trail · Matjazonline's branch anthropic-latest-models also changes src/main.rs (pushed Nov 6)

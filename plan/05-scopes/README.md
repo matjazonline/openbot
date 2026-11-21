@@ -4,14 +4,22 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed, 2026-11-09; knowledge folded in the same day. Fifth of nine organization plans;
+Status: implementation published 2026-11-18 at `3d7148b1`; final documentation and evidence are
+recorded in [phase04](phases/p04/docs/TASK.md). Fifth of nine organization plans;
 depends on
 [01-departments](../01-departments/README.md) through [04-root-unit](../04-root-unit/README.md)
 and on the memory service integration (batch 05A of the archived plan
 [`plan/.archive/memory-service`](../.archive/memory-service/README.md)), which has been on `main`
 since 2026-11-10. File anchors in this plan were rechecked against `main` that day.
 
-## Intended behavior
+Current usage is documented in [Departments](../../docs/departments.md#memory-and-knowledge),
+[Agent authoring](../../docs/agent-authoring.md#memory-and-knowledge-scopes) and the
+[memory service integration notes](../../services/memory/README.md#openbot-integration).
+The design context below records the original 2026-11-09 proposal. The implemented namespace
+kinds are `unit` and `principal`; the new subject contract is the reviewed extension described
+in the completion record.
+
+## Design context recorded 2026-11-09
 
 Memory and knowledge answer two separate questions about a fact: who may know it, which is the
 access level and does not change here, and whose it is, which today is "the company" for
@@ -81,7 +89,9 @@ flows down the tree, never sideways, and a lead change moves nothing, because ro
 
 ## What does not change
 
-- The service contract, its access-level contract, credentials and the lifecycle reconciler.
+- The service's tenant/namespace authority, access-level contract, credentials and lifecycle
+  reconciler. Phase02 added opaque subject provenance and managed list/delete operations; the
+  service remains department-agnostic. See the reviewed C004/C005 decisions and integration notes.
 - `memory.load` and `memory.save` as workflow steps and the agent memory tools, except for the
   scope vocabulary in [02](02-scope-resolution-and-tools.md).
 - Knowledge levels, the lowest-reader rule, withheld replies, consumption proofs, embeddings and the

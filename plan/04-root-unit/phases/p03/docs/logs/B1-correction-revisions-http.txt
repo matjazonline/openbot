@@ -1,0 +1,40 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 27 tests
+test adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation ... ok
+test adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members ... ok
+test adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure ... ok
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate ... ok
+test adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids ... ok
+test adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback ... ok
+test adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_exact_frozen_connection_slot ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys ... ok
+test adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_frozen_provenance_ceiling_and_binding ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_current_revocation_errors_policy_and_approval ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored ... ok
+test adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it ... ok
+test adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_lookup_timeouts_fail_closed ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 4722 filtered out; finished in 5.97s
+

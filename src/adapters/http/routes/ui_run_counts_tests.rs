@@ -66,7 +66,6 @@ use super::super::ui::stream_tests::{Frames, test_config};
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::entities::run_counts::RunCountRow;
 use crate::entities::run_counts::RunCountSnapshot;
@@ -117,7 +116,7 @@ impl CountsFixture {
         let mut channels = Vec::new();
         for index in 0..2 {
             channels.push(
-                ChannelPersistence::create(
+                crate::adapters::persistence::test_support::create_channel(
                     persistence.as_ref(),
                     company.id,
                     ChannelWrite {
@@ -454,11 +453,18 @@ async fn permissions_are_shared_rechecked_and_scoped_to_the_managed_company() {
     let reader = ControlledReader::new(false);
     let mut ws = workspace(&f, reader.clone(), events.clone(), monitor.clone());
     ws.viewer = viewer.clone();
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE company_id = $1")
+    let channels: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM channels WHERE company_id=$1")
         .bind(f.company_id)
-        .execute(f.persistence.pool())
+        .fetch_all(f.persistence.pool())
         .await
         .unwrap();
+    for channel in channels {
+        crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+            f.persistence.pool(),
+            channel,
+        )
+        .await;
+    }
     assert!(
         ws.channels
             .list_managed_readable_channels(&viewer, f.company_id)
@@ -485,7 +491,7 @@ async fn permissions_are_shared_rechecked_and_scoped_to_the_managed_company() {
     assert!(cleared.contains("No open runs"));
     assert!(!cleared.contains("channel:"));
     sqlx::query(
-        "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+        "DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id = $1 AND member.root_user_id = $2",
     )
     .bind(f.company_id)
     .bind(viewer.user_id)

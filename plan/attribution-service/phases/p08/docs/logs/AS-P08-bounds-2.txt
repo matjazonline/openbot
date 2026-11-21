@@ -1,0 +1,134 @@
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 7.63s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 3 tests
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_bounds_unicode_keysets_filters_and_invalid_queries ... ok
+representative fixture: clicks10000 observations1000 orders1000 refund1; report HTTP elapsed 25.393375ms
+Sort  (cost=3116.23..3116.58 rows=140 width=160) (actual time=21.745..21.750 rows=15.00 loops=1)
+  Sort Key: (NULL::text) COLLATE "C" NULLS FIRST, d.currency, d.metric
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=1292
+  CTE data
+    ->  Append  (cost=0.01..2191.80 rows=28007 width=97) (actual time=0.013..7.397 rows=28007.00 loops=1)
+          Buffers: shared hit=1292
+          ->  Nested Loop  (cost=0.01..1320.12 rows=20000 width=104) (actual time=0.012..4.592 rows=20000.00 loops=1)
+                Buffers: shared hit=770
+                ->  Seq Scan on attribution_clicks c  (cost=0.00..945.00 rows=10000 width=2) (actual time=0.007..1.159 rows=10000.00 loops=1)
+                      Filter: ((clicked_at >= '2026-11-15 14:42:19.277491+00'::timestamp with time zone) AND (clicked_at < '2026-11-17 14:42:19.277495+00'::timestamp with time zone) AND (company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid))
+                      Buffers: shared hit=770
+                ->  Memoize  (cost=0.01..0.04 rows=2 width=40) (actual time=0.000..0.000 rows=2.00 loops=10000)
+                      Cache Key: c.is_bot, c.is_prefetch
+                      Cache Mode: binary
+                      Hits: 9997  Misses: 3  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                      ->  Values Scan on "*VALUES*"  (cost=0.00..0.03 rows=2 width=40) (actual time=0.000..0.001 rows=2.00 loops=3)
+          ->  Seq Scan on attribution_observations v  (cost=0.00..113.50 rows=1000 width=104) (actual time=0.008..0.193 rows=1000.00 loops=1)
+                Filter: ((observed_at >= '2026-11-15 14:42:19.277491+00'::timestamp with time zone) AND (observed_at < '2026-11-17 14:42:19.277495+00'::timestamp with time zone) AND (company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid))
+                Buffers: shared hit=91
+          ->  Nested Loop  (cost=0.01..293.80 rows=5000 width=76) (actual time=0.007..0.819 rows=5000.00 loops=1)
+                Buffers: shared hit=201
+                ->  Seq Scan on attribution_orders o  (cost=0.00..218.50 rows=1000 width=31) (actual time=0.004..0.193 rows=1000.00 loops=1)
+                      Filter: ((paid_at >= '2026-11-15 14:42:19.277491+00'::timestamp with time zone) AND (paid_at < '2026-11-17 14:42:19.277495+00'::timestamp with time zone) AND (company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid))
+                      Buffers: shared hit=201
+                ->  Memoize  (cost=0.01..0.07 rows=5 width=40) (actual time=0.000..0.000 rows=5.00 loops=1000)
+                      Cache Key: o.attribution_reason, o.tax_amount, o.shipping_amount
+                      Cache Mode: binary
+                      Hits: 998  Misses: 2  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                      ->  Values Scan on "*VALUES*_1"  (cost=0.00..0.06 rows=5 width=40) (actual time=0.000..0.003 rows=5.00 loops=2)
+          ->  Nested Loop  (cost=233.51..304.98 rows=2002 width=76) (actual time=0.209..0.699 rows=2002.00 loops=1)
+                Buffers: shared hit=217
+                ->  Hash Join  (cost=233.50..267.28 rows=1001 width=20) (actual time=0.206..0.405 rows=1001.00 loops=1)
+                      Hash Cond: ((l.store_id = o_1.store_id) AND (l.order_id = o_1.id))
+                      Buffers: shared hit=217
+                      ->  Seq Scan on attribution_order_lines l  (cost=0.00..28.51 rows=1001 width=64) (actual time=0.005..0.062 rows=1001.00 loops=1)
+                            Filter: (company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid)
+                            Buffers: shared hit=16
+                      ->  Hash  (cost=218.50..218.50 rows=1000 width=52) (actual time=0.194..0.195 rows=1000.00 loops=1)
+                            Buckets: 1024  Batches: 1  Memory Usage: 91kB
+                            Buffers: shared hit=201
+                            ->  Seq Scan on attribution_orders o_1  (cost=0.00..218.50 rows=1000 width=52) (actual time=0.002..0.121 rows=1000.00 loops=1)
+                                  Filter: ((paid_at >= '2026-11-15 14:42:19.277491+00'::timestamp with time zone) AND (paid_at < '2026-11-17 14:42:19.277495+00'::timestamp with time zone) AND (company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid))
+                                  Buffers: shared hit=201
+                ->  Memoize  (cost=0.01..0.04 rows=2 width=40) (actual time=0.000..0.000 rows=2.00 loops=1001)
+                      Cache Key: l.quantity, l.merchandise_amount
+                      Cache Mode: binary
+                      Hits: 998  Misses: 3  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                      ->  Values Scan on "*VALUES*_2"  (cost=0.00..0.03 rows=2 width=40) (actual time=0.000..0.000 rows=2.00 loops=3)
+          ->  Nested Loop  (cost=0.28..9.40 rows=3 width=76) (actual time=0.012..0.013 rows=3.00 loops=1)
+                Buffers: shared hit=4
+                ->  Nested Loop  (cost=0.28..9.33 rows=1 width=20) (actual time=0.011..0.011 rows=1.00 loops=1)
+                      Buffers: shared hit=4
+                      ->  Seq Scan on attribution_refunds r  (cost=0.00..1.02 rows=1 width=68) (actual time=0.004..0.004 rows=1.00 loops=1)
+                            Filter: ((applied_at IS NOT NULL) AND (occurred_at >= '2026-11-15 14:42:19.277491+00'::timestamp with time zone) AND (occurred_at < '2026-11-17 14:42:19.277495+00'::timestamp with time zone) AND (company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid))
+                            Buffers: shared hit=1
+                      ->  Index Only Scan using attribution_orders_company_id_store_id_id_key on attribution_orders o_2  (cost=0.28..8.30 rows=1 width=48) (actual time=0.006..0.006 rows=1.00 loops=1)
+                            Index Cond: ((company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid) AND (store_id = r.store_id) AND (id = r.order_id))
+                            Heap Fetches: 2
+                            Index Searches: 1
+                            Buffers: shared hit=3
+                ->  Values Scan on "*VALUES*_3"  (cost=0.00..0.04 rows=3 width=40) (actual time=0.000..0.001 rows=3.00 loops=1)
+          ->  Nested Loop  (cost=0.68..9.97 rows=2 width=76) (actual time=0.030..0.032 rows=2.00 loops=1)
+                Buffers: shared hit=9
+                ->  Nested Loop  (cost=0.68..9.93 rows=1 width=20) (actual time=0.029..0.030 rows=1.00 loops=1)
+                      Join Filter: (f.line_id = l_1.line_id)
+                      Buffers: shared hit=9
+                      ->  Nested Loop  (cost=0.40..9.50 rows=1 width=139) (actual time=0.013..0.014 rows=1.00 loops=1)
+                            Join Filter: (f.refund_id = r_1.id)
+                            Buffers: shared hit=6
+                            ->  Nested Loop  (cost=0.28..9.33 rows=1 width=135) (actual time=0.005..0.006 rows=1.00 loops=1)
+                                  Buffers: shared hit=4
+                                  ->  Seq Scan on attribution_refund_lines f  (cost=0.00..1.01 rows=1 width=87) (actual time=0.003..0.004 rows=1.00 loops=1)
+                                        Filter: (company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid)
+                                        Buffers: shared hit=1
+                                  ->  Index Only Scan using attribution_orders_company_id_store_id_id_key on attribution_orders o_3  (cost=0.28..8.30 rows=1 width=48) (actual time=0.001..0.001 rows=1.00 loops=1)
+                                        Index Cond: ((company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid) AND (store_id = f.store_id) AND (id = f.order_id))
+                                        Heap Fetches: 2
+                                        Index Searches: 1
+                                        Buffers: shared hit=3
+                            ->  Index Scan using attribution_refunds_company_id_store_id_order_id_id_key on attribution_refunds r_1  (cost=0.12..0.16 rows=1 width=68) (actual time=0.006..0.006 rows=1.00 loops=1)
+                                  Index Cond: ((company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid) AND (store_id = o_3.store_id) AND (order_id = o_3.id))
+                                  Filter: ((applied_at IS NOT NULL) AND (occurred_at >= '2026-11-15 14:42:19.277491+00'::timestamp with time zone) AND (occurred_at < '2026-11-17 14:42:19.277495+00'::timestamp with time zone))
+                                  Index Searches: 1
+                                  Buffers: shared hit=2
+                      ->  Index Only Scan using attribution_order_lines_pkey on attribution_order_lines l_1  (cost=0.28..0.41 rows=1 width=53) (actual time=0.015..0.015 rows=1.00 loops=1)
+                            Index Cond: ((company_id = 'ba6989f3-9d98-4b9b-8b89-1f406333bb39'::uuid) AND (store_id = o_3.store_id) AND (order_id = o_3.id))
+                            Heap Fetches: 1
+                            Index Searches: 1
+                            Buffers: shared hit=3
+                ->  Values Scan on "*VALUES*_4"  (cost=0.00..0.03 rows=2 width=40) (actual time=0.000..0.001 rows=2.00 loops=1)
+  ->  GroupAggregate  (cost=915.24..919.44 rows=140 width=160) (actual time=18.787..21.727 rows=15.00 loops=1)
+        Group Key: (NULL::text), d.currency, d.metric
+        Buffers: shared hit=1292
+        ->  Sort  (cost=915.24..915.59 rows=140 width=104) (actual time=18.661..19.239 rows=28007.00 loops=1)
+              Sort Key: (NULL::text), d.currency, d.metric
+              Sort Method: quicksort  Memory: 1902kB
+              Buffers: shared hit=1292
+              ->  Nested Loop Left Join  (cost=0.00..910.25 rows=140 width=104) (actual time=0.015..13.949 rows=28007.00 loops=1)
+                    Join Filter: (NOT (d.group_key IS DISTINCT FROM (NULL::text)))
+                    Buffers: shared hit=1292
+                    ->  Limit  (cost=0.00..0.01 rows=1 width=64) (actual time=0.001..0.001 rows=1.00 loops=1)
+                          ->  Result  (cost=0.00..0.01 rows=1 width=64) (actual time=0.001..0.001 rows=1.00 loops=1)
+                    ->  CTE Scan on data d  (cost=0.00..560.14 rows=28007 width=104) (actual time=0.013..10.981 rows=28007.00 loops=1)
+                          Storage: Memory  Maximum Storage: 1608kB
+                          Buffers: shared hit=1292
+Planning:
+  Buffers: shared hit=369
+Planning Time: 1.902 ms
+Execution Time: 21.863 ms
+
+thread 'adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_export_limit_formula_and_numeric_overflow' (24022439) panicked at src/adapters/identity/../commerce/../analytics/bounds_tests.rs:30:5:
+assertion `left == right` failed: 10000 data rows must fit
+  left: 503
+ right: 200
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_export_limit_formula_and_numeric_overflow ... FAILED
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_representative_plan_and_timeout ... ok
+
+failures:
+
+failures:
+    adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_export_limit_formula_and_numeric_overflow
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 107 filtered out; finished in 3.74s
+
+error: test failed, to rerun pass `--lib`

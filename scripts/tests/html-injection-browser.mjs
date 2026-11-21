@@ -12,6 +12,7 @@ assert.ok(directory, 'HTML_INJECTION_BROWSER_FIXTURES is required');
 const fixture = name => readFileSync(join(directory, name), 'utf8');
 const root = new URL('../../', import.meta.url);
 const htmx = readFileSync(new URL('assets/htmx-2.0.4.min.js', root));
+const sse = readFileSync(new URL('assets/htmx-ext-sse-2.2.3.js', root));
 const css = readFileSync(new URL('assets/app.css', root));
 const cspSource = readFileSync(new URL('src/adapters/http/security.rs', root), 'utf8');
 const csp = cspSource.match(/const CSP: &str = "([^"]+)";/)?.[1];
@@ -28,7 +29,80 @@ const team = [
   { email: maliciousEmail, username: 'tagged', role: 'member' },
 ];
 
-test('form feedback and another member’s team autocomplete stay text under production CSP', async () => {
+const deskPages = ['desk-classic-create', 'desk-classic-edit', 'desk-modern-create', 'desk-modern-edit'];
+const bindingRequest = fixture('desk-modern-edit.html').match(/hx-get="([^" ]*\/bindings\?[^" ]*)"/)?.[1];
+assert.ok(bindingRequest, 'the modern edit pane has its real lazy binding request');
+const bindingPath = new URL(bindingRequest, 'http://127.0.0.1').pathname;
+
+async function verifyDeskAccessForms(page, base, context) {
+  for (const variant of deskPages) {
+    await page.goto(`${base}/${variant}`);
+    const form = page.locator('form:has(input[name="public"])');
+    await expect(form).toHaveCount(1);
+    const owner = form.locator('select[name="department_id"]');
+    const publicInput = form.locator('input[name="public"]');
+    const confirmation = form.locator('input[name="confirm_spam_disabled"]');
+    const addresses = form.locator('input[name="participant_emails"]');
+    assert.equal(await owner.getAttribute('required'), '');
+    const initialOwner = await owner.inputValue();
+    assert.equal(await owner.evaluate(select => select.selectedOptions[0].textContent.trim()),
+      variant.endsWith('edit') ? 'Dispatch' : 'Company root');
+    assert.equal(await publicInput.isChecked(), variant.endsWith('edit'));
+    assert.equal(await confirmation.isDisabled(), !variant.endsWith('edit'));
+    await expect(addresses).toHaveValue(variant.endsWith('edit') ? 'listed@example.test' : '');
+    await form.getByLabel('Desk Name', { exact: true }).fill('Changed name');
+    await form.locator('[name="slug"]').fill('changed-desk');
+    await publicInput.check();
+    await expect(confirmation).toBeEnabled();
+    await confirmation.check();
+    await addresses.fill('changed@example.test');
+    await expect(confirmation).toBeChecked();
+    const data = await form.evaluate(element => Object.fromEntries(new FormData(element)));
+    assert.equal(data.public, 'true');
+    assert.equal(data.confirm_spam_disabled, 'true');
+    assert.equal(data.participant_emails, 'changed@example.test');
+    assert.equal(data.department_id, initialOwner);
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(value => {
+        document.documentElement.setAttribute('data-theme', value);
+        const toggle = document.querySelector('input.theme-controller');
+        if (toggle) toggle.checked = value === 'light';
+      }, theme);
+      await expect(owner).toBeVisible();
+      await expect(publicInput).toBeVisible();
+      for (const field of [owner, addresses]) {
+        await field.focus();
+        const computed = await field.evaluate(element => {
+          const style = getComputedStyle(element);
+          return { radius: style.borderRadius, outlineOffset: style.outlineOffset };
+        });
+        const expected = variant.startsWith('desk-modern')
+          ? { radius: '8px', outlineOffset: '-1px' }
+          : { radius: '4px', outlineOffset: '2px' };
+        assert.deepEqual(computed, expected, `${variant}/${theme}`);
+      }
+    }
+    await publicInput.uncheck();
+    await expect(confirmation).toBeDisabled();
+    await expect(confirmation).not.toBeChecked();
+    const closed = await form.evaluate(element => Object.fromEntries(new FormData(element)));
+    assert.ok(!Object.hasOwn(closed, 'public'));
+    assert.ok(!Object.hasOwn(closed, 'confirm_spam_disabled'));
+    assert.equal(closed.department_id, initialOwner);
+    assert.equal(closed.participant_emails, 'changed@example.test');
+    const otherOwner = await owner.locator('option').evaluateAll(options =>
+      options.find(option => !option.selected).value);
+    await owner.selectOption(otherOwner);
+    assert.equal(await form.evaluate(element => new FormData(element).get('department_id')), otherOwner);
+    await form.evaluate(element => element.reset());
+    await expect(owner).toHaveValue(initialOwner);
+    assert.equal(await publicInput.isChecked(), variant.endsWith('edit'));
+    assert.equal(await confirmation.isDisabled(), !variant.endsWith('edit'));
+    context.diagnostic(`${variant}: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed`);
+  }
+}
+
+test('form feedback and another member’s team autocomplete stay text under production CSP', async context => {
   const unexpectedRequests = [];
   const server = createServer(async (request, response) => {
     const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
@@ -44,12 +118,20 @@ test('form feedback and another member’s team autocomplete stay text under pro
       response.writeHead(200, { 'content-type': 'text/javascript' }).end(htmx);
       return;
     }
+    if (pathname === '/assets/htmx-ext-sse-2.2.3.js') {
+      response.writeHead(200, { 'content-type': 'text/javascript' }).end(sse);
+      return;
+    }
     if (pathname === '/assets/app.js') {
       response.writeHead(200, { 'content-type': 'text/javascript' }).end(fixture('app.js'));
       return;
     }
     if (pathname === `/api/companies/${companyId}/team`) {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ success: true, members: team }));
+      return;
+    }
+    if (pathname === bindingPath) {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end('<p>Binding pane fixture</p>');
       return;
     }
     if (pathname === '/api/user/register' || pathname === '/api/user/login') {
@@ -61,7 +143,7 @@ test('form feedback and another member’s team autocomplete stay text under pro
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(fixture(name));
       return;
     }
-    const page = pathname === '/register' ? 'register.html' : pathname === '/login' ? 'login.html' : pathname === '/team' ? 'team.html' : pathname === '/restricted' ? 'restricted.html' : null;
+    const page = pathname === '/register' ? 'register.html' : pathname === '/login' ? 'login.html' : pathname === '/team' ? 'team.html' : pathname === '/restricted' ? 'restricted.html' : deskPages.includes(pathname.slice(1)) ? `${pathname.slice(1)}.html` : null;
     if (page) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp }).end(fixture(page));
       return;
@@ -137,6 +219,8 @@ test('form feedback and another member’s team autocomplete stay text under pro
       assert.equal(style.opacity, '0.7');
       assert.notEqual(style.color, style.background);
     }
+
+    await verifyDeskAccessForms(page, base, context);
 
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);

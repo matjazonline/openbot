@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "round": "05SC-P03-B1-R2",
+  "artifact": "2a1e2771ddb751adc80b3a6b20a8bbd404a9b71fa7e1bd69604e212b288b19d8",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_ -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test and per-case migrated databases; 26 passing regressions; final boxed test extraction exercised by final gate",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused-r1.txt",
+          "sha256": "798bce5183404314bf998df84daaa6658f3d7dbbbf52a871e0a14dc9418137e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets --locked --offline",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-sqlx-prepare.txt",
+          "sha256": "8777372d59339af2f8bf8589df71721f09e62103ecb9a12dfa29edea09fe7a7f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-offline-all-targets.txt",
+          "sha256": "c54bca416b8a09e3c2018b0ada16771065b3b9b5469242539af42bc53077e2cf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "e7030463724463a7a6850af00bb87c85b5d202fc026fb92379db1299613ec3b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "Phase-owned current source/cache/migrated schema; no bound changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-modules.txt",
+          "sha256": "e13b83ce9cab8489a157f9b9228297f29dc95219c246b356fd84b86eb8188143"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "Fresh owned pa05_p03_schema on PG18:51167",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-fresh-migrate-r3.txt",
+          "sha256": "d95f0e02c9afcfe27916fd58b86650330da73a87068f51d37a31ef46a4b0b274"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "docker run --rm --name openbot-plan05-p03-network-scope --label phase=05SC-P03 --cap-add=NET_ADMIN -v \"$PWD:/repo:ro\" -w /repo openbot-plan05-network-scope:20261117 python3 -I scripts/tests/network-isolation-scope.py",
+      "fixture": "Owned pinned Ubuntu24 Docker image and private network namespace; all eight real categories",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-linux-scope-test.txt",
+          "sha256": "e82603ee38534631b6639d2c7803c3af3cb93c93f8a5219ddf4fe984c627d4b2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline --all-targets -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test; loopback-only network; unchanged 2048KiB stack",
+      "status": "NOT EXERCISED",
+      "reason": "Corrected-source all-target full run active; final immutable execution evidence must precede PASS."
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "current native browser regeneration/protocols and remaining final-check.sh lease/image/memory gates",
+      "fixture": "Phase-owned native browser and Docker resources",
+      "status": "NOT EXERCISED",
+      "reason": "Browser chain active and historical parent runner held until database full run completes; do not accept yet."
+    }
+  ]
+}

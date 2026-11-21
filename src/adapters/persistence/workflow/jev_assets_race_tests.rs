@@ -75,12 +75,11 @@ async fn restrict_to_view_grant(f: &Fixture, attachment: &Attachment) -> Uuid {
         crate::entities::company_member::CompanyAccessRole::Admin,
     )
     .await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
-        .bind(company)
-        .bind(channel)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        channel,
+    )
+    .await;
     let principal: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
             .bind(company)

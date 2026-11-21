@@ -26,6 +26,7 @@ async fn owner_page(f: &Journey) -> String {
         avatar_url: None,
         is_operator: false,
         company_membership: CompanyMembership::None,
+        administers_units: false,
     };
     pages::profile_page(&pages::ProfilePage {
         user: &user,

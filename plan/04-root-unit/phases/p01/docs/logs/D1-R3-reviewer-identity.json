@@ -1,0 +1,10 @@
+{
+  "round": "04RU-P01-D1-R3",
+  "head": "8fdb892b6e279ed0c09150e2336bbdc7462f877d",
+  "artifact": "686872f7713869716cf5e387417dd23d7ad643011dd869689ee3583860becf24",
+  "decision_sha256": "ef1485f2349888ae207f92b127dab461375715a8246aca0627f6029f5d33f559",
+  "coordination_revision": 1,
+  "snapshot_environment": "source /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-env.sh; original two exclusions",
+  "initial_forced_C_digest": "340e07674898d1cb682cb3fe25b3e730bb78dcc63fc204c24e64588b9bb25769",
+  "runtime_executed": false
+}

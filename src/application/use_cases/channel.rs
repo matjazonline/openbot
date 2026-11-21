@@ -53,11 +53,6 @@ impl ChannelWrite {
             });
         }
 
-        if self.is_public() {
-            // Selecting public intake also clears a department's narrower members-only setting.
-            self.ownership.get_or_insert_default().members_only = Some(false);
-        }
-
         Ok(())
     }
 
@@ -171,6 +166,13 @@ pub(crate) async fn readable_channels(
         .collect())
 }
 
+/// One row of the desk workspace: a desk and whether the viewer manages it or may only read it.
+#[derive(Debug, Clone)]
+pub struct WorkspaceChannel {
+    pub channel: Channel,
+    pub managed: bool,
+}
+
 #[derive(Clone)]
 pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
@@ -199,6 +201,23 @@ impl ChannelUseCases {
         Ok(())
     }
 
+    async fn verify_unit_manager(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit: Option<crate::entities::department::DepartmentId>,
+    ) -> AppResult<()> {
+        use crate::application::ports::administration::{ManagementTarget, require_management};
+        require_management(
+            self.participant_persistence.as_ref(),
+            user_id,
+            crate::domain::workflow::CompanyId::new(company_id),
+            unit.map_or(ManagementTarget::Root, ManagementTarget::Unit),
+        )
+        .await
+        .map(drop)
+    }
+
     #[instrument(skip_all)]
     pub async fn create_channel(
         &self,
@@ -207,7 +226,8 @@ impl ChannelUseCases {
         mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.verify_unit_manager(user_id, company_id, write.department_id)
+            .await?;
         write.created_by = Some(CreationProvenance::user(user_id));
 
         write.normalize()?;
@@ -215,7 +235,13 @@ impl ChannelUseCases {
 
         info!(%company_id, "Creating channel");
 
-        self.channel_persistence.create(company_id, write).await
+        self.channel_persistence
+            .create(
+                crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+                company_id,
+                write,
+            )
+            .await
     }
 
     fn check_spam_interlock(
@@ -236,6 +262,80 @@ impl ChannelUseCases {
         self.channel_persistence
             .list_by_company_id(company_id)
             .await
+    }
+
+    /// The desks a person manages: every desk whose department they manage (all of them for a
+    /// root manager). For configuration lists and pickers; each write rechecks its own desk.
+    #[instrument(skip_all)]
+    pub async fn list_managed_channels(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Vec<Channel>> {
+        Ok(self
+            .workspace_channels(user_id, company_id, None)
+            .await?
+            .into_iter()
+            .filter_map(|desk| desk.managed.then_some(desk.channel))
+            .collect())
+    }
+
+    /// The desk workspace list (Plan06 U6): the desks the viewer manages, then those they may only
+    /// read, each marked. Requires managing at least one unit.
+    #[instrument(skip_all)]
+    pub async fn list_workspace_channels(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+    ) -> AppResult<Vec<WorkspaceChannel>> {
+        self.workspace_channels(viewer.user_id, company_id, Some(viewer))
+            .await
+    }
+
+    async fn workspace_channels(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        reader: Option<&Viewer>,
+    ) -> AppResult<Vec<WorkspaceChannel>> {
+        use crate::application::ports::administration::{ManagementTarget, require_management};
+        let company = crate::domain::workflow::CompanyId::new(company_id);
+        let participants = self.participant_persistence.as_ref();
+        require_management(participants, user_id, company, ManagementTarget::AnyUnit).await?;
+        let managed: std::collections::HashSet<_> = participants
+            .managed_units(user_id, company)
+            .await?
+            .into_iter()
+            .collect();
+        let readable: std::collections::HashSet<Uuid> = match reader {
+            Some(viewer) => self
+                .list_readable_channels(viewer, company_id)
+                .await?
+                .into_iter()
+                .map(|channel| channel.id)
+                .collect(),
+            None => Default::default(),
+        };
+        let (mut managed_desks, mut readable_desks) = (Vec::new(), Vec::new());
+        for channel in self
+            .channel_persistence
+            .list_by_company_id(company_id)
+            .await?
+        {
+            if managed.contains(&channel.department_id) {
+                managed_desks.push(WorkspaceChannel {
+                    channel,
+                    managed: true,
+                });
+            } else if readable.contains(&channel.id) {
+                readable_desks.push(WorkspaceChannel {
+                    channel,
+                    managed: false,
+                });
+            }
+        }
+        managed_desks.append(&mut readable_desks);
+        Ok(managed_desks)
     }
 
     /// Manager-only reads use the same visibility decision as the mailbox.
@@ -292,12 +392,15 @@ impl ChannelUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Option<Channel>> {
-        self.verify_company_manager(user_id, company_id).await?;
         let channel = self.channel_persistence.get_by_id(channel_id).await?;
         if let Some(ref ch) = channel
             && ch.company_id != company_id
         {
             return Ok(None);
+        }
+        if let Some(channel) = &channel {
+            self.verify_unit_manager(user_id, company_id, Some(channel.department_id))
+                .await?;
         }
         Ok(channel)
     }
@@ -315,8 +418,6 @@ impl ChannelUseCases {
         mut write: ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<Channel> {
-        self.verify_company_manager(user_id, company_id).await?;
-
         let channel = self
             .channel_persistence
             .get_by_id(channel_id)
@@ -326,6 +427,14 @@ impl ChannelUseCases {
         if channel.company_id != company_id {
             return Err(channel_not_found());
         }
+        self.verify_unit_manager(user_id, company_id, Some(channel.department_id))
+            .await?;
+        if let Some(unit) = write.department_id
+            && unit != channel.department_id
+        {
+            self.verify_unit_manager(user_id, company_id, Some(unit))
+                .await?;
+        }
 
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
@@ -334,6 +443,7 @@ impl ChannelUseCases {
 
         self.channel_persistence
             .update(ChannelUpdate {
+                actor: crate::application::workflow::WorkflowActor::authenticated(user_id)?,
                 company_id,
                 channel_id,
                 write,
@@ -348,8 +458,6 @@ impl ChannelUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<()> {
-        self.verify_company_manager(user_id, company_id).await?;
-
         let channel = self
             .channel_persistence
             .get_by_id(channel_id)
@@ -359,9 +467,17 @@ impl ChannelUseCases {
         if channel.company_id != company_id {
             return Err(channel_not_found());
         }
+        self.verify_unit_manager(user_id, company_id, Some(channel.department_id))
+            .await?;
 
         info!("Deleting channel {} for company {}", channel_id, company_id);
-        self.channel_persistence.delete(channel_id).await
+        self.channel_persistence
+            .delete(
+                crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+                company_id,
+                channel_id,
+            )
+            .await
     }
 
     #[instrument(skip_all)]
@@ -603,7 +719,12 @@ mod tests {
 
     #[async_trait]
     impl ChannelPersistence for MockChannelPersistence {
-        async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
+        async fn create(
+            &self,
+            _actor: crate::application::workflow::WorkflowActor,
+            company_id: Uuid,
+            write: ChannelWrite,
+        ) -> AppResult<Channel> {
             let channel = channel_from_write(Uuid::new_v4(), company_id, write);
             self.channels.lock().unwrap().push(channel.clone());
             Ok(channel)
@@ -690,7 +811,12 @@ mod tests {
             Ok(existing.clone())
         }
 
-        async fn delete(&self, id: Uuid) -> AppResult<()> {
+        async fn delete(
+            &self,
+            _actor: crate::application::workflow::WorkflowActor,
+            _company_id: Uuid,
+            id: Uuid,
+        ) -> AppResult<()> {
             self.channels.lock().unwrap().retain(|w| w.id != id);
             Ok(())
         }
@@ -719,8 +845,7 @@ mod tests {
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }
     }
 
@@ -1281,13 +1406,12 @@ mod tests {
                 slug: "support".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
                 enabled: false,
@@ -1299,13 +1423,12 @@ mod tests {
                 slug: "billing".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                access_mode: ChannelAccessMode::Members,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
-                department_id: None,
-                members_only: false,
+                department_id: crate::entities::department::DepartmentId::random(),
             },
         ];
 
@@ -1352,6 +1475,7 @@ mod tests {
                 company_id,
                 ChannelWrite {
                     name: "Support Flow".into(),
+                    participant_emails: Some(vec!["customer@example.com".into()]),
                     slug: "support".into(),
                     enabled: false,
                     ..ChannelWrite::default()

@@ -76,10 +76,7 @@ pub struct Channel {
     pub created_by: CreationProvenance,
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// The department this desk belongs to. Ownership never blocks deleting the desk.
-    pub department_id: Option<crate::entities::department::DepartmentId>,
-    /// Only the owning department may use this desk: its access mode is then `Allowlist` and its
-    /// department-derived grants are the allowlist, beside any configured email entries.
-    pub members_only: bool,
+    pub department_id: crate::entities::department::DepartmentId,
 }
 
 /// Participant list entry that opens a channel to any sender.
@@ -88,16 +85,14 @@ pub const PUBLIC_PARTICIPANT: &str = "@public";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelAccessMode {
-    Team,
-    Allowlist,
+    Members,
     Public,
 }
 
 impl ChannelAccessMode {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Team => "team",
-            Self::Allowlist => "allowlist",
+            Self::Members => "members",
             Self::Public => "public",
         }
     }
@@ -108,8 +103,7 @@ impl FromStr for ChannelAccessMode {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "team" => Ok(Self::Team),
-            "allowlist" => Ok(Self::Allowlist),
+            "members" => Ok(Self::Members),
             "public" => Ok(Self::Public),
             _ => Err(format!("invalid channel access mode '{value}'")),
         }
@@ -127,73 +121,25 @@ pub struct ParticipantAccess {
 }
 
 impl Channel {
-    /// The single definition of "may this sender use this channel".
-    ///
-    /// An empty or absent participant list means "company team members only". A list containing
-    /// `@public` opens the channel to anyone, but only explicitly listed senders (or team members)
-    /// are *trusted*.
-    ///
-    /// `membership` is what the account behind `sender` is to the company, so the owner exemption
-    /// this shares with [`Channel::viewer_access`] can be applied here too: a restricted channel
-    /// never shuts its own company's owner out, whether they are reading it or writing to it.
-    /// Mail from an address that belongs to no account is simply [`CompanyMembership::None`].
+    /// Mail admission reads the owning department's materialized grants and explicit grants.
+    /// Public intake accepts outsiders without trusting them; the owner always has access.
     pub fn participant_access(&self, context: PrincipalAccessContext) -> ParticipantAccess {
-        let explicitly_listed = context.grant_authority == PrincipalGrantAuthority::Available
-            && context.principal_id.is_some_and(|principal_id| {
-                self.has_capability(principal_id, PrincipalCapability::Participate)
-            });
-        match self.access_mode {
-            ChannelAccessMode::Public => ParticipantAccess {
-                authorized: true,
-                trusted: explicitly_listed || context.membership.is_team(),
-            },
-            ChannelAccessMode::Allowlist => ParticipantAccess {
-                authorized: explicitly_listed || context.membership.is_owner(),
-                trusted: explicitly_listed || context.membership.is_team(),
-            },
-            ChannelAccessMode::Team => ParticipantAccess {
-                authorized: context.membership.is_team(),
-                trusted: context.membership.is_team(),
-            },
+        let listed = self.has_capability(context, PrincipalCapability::Participate);
+        ParticipantAccess {
+            authorized: self.access_mode == ChannelAccessMode::Public
+                || listed
+                || context.membership.is_owner(),
+            trusted: listed || context.membership.is_team(),
         }
     }
 
-    /// The single definition of "may this signed-in account *read* this channel".
-    ///
-    /// The mirror of [`Channel::participant_access`], which answers the same question for mail
-    /// arriving from outside. The two differ in one deliberate way: `@public` decides what may
-    /// *enter* a channel and never grants a *read*, so an open channel's traffic is still only
-    /// visible to the company's own team. The owner exemption below is *not* one of the
-    /// differences -- it holds on both sides, so the owner of a restricted channel they are not
-    /// listed on can write to it as well as read it.
-    ///
-    /// | participant list | who may read it |
-    /// | --- | --- |
-    /// | absent or empty | the company team |
-    /// | contains `@public` | the company team -- never a stranger |
-    /// | specific addresses | those addresses, plus the company owner |
-    ///
-    /// A restricted channel is therefore *narrower* than the team: a colleague who is not a
-    /// participant does not see it. The owner is the one exception, so a company cannot lock
-    /// itself out of its own data.
+    /// Reading requires current company membership. Public intake never grants outsider reads;
+    /// Members desks additionally require a view grant, with the company owner exempted.
     pub fn viewer_access(&self, context: PrincipalAccessContext) -> bool {
-        if !context.membership.is_team() {
-            return false;
-        }
-
-        if context.membership.is_owner() {
-            return true;
-        }
-
-        match self.access_mode {
-            ChannelAccessMode::Team | ChannelAccessMode::Public => true,
-            ChannelAccessMode::Allowlist => {
-                context.grant_authority == PrincipalGrantAuthority::Available
-                    && context.principal_id.is_some_and(|principal_id| {
-                        self.has_capability(principal_id, PrincipalCapability::View)
-                    })
-            }
-        }
+        context.membership.is_team()
+            && (context.membership.is_owner()
+                || self.access_mode == ChannelAccessMode::Public
+                || self.has_capability(context, PrincipalCapability::View))
     }
 
     /// The stable principal to ask for approval. Resolving a delivery identity is an application
@@ -206,10 +152,21 @@ impl Channel {
             .map(|grant| grant.principal_id)
     }
 
-    fn has_capability(&self, principal_id: PrincipalId, capability: PrincipalCapability) -> bool {
-        self.principal_grants
-            .iter()
-            .any(|grant| grant.principal_id == principal_id && grant.capability == capability)
+    fn has_capability(
+        &self,
+        context: PrincipalAccessContext,
+        capability: PrincipalCapability,
+    ) -> bool {
+        let Some(principal) = context.principal_id else {
+            return false;
+        };
+        self.principal_grants.iter().any(|grant| {
+            grant.principal_id == principal
+                && grant.capability == capability
+                && (context.grant_authority == PrincipalGrantAuthority::Available
+                    || grant.provenance
+                        == super::participant::GrantProvenance::DepartmentMembership)
+        })
     }
 
     /// Every local part this channel answers on: the canonical slug first, then its aliases.
@@ -272,15 +229,14 @@ mod tests {
             slug: "support".into(),
             alias_slugs: aliases.iter().map(|a| ChannelSlug::from(*a)).collect(),
             participant_emails: None,
-            access_mode: ChannelAccessMode::Team,
+            access_mode: ChannelAccessMode::Members,
             principal_grants: Vec::new(),
             enabled: true,
             add_3rd_party: true,
             created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }
     }
 
@@ -316,9 +272,9 @@ mod tests {
     }
 
     #[test]
-    fn a_team_channel_is_readable_by_the_team_and_nobody_else() {
-        let channel = channel_for(ChannelAccessMode::Team, &[]);
+    fn access_mode_root_members_read_through_their_materialized_grants() {
         let dana = PrincipalId::random();
+        let channel = channel_for(ChannelAccessMode::Members, &[dana]);
 
         assert!(channel.viewer_access(actor(dana, CompanyMembership::Owner)));
         assert!(channel.viewer_access(actor(dana, CompanyMembership::Admin)));
@@ -327,11 +283,11 @@ mod tests {
     }
 
     #[test]
-    fn an_allowlist_channel_is_narrower_than_the_team() {
+    fn access_mode_child_members_requires_a_view_grant_even_for_admins() {
         let dana = PrincipalId::random();
         let partner = PrincipalId::random();
         let sam = PrincipalId::random();
-        let channel = channel_for(ChannelAccessMode::Allowlist, &[dana, partner]);
+        let channel = channel_for(ChannelAccessMode::Members, &[dana, partner]);
 
         // A granted colleague sees it...
         assert!(channel.viewer_access(actor(dana, CompanyMembership::Member)));
@@ -345,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn public_opens_a_channel_to_mail_not_to_readers() {
+    fn access_mode_public_opens_mail_but_never_outsider_reads() {
         let channel = channel_for(ChannelAccessMode::Public, &[]);
         let stranger = PrincipalId::random();
 
@@ -358,10 +314,10 @@ mod tests {
     }
 
     #[test]
-    fn an_allowlist_channel_still_takes_its_owner_s_mail() {
+    fn access_mode_members_preserves_owner_and_named_participant_access() {
         let dana = PrincipalId::random();
         let sam = PrincipalId::random();
-        let channel = channel_for(ChannelAccessMode::Allowlist, &[dana]);
+        let channel = channel_for(ChannelAccessMode::Members, &[dana]);
 
         // The granted participant writes in, as they always could.
         let granted = channel.participant_access(actor(dana, CompanyMembership::Member));
@@ -391,9 +347,9 @@ mod tests {
     }
 
     #[test]
-    fn a_team_channel_takes_the_team_s_mail_and_no_one_else_s() {
-        let channel = channel_for(ChannelAccessMode::Team, &[]);
+    fn access_mode_root_members_send_through_their_materialized_grants() {
         let dana = PrincipalId::random();
+        let channel = channel_for(ChannelAccessMode::Members, &[dana]);
 
         for membership in [
             CompanyMembership::Owner,
@@ -411,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn public_lets_a_stranger_write_without_trusting_them() {
+    fn access_mode_public_accepts_outsiders_without_trusting_them() {
         let dana = PrincipalId::random();
         let channel = channel_for(ChannelAccessMode::Public, &[dana]);
 
@@ -442,8 +398,8 @@ mod tests {
     }
 
     #[test]
-    fn an_unresolved_actor_holds_no_grant() {
-        let channel = channel_for(ChannelAccessMode::Allowlist, &[PrincipalId::random()]);
+    fn access_mode_unresolved_actor_holds_no_grant() {
+        let channel = channel_for(ChannelAccessMode::Members, &[PrincipalId::random()]);
 
         assert!(
             !channel
@@ -454,12 +410,54 @@ mod tests {
     }
 
     #[test]
+    fn access_mode_unverified_account_can_use_only_its_department_grants() {
+        let principal = PrincipalId::random();
+        let mut unverified = actor(principal, CompanyMembership::Member);
+        unverified.grant_authority = PrincipalGrantAuthority::WithheldUnverifiedEmail;
+        for provenance in GrantProvenance::ALL.iter().copied() {
+            let mut channel = channel_for(ChannelAccessMode::Members, &[principal]);
+            for grant in &mut channel.principal_grants {
+                grant.provenance = provenance;
+            }
+            let allowed = provenance == GrantProvenance::DepartmentMembership;
+            assert_eq!(
+                channel.viewer_access(unverified),
+                allowed,
+                "view {provenance:?}"
+            );
+            assert_eq!(
+                channel.participant_access(unverified).authorized,
+                allowed,
+                "participate {provenance:?}"
+            );
+            assert!(channel.viewer_access(actor(principal, CompanyMembership::Member)));
+            let missing = PrincipalAccessContext {
+                principal_id: None,
+                ..unverified
+            };
+            assert!(!channel.viewer_access(missing));
+            assert!(!channel.participant_access(missing).authorized);
+        }
+    }
+
+    #[test]
+    fn access_mode_parses_only_members_and_public() {
+        for mode in [ChannelAccessMode::Members, ChannelAccessMode::Public] {
+            assert_eq!(mode.as_str().parse::<ChannelAccessMode>().unwrap(), mode);
+            assert_eq!(serde_json::to_value(mode).unwrap(), mode.as_str());
+        }
+        for invalid in ["team", "allowlist", "Members", "", " members"] {
+            assert!(invalid.parse::<ChannelAccessMode>().is_err());
+        }
+    }
+
+    #[test]
     fn the_preferred_approver_is_the_first_principal_granted_a_view() {
         let first = PrincipalId::random();
         let second = PrincipalId::random();
         let earlier = chrono::Utc::now() - chrono::Duration::minutes(5);
         let channel = Channel {
-            access_mode: ChannelAccessMode::Allowlist,
+            access_mode: ChannelAccessMode::Members,
             principal_grants: vec![
                 ChannelPrincipalGrant {
                     principal_id: second,

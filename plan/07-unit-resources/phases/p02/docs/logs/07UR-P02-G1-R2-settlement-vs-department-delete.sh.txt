@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -u
+L="$1"; DB=openbot_p07_p02g_spend
+p() { psql -h 127.0.0.1 -p 55407 -U mac02 -X "$@"; }
+p -d postgres -qc "DROP DATABASE IF EXISTS $DB" 2>/dev/null; p -d postgres -qc "CREATE DATABASE $DB"
+p -d $DB -q <<'SQL'
+CREATE TABLE departments (company_id uuid NOT NULL, id uuid PRIMARY KEY, UNIQUE (company_id, id));
+-- D6 r2 shape (reduced): running totals with FK to the unit ON DELETE CASCADE.
+CREATE TABLE unit_spend (company_id uuid NOT NULL, unit_id uuid NOT NULL, period text NOT NULL, period_start timestamptz NOT NULL,
+  spent_micros bigint NOT NULL DEFAULT 0, PRIMARY KEY (company_id, unit_id, period, period_start),
+  FOREIGN KEY (company_id, unit_id) REFERENCES departments(company_id, id) ON DELETE CASCADE);
+INSERT INTO departments VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d1'),
+                               ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d2');
+-- d1 already has its day row this period; its month row does not exist yet.
+INSERT INTO unit_spend VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d1','day','2026-11-21+00',5);
+SQL
+UPSERT_DAY_D2="INSERT INTO unit_spend VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d2','day','2026-11-21+00',7) ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=unit_spend.spent_micros+EXCLUDED.spent_micros"
+UPSERT_DAY_D1="INSERT INTO unit_spend VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d1','day','2026-11-21+00',7) ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=unit_spend.spent_micros+EXCLUDED.spent_micros"
+UPSERT_MONTH_D1="INSERT INTO unit_spend VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d1','month','2026-11-01+00',7) ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=unit_spend.spent_micros+EXCLUDED.spent_micros"
+{
+p -d $DB -Atc "SELECT version()"
+echo "== Case 1: a settlement charges a unit whose department delete is in flight and commits (FK race)"
+( p -d $DB -a -c "BEGIN" -c "DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d2'" -c "SELECT pg_sleep(1.5)" -c "COMMIT" > "$L.a1" 2>&1 ) &
+sleep 0.5
+p -d $DB -a -c "$UPSERT_DAY_D2" 2>&1 | sed 's/^/[settlement] /'
+wait; sed 's/^/[delete] /' "$L.a1"
+echo
+echo "== Case 2: a settlement updates the unit's existing day row, then inserts its new month row, while the department delete holds the department row and then deletes it (deadlock)"
+( p -d $DB -a -c "BEGIN" -c "SELECT id FROM departments WHERE id='00000000-0000-0000-0000-0000000000d1' FOR UPDATE" -c "SELECT pg_sleep(1.5)" -c "DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d1'" -c "COMMIT" > "$L.a2" 2>&1 ) &
+sleep 0.5
+p -d $DB -a -c "BEGIN" -c "$UPSERT_DAY_D1" -c "$UPSERT_MONTH_D1" -c "COMMIT" 2>&1 | sed 's/^/[settlement] /'
+wait; sed 's/^/[delete] /' "$L.a2"
+echo; echo "== Remaining rows"; p -d $DB -c "SELECT id FROM departments" -c "SELECT unit_id, period, spent_micros FROM unit_spend"
+} > "$L" 2>&1
+rm -f "$L.a1" "$L.a2"; p -d postgres -qc "DROP DATABASE $DB"

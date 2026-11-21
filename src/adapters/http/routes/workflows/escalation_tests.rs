@@ -2,7 +2,6 @@ use super::*;
 #[path = "escalation_browser.rs"]
 mod browser;
 use crate::application::app_error::WorkflowGuardViolation;
-use crate::application::ports::channel::ChannelOwnershipWrite;
 use crate::application::ports::department::DepartmentWrite;
 use crate::application::workflow::activation::{ActivationRequest, WorkflowJobId};
 use crate::application::workflow::guard::{
@@ -76,7 +75,7 @@ impl Escalating {
             )
             .await
             .unwrap();
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &f.persistence,
             f.company,
             ChannelWrite {
@@ -88,10 +87,7 @@ impl Escalating {
                 enabled: true,
                 add_3rd_party: false,
                 created_by: None,
-                ownership: Some(ChannelOwnershipWrite {
-                    department_id: Some(Some(department.id)),
-                    members_only: Some(false),
-                }),
+                department_id: Some(department.id),
             },
         )
         .await

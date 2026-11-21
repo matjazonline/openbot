@@ -94,7 +94,7 @@ impl Fixture {
         }
     }
     pub async fn level(&self, user: Uuid) -> AccessLevel {
-        AccessLevel::try_from(sqlx::query_scalar::<_, i16>("SELECT access_level::smallint FROM company_members WHERE company_id=$1 AND user_id=$2")
+        AccessLevel::try_from(sqlx::query_scalar::<_, i16>("SELECT access_level::smallint FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2")
             .bind(self.company_id).bind(user).fetch_one(&self.pool).await.unwrap()).unwrap()
     }
 }

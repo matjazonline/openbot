@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "round": "07UR-P02-B2-R1",
+  "artifact": "80557b37f0f8cfabff6563c651842dff085ae5685de3c3882580ffba0e83cd8b",
+  "checks": [
+    {
+      "criteria": [
+        "02B.1",
+        "02B.2",
+        "02B.3",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "decisions c h i j k"
+      ],
+      "command": "cargo test --locked --offline --lib -- run_retention storage_ model_usage unit_budget message_admission",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b2 (+ _test and per-test own databases), fresh init schema, Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-focused.txt",
+          "sha256": "7cdc4079a8180d46b6d226e46940f64de71f869a473f36afeccfdc110bc27749"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "broad regression (before the retention test column fix)"
+      ],
+      "command": "cargo test --locked --offline --lib",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b2 (+ _test and per-test own databases), fresh init schema, Node 24 first on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-lib-suite.txt",
+          "sha256": "4ca90fb724cb4bb8a1cfe1471360552ffd7be3246896568ac5d6a2f904b6b848"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-clippy.txt",
+          "sha256": "cf917e47f781f0e686b8955d3409d30a2953c4a065e32ba4c76a4351e4c7b448"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline SQL metadata"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh openbot_p07_p02b2_sqlx @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-sqlx-check.txt",
+          "sha256": "dfa3855ca1c9772e09bff0ad1045ec6ac182f817a294fc699afcc2871c5c46cf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "schema apply"
+      ],
+      "command": "psql -X -q -v ON_ERROR_STOP=1 -f migrations/20260817000000_init_schema.sql",
+      "fixture": "fresh openbot_p07_p02b2_schema @55407",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-schema-apply.txt",
+          "sha256": "efd3cc8cdfbfdb2883fa3b43ea235cdea7ef1ab56ed44cad66b56b80ba1d634f"
+        }
+      ]
+    }
+  ]
+}

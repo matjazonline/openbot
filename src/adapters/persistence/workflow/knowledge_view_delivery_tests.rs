@@ -13,19 +13,18 @@ async fn classified_delivery() -> Setup {
     let mut fixture = Fixture::new().await;
     let owner = fixture.target.actor.user_id();
     let user = member(&fixture, "admin").await;
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(fixture.target.company.as_uuid())
-        .bind(user)
-        .execute(fixture.persistence.pool())
-        .await
-        .unwrap();
-    sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
-        .bind(user)
-        .execute(fixture.persistence.pool())
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO participant_identities(id,company_id,principal_id,transport,namespace,subject,status,claim_metadata,provenance) SELECT $1,$2,principal.id,'email','email',account.email,'verified','{\"version\":1,\"kind\":\"account\"}'::jsonb,'account' FROM principals AS principal JOIN users AS account ON account.id=principal.user_id WHERE principal.company_id=$2 AND principal.user_id=$3")
-        .bind(Uuid::new_v4()).bind(fixture.target.company.as_uuid()).bind(user).execute(fixture.persistence.pool()).await.unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(fixture.target.company.as_uuid())
+    .bind(user)
+    .execute(fixture.persistence.pool())
+    .await
+    .unwrap();
+    crate::adapters::persistence::workflow::tests::message_tests::support::verify_email(
+        &fixture, user,
+    )
+    .await;
     // The admin is the real command actor at publication/admission, not a rewritten run snapshot.
     fixture.target.actor = WorkflowActor::authenticated(user).unwrap();
     sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
@@ -72,12 +71,14 @@ fn read_scope(setup: &Setup, user: Uuid) -> DeliveryReadScope {
     }
 }
 async fn demote(setup: &Setup) {
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(setup.scope().company.as_uuid())
-        .bind(setup.user)
-        .execute(setup.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(setup.scope().company.as_uuid())
+    .bind(setup.user)
+    .execute(setup.pool())
+    .await
+    .unwrap();
 }
 
 #[tokio::test]

@@ -55,7 +55,7 @@ impl SalesJourney {
         configure(&d, audience).await;
         d.knowledge
             .upload(
-                scope(&d, d.fixture.target.actor.user_id()),
+                target(&d, d.fixture.target.actor.user_id()).await,
                 vec![
                     file("0_sales.md", "AX-4401 public list price 100"),
                     file("5_sales.md", "AX-4410 PRIVATE FLOOR 60"),
@@ -83,7 +83,7 @@ impl SalesJourney {
             .await
             .unwrap();
         sqlx::query(
-            "UPDATE company_members SET access_level=$3 WHERE company_id=$1 AND user_id=$2",
+            "UPDATE department_members SET access_level=$3 WHERE company_id=$1 AND root_user_id=$2",
         )
         .bind(self.d.fixture.target.company.as_uuid())
         .bind(user)
@@ -140,6 +140,7 @@ async fn configure(d: &Deployment, audience: Audience) {
     ChannelPersistence::update(
         d.p(),
         ChannelUpdate {
+            actor: d.fixture.target.actor,
             company_id: d.fixture.target.company.as_uuid(),
             channel_id: d.channel,
             write: ChannelWrite {
@@ -164,6 +165,13 @@ pub(super) fn scope(d: &Deployment, user: Uuid) -> KnowledgeScope {
         company: d.fixture.target.company,
         actor_id: user,
     }
+}
+
+pub(super) async fn target(
+    d: &Deployment,
+    user: Uuid,
+) -> crate::application::knowledge::KnowledgeUploadTarget {
+    crate::adapters::persistence::knowledge::root_target(d.p(), scope(d, user)).await
 }
 
 pub(super) fn file(name: &str, text: &str) -> KnowledgeUploadFile {

@@ -1,0 +1,815 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0308]: mismatched types
+  --> src/adapters/http/routes/knowledge/upload.rs:37:17
+   |
+37 |         .upload(scope, files)
+   |          ------ ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+   |          |
+   |          arguments to this method are incorrect
+   |
+note: method defined here
+  --> src/application/knowledge/service.rs:57:18
+   |
+57 |     pub async fn upload(
+   |                  ^^^^^^
+58 |         &self,
+59 |         target: KnowledgeUploadTarget,
+   |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests.rs:67:22
+    |
+ 67 |             .replace(scope, &[prepared(name, text)])
+    |              ------- ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/root_teardown_test_support.rs:157:9
+    |
+155 |       let documents = KnowledgeDocuments::replace(
+    |                       --------------------------- arguments to this function are incorrect
+156 |           p,
+157 | /         KnowledgeScope {
+158 | |             company,
+159 | |             actor_id: owner,
+160 | |         },
+    | |_________^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/knowledge_search_support.rs:271:17
+    |
+270 |               .upload(
+    |                ------ arguments to this method are incorrect
+271 | /                 KnowledgeScope {
+272 | |                     company: self.fixture.target.company,
+273 | |                     actor_id: self.fixture.target.actor.user_id(),
+274 | |                 },
+    | |_________________^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/knowledge_e2e_support.rs:58:17
+   |
+57 |             .upload(
+   |              ------ arguments to this method are incorrect
+58 |                 scope(&d, d.fixture.target.actor.user_id()),
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+   |
+note: method defined here
+  --> src/application/knowledge/service.rs:57:18
+   |
+57 |     pub async fn upload(
+   |                  ^^^^^^
+58 |         &self,
+59 |         target: KnowledgeUploadTarget,
+   |         -----------------------------
+
+error[E0053]: method `preflight_upload` has an incompatible type for trait
+   --> src/application/knowledge/service_tests.rs:32:41
+    |
+ 32 |     async fn preflight_upload(&self, _: KnowledgeScope, _: &[KnowledgeLayerSize]) -> AppResult<()> {
+    |                                         ^^^^^^^^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: type in trait
+   --> src/application/knowledge/types.rs:120:17
+    |
+120 |         target: KnowledgeUploadTarget,
+    |                 ^^^^^^^^^^^^^^^^^^^^^
+    = note: expected signature `fn(&'life0 Documents, application::knowledge::types::KnowledgeUploadTarget, &'life1 _) -> Pin<_>`
+               found signature `fn(&'life0 Documents, application::knowledge::types::KnowledgeScope, &'life1 _) -> Pin<_>`
+help: change the parameter type to match the trait
+    |
+ 32 -     async fn preflight_upload(&self, _: KnowledgeScope, _: &[KnowledgeLayerSize]) -> AppResult<()> {
+ 32 +     async fn preflight_upload(&self, _: application::knowledge::types::KnowledgeUploadTarget, _: &[KnowledgeLayerSize]) -> AppResult<()> {
+    |
+
+error[E0053]: method `replace` has an incompatible type for trait
+   --> src/application/knowledge/service_tests.rs:42:12
+    |
+ 42 |         _: KnowledgeScope,
+    |            ^^^^^^^^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: type in trait
+   --> src/application/knowledge/types.rs:125:17
+    |
+125 |         target: KnowledgeUploadTarget,
+    |                 ^^^^^^^^^^^^^^^^^^^^^
+    = note: expected signature `fn(&'life0 Documents, application::knowledge::types::KnowledgeUploadTarget, &'life1 _) -> Pin<_>`
+               found signature `fn(&'life0 Documents, application::knowledge::types::KnowledgeScope, &'life1 _) -> Pin<_>`
+help: change the parameter type to match the trait
+    |
+ 42 -         _: KnowledgeScope,
+ 42 +         _: application::knowledge::types::KnowledgeUploadTarget,
+    |
+
+error[E0046]: not all trait items implemented, missing: `move_document`
+   --> src/application/knowledge/service_tests.rs:22:1
+    |
+ 22 | impl KnowledgeDocuments for Documents {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `move_document` in implementation
+    |
+   ::: src/application/knowledge/types.rs:129:5
+    |
+129 |     async fn move_document(&self, command: MoveKnowledgeDocument) -> AppResult<()>;
+    |     ------------------------------------------------------------------------------- `move_document` from trait
+
+error[E0063]: missing fields `unit_id`, `unit_is_root` and `unit_name` in initializer of `domain::entities::knowledge::KnowledgeDocumentLayer`
+  --> src/adapters/http/pages/knowledge_tests.rs:34:22
+   |
+34 |         layers: vec![KnowledgeDocumentLayer {
+   |                      ^^^^^^^^^^^^^^^^^^^^^^ missing `unit_id`, `unit_is_root` and `unit_name`
+
+error[E0063]: missing fields `default_unit`, `units_truncated` and `upload_units` in initializer of `application::knowledge::types::KnowledgeLibraryView`
+  --> src/adapters/http/pages/knowledge_tests.rs:29:16
+   |
+29 |     let view = KnowledgeLibraryView {
+   |                ^^^^^^^^^^^^^^^^^^^^ missing `default_unit`, `units_truncated` and `upload_units`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:13:25
+    |
+ 13 |         f.store.replace(f.owner, &first),
+    |                 ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:14:25
+    |
+ 14 |         f.store.replace(f.owner, &second)
+    |                 ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:43:30
+    |
+ 43 |     f.store.preflight_upload(f.member, &sizes).await.unwrap();
+    |             ---------------- ^^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |             |
+    |             arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:118:14
+    |
+118 |     async fn preflight_upload(
+    |              ^^^^^^^^^^^^^^^^
+119 |         &self,
+120 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:60:58
+    |
+ 60 |     let writer = tokio::spawn(async move { store.replace(scope, &documents).await });
+    |                                                  ------- ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                                                  |
+    |                                                  arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:77:21
+    |
+ 77 |     f.store.replace(f.owner, &seed).await.unwrap();
+    |             ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |             |
+    |             arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:81:25
+    |
+ 81 |         f.store.replace(f.owner, &first),
+    |                 ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:82:25
+    |
+ 82 |         f.store.replace(f.owner, &second)
+    |                 ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:98:38
+    |
+ 98 |     let final_rows = f.store.replace(f.owner, &temporary).await.unwrap();
+    |                              ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                              |
+    |                              arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:103:32
+    |
+103 |     let rows = f.store.replace(f.owner, &duplicates).await.unwrap();
+    |                        ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                        |
+    |                        arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:111:25
+    |
+111 |         f.store.replace(f.owner, &too_large).await,
+    |                 ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:135:22
+    |
+135 |             .replace(scope, &[prepared("0_notes.md", "new")])
+    |              ------- ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests/races.rs:168:27
+    |
+168 |         .preflight_upload(f.member, &[prepared("0_visible.md", "").file.size()])
+    |          ---------------- ^^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:118:14
+    |
+118 |     async fn preflight_upload(
+    |              ^^^^^^^^^^^^^^^^
+119 |         &self,
+120 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/search_tests.rs:36:21
+    |
+ 36 |     f.store.replace(f.owner, &[wrong_model]).await.unwrap();
+    |             ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |             |
+    |             arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/search_quota_tests.rs:30:13
+    |
+ 29 |         .replace(
+    |          ------- arguments to this method are incorrect
+ 30 |             f.owner,
+    |             ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/search_quota_tests.rs:44:27
+    |
+ 44 |             store.replace(scope, &documents).await
+    |                   ------- ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                   |
+    |                   arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/search_quota_tests.rs:76:18
+    |
+ 76 |         .replace(f.owner, &[document("0_after.md", 2)])
+    |          ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/search_quota_tests.rs:85:18
+    |
+ 85 |         .replace(f.owner, &[document("0_first.md", 1)])
+    |          ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests.rs:122:13
+    |
+121 |         .replace(
+    |          ------- arguments to this method are incorrect
+122 |             f.owner,
+    |             ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests.rs:144:22
+    |
+144 |             .replace(f.member, &[prepared("7_notes.md", "private")])
+    |              ------- ^^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests.rs:208:31
+    |
+208 |             .preflight_upload(foreign, &[prepared("0_x.md", "x").file.size()])
+    |              ---------------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:118:14
+    |
+118 |     async fn preflight_upload(
+    |              ^^^^^^^^^^^^^^^^
+119 |         &self,
+120 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests.rs:213:25
+    |
+213 |         f.store.replace(foreign, &[prepared("0_x.md", "x")]).await,
+    |                 ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/knowledge/tests.rs:230:22
+    |
+230 |             .replace(f.owner, &[prepared("0_notes.md", "after"), invalid])
+    |              ------- ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/types.rs:123:14
+    |
+123 |     async fn replace(
+    |              ^^^^^^^
+124 |         &self,
+125 |         target: KnowledgeUploadTarget,
+    |         ------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/knowledge_search_tests.rs:113:13
+    |
+112 |           .upload(
+    |            ------ arguments to this method are incorrect
+113 | /             KnowledgeScope {
+114 | |                 company: f.claim.fence.scope.company,
+115 | |                 actor_id: f.fixture.target.actor.user_id(),
+116 | |             },
+    | |_____________^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/knowledge_e2e_upload_tests.rs:33:25
+   |
+33 |                 .upload(actor, vec![file("3_race.md", body)])
+   |                  ------ ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+   |                  |
+   |                  arguments to this method are incorrect
+   |
+note: method defined here
+  --> src/application/knowledge/service.rs:57:18
+   |
+57 |     pub async fn upload(
+   |                  ^^^^^^
+58 |         &self,
+59 |         target: KnowledgeUploadTarget,
+   |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/knowledge_e2e_tests.rs:141:21
+    |
+141 |             .upload(actor, vec![file("5_sales.md", "forged replacement")])
+    |              ------ ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |              |
+    |              arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/knowledge_e2e_tests.rs:146:17
+    |
+146 |         .upload(actor, vec![file("3_sales.md", "team price 80")])
+    |          ------ ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/knowledge_e2e_tests.rs:150:17
+    |
+150 |         .upload(actor, vec![file("3_sales.md", "team price 75")])
+    |          ------ ^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0063]: missing fields `default_unit`, `units_truncated` and `upload_units` in initializer of `application::knowledge::types::KnowledgeLibraryView`
+  --> src/application/knowledge/service_tests.rs:27:12
+   |
+27 |         Ok(KnowledgeLibraryView {
+   |            ^^^^^^^^^^^^^^^^^^^^ missing `default_unit`, `units_truncated` and `upload_units`
+
+error[E0308]: mismatched types
+  --> src/application/knowledge/query_embedding_tests.rs:48:26
+   |
+48 |         f.library.upload(scope(), vec![file("body")]).await,
+   |                   ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+   |                   |
+   |                   arguments to this method are incorrect
+   |
+note: method defined here
+  --> src/application/knowledge/service.rs:57:18
+   |
+57 |     pub async fn upload(
+   |                  ^^^^^^
+58 |         &self,
+59 |         target: KnowledgeUploadTarget,
+   |         -----------------------------
+
+error[E0308]: mismatched types
+  --> src/application/knowledge/query_embedding_tests.rs:89:24
+   |
+89 |         library.upload(scope(), vec![file("body")]).await,
+   |                 ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+   |                 |
+   |                 arguments to this method are incorrect
+   |
+note: method defined here
+  --> src/application/knowledge/service.rs:57:18
+   |
+57 |     pub async fn upload(
+   |                  ^^^^^^
+58 |         &self,
+59 |         target: KnowledgeUploadTarget,
+   |         -----------------------------
+
+error[E0308]: mismatched types
+  --> src/application/knowledge/query_embedding_tests.rs:93:20
+   |
+93 |     library.upload(scope(), vec![file("body")]).await.unwrap();
+   |             ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+   |             |
+   |             arguments to this method are incorrect
+   |
+note: method defined here
+  --> src/application/knowledge/service.rs:57:18
+   |
+57 |     pub async fn upload(
+   |                  ^^^^^^
+58 |         &self,
+59 |         target: KnowledgeUploadTarget,
+   |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:152:64
+    |
+152 |     let first = tokio::spawn(async move { first_service.upload(scope(), vec![file("one")]).await });
+    |                                                         ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                                                         |
+    |                                                         arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:157:24
+    |
+157 |         service.upload(scope(), vec![file("two")]).await,
+    |                 ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:178:17
+    |
+177 |             .upload(
+    |              ------ arguments to this method are incorrect
+178 |                 scope(),
+    |                 ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:188:32
+    |
+188 |         assert!(library.upload(scope(), vec![file("text")]).await.is_err());
+    |                         ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                         |
+    |                         arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:192:17
+    |
+192 |         .upload(scope(), vec![file(&"long paragraph ".repeat(200))])
+    |          ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:230:62
+    |
+230 |     let request = tokio::spawn(async move { uploading.upload(scope(), vec![file("text")]).await });
+    |                                                       ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                                                       |
+    |                                                       arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:253:62
+    |
+253 |     let request = tokio::spawn(async move { uploading.upload(scope(), vec![file("text")]).await });
+    |                                                       ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                                                       |
+    |                                                       arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+error[E0308]: mismatched types
+   --> src/application/knowledge/service_tests.rs:258:24
+    |
+258 |         library.upload(scope(), vec![file("retry")]).await,
+    |                 ------ ^^^^^^^ expected `KnowledgeUploadTarget`, found `KnowledgeScope`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/knowledge/service.rs:57:18
+    |
+ 57 |     pub async fn upload(
+    |                  ^^^^^^
+ 58 |         &self,
+ 59 |         target: KnowledgeUploadTarget,
+    |         -----------------------------
+
+Some errors have detailed explanations: E0046, E0053, E0063, E0308.
+For more information about an error, try `rustc --explain E0046`.
+error: could not compile `open_bots` (lib test) due to 49 previous errors

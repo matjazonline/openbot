@@ -62,7 +62,7 @@ pub(super) async fn thread_audience_on(
          FROM thread_principals AS party JOIN principals AS principal \
            ON (principal.company_id,principal.id)=(party.company_id,party.principal_id) \
          JOIN companies AS company ON company.id=party.company_id \
-         LEFT JOIN company_members AS member ON (member.company_id,member.user_id)=(principal.company_id,principal.user_id) \
+         LEFT JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true \
          WHERE party.company_id=$1 AND party.channel_id IS NOT DISTINCT FROM $2::uuid AND party.thread_id=$3 \
            AND party.target_principal_id IS NOT DISTINCT FROM $5::uuid LIMIT $4")
         .bind(company.as_uuid()).bind(target.desk_id()).bind(thread_id.as_uuid()).bind((MAX_READER_FACTS+1) as i64).bind(target.principal_id().map(|id| id.as_uuid()))
@@ -80,7 +80,7 @@ pub(super) async fn actor_level_on(
     let fact=sqlx::query_as::<_,ReaderFact>(
         "SELECT principal.kind,member.role AS membership,member.access_level::smallint AS access_level, \
             company.user_id=member.user_id AS is_owner \
-         FROM company_members AS member JOIN companies AS company ON company.id=member.company_id \
+         FROM membership_of($2, $1) AS member JOIN companies AS company ON company.id=member.company_id \
          JOIN principals AS principal ON (principal.company_id,principal.user_id)=(member.company_id,member.user_id) \
          WHERE member.company_id=$1 AND member.user_id=$2")
         .bind(company.as_uuid()).bind(actor).fetch_optional(db).await?;
@@ -256,6 +256,50 @@ pub(crate) async fn raise_content_level_on(
     .await?;
     if changed.rows_affected() != 1 {
         return Err(missing());
+    }
+    Ok(())
+}
+
+/// A cached checkpoint can feed the next model without replaying its local tool callback.
+/// Its consumed knowledge therefore needs the same current unit owners at the authority prefix.
+pub(super) async fn require_consumed_units_on(
+    db: &mut PgConnection,
+    scope: crate::application::workflow::actions::ActionScope,
+    agent: crate::entities::agent_capability::AgentId,
+) -> AppResult<()> {
+    let consumed: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_knowledge_consumptions WHERE company_id=$1 AND run_id=$2 AND execution_id=$3)",
+    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
+        .fetch_one(&mut *db).await?;
+    if !consumed {
+        return Ok(());
+    }
+    let units = super::run_scopes::knowledge_units_on(db, scope.company, scope.run, agent)
+        .await?
+        .map(|units| {
+            units
+                .into_iter()
+                .map(|unit| unit.as_uuid())
+                .collect::<Vec<_>>()
+        });
+    let refusal = crate::application::workflow::knowledge::scope_unavailable();
+    let authorized: bool = sqlx::query_scalar(
+        "SELECT NOT EXISTS(SELECT 1 FROM workflow_knowledge_consumptions AS proof
+         WHERE proof.company_id=$1 AND proof.run_id=$2 AND proof.execution_id=$3
+           AND CASE WHEN $4::uuid[] IS NULL THEN NOT (
+               proof.queried_unit_ids='{}'::uuid[] AND proof.source_items='[]'::jsonb
+               AND proof.content_level=0 AND proof.result=$5
+           ) ELSE proof.queried_unit_ids IS DISTINCT FROM $4 END)",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(units)
+    .bind(refusal.result())
+    .fetch_one(db)
+    .await?;
+    if !authorized {
+        return Err(AppError::BadRequest("knowledge.scope_unavailable".into()));
     }
     Ok(())
 }

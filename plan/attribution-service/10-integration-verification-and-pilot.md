@@ -8,7 +8,8 @@
 
 Depends on [09](09-operations-retention-and-separate-deployment.md) and all preceding phases. Prove
 the full tracking-to-sale flow, the application boundary, account access, and operational behavior
-with real PostgreSQL and the selected first merchant integration. Saving this plan does not imply
+with real PostgreSQL and a representative merchant API client. Native store adapters and a real-store
+pilot are deferred by the API-first scope selected on 2026-11-15. Saving this plan does not imply
 that any implementation or integration verification below has happened.
 
 ## Batch 10A — Cross-application and commerce acceptance
@@ -37,10 +38,10 @@ Add `attribution_e2e_` acceptance tests and browser journeys covering:
    delivery and cleanup. Verify durable retry behavior and competing-claimant protection with
    actual parallel transactions/processes. Do not substitute sequential mocks for race tests.
 8. Move attribution's running artifact to the separate-host topology and deny cross-database
-   access. Repeat login, link creation, real merchant sandbox purchase/refund and reporting. Build
+   access. Repeat login, link creation, merchant API purchase/refund fixture and reporting. Build
    the extracted directory without any parent Openbot files; do not hide a shared library or proxy.
 9. Verify production container UID, TLS/proxy trust, request/rate/body limits, CSRF, CSP/escaping,
-   secret redaction, retention, restored backups, and the agreed peak-load/latency/error targets.
+   secret redaction, retention, restored backups, and the documented implementation peak-load/latency/error targets.
 
 Focused checks: run `attribution_e2e_` and affected browser/contract suites while resolving these
 cases; record exact commands, counts, fixtures, topology, outcomes and any sandbox limitations.
@@ -48,8 +49,9 @@ cases; record exact commands, counts, fixtures, topology, outcomes and any sandb
 ## Batch 10B — Final full-suite gate
 
 Run once after the complete implementation is integrated. Reconcile commands against the current
-[Openbot CI](../../.github/workflows/ci.yml) and the service CI added in phase 02. The existing
-[local check script](../../scripts/check.sh) does not currently cover every CI gate. Prepare locked
+[Openbot CI](../../.github/workflows/ci.yml) and the service CI added in phase 02. The updated
+[local check script](../../scripts/check.sh) covers the required local CI families; also
+run the attribution topology job and reconcile new gates against both workflow files. Prepare locked
 dependencies, browser binaries and SQLx CLI before offline checks; use disposable PostgreSQL
 databases and CI's PostgreSQL/query-statistics setup. Never reset a development/customer database.
 
@@ -111,11 +113,13 @@ inspect the changes. Keep every plan file registered in Openbot's startup warnin
 
 ## Batch 10C — Pilot and completion criteria
 
-- The agreed first store completes a purchase and refund through the real supported integration;
-  generic test payloads alone do not satisfy the commerce pilot.
+- The generic merchant client completes a purchase and refund through the implemented API.
+  Native store adapters and their real-store pilot remain explicitly deferred; these fixtures
+  do not prove support for any specific checkout platform.
 - Reports reconcile with merchant order/line/refund facts, and remaining unmatched observations
   have explicit reasons. Platform impressions/spend remain separately labeled future imports.
-- Phase 01's consent, retention, traffic, latency and failure decisions are recorded and met.
+- Phase 01's confirmed consent and failure decisions and the documented test budgets are met.
+  Production retention/region/SLO choices and a real-store pilot remain deployment follow-up.
   Demonstrate restore and verify secret rotation/revocation procedures.
 - Attribution is deployable and buildable independently, with its own UI and data. Its documented
   Openbot identity/company dependency is the only required application integration. There are no
@@ -144,3 +148,30 @@ Implementation, database, browser, provider and performance gates above remain f
 - Compilation, database-backed, browser, provider and load suites were not run for this
   documentation/path-list change. The implementation gates above are requirements for future work,
   not claims of completed verification.
+
+
+## Implementation verification — 2026-11-16
+
+The API-first implementation covers all ten phases with Openbot sign-in, independent
+sessions/storage, merchant setup and credentials, durable click redirects, consent-gated
+tracking and checkout, paid orders/refunds, immutable attribution, reports/CSV and
+operations. Native store adapters and a real-store pilot remain deferred as agreed.
+
+The final extracted-copy gate ran on Rust1.95.0/PostgreSQL18 with an owned native
+PostgreSQL fixture and external network access denied:120 database/unit tests passed;
+all3 separately invoked browser journeys passed;15 contract checks and11 boundary
+fixtures passed. Formatting, offline compilation/Clippy, fresh migrations and SQLx
+metadata checks passed. The suite includes actual restore and bounded-load cases.
+The Linux command-group guard additionally passed real competing-process socket
+checks under an unprivileged user, including a failing UID-selector counterexample.
+Root source-module reachability passed all8 checks.
+
+Detailed commands, environment identities, counts, original failures, correction
+evidence and final gate/review dispositions live in [p10 TASK](phases/p10/docs/TASK.md),
+[p10 review](phases/p10/docs/REVIEW.md) and their immutable `logs/` evidence manifests.
+Openbot's whole-repository runner includes the user's test-fixcommit6e55258c. Its
+results are separate from the standalone-service result; a service pass does not
+assert that every existing Openbot gate passes. Accepted prerequisite phase
+identities are retained in [coordination](COORDINATION.md). No production region,
+retention/SLO policy, deployment, native-platform support or real-store pilot is
+established by the disposable fixtures.

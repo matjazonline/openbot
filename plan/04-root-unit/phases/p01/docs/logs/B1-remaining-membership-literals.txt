@@ -1,0 +1,131 @@
+src/infra/config.rs:110:    /// Deliberately deploy-controlled rather than a database role: `company_members.role` grants
+src/adapters/persistence/participant.rs:741:        // at `company_members`, where that pair does not exist.
+src/adapters/persistence/company_tests.rs:12:/// whether its `is_owner` projection and its `company_members` join do what they claim.
+src/application/use_cases/participant/test_support.rs:126:/// Production answers this by joining a principal to its `company_members` row, inside the same
+src/adapters/persistence/company_access_level_test_support.rs:97:        AccessLevel::try_from(sqlx::query_scalar::<_, i16>("SELECT access_level::smallint FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/company_access_level_tests.rs:27:        let error = sqlx::query("UPDATE company_members SET access_level=$3::smallint WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/company_access_level_tests.rs:44:            "UPDATE company_members SET access_level=8 WHERE company_id=$1 AND role='owner'"
+src/adapters/persistence/company_access_level_tests.rs:53:            "UPDATE company_members SET access_level=NULL WHERE company_id=$1 AND role='owner'"
+src/adapters/persistence/department_competing_tests.rs:241:        "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+src/adapters/http/routes/connection_level_tests.rs:458:    sqlx::query("UPDATE company_members SET access_level=1 WHERE company_id=$1 AND user_id=$2")
+src/application/use_cases/company_invite_tests.rs:524:    // The two doubles stand for one `company_members` table: acceptance wrote the row the
+src/adapters/http/routes/ui_knowledge_view_tests.rs:146:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/http/routes/ui_knowledge_view_tests.rs:222:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/http/routes/ui_knowledge_view_tests.rs:281:        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/http/routes/company_invite_level_test_support.rs:173:        sqlx::query("UPDATE company_members SET role='admin',access_level=4 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/company_owner_tests.rs:3://! `companies.user_id` and the owner's `company_members` row are checked against each other at
+src/adapters/persistence/company_owner_tests.rs:92:            "SELECT role FROM company_members WHERE company_id = $1 AND user_id = $2",
+src/adapters/persistence/company_owner_tests.rs:177:            "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+src/adapters/persistence/company_owner_tests.rs:200:            "DELETE FROM company_members WHERE company_id = $1 AND user_id = $2",
+src/adapters/http/routes/ui_run_counts_tests.rs:488:        "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+src/adapters/persistence/address_tests/notifications.rs:77:         FROM notification_events AS event JOIN company_members AS membership \
+src/adapters/persistence/address_tests/notifications.rs:151:        sqlx::query_scalar("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/address_tests/notifications.rs:163:        sqlx::query_scalar("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/address_tests/direct.rs:57:    sqlx::query("UPDATE company_members SET role = 'admin' WHERE company_id = $1 AND user_id = $2")
+src/adapters/persistence/address_tests/notification_authority_tests.rs:19:        sqlx::query_scalar("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/address_tests/notification_authority_tests.rs:147:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/address_tests/notification_authority_tests.rs:180:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/http/routes/ui_team_authorization_tests.rs:95:        sqlx::query("UPDATE company_members SET role=$3 WHERE company_id=$1 AND user_id=$2")
+src/adapters/http/routes/ui_team_authorization_tests.rs:237:        "UPDATE company_members SET role='admin',access_level=4 WHERE company_id=$1 AND user_id=$2",
+src/adapters/http/routes/vault_authoring_route_tests.rs:80:    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/company_invite_tests.rs:274:        "SELECT COUNT(*) FROM company_members WHERE company_id = $1 AND user_id = $2",
+src/adapters/persistence/workflow/knowledge_view_tests.rs:55:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_view_tests.rs:102:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_view_tests.rs:136:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/company_access_level_race_tests.rs:18:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/company_access_level_race_tests.rs:41:    sqlx::query("CREATE TRIGGER pause_level_write BEFORE INSERT OR UPDATE ON company_members FOR EACH ROW EXECUTE FUNCTION pause_level_write()")
+src/adapters/persistence/company_access_level_race_tests.rs:90:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/company_access_level_race_tests.rs:97:        "UPDATE company_members SET role='owner',access_level=9 WHERE company_id=$1 AND user_id=$2",
+src/adapters/persistence/agent_retire_tests.rs:265:        "company_members",
+src/adapters/persistence/local_agents/native_mcp_workflow_test_support.rs:68:        'actor_live',EXISTS(SELECT 1 FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id JOIN users AS account ON account.id=member.user_id WHERE member.company_id=call.company_id AND member.user_id=call.actor_id AND member.role IN ('owner','admin') AND principal.kind='person'),
+src/adapters/persistence/workflow/action_reconciliation_authority_support.rs:254:    sqlx::query("UPDATE company_members SET role='member' WHERE user_id=$1")
+src/adapters/persistence/workflow/action_reconciliation_authority_support.rs:264:    sqlx::query("UPDATE company_members SET role='admin' WHERE user_id=$1")
+src/adapters/persistence/workflow/action_reconciliation_authority_support.rs:289:            sqlx::query("UPDATE company_members SET role='member' WHERE user_id=$1")
+src/adapters/persistence/workflow/agent_history_knowledge_resume_tests.rs:113:    assert_eq!(sqlx::query("UPDATE company_members AS member SET access_level=0 FROM workflow_runs AS run WHERE member.company_id=run.company_id AND member.user_id=run.actor_id AND run.company_id=$1 AND run.id=$2")
+src/adapters/persistence/workflow/knowledge_history_tests.rs:13:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/http/routes/workflows/ui/runs/events_tests.rs:83:    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+src/adapters/persistence/local_agents/protocol/admission_failure_tests.rs:66:        sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_question_release_tests.rs:74:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_admission_tests.rs:230:        sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/knowledge/tests/races.rs:50:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:366:            let waiting:i64=sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE '%company_members%'").fetch_one(pool).await.unwrap();
+src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:416:    sqlx::query("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2 FOR UPDATE")
+src/adapters/persistence/delivery/tenant_tests.rs:302:    sqlx::query("SELECT 1 FROM principals AS principal JOIN company_members AS member ON member.company_id = principal.company_id AND member.user_id = principal.user_id WHERE principal.company_id = $1 AND principal.id = $2 FOR SHARE OF principal, member")
+src/adapters/persistence/delivery/tenant_tests.rs:364:               JOIN company_members AS member \
+src/adapters/persistence/workflow/memory_tool_tests.rs:436:    sqlx::query("UPDATE company_members SET access_level=3 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_publication_authority_tests.rs:100:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/local_agents/management/native_tests.rs:377:    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs:64:        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin' LIMIT 1",
+src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:189:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:207:    sqlx::query("UPDATE company_members SET access_level=9 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/vault_tests/native_journeys.rs:240:        "UPDATE company_members SET role='admin',access_level=9 WHERE company_id=$1 AND user_id=$2",
+src/adapters/persistence/workflow/agent_history_private_context_tests.rs:328:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_private_context_tests.rs:356:        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_private_context_tests.rs:402:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/local_agent_mcp_history_tests.rs:105:    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=(SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2)")
+src/adapters/persistence/workflow/doop_document_delivery_support.rs:110:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2 AND role<>'owner'")
+src/adapters/persistence/workflow/knowledge_message_tests.rs:114:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_message_tests.rs:175:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_message_tests.rs:211:            let waiting:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity AS activity WHERE $1=ANY(pg_blocking_pids(activity.pid)) AND activity.wait_event_type='Lock' AND activity.query LIKE 'SELECT principal.id, account.email FROM company_members%')")
+src/adapters/persistence/workflow/decision_business_member_tests.rs:10:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/decision_business_member_tests.rs:17:        sqlx::query_scalar("SELECT role FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs:55:            let affected = sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2 AND access_level=5")
+src/adapters/persistence/workflow/escalation_history_tests.rs:33:    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/admission_token_tests.rs:27:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/admission_token_tests.rs:63:    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/decision_tests.rs:471:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_search_support.rs:61:            "UPDATE company_members SET access_level=$3 WHERE company_id=$1 AND user_id=$2",
+src/adapters/persistence/workflow/local_agent_continuation_tests.rs:179:        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin'",
+src/adapters/persistence/workflow/local_agent_continuation_tests.rs:291:                "UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2",
+src/adapters/persistence/workflow/agent_history_views_authority_tests.rs:231:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_views_authority_tests.rs:272:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/binding_association_tests.rs:162:        sqlx::query("UPDATE company_members SET role = $3 WHERE company_id = $1 AND user_id = $2")
+src/adapters/persistence/workflow/knowledge_account_order_tests.rs:147:          AND activity.query LIKE 'SELECT principal.id, account.email FROM company_members%'",
+src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs:29:        sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs:166:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs:217:        sqlx::query("UPDATE company_members SET access_level=$3::smallint WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs:248:        sqlx::query("UPDATE company_members SET access_level=1 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs:348:        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/reviewer_account_race_tests.rs:98:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/reviewer_account_race_tests.rs:120:        sqlx::query_scalar("SELECT role FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs:134:        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs:290:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs:322:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/provisioning_runtime_tests.rs:61:    sqlx::query("UPDATE company_members SET role = $2 WHERE user_id = $1")
+src/adapters/persistence/workflow/control_acceptance_tests.rs:358:    for table in ["principals", "company_members"] {
+src/adapters/persistence/workflow/message_intent_tests.rs:491:    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+src/adapters/persistence/workflow/message_intent_tests.rs:1328:    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+src/adapters/persistence/workflow/message_intent_tests.rs:1443:    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+src/adapters/persistence/workflow/message_authority_tests.rs:80:        "UPDATE company_members SET role='member' WHERE company_id='{company}' AND user_id='{owner}'; \
+src/adapters/persistence/workflow/message_authority_tests.rs:81:         UPDATE company_members SET role='owner', access_level=9 WHERE company_id='{company}' AND user_id='{user}'; \
+src/adapters/persistence/workflow/message_authority_tests.rs:90:        "DELETE FROM company_members WHERE company_id='{}' AND user_id='{}'",
+src/adapters/persistence/workflow/channel_reply_delivery_tests.rs:157:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_e2e_support.rs:86:            "UPDATE company_members SET access_level=$3 WHERE company_id=$1 AND user_id=$2",
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:80:        sqlx::query_scalar("SELECT user_id FROM company_members WHERE company_id=$1")
+src/adapters/persistence/workflow/agent_history_channel_release_tests.rs:12:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_knowledge_e2e_tests.rs:162:    sqlx::query("UPDATE company_members SET role='admin' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/escalation_cancellation_tests.rs:173:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/escalation_cancellation_tests.rs:208:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_views_tests.rs:52:    sqlx::query("UPDATE company_members SET access_level=$3 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/reviewer_action_tests.rs:209:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs:28:        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='member' LIMIT 1",
+src/adapters/persistence/workflow/doop_document_result_tests.rs:346:        let removed = sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_account_race_support.rs:60:    sqlx::query("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2 FOR UPDATE")
+src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs:16:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs:75:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/local_agent_behavior_tests.rs:219:        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin'",
+src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs:205:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs:215:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/decision_authority_tests.rs:128:    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/decision_authority_tests.rs:145:            sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/harness_token_atomic_tests.rs:166:    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_session_tests.rs:94:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/channel_reply_knowledge_tests.rs:59:        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/action_approval_http_tests.rs:388:            "SELECT user_id FROM company_members WHERE company_id=$1 AND user_id<>$2",
+src/adapters/persistence/workflow/action_approval_http_tests.rs:401:        sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/knowledge_history_race_tests.rs:26:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_caller_tests.rs:36:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/agent_history_caller_tests.rs:60:    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/local_agent_mcp_tests.rs:83:        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin' LIMIT 1",
+src/adapters/persistence/workflow/local_agent_mcp_tests.rs:89:    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
+src/adapters/persistence/workflow/local_agent_mcp_tests.rs:101:    sqlx::query("UPDATE company_members SET access_level=9 WHERE company_id=$1 AND user_id=$2")

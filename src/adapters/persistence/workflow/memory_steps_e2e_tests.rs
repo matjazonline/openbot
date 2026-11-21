@@ -28,13 +28,23 @@ async fn live_memory(
         .await
         .unwrap();
     persistence
-        .ensure_namespace(scope.company, NamespaceOwner::Company)
+        .ensure_namespace(
+            scope.company,
+            NamespaceOwner::Unit(
+                crate::adapters::persistence::company::root_on(
+                    &mut persistence.pool().acquire().await.unwrap(),
+                    scope.company,
+                )
+                .await
+                .unwrap(),
+            ),
+        )
         .await
         .unwrap();
     let http = client(live);
     reconcile_with(&persistence, live, &http).await;
     let namespace: Uuid = sqlx::query_scalar(
-        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='company' \
+        "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='unit' \
          AND state='ready'",
     )
     .bind(scope.company.as_uuid())
@@ -98,7 +108,7 @@ async fn memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_s
     for case in ["audience", "drop", "refused"] {
         let mut load: Value =
             serde_json::from_str(&registry::example("memory.load").unwrap().source).unwrap();
-        load["steps"]["start"]["with"] = json!({"scope":{"literal":{"kind":"company"}},
+        load["steps"]["start"]["with"] = json!({"scope":{"literal":{"unit":"root"}},
             "query":{"literal":"concise replies"},"limit":{"literal":20}});
         let f = AdmissionFixture::with_binding(BindingFixture::from_source(load).await).await;
         let c = Conversation::new(&f).await;

@@ -6,8 +6,10 @@ pub struct UsageSample {
     pub model: ModelName,
     pub workflow: Uuid,
     pub agent: Option<Uuid>,
-    /// The department that owns the run's desk now, with its name.
+    /// The department the call is attributed to, with its name.
     pub department: Option<(Uuid, String)>,
+    /// The run's desk, with its name; none for archived usage.
+    pub desk: Option<(Uuid, String)>,
     pub input: u64,
     pub output: u64,
     pub source: Option<TokenUsageSource>,
@@ -32,6 +34,8 @@ enum GroupKey {
     Workflow(Uuid),
     /// Departments by name, then "No department" last: the flag is `true` for it.
     Department(bool, Option<(String, Uuid)>),
+    /// Desks by name, then "No desk" last.
+    Desk(bool, Option<(String, Uuid)>),
 }
 pub fn aggregate(
     calls: Vec<UsageSample>,
@@ -56,6 +60,10 @@ pub fn aggregate(
             UsageGrouping::Department => GroupKey::Department(
                 call.department.is_none(),
                 call.department.clone().map(|(id, name)| (name, id)),
+            ),
+            UsageGrouping::Desk => GroupKey::Desk(
+                call.desk.is_none(),
+                call.desk.clone().map(|(id, name)| (name, id)),
             ),
         };
         if groups.len() >= 200 && !groups.contains_key(&key) {
@@ -113,6 +121,7 @@ fn group(key: GroupKey, total: Total) -> UsageGroup {
         model: None,
         workflow: None,
         department: None,
+        desk: None,
         calls: total.calls,
         completed_calls: total.completed,
         unconfirmed_calls: total.calls - total.completed,
@@ -145,6 +154,15 @@ fn group(key: GroupKey, total: Total) -> UsageGroup {
                 },
             })
         }
+        GroupKey::Desk(_, desk) => {
+            group.desk = Some(match desk {
+                Some((name, id)) => UsageDesk { id: Some(id), name },
+                None => UsageDesk {
+                    id: None,
+                    name: "No desk".into(),
+                },
+            })
+        }
     }
     group
 }
@@ -164,11 +182,13 @@ mod tests {
             grouping: UsageGrouping::Workflow,
             agent: None,
             workflow: None,
+            unit: None,
         }
     }
     fn sample(source: Option<TokenUsageSource>) -> UsageSample {
         UsageSample {
             department: None,
+            desk: None,
             provider: "openai".into(),
             model: "model".into(),
             workflow: Uuid::nil(),

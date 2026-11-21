@@ -75,6 +75,24 @@ pub(super) async fn capture_on(
     .await?;
     let tools = super::tools::resolve_tools(tx, scope.company, &bindings, model.is_none()).await?;
     let skills = capture_skills(tx, scope).await?;
+    // Read under the capture's row locks: what is published is in the agent's reach (01B.2).
+    super::super::unit_resources::check_agent_reach_on(
+        tx,
+        scope.company,
+        scope.agent.as_uuid(),
+        &tools,
+        &skills,
+        crate::app_error::UnitCheckStage::Publication,
+    )
+    .await?;
+    super::super::unit_resources::check_agent_model_reach_on(
+        tx,
+        scope.company,
+        scope.agent.as_uuid(),
+        model.as_ref(),
+        crate::app_error::UnitCheckStage::Publication,
+    )
+    .await?;
     let draft = AgentDraft {
         company_id: scope.company,
         agent_id: scope.agent,
@@ -214,6 +232,7 @@ fn resolved_skill(
         assignment_id: AgentSkillAssignmentId::new(assignment),
         skill: SkillSnapshot {
             company_id: company,
+            unit_id: skill.unit_id.ok_or_else(invalid)?,
             skill_id: skill.id,
             name: TypeName::parse(skill.slug.as_str()).map_err(|_| invalid())?,
             instructions: skill.instructions.clone(),

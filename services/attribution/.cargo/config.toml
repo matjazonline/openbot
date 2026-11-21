@@ -1,0 +1,4 @@
+[env]
+# Exercise the same stock stack budget in libtest and the production runtime.
+RUST_MIN_STACK = "2097152"
+SQLX_OFFLINE = "true"

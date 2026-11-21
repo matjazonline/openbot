@@ -1,0 +1,10 @@
+--- B1/src/adapters/persistence/workflow/knowledge_e2e_support.rs
++++ B2/src/adapters/persistence/workflow/knowledge_e2e_support.rs
+@@ -140,6 +140,7 @@
+     ChannelPersistence::update(
+         d.p(),
+         ChannelUpdate {
++            actor: d.fixture.target.actor,
+             company_id: d.fixture.target.company.as_uuid(),
+             channel_id: d.channel,
+             write: ChannelWrite {

@@ -15,13 +15,14 @@ async fn direct_thread_notification_native_guards_refuse_wrong_membership_retarg
     let (event,membership,actor):(Uuid,Uuid,Uuid)=sqlx::query_as(
         "SELECT id,direct_membership_id,actor_principal_id FROM notification_events WHERE company_id=$1 AND source_id=$2")
         .bind(f.company.id).bind(source).fetch_one(f.pool()).await.unwrap();
-    let wrong_member: Uuid =
-        sqlx::query_scalar("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2")
-            .bind(f.company.id)
-            .bind(other)
-            .fetch_one(f.pool())
-            .await
-            .unwrap();
+    let wrong_member: Uuid = sqlx::query_scalar(
+        "SELECT id FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(other)
+    .fetch_one(f.pool())
+    .await
+    .unwrap();
     assert_ne!(membership, wrong_member);
     let error=sqlx::query("INSERT INTO notification_events(company_id,source_kind,source_id,action_kind,source_generation,actor_principal_id,direct_membership_id) \
         VALUES($1,'direct_message',$2,'direct_message_received',1,$3,$4)")
@@ -144,12 +145,14 @@ async fn direct_thread_notification_content_clearance_loss_withdraws_before_list
     };
     let (user, name) = account(&f.persistence, "receipt_classified").await;
     let target = f.join(user, &name).await;
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.company.id)
-        .bind(user)
-        .execute(f.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(user)
+    .execute(f.pool())
+    .await
+    .unwrap();
     let thread = crate::application::ports::thread::ThreadPersistence::create_thread(
         &f.persistence,
         f.company.id,
@@ -177,12 +180,14 @@ async fn direct_thread_notification_content_clearance_loss_withdraws_before_list
     .unwrap();
     assert_eq!(projected(&f).await, 1);
     let item = list(&f, user, target).await.items.remove(0);
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.company.id)
-        .bind(user)
-        .execute(f.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(user)
+    .execute(f.pool())
+    .await
+    .unwrap();
     let state: String = sqlx::query_scalar("SELECT state FROM notifications WHERE id=$1")
         .bind(item.id.as_uuid())
         .fetch_one(f.pool())

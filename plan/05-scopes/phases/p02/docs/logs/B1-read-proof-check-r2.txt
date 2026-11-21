@@ -1,0 +1,40 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error: implementation of `FnOnce` is not general enough
+   --> src/adapters/memory_service/mod.rs:474:5
+    |
+474 |     async fn search_scopes(
+    |     ^^^^^ implementation of `FnOnce` is not general enough
+    |
+    = note: closure with signature `fn(&'0 application::memory::ports::ScopedSearch<'_>) -> {async block@...}` must implement `FnOnce<(&'1 application::memory::ports::ScopedSearch<'_>,)>`, for any two lifetimes `'0` and `'1`...
+    = note: ...but it actually implements `FnOnce<(&application::memory::ports::ScopedSearch<'_>,)>`
+
+error: implementation of `FnOnce` is not general enough
+   --> src/adapters/memory_service/mod.rs:474:5
+    |
+474 |     async fn search_scopes(
+    |     ^^^^^ implementation of `FnOnce` is not general enough
+    |
+    = note: closure with signature `fn(&application::memory::ports::ScopedSearch<'0>) -> {async block@...}` must implement `FnOnce<(&application::memory::ports::ScopedSearch<'1>,)>`, for any two lifetimes `'0` and `'1`...
+    = note: ...but it actually implements `FnOnce<(&application::memory::ports::ScopedSearch<'_>,)>`
+
+error: implementation of `FnOnce` is not general enough
+   --> src/adapters/memory_service/mod.rs:509:5
+    |
+509 |     async fn context_pack(
+    |     ^^^^^ implementation of `FnOnce` is not general enough
+    |
+    = note: closure with signature `fn(&'0 application::memory::ports::ScopedPack<'_>) -> {async block@...}` must implement `FnOnce<(&'1 application::memory::ports::ScopedPack<'_>,)>`, for any two lifetimes `'0` and `'1`...
+    = note: ...but it actually implements `FnOnce<(&application::memory::ports::ScopedPack<'_>,)>`
+
+error: implementation of `FnOnce` is not general enough
+   --> src/adapters/memory_service/mod.rs:509:5
+    |
+509 |     async fn context_pack(
+    |     ^^^^^ implementation of `FnOnce` is not general enough
+    |
+    = note: closure with signature `fn(&application::memory::ports::ScopedPack<'0>) -> {async block@...}` must implement `FnOnce<(&application::memory::ports::ScopedPack<'1>,)>`, for any two lifetimes `'0` and `'1`...
+    = note: ...but it actually implements `FnOnce<(&application::memory::ports::ScopedPack<'_>,)>`
+
+error: could not compile `open_bots` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 4 previous errors

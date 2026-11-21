@@ -49,6 +49,7 @@ async fn autonomous_agent_admission_checks_resources_of_agent_owned_child_workfl
         .create_http(
             company,
             setup.fixture.target.actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://child.fixture.test").unwrap(),
                 bearer: false,

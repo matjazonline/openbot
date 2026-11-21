@@ -19,6 +19,7 @@ use crate::use_cases::user::UserPersistence;
 /// A company with an "edited" channel and an "elsewhere" channel whose address an edit can
 /// collide with.
 struct Fixture {
+    actor: crate::application::workflow::WorkflowActor,
     persistence: PostgresPersistence,
     company_id: Uuid,
     channel_id: Uuid,
@@ -48,13 +49,22 @@ async fn fixture(pool: &sqlx::PgPool) -> Fixture {
     )
     .await
     .unwrap();
-    let channel = ChannelPersistence::create(&persistence, company.id, write("edited", "Edited"))
-        .await
-        .unwrap();
-    ChannelPersistence::create(&persistence, company.id, write("elsewhere", "Elsewhere"))
-        .await
-        .unwrap();
+    let channel = crate::adapters::persistence::test_support::create_channel(
+        &persistence,
+        company.id,
+        write("edited", "Edited"),
+    )
+    .await
+    .unwrap();
+    crate::adapters::persistence::test_support::create_channel(
+        &persistence,
+        company.id,
+        write("elsewhere", "Elsewhere"),
+    )
+    .await
+    .unwrap();
     Fixture {
+        actor: crate::application::workflow::WorkflowActor::authenticated(manager.id).unwrap(),
         persistence,
         company_id: company.id,
         channel_id: channel.id,
@@ -73,6 +83,7 @@ fn write(slug: &str, name: &str) -> ChannelWrite {
 impl Fixture {
     fn request(&self, name: &str) -> ChannelUpdate {
         ChannelUpdate {
+            actor: self.actor,
             company_id: self.company_id,
             channel_id: self.channel_id,
             write: write("edited", name),

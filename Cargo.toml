@@ -34,7 +34,10 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1", "to
 htmd = "0.1"
 mail-parser = "0.9"
 mail-auth = "0.6"
+serde_urlencoded = "0.7"
 sha2 = "0.10"
+oauth2 = { version = "5", default-features = false }
+subtle = "2"
 hmac = "0.12"
 jsonschema = { version = "=0.33.0", default-features = false }
 serde_yaml = "0.9"
@@ -66,6 +69,9 @@ tokenizers = { version = "=0.23.2", default-features = false, features = ["onig"
 libc = "0.2"
 
 [dev-dependencies]
+# Use the already-locked HTML parser to submit controls from real rendered forms in route tests.
+html5ever = "=0.27.0"
+markup5ever_rcdom = "=0.3.0"
 # Already used by mail-auth; local DNS fixtures exercise its real SPF/DMARC verifier.
 hickory-resolver = "=0.24.4"
 tokio-rustls = { version = "=0.26.4", default-features = false, features = ["ring", "tls12"] }

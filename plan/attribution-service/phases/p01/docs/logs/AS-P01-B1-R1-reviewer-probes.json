@@ -1,0 +1,82 @@
+[
+  {
+    "operation": "POST /v1/stores",
+    "parameters": [
+      "X-Company-ID",
+      "X-CSRF-Token"
+    ],
+    "body_fields": [
+      "name",
+      "timezone"
+    ]
+  },
+  {
+    "operation": "POST /v1/campaigns",
+    "parameters": [
+      "X-Company-ID",
+      "X-CSRF-Token"
+    ],
+    "body_fields": [
+      "store_id",
+      "name"
+    ]
+  },
+  {
+    "operation": "POST /v1/ads",
+    "parameters": [
+      "X-Company-ID",
+      "X-CSRF-Token"
+    ],
+    "body_fields": [
+      "store_id",
+      "campaign_id",
+      "name",
+      "advertised_product_id"
+    ]
+  },
+  {
+    "operation": "POST /v1/credentials",
+    "parameters": [
+      "X-Company-ID",
+      "X-CSRF-Token"
+    ],
+    "body_fields": [
+      "store_id",
+      "label",
+      "scopes",
+      "expires_at"
+    ]
+  },
+  {
+    "operation": "POST /v1/credentials/{id}/rotate",
+    "parameters": [
+      "X-Company-ID",
+      "X-CSRF-Token",
+      "id"
+    ],
+    "body_fields": [
+      "overlap_seconds"
+    ]
+  },
+  {
+    "valid_base_report": true,
+    "with_unattributed_reasons": false,
+    "with_refund_count": false
+  },
+  {
+    "financial_fields": [
+      "currency",
+      "paid_orders",
+      "attributed_paid_orders",
+      "sold_units",
+      "returned_units",
+      "merchandise_amount",
+      "refunded_merchandise_amount",
+      "net_merchandise_amount",
+      "tax_amount",
+      "shipping_amount",
+      "refunded_tax_amount",
+      "refunded_shipping_amount"
+    ]
+  }
+]

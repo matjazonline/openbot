@@ -1,0 +1,186 @@
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+error: digits grouped inconsistently by underscores
+   --> src/adapters/identity/../commerce/ledger_tests.rs:139:19
+    |
+139 |         (0, -30 * 86400_000_000i64, false, true, "attributed"),
+    |                   ^^^^^^^^^^^^^^^^ help: consider: `86_400_000_000_i64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#inconsistent_digit_grouping
+    = note: `-D clippy::inconsistent-digit-grouping` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::inconsistent_digit_grouping)]`
+
+error: digits grouped inconsistently by underscores
+   --> src/adapters/identity/../commerce/ledger_tests.rs:140:19
+    |
+140 |         (1, -30 * 86400_000_000 - 1, false, true, "expired"),
+    |                   ^^^^^^^^^^^^^ help: consider: `86_400_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#inconsistent_digit_grouping
+
+error: this `if` statement can be collapsed
+   --> src/adapters/identity/http.rs:251:13
+    |
+251 | /             if let Some((key, value)) = item.trim().split_once('=') {
+252 | |                 if key == name {
+253 | |                     if found.is_some() || !opaque(value) {
+254 | |                         return Err(Failure::Unauthorized);
+...   |
+258 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+251 ~             if let Some((key, value)) = item.trim().split_once('=')
+252 ~                 && key == name {
+253 |                     if found.is_some() || !opaque(value) {
+...
+256 |                     found = Some(value.to_owned());
+257 ~                 }
+    |
+
+error: this `if` statement can be collapsed
+  --> src/adapters/setup/admission.rs:33:9
+   |
+33 | /         if let Ok(mut counts) = self.admission.0.lock() {
+34 | |             if let Some(n) = counts.get_mut(&self.company) {
+35 | |                 *n -= 1;
+36 | |                 if *n == 0 {
+...  |
+40 | |         }
+   | |_________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+help: collapse nested if block
+   |
+33 ~         if let Ok(mut counts) = self.admission.0.lock()
+34 ~             && let Some(n) = counts.get_mut(&self.company) {
+35 |                 *n -= 1;
+...
+38 |                 }
+39 ~             }
+   |
+
+error: this `if` statement can be collapsed
+  --> src/adapters/website/http.rs:64:5
+   |
+64 | /     if let Some(origin) = origin {
+65 | |         if let Ok(value) = HeaderValue::from_str(origin) {
+66 | |             response
+67 | |                 .headers_mut()
+...  |
+70 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+help: collapse nested if block
+   |
+64 ~     if let Some(origin) = origin
+65 ~         && let Ok(value) = HeaderValue::from_str(origin) {
+66 |             response
+67 |                 .headers_mut()
+68 |                 .insert("access-control-allow-origin", value);
+69 ~         }
+   |
+
+error: this `if` statement can be collapsed
+   --> src/adapters/website/http.rs:111:9
+    |
+111 | /         if let Some(headers) = request.headers().get("access-control-request-headers") {
+112 | |             if !headers
+113 | |                 .to_str()
+114 | |                 .map_err(|_| Failure::Forbidden)?
+...   |
+120 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+111 ~         if let Some(headers) = request.headers().get("access-control-request-headers")
+112 ~             && !headers
+113 |                 .to_str()
+...
+118 |                 return Err(Failure::Forbidden);
+119 ~             }
+    |
+
+error: this `if` statement can be collapsed
+   --> src/adapters/website/http.rs:153:5
+    |
+153 | /     if let Some(origin) = &origin {
+154 | |         if let Err(e) = postgres::cors_origin(&state.setup.store, origin).await {
+155 | |             return e.into_response();
+156 | |         }
+157 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+153 ~     if let Some(origin) = &origin
+154 ~         && let Err(e) = postgres::cors_origin(&state.setup.store, origin).await {
+155 |             return e.into_response();
+156 ~         }
+    |
+
+error: this `if` statement can be collapsed
+  --> src/adapters/website/postgres.rs:76:5
+   |
+76 | /     if let Some(origin) = origin {
+77 | |         if origin_host(origin)? != installation.host {
+78 | |             return Err(Failure::Forbidden);
+79 | |         }
+80 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+help: collapse nested if block
+   |
+76 ~     if let Some(origin) = origin
+77 ~         && origin_host(origin)? != installation.host {
+78 |             return Err(Failure::Forbidden);
+79 ~         }
+   |
+
+error: this `if` statement can be collapsed
+  --> src/application/freshness.rs:55:9
+   |
+55 | /         if let Some(previous) = tickets.get(&status.company_id) {
+56 | |             if previous.version == ticket.version && previous.deadline > ticket.deadline {
+57 | |                 return Ok(previous.clone());
+58 | |             }
+59 | |         }
+   | |_________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+help: collapse nested if block
+   |
+55 ~         if let Some(previous) = tickets.get(&status.company_id)
+56 ~             && previous.version == ticket.version && previous.deadline > ticket.deadline {
+57 |                 return Ok(previous.clone());
+58 ~             }
+   |
+
+error: could not compile `attribution_service` (lib) due to 7 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: items after a test module
+  --> src/infra/identity.rs:55:1
+   |
+55 |   mod tests {
+   |   ^^^^^^^^^
+...
+92 | / pub fn compose(
+93 | |     pool: sqlx::PgPool,
+94 | |     config: Arc<IdentityConfig>,
+95 | | ) -> Result<crate::adapters::identity::http::IdentityHttp> {
+   | |__________________________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#items_after_test_module
+   = note: `-D clippy::items-after-test-module` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
+   = help: move the items to before the test module was defined
+
+error: could not compile `attribution_service` (lib test) due to 10 previous errors

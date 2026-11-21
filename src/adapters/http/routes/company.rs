@@ -35,6 +35,62 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{id}",
             put(update_company_json).delete(delete_company_json),
         )
+        .route(
+            "/api/companies/{company}/model-connections/{id}/move",
+            axum::routing::post(move_model_connection),
+        )
+        .route(
+            "/api/companies/{company}/departments/{unit}/budgets/{period}",
+            put(set_unit_budget).delete(clear_unit_budget),
+        )
+}
+
+#[derive(Debug, Deserialize)]
+struct UnitBudgetCap {
+    cap_micros: i64,
+}
+
+/// PUT /api/companies/{company}/departments/{unit}/budgets/{period} - Set a department's spend cap
+/// for the UTC day or month, in micro-USD (Plan07 02B.1): whoever manages the department.
+#[instrument(skip_all)]
+async fn set_unit_budget(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, unit, period)): Path<(Uuid, Uuid, String)>,
+    Json(cap): Json<UnitBudgetCap>,
+) -> AppResult<StatusCode> {
+    company_use_cases
+        .set_unit_budget(user.id, company, unit, &period, cap.cap_micros)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/companies/{company}/departments/{unit}/budgets/{period} - Remove that cap.
+#[instrument(skip_all)]
+async fn clear_unit_budget(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, unit, period)): Path<(Uuid, Uuid, String)>,
+) -> AppResult<StatusCode> {
+    company_use_cases
+        .clear_unit_budget(user.id, company, unit, &period)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/companies/{company}/model-connections/{id}/move - Move a model connection to
+/// another unit the caller manages, listing the agents pinned to it (Plan07 02A).
+#[instrument(skip_all)]
+async fn move_model_connection(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    user: AuthenticatedUser,
+    Path((company, id)): Path<(Uuid, Uuid)>,
+    Json(target): Json<super::unit_resources::UnitTarget>,
+) -> AppResult<Json<serde_json::Value>> {
+    let moved = company_use_cases
+        .move_model_connection(user.id, company, id, target.unit_id)
+        .await?;
+    Ok(Json(super::unit_resources::moved_json(&moved)))
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

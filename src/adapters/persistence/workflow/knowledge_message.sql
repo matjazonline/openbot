@@ -9,7 +9,7 @@ WITH requested AS (
     SELECT requested.kind, requested.id, requested.recipient, requested.frozen, run.delivery_policy,
         CASE requested.kind
             WHEN 'channel' THEN EXISTS (SELECT 1 FROM channels WHERE company_id = $1 AND id = requested.id)
-            WHEN 'user' THEN EXISTS (SELECT 1 FROM company_members WHERE company_id = $1 AND user_id = requested.id)
+            WHEN 'user' THEN EXISTS (SELECT 1 FROM membership_of(requested.id, $1))
             WHEN 'reply' THEN source.associations = 1
             ELSE false
         END AS valid,
@@ -70,7 +70,7 @@ WITH requested AS (
           AND ((receiver.user_id IS NOT NULL AND principal.user_id = receiver.user_id)
             OR (receiver.identity_id IS NOT NULL AND identity.id = receiver.identity_id))
     ) AS principal ON true
-    LEFT JOIN company_members AS member ON member.company_id = $1 AND member.user_id = principal.user_id
+    LEFT JOIN LATERAL membership_of(principal.user_id, $1) AS member ON true
     JOIN companies AS company ON company.id = $1
 )
 SELECT DISTINCT valid, clearance, kind, membership, access_level, is_owner FROM facts LIMIT $4

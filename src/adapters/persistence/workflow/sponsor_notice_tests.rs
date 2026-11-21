@@ -94,7 +94,11 @@ async fn workflow_role_sponsor_admission_information_retirement_cancels_pending_
             match retirement {
                 Retirement::Member => f
                     .p()
-                    .remove_member(f.people.role.company().as_uuid(), f.people.users[1])
+                    .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                        actor_id: f.people.role.admission.binding.target.actor.user_id(),
+                        company_id: f.people.role.company().as_uuid(),
+                        member_user_id: f.people.users[1],
+                    })
                     .await
                     .unwrap(),
                 Retirement::Account => f.p().delete_user_account(f.people.users[1]).await.unwrap(),
@@ -132,7 +136,11 @@ async fn workflow_role_sponsor_admission_retired_information_event_cannot_projec
         let f = Box::pin(SponsorPeople::new(follow)).await;
         f.park("retired-before-information-projection").await;
         f.p()
-            .remove_member(f.people.role.company().as_uuid(), f.people.users[1])
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.people.role.admission.binding.target.actor.user_id(),
+                company_id: f.people.role.company().as_uuid(),
+                member_user_id: f.people.users[1],
+            })
             .await
             .unwrap();
         f.drain().await;
@@ -156,7 +164,11 @@ async fn department_sponsor_competing_retirement_and_admission_refuse_or_keep_on
         async {
             barrier.wait().await;
             f.p()
-                .remove_member(f.people.role.company().as_uuid(), f.people.users[0])
+                .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                    actor_id: f.people.role.admission.binding.target.actor.user_id(),
+                    company_id: f.people.role.company().as_uuid(),
+                    member_user_id: f.people.users[0],
+                })
                 .await
         }
     );
@@ -301,7 +313,11 @@ async fn workflow_escalation_default_sponsor_without_decider_skips_to_the_parent
         .unwrap();
     let prepared = role.prepared("no-sponsor-decider-escalates").await;
     f.p()
-        .remove_member(role.company().as_uuid(), f.people.users[0])
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: role.admission.binding.target.actor.user_id(),
+            company_id: role.company().as_uuid(),
+            member_user_id: f.people.users[0],
+        })
         .await
         .unwrap();
     assert!(

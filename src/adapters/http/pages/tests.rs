@@ -141,13 +141,12 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         slug: "inbox".into(),
         alias_slugs: Vec::new(),
         participant_emails: Some(vec!["person@example.com".into()]),
-        access_mode: crate::entities::channel::ChannelAccessMode::Allowlist,
+        access_mode: crate::entities::channel::ChannelAccessMode::Members,
         principal_grants: Vec::new(),
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
         settings_revision: 0,
-        department_id: None,
-        members_only: false,
+        department_id: crate::entities::department::DepartmentId::random(),
     }
 }
 
@@ -184,6 +183,7 @@ fn mailbox_user(email: &EmailAddress) -> MailboxUser<'_> {
         avatar_url: None,
         is_operator: false,
         company_membership: CompanyMembership::Owner,
+        administers_units: CompanyMembership::Owner.administers_company(),
     }
 }
 
@@ -238,6 +238,7 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
         avatar_url: None,
         is_operator: false,
         company_membership: CompanyMembership::Owner,
+        administers_units: CompanyMembership::Owner.administers_company(),
     };
 
     let html = mailbox_page(&MailboxPage {
@@ -336,6 +337,7 @@ fn dark_theme_recuts_the_blues_at_the_logos_hue() {
         avatar_url: None,
         is_operator: false,
         company_membership: CompanyMembership::None,
+        administers_units: false,
     };
 
     let html = mailbox_no_company_page(&user);
@@ -367,6 +369,7 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         avatar_url: None,
         is_operator: false,
         company_membership: CompanyMembership::Owner,
+        administers_units: CompanyMembership::Owner.administers_company(),
     };
 
     let html = mailbox_page(&MailboxPage {
@@ -825,6 +828,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         company: &company,
         app_domain_name: "example.com",
         channels: std::slice::from_ref(&channel),
+        read_only: &Default::default(),
         selected_channel_id: None,
     };
     let pane = channel_settings_empty_pane("Select a desk.", FragmentSwap::Inline);
@@ -882,6 +886,7 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     ] {
         let user = MailboxUser {
             company_membership: membership,
+            administers_units: membership.administers_company(),
             ..mailbox_user(&email)
         };
         let shell = |section| {
@@ -955,6 +960,7 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
     let render = |membership, is_operator| {
         let user = MailboxUser {
             company_membership: membership,
+            administers_units: membership.administers_company(),
             is_operator,
             ..mailbox_user(&email)
         };
@@ -1060,6 +1066,10 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         ..settings_agent(company.id, "Triage <bot>", "triage")
     };
     let model_connections = [CompanyModelConnection {
+        id: uuid::Uuid::nil(),
+        unit_id: uuid::Uuid::nil(),
+        unit_name: "Root".into(),
+        in_root: true,
         provider: "openai".into(),
         models: vec![ModelName::from("gpt-4o")],
         is_default: true,
@@ -1097,6 +1107,37 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         agent.id, company.id
     )));
     assert!(html.contains("This cannot be undone."));
+
+    // Plan07 02A (07UR-P02-B1-F7): a department's provider is labelled with its department, and
+    // its own default is not marked as the company default.
+    let model_connections = [
+        CompanyModelConnection {
+            provider: "anthropic".into(),
+            unit_name: "<Sales>".into(),
+            in_root: false,
+            ..model_connections[0].clone()
+        },
+        CompanyModelConnection {
+            is_default: false,
+            ..model_connections[0].clone()
+        },
+    ];
+    let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
+        authoring: None,
+        company: &company,
+        app_domain_name: "mail.test",
+        model_connections: &model_connections,
+        agent: &agent,
+        draft: None,
+        error: None,
+        capability_options: AgentCapabilityOptions::default(),
+    });
+    assert!(
+        html.contains(">anthropic — &lt;Sales&gt;</option>"),
+        "{html}"
+    );
+    assert!(!html.contains("(default)"), "{html}");
 
     // An agent with nothing overridden keeps the model section collapsed.
     let plain = settings_agent(company.id, "Plain", "plain");
@@ -1398,7 +1439,7 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
 
     // A rejected Advanced submit has to come back on the Advanced tab.
     let advanced = pane(AgentCreateTab::Advanced);
-    assert!(advanced.contains("<option value=\"\">Company default</option>"));
+    assert!(advanced.contains("<option value=\"\">Default for its department</option>"));
     assert!(advanced.contains("Creating an agent requires a model connection with an API key."));
     assert!(!advanced.contains("Leave both blank for native profiles."));
     assert!(advanced.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
@@ -1414,6 +1455,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
         company: &company,
         app_domain_name: "example.com",
         channels: std::slice::from_ref(&channel),
+        read_only: &Default::default(),
         selected_channel_id: Some(channel.id),
     };
 
@@ -1435,6 +1477,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
     let empty = ChannelSettingsList {
         channels: &[],
+        read_only: &Default::default(),
         selected_channel_id: None,
         ..list
     };
@@ -1486,7 +1529,9 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     )));
     assert!(html.contains("value=\"Inbox\""));
     assert!(html.contains("value=\"inbox\""));
-    assert!(html.contains("value=\"person@example.com, @public\""));
+    assert!(html.contains("value=\"person@example.com\""));
+    assert!(!html.contains("value=\"person@example.com, @public\""));
+    assert!(html.contains(r#"name="public""#));
     assert!(!html.contains("name=\"provider\""));
     assert!(!html.contains("name=\"channel_config\""));
 
@@ -1621,7 +1666,7 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
     assert!(!public.contains("opacity-40"));
     assert!(public.contains("class=\"checkbox checkbox-sm\">"));
 
-    // The participants field is what drives the toggle from there on.
+    // The Public checkbox drives the toggle from there on.
     assert!(public.contains(r##"data-input="channel-spam-confirm""##));
 }
 
@@ -3065,6 +3110,10 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         ..settings_company("Acme & Co", "acme")
     };
     let model_connections = [CompanyModelConnection {
+        id: uuid::Uuid::nil(),
+        unit_id: uuid::Uuid::nil(),
+        unit_name: "Root".into(),
+        in_root: true,
         provider: "openai".into(),
         models: vec![ModelName::from("gpt-4o")],
         is_default: true,
@@ -3125,6 +3174,10 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
 fn rejected_company_edit_gets_key_status_only_from_stored_metadata() {
     let company = settings_company("Acme", "acme");
     let stored_connections = [CompanyModelConnection {
+        id: uuid::Uuid::nil(),
+        unit_id: uuid::Uuid::nil(),
+        unit_name: "Root".into(),
+        in_root: true,
         provider: "openai".into(),
         models: vec![ModelName::from("gpt-5.6-terra")],
         is_default: true,
@@ -3769,6 +3822,7 @@ fn the_invite_forms_keep_a_rejected_submit_in_the_form() {
         company: &company,
         email_draft: "typo@example",
         role_draft: CompanyAccessRole::Admin,
+        role: TeamRole::Owner,
         error: Some("Please provide a valid email address."),
     });
     assert!(rejected_create.contains("Please provide a valid email address."));
@@ -4145,6 +4199,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
             company: &company,
             app_domain_name: "example.com",
             channels: &[],
+            read_only: &Default::default(),
             selected_channel_id: None,
         },
         pane_html: "",
@@ -4922,7 +4977,10 @@ fn dump_html_injection_browser_fixtures() {
             error_alert("Registration failed: <svg/onload=fetch('/exfil')>"),
         ),
     ];
-    for (name, body) in files {
+    for (name, body) in files
+        .into_iter()
+        .chain(department_ui::desk_access_browser_fixtures())
+    {
         std::fs::write(output.join(name), body).expect("write fixture");
     }
 }
@@ -4953,3 +5011,96 @@ mod desk_wording;
 
 #[path = "department_ui_tests.rs"]
 mod department_ui;
+
+/// Plan06 02A: a unit lead's rail opens the unit workspaces but not the company-wide read views;
+/// a desk they may only read is listed without a settings link.
+#[test]
+fn delegated_admin_ui_lead_rail_and_read_only_desk_rows() {
+    let company = mailbox_company();
+    let email = mailbox_account_email();
+    let lead = MailboxUser {
+        company_membership: CompanyMembership::Member,
+        administers_units: true,
+        ..mailbox_user(&email)
+    };
+    let member = MailboxUser {
+        company_membership: CompanyMembership::Member,
+        administers_units: false,
+        ..mailbox_user(&email)
+    };
+    let shell = |user: &MailboxUser<'_>| {
+        ui_shell(&UiShell {
+            title: "Desks",
+            user,
+            company: Some(&company),
+            section: UiSection::Mailbox,
+            content: "",
+        })
+    };
+    let workspace = |path: &str| format!(r#"href="/ui/{path}?company_id={}""#, company.id);
+    let led = shell(&lead);
+    for open in ["channels", "agents", "workflows", "schedules"] {
+        assert!(led.contains(&workspace(open)), "{open}: {led}");
+    }
+    for closed in ["workflow-runs", "deliveries", "dashboard"] {
+        assert!(!led.contains(&workspace(closed)), "{closed}");
+    }
+    let plain = shell(&member);
+    for closed in ["channels", "agents", "workflows", "schedules"] {
+        assert!(!plain.contains(&workspace(closed)), "{closed}");
+    }
+
+    let managed = mailbox_channel(company.id);
+    let readable = Channel {
+        id: Uuid::new_v4(),
+        name: "Members <desk>".into(),
+        ..managed.clone()
+    };
+    let read_only: std::collections::HashSet<Uuid> = [readable.id].into_iter().collect();
+    let channels = [managed.clone(), readable.clone()];
+    let html = channel_settings_list(
+        &ChannelSettingsList {
+            departments: &[],
+            company: &company,
+            app_domain_name: "example.com",
+            channels: &channels,
+            read_only: &read_only,
+            selected_channel_id: None,
+        },
+        FragmentSwap::Inline,
+    );
+    assert!(html.contains(&format!(
+        "hx-get=\"/ui/channels/{}?company_id={}\"",
+        managed.id, company.id
+    )));
+    assert!(
+        !html.contains(&format!("/ui/channels/{}?", readable.id)),
+        "{html}"
+    );
+    assert!(html.contains(&format!(
+        "href=\"/ui?company_id={}&amp;channel_id={}\"",
+        company.id, readable.id
+    )));
+    assert!(html.contains("Read only") && html.contains("Members &lt;desk&gt;"));
+
+    // B1-F2: the run counts are a company-wide read view (U4); a lead's desk page opens no stream.
+    let list = ChannelSettingsList {
+        departments: &[],
+        company: &company,
+        app_domain_name: "example.com",
+        channels: &channels,
+        read_only: &read_only,
+        selected_channel_id: None,
+    };
+    let page = |user: &MailboxUser<'_>| {
+        channel_settings_page(&ChannelSettingsPage {
+            user,
+            companies: std::slice::from_ref(&company),
+            list: &list,
+            pane_html: "",
+        })
+    };
+    let stream = "/ui/run-counts/events?company_id=";
+    assert!(!page(&lead).contains(stream));
+    assert!(page(&mailbox_user(&email)).contains(stream));
+}

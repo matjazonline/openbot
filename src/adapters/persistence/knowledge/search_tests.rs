@@ -4,12 +4,13 @@ use serde_json::{Value, json};
 
 // This tests the internal SQL port. Workflow tests separately prove the server-origin ceiling.
 pub(super) fn request(
-    company: CompanyId,
+    target: KnowledgeUploadTarget,
     ceiling: AccessLevel,
     input: Value,
 ) -> VisibleKnowledgeQuery {
     VisibleKnowledgeQuery {
-        company,
+        company: target.scope.company,
+        units: vec![target.unit],
         ceiling,
         model: "test-model".into(),
         exact_terms: KnowledgeSearchQuery::parse(&input).unwrap().exact_terms(),
@@ -33,7 +34,10 @@ async fn knowledge_search_sql_filters_company_model_and_ceiling_before_both_rank
         .await;
     let mut wrong_model = prepared("0_other.md", "AX-4410 from another model");
     wrong_model.embedding_model = "other-model".into();
-    f.store.replace(f.owner, &[wrong_model]).await.unwrap();
+    f.store
+        .replace(f.target(f.owner), &[wrong_model])
+        .await
+        .unwrap();
     let foreign = Fixture::new(database.pool.clone()).await;
     foreign
         .replace(foreign.owner, "0_foreign.md", "AX-4410 FOREIGN CANARY")
@@ -42,7 +46,11 @@ async fn knowledge_search_sql_filters_company_model_and_ceiling_before_both_rank
     let input = json!({"query":"What is the price of AX-4410?"});
     let public = f
         .store
-        .visible(request(f.owner.company, AccessLevel::PUBLIC, input.clone()))
+        .visible(request(
+            f.target(f.owner),
+            AccessLevel::PUBLIC,
+            input.clone(),
+        ))
         .await
         .unwrap();
     assert_eq!(public.len(), 1);
@@ -60,7 +68,7 @@ async fn knowledge_search_sql_filters_company_model_and_ceiling_before_both_rank
 
     let both = f
         .store
-        .visible(request(f.owner.company, AccessLevel::L5, input))
+        .visible(request(f.target(f.owner), AccessLevel::L5, input))
         .await
         .unwrap();
     assert_eq!(both.len(), 2);
@@ -110,7 +118,7 @@ async fn knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_
     ] {
         let chunks = f
             .store
-            .visible(request(f.owner.company, AccessLevel::PUBLIC, input))
+            .visible(request(f.target(f.owner), AccessLevel::PUBLIC, input))
             .await
             .unwrap();
         let result = rank_chunks(
@@ -152,7 +160,7 @@ async fn knowledge_e2e_quality_fixture_exact_hit_oracle_matches_real_postgres_se
         let input = json!({"query":question["query"],"exact_terms":question["exact_terms"]});
         let rows = f
             .store
-            .visible(request(f.owner.company, AccessLevel::L9, input))
+            .visible(request(f.target(f.owner), AccessLevel::L9, input))
             .await
             .unwrap();
         let mut actual: Vec<_> = rows

@@ -1,0 +1,13 @@
+{
+  "accepted_commit": "3d7148b1b496e491e139fc90e0534ef8d7d296ab",
+  "accepted_digest": "62d667d9e56395de26652accbbab2ee1eb9f854969e308607cae2aa003cb5907",
+  "independent_review": "05SC-P03-B1-R2-N2 PASS",
+  "prior_manifest": "plan/05-scopes/phases/p03/docs/logs/B1-R2-final.evidence.json",
+  "prior_sha256": "004bd93f3777f8598888a46a0fb8d0034df8c5c9be9c22a316b120222376db58",
+  "source_diff_exit": 0,
+  "limits": [
+    "Full4706PASS/2FAIL, exact and related competing-family rerunsPASS, precise timing causes unproven",
+    "Main-identical native fresh-download404, cached pins independently verified/images/livePASS",
+    "Doop user-deferred; no whole-CIgreen claim"
+  ]
+}

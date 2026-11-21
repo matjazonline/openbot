@@ -7,7 +7,6 @@ use super::*;
 use crate::adapters::persistence::test_support::{
     own_database, test_pool, wait_until_a_backend_is_blocked,
 };
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::participant::IdentityObservation;
 use crate::entities::participant::{IdentityClaimMetadata, IdentityProvenance};
@@ -46,7 +45,7 @@ async fn spoken_agent(persistence: &PostgresPersistence) -> SpokenAgent {
     .await
     .unwrap()
     .id;
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         persistence,
         company_id,
         ChannelWrite {
@@ -262,7 +261,9 @@ async fn agent_retire_company_delete_still_removes_everything() {
     }
     for table in [
         "companies",
-        "company_members",
+        "departments",
+        "department_members",
+        "department_roles",
         "agents",
         "principals",
         "participant_identities",
@@ -292,8 +293,8 @@ async fn agent_retire_races_agent_principal_upsert() {
     };
     let persistence = PostgresPersistence::new(database.pool.clone());
     let spoken = spoken_agent(&persistence).await;
-    // Start from an agent with no principal yet, so the writer inserts one and its foreign key
-    // check is what holds the agent row.
+    // Start without a principal. Run the deferred FK check before releasing the writer so the
+    // delete must compete with the same agent lock that a successful writer commit takes.
     let agent = AgentPersistence::create(
         &persistence,
         spoken.company_id,
@@ -320,6 +321,10 @@ async fn agent_retire_races_agent_principal_upsert() {
     )
     .await
     .unwrap();
+    sqlx::query("SET CONSTRAINTS principals_company_agent_fk IMMEDIATE")
+        .execute(&mut *writer)
+        .await
+        .unwrap();
     let delete = {
         let persistence = persistence.clone();
         tokio::spawn(async move { AgentPersistence::delete(&persistence, agent.id).await })
@@ -349,10 +354,17 @@ async fn agent_retire_races_agent_principal_upsert() {
     )
     .await;
     assert!(
+        matches!(refused, Err(AppError::NotFound(_))),
+        "production upsert refuses before a missing owner write"
+    );
+    // Independently retain the deferred database FK proof even though the API now refuses earlier.
+    sqlx::query("INSERT INTO principals (id,company_id,kind,agent_id,display_label) VALUES (gen_random_uuid(),$1,'agent',$2,'Late raw writer')")
+        .bind(spoken.company_id).bind(agent.id).execute(&mut *late).await.unwrap();
+    let refused = late.commit().await;
+    assert!(
         refused.is_err(),
         "a principal for a deleted agent is refused"
     );
-    late.rollback().await.unwrap();
     let dangling: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM principals WHERE agent_id = $1")
         .bind(agent.id)
         .fetch_one(persistence.pool())

@@ -8,11 +8,26 @@ use serde_json::Value;
 use sqlx::PgConnection;
 use uuid::Uuid;
 
+/// Fixtures resolve names in the root's reach, where they create their connections.
+#[cfg(test)]
 pub(super) async fn resolve_bindings_on(
     db: &mut PgConnection,
     company: Uuid,
     agent: Option<Uuid>,
     names: &[TypeName],
+) -> AppResult<Vec<AgentToolBinding>> {
+    resolve_bindings_in_reach_on(db, company, agent, names, None).await
+}
+
+/// Resolve tool names for an agent placed in `placement` (the root when `None`): only
+/// connections in that unit's reach are candidates (Plan07 decision d), so another unit's same
+/// operation name neither stands in nor makes the choice ambiguous.
+pub(super) async fn resolve_bindings_in_reach_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    agent: Option<Uuid>,
+    names: &[TypeName],
+    placement: Option<Uuid>,
 ) -> AppResult<Vec<AgentToolBinding>> {
     if names.len() > 32 {
         return Err(AppError::BadRequest(
@@ -27,7 +42,7 @@ pub(super) async fn resolve_bindings_on(
     for name in names {
         let source = match AgentBuiltinTool::parse(name.as_str()) {
             Some(tool) => AgentBindingSource::Builtin { tool },
-            None => registered_source_on(db, company, name).await?,
+            None => registered_source_on(db, company, name, placement).await?,
         };
         let binding = previous
             .iter()
@@ -49,6 +64,7 @@ async fn registered_source_on(
     db: &mut PgConnection,
     company: Uuid,
     name: &TypeName,
+    placement: Option<Uuid>,
 ) -> AppResult<AgentBindingSource> {
     let sources: Vec<Value> = sqlx::query_scalar(
         "SELECT source FROM (
@@ -56,6 +72,7 @@ async fn registered_source_on(
             FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection
                 ON connection.company_id=operation.company_id AND connection.id=operation.connection_id
             WHERE operation.company_id=$1 AND operation.name=$2 AND operation.revoked_at IS NULL AND connection.enabled
+                AND unit_reaches($1,COALESCE($3,(SELECT id FROM departments WHERE company_id=$1 AND is_root)),connection.unit_id)
             UNION ALL
             SELECT jsonb_build_object('kind','mcp','connection',operation.connection_id,'operation',operation.name,
                 'reviewed_version',operation.version,'remote_name',operation.name)
@@ -63,13 +80,14 @@ async fn registered_source_on(
                 ON connection.company_id=operation.company_id AND connection.id=operation.connection_id
             WHERE operation.company_id=$1 AND operation.name=$2 AND operation.revoked_at IS NULL AND connection.enabled
                 AND connection.deleted_at IS NULL
+                AND unit_reaches($1,COALESCE($3,(SELECT id FROM departments WHERE company_id=$1 AND is_root)),connection.unit_id)
             UNION ALL
             SELECT jsonb_build_object('kind','workflow','registration',registration.name,'workflow',registration.workflow_id,
                 'version',registration.version_id,'params',registration.params)
             FROM workflow_tool_registrations AS registration
             WHERE registration.company_id=$1 AND registration.name=$2 AND registration.revoked_at IS NULL
         ) AS selections LIMIT 2",
-    ).bind(company).bind(name.as_str()).fetch_all(db).await?;
+    ).bind(company).bind(name.as_str()).bind(placement).fetch_all(db).await?;
     match sources.as_slice() {
         [source] => serde_json::from_value(source.clone())
             .map_err(|_| AppError::Internal("Invalid registered agent tool target".into())),

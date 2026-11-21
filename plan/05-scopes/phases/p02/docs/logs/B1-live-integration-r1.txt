@@ -1,0 +1,89 @@
+building the memory service in /Users/mac02/orca/workspaces/openbot/plan03-04/services/memory
+   Compiling memory-service v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04/services/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.50s
+provisioned database memory_live_b14d0e326646 owned by memory_live_b14d0e326646
+isolation: neither role can read the other's database
+   Compiling digest v0.10.7
+   Compiling url v2.5.8
+   Compiling rustls v0.23.31
+   Compiling sec1 v0.7.3
+   Compiling crypto-bigint v0.5.5
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling sha1 v0.10.6
+   Compiling md-5 v0.10.6
+   Compiling signature v2.2.0
+   Compiling blake2 v0.10.6
+   Compiling sqlx-core v0.8.6
+   Compiling rfc6979 v0.4.0
+   Compiling tower-http v0.6.11
+   Compiling tungstenite v0.26.2
+   Compiling hickory-proto v0.24.4
+   Compiling pbkdf2 v0.12.2
+   Compiling hkdf v0.12.4
+   Compiling argon2 v0.5.3
+   Compiling oauth2 v5.0.0
+   Compiling ammonia v4.1.4
+   Compiling elliptic-curve v0.13.8
+   Compiling zip v2.4.2
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling tokio-tungstenite v0.26.2
+   Compiling axum v0.8.4
+   Compiling p256 v0.13.2
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling hyper-rustls v0.27.9
+   Compiling lettre v0.11.23
+   Compiling reqwest v0.13.4
+   Compiling hickory-resolver v0.24.4
+   Compiling axum-extra v0.10.1
+   Compiling rig-core v0.42.0
+   Compiling rmcp v1.8.0
+   Compiling mail-auth v0.6.1
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling rig-agent v0.42.0
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (bin "open_bots") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 06s
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 35s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 7 tests
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_tampered_labels_and_missing_authority_save_nothing ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_competing_delivery_workers_deliver_each_intent_once ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_provisioning_save_recall_capture_and_disable ... ok
+test adapters::persistence::memory::live_tests::subjects::memory_e2e_subject_delivery_and_operator_purge_page_units_and_preserve_personal_records ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ok
+
+failures:
+
+---- adapters::persistence::memory::live_tests::subjects::memory_e2e_subject_delivery_and_operator_purge_page_units_and_preserve_personal_records stdout ----
+
+thread 'adapters::persistence::memory::live_tests::subjects::memory_e2e_subject_delivery_and_operator_purge_page_units_and_preserve_personal_records' (30467694) panicked at src/adapters/persistence/memory/live_subject_tests.rs:86:10:
+CLI emits its completion summary on success and failure
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::memory::live_tests::subjects::memory_e2e_subject_delivery_and_operator_purge_page_units_and_preserve_personal_records
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 4768 filtered out; finished in 12.88s
+
+error: test failed, to rerun pass `--lib`
+--- service log (last 40 lines) ---

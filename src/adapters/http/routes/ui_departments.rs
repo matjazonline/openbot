@@ -33,10 +33,7 @@ use crate::{
         transport::PrincipalId,
     },
     infra::config::AppConfig,
-    use_cases::{
-        company::{CompanyUseCases, company_not_found},
-        department::DepartmentUseCases,
-    },
+    use_cases::{company::CompanyUseCases, department::DepartmentUseCases},
 };
 
 use super::channel::slugify;
@@ -70,6 +67,14 @@ pub fn router() -> Router<AppState> {
             put(assign_lead),
         )
         .route(
+            "/ui/companies/{company_id}/departments/{department_id}/models",
+            post(save_models),
+        )
+        .route(
+            "/ui/companies/{company_id}/departments/{department_id}/budgets",
+            post(save_budgets),
+        )
+        .route(
             "/ui/companies/{company_id}/departments/{department_id}/lead/{principal_id}",
             delete(clear_lead),
         )
@@ -100,17 +105,31 @@ pub(super) enum DepartmentSelection {
 /// Renders the tab's section for `access`'s company: the departments the caller may see, the
 /// selection, and the forms when they manage the company. Shared with the company pane, which
 /// draws the same section under its tabs.
+pub(super) struct DepartmentSectionServices<'a> {
+    pub departments: &'a DepartmentUseCases,
+    /// The selected department's own model connections, for its managers (Plan07 02A).
+    pub companies: &'a CompanyUseCases,
+    pub knowledge: &'a crate::application::knowledge::KnowledgeLibrary,
+    pub config: &'a AppConfig,
+}
+
 pub(super) async fn department_section(
-    departments: &DepartmentUseCases,
-    config: &AppConfig,
+    services: DepartmentSectionServices<'_>,
     user_id: Uuid,
     access: &CompanyAccess,
     selection: DepartmentSelection,
     error: Option<(DepartmentForm, &str)>,
     notice: Option<&str>,
 ) -> AppResult<String> {
+    let DepartmentSectionServices {
+        departments,
+        companies,
+        knowledge,
+        config,
+    } = services;
     let company_id = access.company.id;
-    let editable = access.membership.manages_company_operations();
+    let managed = departments.managed_units(user_id, company_id).await?;
+    let editable = !managed.is_empty();
     let listed = departments.visible_departments(user_id, company_id).await?;
     let (choices, choices_cut) = if editable {
         departments.principal_choices(user_id, company_id).await?
@@ -125,6 +144,34 @@ pub(super) async fn department_section(
         ),
         _ => None,
     };
+    let models = match &view {
+        Some(view) if managed.contains(&view.detail.department.id) => Some(
+            companies
+                .list_unit_model_connections(
+                    user_id,
+                    company_id,
+                    Some(view.detail.department.id.as_uuid()),
+                )
+                .await?,
+        ),
+        _ => None,
+    };
+    let budgets = match &view {
+        Some(view) if managed.contains(&view.detail.department.id) => Some(
+            companies
+                .unit_budget_states(user_id, company_id, view.detail.department.id.as_uuid())
+                .await?,
+        ),
+        _ => None,
+    };
+    let history = match &view {
+        Some(view) if managed.contains(&view.detail.department.id) => {
+            departments
+                .administration_history(user_id, company_id, view.detail.department.id)
+                .await?
+        }
+        _ => Vec::new(),
+    };
     let detail = match (&selection, &view) {
         (DepartmentSelection::Create(draft), _) if editable => DepartmentDetailPane::Create(draft),
         (DepartmentSelection::Department { draft, .. }, Some(view)) => {
@@ -135,6 +182,22 @@ pub(super) async fn department_section(
         }
         _ => DepartmentDetailPane::None,
     };
+    let knowledge = if let Some(view) = &view {
+        knowledge_card_layers(
+            knowledge
+                .documents()
+                .list(
+                    crate::application::knowledge::KnowledgeScope {
+                        company: crate::domain::workflow::CompanyId::new(company_id),
+                        actor_id: user_id,
+                    },
+                    Some(view.detail.department.id),
+                )
+                .await,
+        )?
+    } else {
+        Some(Vec::new())
+    };
     Ok(pages::company_departments_section(
         &pages::DepartmentSection {
             company: &access.company,
@@ -143,16 +206,39 @@ pub(super) async fn department_section(
             detail,
             choices: &choices,
             choices_cut,
-            editable,
+            membership: access.membership,
+            managed: &managed,
+            history: &history,
             error,
             notice,
+            knowledge: knowledge.as_deref().map_or(
+                pages::DepartmentKnowledge::ScopeLimit,
+                pages::DepartmentKnowledge::Documents,
+            ),
+            models: models.as_deref(),
+            budgets: budgets.as_deref(),
         },
     ))
+}
+
+fn knowledge_card_layers(
+    result: AppResult<crate::application::knowledge::KnowledgeLibraryView>,
+) -> AppResult<Option<Vec<crate::entities::knowledge::KnowledgeDocumentLayer>>> {
+    match result {
+        Ok(view) => Ok(Some(view.layers)),
+        Err(AppError::BadRequest(code))
+            if code == crate::application::knowledge::KNOWLEDGE_SCOPE_LIMIT_EXCEEDED =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     department_use_cases: Arc<DepartmentUseCases>,
+    knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -168,6 +254,7 @@ impl FromRequestParts<AppState> for Workspace {
         Ok(Self {
             company_use_cases: state.company_use_cases.clone(),
             department_use_cases: state.department_use_cases.clone(),
+            knowledge: state.knowledge.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -181,16 +268,12 @@ impl Workspace {
             .await
     }
 
-    /// The company, only for its owner or an admin: anyone else gets the stranger's `404`.
+    /// The company, only for someone who manages at least one of its units: anyone else gets
+    /// the stranger's `404`. Each write then checks its own department.
     async fn managed(&self, company_id: Uuid) -> AppResult<CompanyAccess> {
-        match self
-            .company_use_cases
-            .managed_company(self.user_id, company_id)
+        self.company_use_cases
+            .administered_company(self.user_id, company_id)
             .await
-        {
-            Err(AppError::Forbidden(_)) => Err(company_not_found()),
-            other => other,
-        }
     }
 
     async fn section(
@@ -201,8 +284,12 @@ impl Workspace {
         notice: Option<&str>,
     ) -> AppResult<String> {
         department_section(
-            &self.department_use_cases,
-            &self.config,
+            DepartmentSectionServices {
+                departments: &self.department_use_cases,
+                companies: &self.company_use_cases,
+                knowledge: &self.knowledge,
+                config: &self.config,
+            },
             self.user_id,
             access,
             selection,
@@ -812,3 +899,135 @@ async fn set_escalation(
 #[cfg(test)]
 #[path = "ui_departments_tests.rs"]
 mod tests;
+
+/// The department model form as submitted: the same provider rows as the company settings form.
+#[derive(Debug, Deserialize)]
+struct DepartmentModelsForm {
+    default_model_provider: Option<usize>,
+    #[serde(flatten)]
+    connection_fields: std::collections::HashMap<String, String>,
+}
+
+/// POST /ui/companies/{company_id}/departments/{department_id}/models - Replace the
+/// department's own model connections (Plan07 02A): whoever manages the department.
+#[instrument(skip_all)]
+async fn save_models(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<DepartmentModelsForm>,
+) -> AppResult<Response> {
+    let access = workspace.readable(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    let saved = match super::ui_companies::submitted_model_connections(
+        &form.connection_fields,
+        form.default_model_provider,
+    ) {
+        Ok(connections) => {
+            workspace
+                .company_use_cases
+                .replace_unit_model_connections(
+                    workspace.user_id,
+                    company_id,
+                    department_id,
+                    connections,
+                )
+                .await
+        }
+        Err(error) => Err(error),
+    };
+    match saved {
+        Ok(()) => {
+            workspace
+                .saved(&access, Some(department), "Saved model connections.")
+                .await
+        }
+        Err(AppError::BadRequest(message) | AppError::Conflict(message)) => Ok(Html(
+            workspace
+                .section(
+                    &access,
+                    DepartmentSelection::Department {
+                        id: department,
+                        draft: None,
+                    },
+                    None,
+                    Some(&format!("Model connections not saved: {message}")),
+                )
+                .await?,
+        )
+        .into_response()),
+        Err(error) => Err(error),
+    }
+}
+
+/// The department cap form: USD amounts for the UTC day and month; blank removes that cap.
+#[derive(Debug, Default, Deserialize)]
+struct DepartmentBudgetsForm {
+    #[serde(default)]
+    day_cap: String,
+    #[serde(default)]
+    month_cap: String,
+}
+
+/// A USD amount with at most six decimals as micro-USD; blank is `None` (no cap).
+fn cap_micros(value: &str) -> AppResult<Option<i64>> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let micros = crate::services::model_usage::TokenPrice::parse(value)
+        .map_err(|_| {
+            AppError::BadRequest(
+                "A cap is an amount in USD up to 1000000 with at most six decimal places.".into(),
+            )
+        })?
+        .micros();
+    if micros == 0 {
+        return Err(AppError::BadRequest(
+            "A cap is a positive amount; leave it blank to remove it.".into(),
+        ));
+    }
+    Ok(Some(micros))
+}
+
+/// POST /ui/companies/{company_id}/departments/{department_id}/budgets - Set or clear the
+/// department's spend caps (Plan07 02B.1, decision c): whoever manages the department.
+#[instrument(skip_all)]
+async fn save_budgets(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<DepartmentBudgetsForm>,
+) -> AppResult<Response> {
+    let access = workspace.readable(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    // Both amounts are checked before anything is written, then applied together (B3-F1).
+    let saved = async {
+        let (day, month) = (cap_micros(&form.day_cap)?, cap_micros(&form.month_cap)?);
+        workspace
+            .company_use_cases
+            .replace_unit_budgets(workspace.user_id, company_id, department_id, day, month)
+            .await
+    }
+    .await;
+    match saved {
+        Ok(()) => {
+            workspace
+                .saved(&access, Some(department), "Saved spend caps.")
+                .await
+        }
+        Err(AppError::BadRequest(message)) => Ok(Html(
+            workspace
+                .section(
+                    &access,
+                    DepartmentSelection::Department {
+                        id: department,
+                        draft: None,
+                    },
+                    None,
+                    Some(&format!("Spend caps not saved: {message}")),
+                )
+                .await?,
+        )
+        .into_response()),
+        Err(error) => Err(error),
+    }
+}

@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B4-R3",
+  "artifact": "ee4c49d0820f1ca469e825507a06b714ec3f308a54a0b2ea417739eb04f320f4",
+  "checks": [
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R3-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "git diff --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R3-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R3-sqlx-prepare-check.txt",
+          "sha256": "bc351fd0f2fd8f3cad6851e1967a85fb55530ceea85bac34f38bfc3848b1dae1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R3-source-modules.txt",
+          "sha256": "b0e120cdc1e785aa0391203a5c0d892e8f119d3cbe3d17af03c1447a6e541ed2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "01B.6",
+        "01B.7",
+        "F1",
+        "F6",
+        "B4-REGRESSION"
+      ],
+      "command": "cargo test --locked --offline --lib -- company_invite ui_team invite team company_owner company_tests:: root_unit root_competing account_identity access_mode_scale knowledge delegated_admin memory_scope workflow_and_transport_depend department_ manages_unit",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R3-focused-final.txt",
+          "sha256": "d1ee8d48da48a22a5471c3610d4d8e31541b9cf82ffaca7782cd70430b4714f3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-DISCOVERY"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R2-discovery-after.txt",
+          "sha256": "47460152b4354054eed87e2f459f521b34395ef24fc6c21b6aabf75430f8a0d8"
+        },
+        {
+          "path": "logs/B4-R3-discovery-after.txt",
+          "sha256": "43736c8b9aa74fec6c46a0984816aa4b5e1e3c51f7352058b54b37a05c33c207"
+        }
+      ]
+    }
+  ]
+}

@@ -31,17 +31,6 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(MAX_BUNDLE_BYTES as i32)
         .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
     let actor = WorkflowActor::authenticated(facts.actor_id).map_err(|_| invalid())?;
-    association::authorize_association(
-        db,
-        scope.company,
-        actor,
-        association::association_from_columns(association::AssociationColumns {
-            channel_id: facts.channel_id,
-            principal_id: facts.principal_id,
-            thread_id: facts.thread_id,
-        })?,
-    )
-    .await?;
     let bundle = restore_bundle(
         &facts.bundle,
         &crate::adapters::workflow_source::WorkflowSourceDecoder,
@@ -57,7 +46,89 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
         return Err(invalid());
     }
     super::agent_authority::check_execution_on(db, scope, selection.agent(), identity.mode).await?;
+    authorize_model_source_on(
+        db,
+        scope,
+        actor,
+        association::association_from_columns(association::AssociationColumns {
+            channel_id: facts.channel_id,
+            principal_id: facts.principal_id,
+            thread_id: facts.thread_id,
+        })?,
+        selection.agent().agent_id,
+    )
+    .await?;
+    super::knowledge::require_consumed_units_on(db, scope, identity.agent).await?;
     agent_history::check_prepared_on(db, scope, selection.mode(), prepared).await
+}
+
+/// Human sessions keep their View requirement. An owned automatic reply may instead
+/// execute as its exact selected agent with that agent's current desk grants.
+async fn owned_agent_desk_on(
+    db: &mut PgConnection,
+    scope: crate::application::workflow::actions::ActionScope,
+    actor: WorkflowActor,
+    association: RelatedAssociation,
+    agent: crate::entities::agent_capability::AgentId,
+) -> AppResult<()> {
+    let RelatedAssociation::Thread {
+        target: AddressTarget::Desk(desk),
+        thread_id,
+    } = association
+    else {
+        return Err(missing());
+    };
+    let owned: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM channel_reply_runs AS owned \
+         JOIN channel_reply_contexts AS source ON source.company_id=owned.company_id \
+           AND source.intent_id=owned.intent_id AND source.binding_id=owned.binding_id \
+           AND source.binding_revision=owned.binding_revision \
+         JOIN workflow_runs AS run ON run.company_id=owned.company_id AND run.id=owned.run_id \
+           AND run.binding_id=owned.binding_id AND run.binding_revision=owned.binding_revision \
+         WHERE owned.company_id=$1 AND owned.run_id=$2 AND source.actor_id=$3 \
+           AND run.actor_id=source.actor_id AND run.channel_id=$4 AND source.channel_id=run.channel_id \
+           AND source.principal_id IS NULL AND run.principal_id IS NULL \
+           AND source.thread_id=run.thread_id AND run.thread_id=$5 AND run.parent_run_id IS NULL)")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(actor.user_id())
+        .bind(desk).bind(thread_id.as_uuid()).fetch_one(&mut *db).await?;
+    if !owned {
+        return Err(missing());
+    }
+    let principal: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2 AND kind='agent' FOR SHARE",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(agent.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    .ok_or_else(missing)?;
+    let capabilities: Vec<String> = sqlx::query_scalar(
+        "SELECT capability FROM channel_principal_grants WHERE company_id=$1 AND channel_id=$2 \
+         AND principal_id=$3 AND capability IN ('view','participate') ORDER BY capability,provenance FOR SHARE")
+        .bind(scope.company.as_uuid()).bind(desk).bind(principal).fetch_all(db).await?;
+    if !capabilities.iter().any(|capability| capability == "view")
+        || !capabilities
+            .iter()
+            .any(|capability| capability == "participate")
+    {
+        return Err(missing());
+    }
+    Ok(())
+}
+
+pub(super) async fn authorize_model_source_on(
+    db: &mut PgConnection,
+    scope: crate::application::workflow::actions::ActionScope,
+    actor: WorkflowActor,
+    target: RelatedAssociation,
+    agent: crate::entities::agent_capability::AgentId,
+) -> AppResult<()> {
+    management::authorize_association_on(db, scope.company, actor, target).await?;
+    match association::authorize_association(db, scope.company, actor, target).await {
+        Ok(()) => Ok(()),
+        Err(AppError::NotFound(_)) => owned_agent_desk_on(db, scope, actor, target, agent).await,
+        Err(error) => Err(error),
+    }
 }
 
 /// Terminal: retrying cannot restore a revoked grant or connection.

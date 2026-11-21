@@ -1,0 +1,60 @@
+--- B2/src/adapters/persistence/department.rs
++++ B3/src/adapters/persistence/department.rs
+@@ -45,6 +45,8 @@
+ use crate::use_cases::company::company_not_found;
+ use crate::use_cases::department::department_not_found;
+ 
++mod placement;
++pub(crate) use placement::{place_in_department_on, prepare_new_agent_placement_on};
+ mod lifecycle;
+ mod root;
+ pub(crate) use lifecycle::{
+@@ -350,39 +352,6 @@
+         Some(principal),
+     )
+     .await?;
+-    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
+-}
+-
+-/// Make `principal` a member of the department and, with `role`, its holder of that role, as
+-/// company-agent creation places a new agent (plan 01-departments 03C item 0). One write: the
+-/// rows, then a single grant sync over everything they reach, so the department's desk gates
+-/// are taken once, in order, with its neighbours' (01DEP-P03-B1-F1). The caller holds the company
+-/// write lock.
+-pub(crate) async fn place_in_department_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    templates: &ProvisioningDeployment,
+-    company: CompanyId,
+-    actor: WorkflowActor,
+-    department: DepartmentId,
+-    principal: PrincipalId,
+-    role: Option<DepartmentRole>,
+-) -> AppResult<()> {
+-    if let Some(role) = role {
+-        root_role_authority_on(tx, company, actor, department, role).await?;
+-    }
+-    write_placement_on(tx, company, department, principal, true, role).await?;
+-    if let Some(role) = role {
+-        follow_lead_on(
+-            tx,
+-            templates,
+-            company,
+-            actor,
+-            department,
+-            role,
+-            Some(principal),
+-        )
+-        .await?;
+-    }
+     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
+ }
+ 
+@@ -672,7 +641,7 @@
+         let mut tx = begin_department_write(&self.persistence, scope).await?;
+         require_parent_management_on(&mut tx, scope, department).await?;
+         delete_department_on(&mut tx, scope.company, department).await?;
+-        tx.commit().await?;
++        tx.commit().await.map_err(lifecycle::delete_error)?;
+         Ok(())
+     }
+ 

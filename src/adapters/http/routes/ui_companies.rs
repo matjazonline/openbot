@@ -33,7 +33,6 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         company::{Company, CompanyAccess},
-        company_member::CompanyMembership,
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -135,6 +134,7 @@ struct Workspace {
     user_use_cases: Arc<UserUseCases>,
     skill_use_cases: Arc<SkillUseCases>,
     department_use_cases: Arc<DepartmentUseCases>,
+    knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -157,6 +157,7 @@ impl FromRequestParts<AppState> for Workspace {
             user_use_cases: state.user_use_cases.clone(),
             skill_use_cases: state.skill_use_cases.clone(),
             department_use_cases: state.department_use_cases.clone(),
+            knowledge: state.knowledge.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -223,8 +224,10 @@ impl Workspace {
         editable: bool,
     ) -> AppResult<String> {
         let model_connections = if editable {
+            // The settings form edits the root's own connections (Plan07 02A); a department's
+            // are edited on its page.
             self.company_use_cases
-                .list_model_connections(self.user_id, company.id)
+                .list_unit_model_connections(self.user_id, company.id, None)
                 .await?
         } else {
             Vec::new()
@@ -298,8 +301,12 @@ impl Workspace {
         }))
     }
 
-    async fn skills_pane(&self, company: &Company, editable: bool) -> AppResult<String> {
-        let counts = self.counts(company.id, editable).await?;
+    /// The Skills tab: `editable` is skill configuration (any unit manager, Plan07); the company
+    /// summary and its links stay the owner's, as on the Settings tab.
+    async fn skills_pane(&self, access: &CompanyAccess, editable: bool) -> AppResult<String> {
+        let company = &access.company;
+        let owner = access.membership.is_owner();
+        let counts = self.counts(company.id, owner).await?;
         let empty = SkillPage::default();
         let page = if editable {
             self.skill_use_cases
@@ -315,6 +322,13 @@ impl Workspace {
         } else {
             empty
         };
+        let (units, default_unit) = if editable {
+            self.skill_use_cases
+                .unit_choices(self.user_id, company.id)
+                .await?
+        } else {
+            (Vec::new(), None)
+        };
         let skills = pages::company_skills_section(&pages::SkillSection {
             company_id: Some(company.id),
             skills: &page.items,
@@ -324,6 +338,8 @@ impl Workspace {
             error: None,
             notice: None,
             editable,
+            units: &units,
+            default_unit,
         });
         Ok(pages::company_edit_pane(&pages::CompanyEditPane {
             company,
@@ -332,7 +348,7 @@ impl Workspace {
             counts,
             draft: None,
             error: None,
-            editable,
+            editable: owner,
             resend_api_section: "",
             body: pages::CompanyPaneBody::Skills(&skills),
         }))
@@ -357,8 +373,12 @@ impl Workspace {
             None => DepartmentSelection::None,
         };
         let section = department_section(
-            &self.department_use_cases,
-            &self.config,
+            super::ui_departments::DepartmentSectionServices {
+                departments: &self.department_use_cases,
+                companies: &self.company_use_cases,
+                knowledge: &self.knowledge,
+                config: &self.config,
+            },
             self.user_id,
             access,
             selection,
@@ -457,12 +477,7 @@ async fn companies_page(
         query.company_id,
     )
     .await?;
-    let workspace_user = workspace_user.with_company_membership(
-        access
-            .as_ref()
-            .map(|access| access.membership)
-            .unwrap_or(CompanyMembership::None),
-    );
+    let workspace_user = workspace_user.with_company_option(access.as_ref());
 
     let tab = CompanyTab::from_query(query.tab.as_deref());
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
@@ -494,8 +509,12 @@ async fn companies_page(
                 .await?
         }
         Some(selected) if tab == CompanyTab::Skills => {
-            let editable = selected.membership.is_owner();
-            workspace.skills_pane(&selected.company, editable).await?
+            // Skills belong to units; whoever manages one configures its skills (Plan07).
+            let editable = workspace
+                .skill_use_cases
+                .manages_skills(workspace.user_id, selected.company.id)
+                .await?;
+            workspace.skills_pane(selected, editable).await?
         }
         Some(selected) => {
             let editable = selected.membership.is_owner();
@@ -883,65 +902,73 @@ impl SubmittedCompany {
     }
 
     fn model_connections(&self) -> AppResult<Vec<CompanyModelConnectionWrite>> {
-        // `connection_fields` is a flattened catch-all, so an input named `connection_0_modles`
-        // would otherwise be dropped in silence and read as "this provider enabled no models".
-        // Anything claiming to be a connection field has to be one this loop actually reads.
-        for key in self.form.connection_fields.keys() {
-            let Some(rest) = key.strip_prefix("connection_") else {
-                continue;
-            };
-            let recognized = rest.split_once('_').is_some_and(|(index, field)| {
-                index.parse::<usize>().is_ok_and(|index| {
-                    index < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS
-                }) && matches!(field, "provider" | "models" | "api_key" | "remove")
-            });
-            if !recognized {
-                return Err(AppError::BadRequest(format!(
-                    "Unrecognized model connection field '{key}'."
-                )));
-            }
-        }
-
-        let mut connections = Vec::new();
-        for index in 0..crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
-            if self.connection_removed(index) {
-                continue;
-            }
-            let provider = self
-                .form
-                .connection_fields
-                .get(&format!("connection_{index}_provider"))
-                .map(String::as_str)
-                .unwrap_or_default()
-                .trim();
-            if provider.is_empty() {
-                continue;
-            }
-            let models = self
-                .form
-                .connection_fields
-                .get(&format!("connection_{index}_models"))
-                .map(String::as_str)
-                .unwrap_or_default()
-                .split([',', '\n'])
-                .map(str::trim)
-                .filter(|model| !model.is_empty())
-                .map(String::from)
-                .collect();
-            let api_key = self
-                .form
-                .connection_fields
-                .get(&format!("connection_{index}_api_key"))
-                .cloned();
-            connections.push(CompanyModelConnectionWrite::new(
-                provider,
-                api_key,
-                models,
-                self.form.default_model_provider == Some(index),
-            )?);
-        }
-        Ok(connections)
+        submitted_model_connections(
+            &self.form.connection_fields,
+            self.form.default_model_provider,
+        )
     }
+}
+
+/// The provider rows of a submitted model connection form, shared by the company settings form
+/// and a department's (Plan07 02A). Unknown connection fields are refused, removed rows skipped.
+pub(super) fn submitted_model_connections(
+    fields: &HashMap<String, String>,
+    default_model_provider: Option<usize>,
+) -> AppResult<Vec<CompanyModelConnectionWrite>> {
+    // `connection_fields` is a flattened catch-all, so an input named `connection_0_modles`
+    // would otherwise be dropped in silence and read as "this provider enabled no models".
+    // Anything claiming to be a connection field has to be one this loop actually reads.
+    for key in fields.keys() {
+        let Some(rest) = key.strip_prefix("connection_") else {
+            continue;
+        };
+        let recognized = rest.split_once('_').is_some_and(|(index, field)| {
+            index
+                .parse::<usize>()
+                .is_ok_and(|index| index < crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS)
+                && matches!(field, "provider" | "models" | "api_key" | "remove")
+        });
+        if !recognized {
+            return Err(AppError::BadRequest(format!(
+                "Unrecognized model connection field '{key}'."
+            )));
+        }
+    }
+
+    let mut connections = Vec::new();
+    for index in 0..crate::use_cases::company::MAX_COMPANY_MODEL_CONNECTIONS {
+        if fields
+            .get(&format!("connection_{index}_remove"))
+            .is_some_and(|value| matches!(value.as_str(), "true" | "on"))
+        {
+            continue;
+        }
+        let provider = fields
+            .get(&format!("connection_{index}_provider"))
+            .map(String::as_str)
+            .unwrap_or_default()
+            .trim();
+        if provider.is_empty() {
+            continue;
+        }
+        let models = fields
+            .get(&format!("connection_{index}_models"))
+            .map(String::as_str)
+            .unwrap_or_default()
+            .split([',', '\n'])
+            .map(str::trim)
+            .filter(|model| !model.is_empty())
+            .map(String::from)
+            .collect();
+        let api_key = fields.get(&format!("connection_{index}_api_key")).cloned();
+        connections.push(CompanyModelConnectionWrite::new(
+            provider,
+            api_key,
+            models,
+            default_model_provider == Some(index),
+        )?);
+    }
+    Ok(connections)
 }
 
 impl Workspace {
@@ -971,6 +998,10 @@ impl Workspace {
             .await
     }
 }
+
+#[cfg(test)]
+#[path = "ui_company_skills_tests.rs"]
+mod skills_tests;
 
 #[cfg(test)]
 mod tests {

@@ -54,17 +54,18 @@ async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
     let p = PostgresPersistence::with_credential_cipher(pool.clone(), CredentialCipher::for_test());
     let company = company(&p).await;
     let first = p
-        .create_mcp_connection(company, write("crm"))
+        .create_mcp_connection(company, p.test_root_unit(company).await, write("crm"))
         .await
         .unwrap();
     let second = p
-        .create_mcp_connection(company, write("knowledge"))
+        .create_mcp_connection(company, p.test_root_unit(company).await, write("knowledge"))
         .await
         .unwrap();
     assert_ne!(first.id, second.id);
     let rev = p
         .replace_mcp_token(
             company,
+            p.test_root_unit(company).await,
             first.id,
             first.revision,
             Some(SecretString::from("synthetic-token")),
@@ -89,16 +90,27 @@ async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
     .unwrap();
     assert!(!ciphertext.contains("synthetic-token"));
     assert!(
-        !serde_json::to_string(&p.list_mcp_connections(company).await.unwrap())
-            .unwrap()
-            .contains("synthetic-token")
+        !serde_json::to_string(
+            &p.list_mcp_connections(company, &p.test_all_units(company).await)
+                .await
+                .unwrap()
+        )
+        .unwrap()
+        .contains("synthetic-token")
     );
     // 04.10: an endpoint is fixed for the connection's lifetime (frozen workflow actions
     // target the connection id). The writer refuses, and the trigger backs it up.
     let mut moved = write("crm");
     moved.endpoint = "https://example.org/mcp".to_string().try_into().unwrap();
     assert!(matches!(
-        p.update_mcp_connection(company, first.id, rev, moved).await,
+        p.update_mcp_connection(
+            company,
+            p.test_root_unit(company).await,
+            first.id,
+            rev,
+            moved
+        )
+        .await,
         Err(AppError::BadRequest(_))
     ));
     assert!(
@@ -113,12 +125,24 @@ async fn mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved() {
     let mut rebound = write("crm");
     rebound.auth = McpAuth::None;
     let changed = p
-        .update_mcp_connection(company, first.id, rev, rebound)
+        .update_mcp_connection(
+            company,
+            p.test_root_unit(company).await,
+            first.id,
+            rev,
+            rebound,
+        )
         .await
         .unwrap();
     assert!(!changed.secret_set);
     assert!(p.mcp_token(company, first.id, rev).await.is_err());
-    assert_eq!(p.list_mcp_connections(company).await.unwrap().len(), 2);
+    assert_eq!(
+        p.list_mcp_connections(company, &p.test_all_units(company).await)
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
     sqlx::query("DELETE FROM companies WHERE id=$1")
         .bind(company)
         .execute(&pool)
@@ -137,21 +161,28 @@ async fn mcp_key_rotation_retains_shared_token_and_rejects_row_substitution() {
     );
     let owner = company(&old).await;
     let first = old
-        .create_mcp_connection(owner, write("first"))
+        .create_mcp_connection(owner, old.test_root_unit(owner).await, write("first"))
         .await
         .unwrap();
     let second = old
-        .create_mcp_connection(owner, write("second"))
+        .create_mcp_connection(owner, old.test_root_unit(owner).await, write("second"))
         .await
         .unwrap();
     let token = "x".repeat(MAX_MCP_SECRET_BYTES);
     let rev = old
-        .replace_mcp_token(owner, first.id, 1, Some(SecretString::from(token.clone())))
+        .replace_mcp_token(
+            owner,
+            old.test_root_unit(owner).await,
+            first.id,
+            1,
+            Some(SecretString::from(token.clone())),
+        )
         .await
         .unwrap();
     assert!(
         old.replace_mcp_token(
             owner,
+            old.test_root_unit(owner).await,
             first.id,
             rev,
             Some(SecretString::from("x".repeat(MAX_MCP_SECRET_BYTES + 1)))
@@ -207,14 +238,20 @@ async fn mcp_connection_capacity_is_atomic_for_competing_creators() {
     };
     let p = PostgresPersistence::new(pool.clone());
     let owner = company(&p).await;
-    sqlx::query("INSERT INTO company_mcp_connections(company_id,id,slug,endpoint_url,auth_type) SELECT $1,gen_random_uuid(),'seed-' || value,'https://example.com/mcp','none' FROM generate_series(1,63) AS value")
+    sqlx::query("INSERT INTO company_mcp_connections(company_id,id,slug,endpoint_url,auth_type,unit_id) SELECT $1,gen_random_uuid(),'seed-' || value,'https://example.com/mcp','none',(SELECT id FROM departments WHERE company_id=$1 AND is_root) FROM generate_series(1,63) AS value")
         .bind(owner).execute(&pool).await.unwrap();
     let (left, right) = tokio::join!(
-        p.create_mcp_connection(owner, write("left")),
-        p.create_mcp_connection(owner, write("right"))
+        p.create_mcp_connection(owner, p.test_root_unit(owner).await, write("left")),
+        p.create_mcp_connection(owner, p.test_root_unit(owner).await, write("right"))
     );
     assert_ne!(left.is_ok(), right.is_ok());
-    assert_eq!(p.list_mcp_connections(owner).await.unwrap().len(), 64);
+    assert_eq!(
+        p.list_mcp_connections(owner, &p.test_all_units(owner).await)
+            .await
+            .unwrap()
+            .len(),
+        64
+    );
     sqlx::query("DELETE FROM companies WHERE id=$1")
         .bind(owner)
         .execute(&pool)
@@ -231,12 +268,17 @@ async fn schema_constraint_deleted_mcp_slug_is_reusable_and_live_creators_compet
     let p = PostgresPersistence::new(pool);
     let company = company(&p).await;
     let first = p
-        .create_mcp_connection(company, write("reusable"))
+        .create_mcp_connection(company, p.test_root_unit(company).await, write("reusable"))
         .await
         .unwrap();
-    p.delete_mcp_connection(company, first.id, first.revision)
-        .await
-        .unwrap();
+    p.delete_mcp_connection(
+        company,
+        p.test_root_unit(company).await,
+        first.id,
+        first.revision,
+    )
+    .await
+    .unwrap();
     let error = sqlx::query(
         "UPDATE company_mcp_connections SET enabled=true WHERE company_id=$1 AND id=$2",
     )
@@ -252,14 +294,17 @@ async fn schema_constraint_deleted_mcp_slug_is_reusable_and_live_creators_compet
         Some("company_mcp_connections_deleted_check")
     );
     let (a, b) = tokio::join!(
-        p.create_mcp_connection(company, write("reusable")),
-        p.create_mcp_connection(company, write("reusable")),
+        p.create_mcp_connection(company, p.test_root_unit(company).await, write("reusable")),
+        p.create_mcp_connection(company, p.test_root_unit(company).await, write("reusable")),
     );
     assert_eq!(
         [a.is_ok(), b.is_ok()].into_iter().filter(|ok| *ok).count(),
         1
     );
-    let listed = p.list_mcp_connections(company).await.unwrap();
+    let listed = p
+        .list_mcp_connections(company, &p.test_all_units(company).await)
+        .await
+        .unwrap();
     assert_eq!(listed.len(), 1);
     assert_ne!(listed[0].id, first.id);
     assert_eq!(listed[0].slug.as_str(), "reusable");
@@ -274,11 +319,11 @@ async fn jsonb_row_context_mcp_quarantines_discovery_and_effective_grants() {
     let p = PostgresPersistence::with_credential_cipher(pool.clone(), CredentialCipher::for_test());
     let company = company(&p).await;
     let broken = p
-        .create_mcp_connection(company, write("broken"))
+        .create_mcp_connection(company, p.test_root_unit(company).await, write("broken"))
         .await
         .unwrap();
     let good = p
-        .create_mcp_connection(company, write("good"))
+        .create_mcp_connection(company, p.test_root_unit(company).await, write("good"))
         .await
         .unwrap();
     for discovery in [
@@ -298,7 +343,7 @@ async fn jsonb_row_context_mcp_quarantines_discovery_and_effective_grants() {
         .unwrap();
         let logs = LogCapture::default();
         let connections = p
-            .list_mcp_connections(company)
+            .list_mcp_connections(company, &p.test_all_units(company).await)
             .with_subscriber(logs.dispatch())
             .await
             .unwrap();

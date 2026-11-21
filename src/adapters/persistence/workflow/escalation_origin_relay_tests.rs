@@ -582,7 +582,7 @@ async fn denied_destinations(
     email: &OutboundEmailV1,
     real: InternalRelayProof,
 ) {
-    use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+    use crate::application::ports::channel::ChannelWrite;
     use crate::entities::transport::AddressSelector;
     use crate::entities::value_objects::{ChannelSlug, CompanySlug};
     let p = f.people.role.p();
@@ -596,7 +596,7 @@ async fn denied_destinations(
         f.people.role.admission.binding.target.actor.user_id(),
     )
     .await;
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         p,
         foreign,
         ChannelWrite {

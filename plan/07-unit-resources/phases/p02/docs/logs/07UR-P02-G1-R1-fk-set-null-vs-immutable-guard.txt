@@ -1,0 +1,40 @@
+SELECT version();
+                                                           version                                                           
+-----------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit
+(1 row)
+
+CREATE TABLE departments (company_id uuid NOT NULL, id uuid PRIMARY KEY, UNIQUE (company_id, id));
+CREATE TABLE
+CREATE TABLE usage_calls (company_id uuid NOT NULL, request_id uuid PRIMARY KEY, unit_id uuid,
+  input_tokens bigint, settled_at timestamptz,
+  FOREIGN KEY (company_id, unit_id) REFERENCES departments(company_id, id) ON DELETE SET NULL (unit_id));
+CREATE TABLE
+-- Same shape as guard_model_usage_update (init_schema.sql:11499-11510): only settlement columns may change.
+CREATE FUNCTION guard_usage_update() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (to_jsonb(NEW) - ARRAY['input_tokens','settled_at'])
+        IS DISTINCT FROM (to_jsonb(OLD) - ARRAY['input_tokens','settled_at'])
+        OR (OLD.settled_at IS NOT NULL AND NEW IS DISTINCT FROM OLD) THEN
+        RAISE EXCEPTION 'model usage identity and settled usage are immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE FUNCTION
+CREATE TRIGGER usage_immutable BEFORE UPDATE ON usage_calls FOR EACH ROW EXECUTE FUNCTION guard_usage_update();
+CREATE TRIGGER
+INSERT INTO departments VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d1');
+INSERT 0 1
+INSERT INTO usage_calls VALUES ('00000000-0000-0000-0000-000000000001', gen_random_uuid(), '00000000-0000-0000-0000-0000000000d1', 10, now());
+INSERT 0 1
+-- Deleting the department: does the FK's SET NULL action fire the immutability guard?
+DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d1';
+ERROR:  model usage identity and settled usage are immutable
+CONTEXT:  PL/pgSQL function guard_usage_update() line 6 at RAISE
+SQL statement "UPDATE ONLY "public"."usage_calls" SET "unit_id" = NULL WHERE $1 OPERATOR(pg_catalog.=) "company_id" AND $2 OPERATOR(pg_catalog.=) "unit_id""
+SELECT count(*) AS departments_left FROM departments;
+ departments_left 
+------------------
+                1
+(1 row)
+

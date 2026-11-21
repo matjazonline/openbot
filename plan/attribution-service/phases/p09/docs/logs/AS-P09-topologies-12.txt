@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 321, in <module>
+    main()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 303, in main
+    docker("build", "--tag", tag, "--file", str(dockerfile), str(directory))
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 38, in docker
+    return run("docker", *args, **kwargs).stdout.strip()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 33, in run
+    raise RuntimeError(f"fixture command failed: {args[0]} {args[1]} (exit {r.returncode})")
+RuntimeError: fixture command failed: docker build (exit 1)

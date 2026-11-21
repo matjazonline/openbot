@@ -1,0 +1,20 @@
+services/attribution/config.env.example:8:ATTRIBUTION_EVENT_MAX_AGE_DAYS=7
+services/attribution/config.env.example:9:ATTRIBUTION_REFUND_WINDOW_DAYS=365
+services/attribution/scripts/container-smoke.py:60:            envfile.write_text(f"ATTRIBUTION_DATABASE_URL=postgres://attribution:{password}@{db}/attribution\nATTRIBUTION_PUBLIC_ORIGIN=http://localhost:8091\nATTRIBUTION_EVENT_MAX_AGE_DAYS=7\nATTRIBUTION_REFUND_WINDOW_DAYS=365\nATTRIBUTION_OPENBOT_ORIGIN=http://127.0.0.1:8092\nATTRIBUTION_CLIENT_SECRET={client_secret}\nATTRIBUTION_LIFECYCLE_SECRET={lifecycle_secret}\nATTRIBUTION_SESSION_KEYS={keys}\n")
+services/attribution/contract/README.md:269:Set `ATTRIBUTION_EVENT_MAX_AGE_DAYS` and `ATTRIBUTION_REFUND_WINDOW_DAYS`
+services/attribution/src/infra/config.rs:63:            days("ATTRIBUTION_EVENT_MAX_AGE_DAYS")?,
+services/attribution/src/infra/config.rs:64:            days("ATTRIBUTION_REFUND_WINDOW_DAYS")?,
+services/attribution/src/infra/config.rs:111:        Config::from_lookup(|key| {
+services/attribution/src/infra/config.rs:121:                    "ATTRIBUTION_EVENT_MAX_AGE_DAYS" => Some("7".into()),
+services/attribution/src/infra/config.rs:122:                    "ATTRIBUTION_REFUND_WINDOW_DAYS" => Some("365".into()),
+services/attribution/src/infra/config.rs:149:        assert!(Config::from_lookup(|_| None).is_err());
+services/attribution/src/infra/identity.rs:66:            let result = IdentityConfig::from_lookup(&origin, |name| match name {
+services/attribution/scripts/browser-sso.py:34:                   ATTRIBUTION_EVENT_MAX_AGE_DAYS="7", ATTRIBUTION_REFUND_WINDOW_DAYS="365",
+services/attribution/README.md:39:| `ATTRIBUTION_EVENT_MAX_AGE_DAYS` | Required integer 1–3650; original event and paid time delivery horizon |
+services/attribution/README.md:40:| `ATTRIBUTION_REFUND_WINDOW_DAYS` | Required integer 1–3650; maximum refund occurrence age relative to payment |
+services/attribution/src/test_support.rs:86:        let mut config = Config::from_lookup(|key| match key {
+services/attribution/src/test_support.rs:89:            "ATTRIBUTION_EVENT_MAX_AGE_DAYS" => Some("7".into()),
+services/attribution/src/test_support.rs:90:            "ATTRIBUTION_REFUND_WINDOW_DAYS" => Some("365".into()),
+services/attribution/src/test_support.rs:149:    let config = crate::infra::identity::IdentityConfig::from_lookup(origin, |name| match name {
+services/attribution/src/adapters/identity/http_tests.rs:204:            IdentityConfig::from_lookup(
+services/attribution/src/adapters/identity/authority_tests.rs:72:    let config = IdentityConfig::from_lookup(

@@ -20,7 +20,6 @@ use crate::adapters::persistence::test_support::DeliveryFixtureRequest;
 use crate::adapters::persistence::test_support::delivery_fixture;
 use crate::adapters::persistence::test_support::own_database;
 use crate::adapters::persistence::test_support::test_pool;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::thread::ThreadPersistence;
 use crate::entities::transport::DeliveryPartStatus;
@@ -88,7 +87,7 @@ async fn scope(persistence: &PostgresPersistence) -> Scope {
     )
     .await
     .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         persistence,
         company.id,
         ChannelWrite {

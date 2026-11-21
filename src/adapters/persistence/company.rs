@@ -4,7 +4,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{PostgresPersistence, participant::create_person_principal_on},
+    adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
         company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
@@ -14,6 +14,13 @@ use crate::{
     use_cases::company::{
         CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite, company_not_found,
     },
+};
+
+mod member_retirement;
+mod root;
+pub(crate) use member_retirement::retire_member_on;
+pub(crate) use root::{
+    RootJoin, bootstrap_root_on, join_root_on, root_member_on, root_on, set_admin_on,
 };
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
@@ -43,16 +50,14 @@ impl From<CompanyDb> for Company {
     }
 }
 
-/// A company row plus the caller's `company_members.role` in it, for the access reads.
-///
-/// Ownership is the owner member row: 01 makes it agree with `companies.user_id` at commit, so the
-/// role column alone says what the caller is.
+/// A company row plus its caller's canonical root membership and knowledge level.
 #[derive(sqlx::FromRow, Debug)]
 struct AccessibleCompanyDb {
     #[sqlx(flatten)]
     company: CompanyDb,
     role: String,
     access_level: i16,
+    administers_units: bool,
 }
 
 impl TryFrom<AccessibleCompanyDb> for CompanyAccess {
@@ -89,13 +94,15 @@ impl TryFrom<AccessibleCompanyDb> for CompanyAccess {
             company: db.company.into(),
             membership,
             access_level,
+            administers_units: db.administers_units,
         })
     }
 }
 
 /// The columns of [`AccessibleCompanyDb`], joined from `company` and `member`.
 const ACCESSIBLE_COMPANY_COLUMNS: &str = "company.id, company.user_id, company.name, company.slug, \
-     company.default_add_3rd_party, company.avatar_url, company.created_at, member.role, member.access_level::smallint AS access_level";
+     company.default_add_3rd_party, company.avatar_url, company.created_at, member.role, member.access_level::smallint AS access_level, \
+     any_unit_management_role($1, company.id) IS NOT NULL AS administers_units";
 
 /// How many dependent agents a rejected model-connection change names before it stops listing
 /// them. The message is for a person reading a form, not an inventory.
@@ -142,13 +149,11 @@ impl CompanyPersistence for PostgresPersistence {
     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
         let uuid = Uuid::new_v4();
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
-        let (username, email): (String, String) = sqlx::query_as(
-            "SELECT username::text, email::text FROM users WHERE id = $1 FOR UPDATE",
-        )
-        .bind(user_id)
-        .fetch_one(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
+        sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
+            .bind(user_id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"INSERT INTO companies (id, user_id, name, slug, avatar_url, default_add_3rd_party)
                VALUES ($1, $2, $3, $4, $5, $6)
@@ -164,20 +169,10 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
 
-        sqlx::query(
-            r#"INSERT INTO company_members (id, company_id, user_id, role, access_level)
-               VALUES ($1, $2, $3, 'owner', 9)"#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(uuid)
-        .bind(user_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        create_person_principal_on(&mut transaction, uuid, user_id, &username, &email).await?;
+        let company: Company = db.into();
+        bootstrap_root_on(&mut transaction, &company).await?;
         transaction.commit().await.map_err(AppError::from)?;
-
-        Ok(db.into())
+        Ok(company)
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
@@ -225,9 +220,10 @@ impl CompanyPersistence for PostgresPersistence {
         // authorized by `company_access`, so this cap never denies anything.
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(&format!(
             r#"SELECT {ACCESSIBLE_COMPANY_COLUMNS}
-               FROM companies AS company
-               JOIN company_members AS member
-                 ON member.company_id = company.id AND member.user_id = $1
+               FROM department_members AS current_member
+               JOIN companies AS company ON company.id = current_member.company_id
+               JOIN LATERAL membership_of($1, company.id) AS member ON member.id = current_member.id
+               WHERE current_member.root_user_id = $1
                ORDER BY company.created_at DESC, company.id DESC LIMIT 200"#
         ))
         .bind(user_id)
@@ -246,8 +242,7 @@ impl CompanyPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, AccessibleCompanyDb>(&format!(
             r#"SELECT {ACCESSIBLE_COMPANY_COLUMNS}
                FROM companies AS company
-               JOIN company_members AS member
-                 ON member.company_id = company.id AND member.user_id = $1
+               JOIN LATERAL membership_of($1, company.id) AS member ON true
                WHERE company.id = $2"#
         ))
         .bind(user_id)
@@ -338,651 +333,357 @@ impl CompanyPersistence for PostgresPersistence {
         company_id: Uuid,
         connections: Vec<CompanyModelConnectionWrite>,
     ) -> AppResult<()> {
-        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
-        let owned = sqlx::query_scalar::<_, Uuid>(
-            "SELECT id FROM companies WHERE id = $1 AND user_id = $2 FOR UPDATE",
-        )
-        .bind(company_id)
-        .bind(user_id)
-        .fetch_optional(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        if owned.is_none() {
-            return Err(crate::use_cases::company::company_not_found());
-        }
+        replace_unit_model_connections(self, user_id, company_id, None, connections).await
+    }
 
-        sqlx::query(
-            "UPDATE company_model_connections SET is_default = FALSE WHERE company_id = $1 AND is_default",
-        )
-        .bind(company_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
+    async fn replace_unit_model_connections_for_user(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()> {
+        replace_unit_model_connections(self, user_id, company_id, Some(unit_id), connections).await
+    }
 
-        for connection in &connections {
-            let encrypted_api_key = self.encrypt_credential(connection.api_key.as_deref())?;
-            let models: Vec<String> = connection
-                .models
-                .iter()
-                .map(|model| model.as_str().to_string())
-                .collect();
-            let changed = match encrypted_api_key {
-                Some(api_key) => sqlx::query(
-                    r#"INSERT INTO company_model_connections
-                           (company_id, provider, api_key, models, is_default)
-                       VALUES ($1, $2, $3, $4, $5)
-                       ON CONFLICT (company_id, provider) DO UPDATE
-                       SET api_key = EXCLUDED.api_key, models = EXCLUDED.models,
-                           is_default = EXCLUDED.is_default, updated_at = CURRENT_TIMESTAMP"#,
-                )
-                .bind(company_id)
-                .bind(connection.provider.as_str())
-                .bind(api_key)
-                .bind(&models)
-                .bind(connection.is_default)
-                .execute(&mut *transaction)
-                .await
-                .map_err(AppError::from)?
-                .rows_affected(),
-                None => sqlx::query(
-                    r#"UPDATE company_model_connections
-                       SET models = $3, is_default = $4, updated_at = CURRENT_TIMESTAMP
-                       WHERE company_id = $1 AND provider = $2"#,
-                )
-                .bind(company_id)
-                .bind(connection.provider.as_str())
-                .bind(&models)
-                .bind(connection.is_default)
-                .execute(&mut *transaction)
-                .await
-                .map_err(AppError::from)?
-                .rows_affected(),
-            };
-            if changed == 0 {
-                return Err(AppError::BadRequest(format!(
-                    "An API key is required when adding provider '{}'.",
-                    connection.provider
-                )));
+    async fn set_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+        cap_micros: i64,
+    ) -> AppResult<()> {
+        let period = super::unit_budgets::period(period)?;
+        let mut tx = self.pool.begin().await?;
+        super::unit_budgets::set_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::entities::department::DepartmentId::new(unit_id),
+            period,
+            cap_micros,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn replace_unit_budgets(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        day_micros: Option<i64>,
+        month_micros: Option<i64>,
+    ) -> AppResult<()> {
+        let actor = crate::application::workflow::WorkflowActor::authenticated(user_id)?;
+        let company = crate::domain::workflow::CompanyId::new(company_id);
+        let unit = crate::entities::department::DepartmentId::new(unit_id);
+        // Both periods in one transaction: a refused amount leaves both caps as they were.
+        let mut tx = self.pool.begin().await?;
+        for (period, cap) in [("day", day_micros), ("month", month_micros)] {
+            match cap {
+                Some(cap) => {
+                    super::unit_budgets::set_on(&mut tx, actor, company, unit, period, cap).await?
+                }
+                None => {
+                    super::unit_budgets::clear_on(&mut tx, actor, company, unit, period).await?
+                }
             }
         }
-
-        let retained: Vec<String> = connections
-            .iter()
-            .map(|connection| connection.provider.as_str().to_string())
-            .collect();
-        sqlx::query(
-            "DELETE FROM company_model_connections WHERE company_id = $1 AND NOT (provider = ANY($2))",
-        )
-        .bind(company_id)
-        .bind(&retained)
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-
-        // Agents are validated against the connections when *they* are written; this is the other
-        // direction. Narrowing a `models` list or dropping a provider out from under a pinned
-        // agent would otherwise commit cleanly and only surface much later, per run, as
-        // "Model 'x' is not enabled for provider 'y'" on a task that had been working. The check
-        // runs inside the transaction, so a refusal rolls the whole replace back.
-        let orphaned: Vec<String> = sqlx::query_scalar(
-            r#"SELECT agent.name
-               FROM agents AS agent
-               WHERE agent.company_id = $1
-                 AND agent.provider IS NOT NULL
-                 AND NOT EXISTS (
-                     SELECT 1 FROM company_model_connections AS connection
-                     WHERE connection.company_id = agent.company_id
-                       AND connection.provider = lower(btrim(agent.provider))
-                       AND agent.model = ANY(connection.models)
-                 )
-               ORDER BY agent.name
-               LIMIT $2"#,
-        )
-        .bind(company_id)
-        .bind(i64::try_from(MAX_REPORTED_ORPHANED_AGENTS).unwrap_or(i64::MAX))
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        if !orphaned.is_empty() {
-            return Err(AppError::BadRequest(format!(
-                "{} still {} a model this change removes. Point {} at an enabled model first.",
-                orphaned.join(", "),
-                if orphaned.len() == 1 { "uses" } else { "use" },
-                if orphaned.len() == 1 { "it" } else { "them" },
-            )));
-        }
-
-        transaction.commit().await.map_err(AppError::from)
+        tx.commit().await?;
+        Ok(())
     }
+
+    async fn unit_budget_states(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+    ) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>> {
+        let mut tx = self.pool.begin().await?;
+        let states = super::unit_budgets::states_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::entities::department::DepartmentId::new(unit_id),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(states)
+    }
+
+    async fn clear_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+    ) -> AppResult<()> {
+        let period = super::unit_budgets::period(period)?;
+        let mut tx = self.pool.begin().await?;
+        super::unit_budgets::clear_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::entities::department::DepartmentId::new(unit_id),
+            period,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn model_connections_in_agent_reach(
+        &self,
+        company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Vec<Uuid>> {
+        Ok(sqlx::query_scalar(
+            "SELECT id FROM company_model_connections \
+             WHERE company_id = $1 AND agent_reaches($1, $2, unit_id)",
+        )
+        .bind(company_id)
+        .bind(agent_id)
+        .fetch_all(&self.pool)
+        .await?)
+    }
+
+    async fn move_model_connection(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        let mut tx = self.pool.begin().await?;
+        let moved = super::unit_resources::move_resource_on(
+            &mut tx,
+            crate::application::workflow::WorkflowActor::authenticated(user_id)?,
+            crate::domain::workflow::CompanyId::new(company_id),
+            crate::application::ports::unit_resources::UnitResourceKind::ModelConnection,
+            id,
+            crate::entities::department::DepartmentId::new(target),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(moved)
+    }
+}
+
+/// Replace the model connections of one unit, the root when `unit` is `None` (Plan07 02A,
+/// decisions a and g): whoever manages the unit, under the company and person locks every
+/// replace and move takes. Other units' rows are untouched; a provider another unit owns is a
+/// conflict, never an overwrite of its key.
+async fn replace_unit_model_connections(
+    persistence: &PostgresPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+    unit: Option<Uuid>,
+    connections: Vec<CompanyModelConnectionWrite>,
+) -> AppResult<()> {
+    let company = crate::domain::workflow::CompanyId::new(company_id);
+    let actor = crate::application::workflow::WorkflowActor::authenticated(user_id)?;
+    let mut transaction = persistence.pool.begin().await.map_err(AppError::from)?;
+    super::workflow::authority::authorize_person_with_locks(
+        &mut transaction,
+        company,
+        actor,
+        super::workflow::row_locks::RowLocks::Wait,
+    )
+    .await
+    .map_err(|error| match error {
+        AppError::NotFound(_) => crate::use_cases::company::company_not_found(),
+        other => other,
+    })?;
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1 AND is_root")
+            .bind(company_id)
+            .fetch_one(&mut *transaction)
+            .await?;
+    // A department's form may empty its own unit, but never the company's last connection.
+    let named = unit.is_some();
+    let unit = unit.unwrap_or(root);
+    super::administration::management_role_on(
+        &mut transaction,
+        user_id,
+        company,
+        crate::application::ports::administration::ManagementTarget::Unit(
+            crate::entities::department::DepartmentId::new(unit),
+        ),
+    )
+    .await?
+    .ok_or_else(crate::use_cases::company::company_not_found)?;
+
+    sqlx::query(
+        "UPDATE company_model_connections SET default_for_unit = FALSE \
+         WHERE company_id = $1 AND unit_id = $2 AND default_for_unit",
+    )
+    .bind(company_id)
+    .bind(unit)
+    .execute(&mut *transaction)
+    .await?;
+
+    for connection in &connections {
+        let encrypted_api_key = persistence.encrypt_credential(connection.api_key.as_deref())?;
+        let models: Vec<String> = connection
+            .models
+            .iter()
+            .map(|model| model.as_str().to_string())
+            .collect();
+        let changed = match encrypted_api_key {
+            // Updates only a row this unit owns: another unit's provider is never rewritten.
+            Some(api_key) => sqlx::query(
+                r#"INSERT INTO company_model_connections
+                       (company_id, unit_id, provider, api_key, models, default_for_unit)
+                   VALUES ($1, $2, $3, $4, $5, $6)
+                   ON CONFLICT (company_id, provider) DO UPDATE
+                   SET api_key = EXCLUDED.api_key, models = EXCLUDED.models,
+                       default_for_unit = EXCLUDED.default_for_unit, updated_at = CURRENT_TIMESTAMP
+                   WHERE company_model_connections.unit_id = EXCLUDED.unit_id"#,
+            )
+            .bind(company_id)
+            .bind(unit)
+            .bind(connection.provider.as_str())
+            .bind(api_key)
+            .bind(&models)
+            .bind(connection.is_default)
+            .execute(&mut *transaction)
+            .await?
+            .rows_affected(),
+            None => sqlx::query(
+                r#"UPDATE company_model_connections
+                   SET models = $4, default_for_unit = $5, updated_at = CURRENT_TIMESTAMP
+                   WHERE company_id = $1 AND unit_id = $2 AND provider = $3"#,
+            )
+            .bind(company_id)
+            .bind(unit)
+            .bind(connection.provider.as_str())
+            .bind(&models)
+            .bind(connection.is_default)
+            .execute(&mut *transaction)
+            .await?
+            .rows_affected(),
+        };
+        if changed == 0 {
+            let owner: Option<String> = sqlx::query_scalar(
+                "SELECT department.name FROM company_model_connections AS connection \
+                 JOIN departments AS department ON department.company_id = connection.company_id \
+                  AND department.id = connection.unit_id \
+                 WHERE connection.company_id = $1 AND connection.provider = $2 \
+                   AND connection.unit_id <> $3",
+            )
+            .bind(company_id)
+            .bind(connection.provider.as_str())
+            .bind(unit)
+            .fetch_optional(&mut *transaction)
+            .await?;
+            return Err(match owner {
+                Some(owner) => AppError::Conflict(format!(
+                    "Provider '{}' is configured by the department {owner}. Edit it there, or move \
+                     it here.",
+                    connection.provider
+                )),
+                None => AppError::BadRequest(format!(
+                    "An API key is required when adding provider '{}'.",
+                    connection.provider
+                )),
+            });
+        }
+    }
+
+    let retained: Vec<String> = connections
+        .iter()
+        .map(|connection| connection.provider.as_str().to_string())
+        .collect();
+    sqlx::query(
+        "DELETE FROM company_model_connections \
+         WHERE company_id = $1 AND unit_id = $2 AND NOT (provider = ANY($3))",
+    )
+    .bind(company_id)
+    .bind(unit)
+    .bind(&retained)
+    .execute(&mut *transaction)
+    .await?;
+
+    check_model_connection_invariants_on(&mut transaction, company_id, root).await?;
+    if named {
+        let remaining: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM company_model_connections WHERE company_id = $1",
+        )
+        .bind(company_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        if remaining == 0 {
+            return Err(AppError::BadRequest(
+                "A company must keep at least one model provider configured.".into(),
+            ));
+        }
+    }
+
+    // Agents are validated against the connections when *they* are written; this is the other
+    // direction. Narrowing a `models` list or dropping a provider out from under a pinned
+    // agent would otherwise commit cleanly and only surface much later, per run, as
+    // "Model 'x' is not enabled for provider 'y'" on a task that had been working. The check
+    // runs inside the transaction, so a refusal rolls the whole replace back.
+    let orphaned: Vec<String> = sqlx::query_scalar(
+        r#"SELECT agent.name
+           FROM agents AS agent
+           WHERE agent.company_id = $1
+             AND agent.provider IS NOT NULL
+             AND NOT EXISTS (
+                 SELECT 1 FROM company_model_connections AS connection
+                 WHERE connection.company_id = agent.company_id
+                   AND connection.provider = lower(btrim(agent.provider))
+                   AND agent.model = ANY(connection.models)
+             )
+           ORDER BY agent.name
+           LIMIT $2"#,
+    )
+    .bind(company_id)
+    .bind(i64::try_from(MAX_REPORTED_ORPHANED_AGENTS).unwrap_or(i64::MAX))
+    .fetch_all(&mut *transaction)
+    .await?;
+    if !orphaned.is_empty() {
+        return Err(AppError::BadRequest(format!(
+            "{} still {} a model this change removes. Point {} at an enabled model first.",
+            orphaned.join(", "),
+            if orphaned.len() == 1 { "uses" } else { "use" },
+            if orphaned.len() == 1 { "it" } else { "them" },
+        )));
+    }
+
+    transaction.commit().await.map_err(AppError::from)
+}
+
+/// The root holds exactly one default whenever it holds a connection (Plan07 G1 r2 D1); checked
+/// after every replace and move. A replace never empties the root's own form (the use case
+/// refuses that), as before.
+pub(super) async fn check_model_connection_invariants_on(
+    db: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    root: Uuid,
+) -> AppResult<()> {
+    let (root_connections, root_defaults): (i64, i64) = sqlx::query_as(
+        "SELECT count(*), count(*) FILTER (WHERE default_for_unit) \
+         FROM company_model_connections WHERE company_id = $1 AND unit_id = $2",
+    )
+    .bind(company_id)
+    .bind(root)
+    .fetch_one(&mut *db)
+    .await?;
+    if root_connections > 0 && root_defaults != 1 {
+        return Err(AppError::BadRequest(
+            "Exactly one of the company's own model providers must be the company default.".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::adapters::persistence::test_support::test_pool;
-    use crate::adapters::protocols::email::EmailIdentity;
-    use crate::application::ports::participant::PrincipalAccessPersistence;
-    use crate::entities::company_member::CompanyAccessRole;
-    use crate::entities::value_objects::EmailAddress;
-    use crate::use_cases::company_invite::CompanyInvitePersistence;
-    use crate::use_cases::user::UserPersistence;
-
-    /// The accessible-companies query is built at runtime, so nothing but a real database can say
-    /// whether its `is_owner` projection and its `company_members` join do what they claim.
-    #[tokio::test]
-    async fn company_access_returns_owner_admin_member_and_no_relation() {
-        let Some(pool) = test_pool().await else {
-            return;
-        };
-        let persistence = PostgresPersistence::with_credential_cipher(
-            pool.clone(),
-            crate::adapters::persistence::credentials::CredentialCipher::for_test(),
-        );
-
-        let owner = create_account(&persistence, "owner").await;
-        let admin = create_account(&persistence, "admin").await;
-        let member = create_account(&persistence, "member").await;
-        let stranger = create_account(&persistence, "stranger").await;
-        sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = ANY($1)")
-            .bind([admin.0, member.0])
-            .execute(persistence.pool())
-            .await
-            .unwrap();
-
-        let company = persistence
-            .create(
-                owner.0,
-                CompanyWrite {
-                    name: "Acme".to_string(),
-                    slug: format!("acme-{}", Uuid::new_v4().simple()),
-                    ..CompanyWrite::default()
-                },
-            )
-            .await
-            .expect("a company");
-        let listed = persistence
-            .list_by_user_id(owner.0)
-            .await
-            .expect("the ordinary company list");
-        assert_eq!(listed[0].id, company.id);
-
-        // Before the invite is accepted, the member is a stranger to it.
-        assert!(accessible_ids(&persistence, member.0).await.is_empty());
-
-        let invite = persistence
-            .create_invite(
-                crate::adapters::persistence::test_support::invite_command(
-                    &persistence,
-                    company.id,
-                    &member.1,
-                    CompanyAccessRole::Member,
-                )
-                .await,
-            )
-            .await
-            .expect("an invite");
-        persistence
-            .accept_pending_invite(invite.id, member.0, &member.1)
-            .await
-            .expect("the invite is accepted");
-        let admin_invite = persistence
-            .create_invite(
-                crate::adapters::persistence::test_support::invite_command(
-                    &persistence,
-                    company.id,
-                    &admin.1,
-                    CompanyAccessRole::Admin,
-                )
-                .await,
-            )
-            .await
-            .expect("an admin invite");
-        persistence
-            .accept_pending_invite(admin_invite.id, admin.0, &admin.1)
-            .await
-            .expect("the admin invite is accepted");
-
-        // The owner owns it, the member was let in, and the stranger sees nothing.
-        let owner_view = persistence
-            .company_access(owner.0, company.id)
-            .await
-            .expect("a lookup")
-            .expect("the owner reaches their own company");
-        assert_eq!(owner_view.membership, CompanyMembership::Owner);
-        assert_eq!(owner_view.company.id, company.id);
-
-        let member_view = persistence
-            .company_access(member.0, company.id)
-            .await
-            .expect("a lookup")
-            .expect("an accepted invite reaches the company");
-        assert_eq!(member_view.membership, CompanyMembership::Member);
-
-        let admin_view = persistence
-            .company_access(admin.0, company.id)
-            .await
-            .expect("a lookup")
-            .expect("an accepted admin reaches the company");
-        assert_eq!(admin_view.membership, CompanyMembership::Admin);
-
-        assert!(
-            persistence
-                .company_access(stranger.0, company.id)
-                .await
-                .expect("a lookup")
-                .is_none()
-        );
-
-        // The inbound path asks the same question by address, but through the principal the
-        // address resolves to -- and must tell the owner apart from the rest of the team:
-        // `Channel::participant_access` hands the owner a restricted channel they are not granted,
-        // and hands a member nothing.
-        let by_address = async |address: &str| {
-            persistence
-                .access_context_for_identity(
-                    company.id,
-                    &EmailIdentity::parse(EmailAddress::from(address))
-                        .expect("a parseable mailbox")
-                        .qualify_default(),
-                )
-                .await
-                .expect("a lookup")
-        };
-        // Bootstrap stores the normalized mailbox, and the parser normalizes what it is asked.
-        assert_eq!(
-            by_address(&owner.1.to_uppercase()).await.membership,
-            CompanyMembership::Owner
-        );
-        assert_eq!(
-            by_address(&member.1).await.membership,
-            CompanyMembership::Member
-        );
-        assert_eq!(
-            by_address(&admin.1).await.membership,
-            CompanyMembership::Admin
-        );
-
-        // Somebody with an account but no standing here, and somebody with no account at all, are
-        // both strangers -- and neither resolves to a principal in this company.
-        for outsider in [stranger.1.as_str(), "nobody@example.com"] {
-            let context = by_address(outsider).await;
-            assert_eq!(context.membership, CompanyMembership::None);
-            assert_eq!(context.principal_id, None);
-        }
-
-        // ...and the ownership-scoped listing the administration pages use is unchanged by any
-        // of this: an invited member still owns nothing.
-        assert!(
-            persistence
-                .list_by_user_id(member.0)
-                .await
-                .expect("a listing")
-                .is_empty()
-        );
-
-        persistence.remove_member(company.id, member.0).await.ok();
-        persistence.remove_member(company.id, admin.0).await.ok();
-        persistence.delete_invite(invite.id).await.ok();
-        persistence.delete_invite(admin_invite.id).await.ok();
-        persistence.delete(company.id).await.ok();
-    }
-
-    #[tokio::test]
-    async fn a_company_can_replace_multiple_encrypted_model_connections_without_resending_keys() {
-        let Some(pool) = test_pool().await else {
-            return;
-        };
-        let persistence = PostgresPersistence::with_credential_cipher(
-            pool.clone(),
-            crate::adapters::persistence::credentials::CredentialCipher::for_test(),
-        );
-        let owner = create_account(&persistence, "model_connections").await;
-        let stranger = create_account(&persistence, "model_connections_stranger").await;
-        let company = persistence
-            .create(
-                owner.0,
-                CompanyWrite {
-                    name: "Model Connections".into(),
-                    slug: format!("models-{}", Uuid::new_v4().simple()),
-                    ..CompanyWrite::default()
-                },
-            )
-            .await
-            .expect("a company");
-
-        let denied = persistence
-            .replace_model_connections_for_user(
-                stranger.0,
-                company.id,
-                vec![
-                    CompanyModelConnectionWrite::new(
-                        "openai",
-                        Some("stolen-secret".into()),
-                        vec!["gpt-a".into()],
-                        true,
-                    )
-                    .unwrap(),
-                ],
-            )
-            .await;
-        assert!(denied.is_err());
-
-        persistence
-            .replace_model_connections_for_user(
-                owner.0,
-                company.id,
-                vec![
-                    CompanyModelConnectionWrite::new(
-                        "openai",
-                        Some("openai-secret".into()),
-                        vec!["gpt-a".into(), "gpt-b".into()],
-                        true,
-                    )
-                    .unwrap(),
-                    CompanyModelConnectionWrite::new(
-                        "anthropic",
-                        Some("anthropic-secret".into()),
-                        vec!["claude-a".into()],
-                        false,
-                    )
-                    .unwrap(),
-                ],
-            )
-            .await
-            .expect("both providers save");
-
-        let metadata = persistence
-            .list_model_connections(company.id)
-            .await
-            .expect("connection metadata");
-        assert_eq!(metadata.len(), 2);
-        assert!(metadata.iter().all(|connection| connection.has_api_key));
-        assert_eq!(
-            persistence
-                .model_api_key(company.id, &ModelProvider::canonical("anthropic"))
-                .await
-                .unwrap()
-                .as_deref(),
-            Some("anthropic-secret")
-        );
-        let stored: Vec<String> = sqlx::query_scalar(
-            "SELECT api_key FROM company_model_connections WHERE company_id = $1 ORDER BY provider",
-        )
-        .bind(company.id)
-        .fetch_all(&pool)
-        .await
-        .expect("stored credentials");
-        assert!(stored.iter().all(|key| key.starts_with("enc:v1:1:")));
-        assert!(stored.iter().all(|key| !key.contains("secret")));
-
-        // Browsers never receive stored keys. A blank key on an existing row retains its secret
-        // while the model allow-list and default selection can still change.
-        persistence
-            .replace_model_connections_for_user(
-                owner.0,
-                company.id,
-                vec![
-                    CompanyModelConnectionWrite::new("openai", None, vec!["gpt-b".into()], false)
-                        .unwrap(),
-                    CompanyModelConnectionWrite::new(
-                        "anthropic",
-                        None,
-                        vec!["claude-a".into()],
-                        true,
-                    )
-                    .unwrap(),
-                ],
-            )
-            .await
-            .expect("metadata changes without key material");
-        assert_eq!(
-            persistence
-                .model_api_key(company.id, &ModelProvider::canonical("openai"))
-                .await
-                .unwrap()
-                .as_deref(),
-            Some("openai-secret")
-        );
-        let connections = CompanyPersistence::list_model_connections(&persistence, company.id)
-            .await
-            .unwrap();
-        let default = connections
-            .iter()
-            .find(|connection| connection.is_default)
-            .expect("default connection remains");
-        assert_eq!(default.provider.as_ref(), "anthropic");
-        assert_eq!(default.models[0].as_ref(), "claude-a");
-
-        // The form's explicit remove operation becomes omission from this wholesale replacement.
-        // The omitted provider and its encrypted credential are deleted together.
-        persistence
-            .replace_model_connections_for_user(
-                owner.0,
-                company.id,
-                vec![
-                    CompanyModelConnectionWrite::new("openai", None, vec!["gpt-b".into()], true)
-                        .unwrap(),
-                ],
-            )
-            .await
-            .expect("one provider is deliberately removed");
-        assert_eq!(
-            persistence
-                .model_api_key(company.id, &ModelProvider::canonical("anthropic"))
-                .await
-                .unwrap(),
-            None
-        );
-        assert_eq!(
-            persistence
-                .list_model_connections(company.id)
-                .await
-                .unwrap()
-                .len(),
-            1
-        );
-
-        persistence.delete(company.id).await.ok();
-    }
-
-    #[tokio::test]
-    async fn a_replace_that_would_strand_a_pinned_agent_is_refused_whole() {
-        let Some(pool) = test_pool().await else {
-            return;
-        };
-        let persistence = PostgresPersistence::with_credential_cipher(
-            pool.clone(),
-            crate::adapters::persistence::credentials::CredentialCipher::for_test(),
-        );
-        let owner = create_account(&persistence, "orphan_guard").await;
-        let company = persistence
-            .create(
-                owner.0,
-                CompanyWrite {
-                    name: "Orphan Guard".into(),
-                    slug: format!("orphan-{}", Uuid::new_v4().simple()),
-                    ..CompanyWrite::default()
-                },
-            )
-            .await
-            .expect("a company");
-
-        persistence
-            .replace_model_connections_for_user(
-                owner.0,
-                company.id,
-                vec![
-                    CompanyModelConnectionWrite::new(
-                        "openai",
-                        Some("openai-secret".into()),
-                        vec!["gpt-a".into(), "gpt-b".into()],
-                        true,
-                    )
-                    .unwrap(),
-                ],
-            )
-            .await
-            .expect("the initial connection saves");
-
-        crate::use_cases::agent::AgentPersistence::create(
-            &persistence,
-            company.id,
-            crate::use_cases::agent::AgentWrite {
-                name: "Pinned".into(),
-                slug: "pinned".into(),
-                provider: Some("openai".into()),
-                model: Some("gpt-b".into()),
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("an agent pinned to gpt-b");
-
-        // Narrowing the allow-list out from under the agent would leave it unable to run, so the
-        // whole replace is refused rather than committing half a configuration.
-        let refused = persistence
-            .replace_model_connections_for_user(
-                owner.0,
-                company.id,
-                vec![
-                    CompanyModelConnectionWrite::new("openai", None, vec!["gpt-a".into()], true)
-                        .unwrap(),
-                ],
-            )
-            .await
-            .expect_err("the pinned agent blocks the narrowing");
-        assert!(
-            refused.to_string().contains("Pinned"),
-            "the refusal should name the agent: {refused}"
-        );
-
-        // ... and nothing was written: gpt-b is still enabled.
-        let connections = CompanyPersistence::list_model_connections(&persistence, company.id)
-            .await
-            .expect("connections survive the rolled-back replace");
-        assert_eq!(connections.len(), 1);
-        assert!(connections[0].models.iter().any(|model| model == "gpt-b"));
-
-        persistence.delete(company.id).await.ok();
-    }
-
-    /// Both saves are positional binds built at runtime, so only a real database can say each
-    /// value still lands in its own column -- and that an owner-scoped save names its owner.
-    #[tokio::test]
-    async fn a_company_save_writes_every_field_to_its_own_column() {
-        let Some(pool) = test_pool().await else {
-            return;
-        };
-        let persistence = PostgresPersistence::new(pool.clone());
-        let owner = create_account(&persistence, "owner").await;
-        let stranger = create_account(&persistence, "stranger").await;
-        let company = persistence
-            .create(
-                owner.0,
-                CompanyWrite {
-                    name: "Acme".to_string(),
-                    slug: format!("acme-{}", Uuid::new_v4().simple()),
-                    ..CompanyWrite::default()
-                },
-            )
-            .await
-            .expect("a company");
-        assert!(company.channel_defaults.add_3rd_party);
-
-        let slug = format!("globex-{}", Uuid::new_v4().simple());
-        let saved = persistence
-            .update_for_user(
-                owner.0,
-                company.id,
-                CompanyWrite {
-                    name: "Globex".to_string(),
-                    slug: slug.clone(),
-                    channel_defaults: CompanyChannelDefaults {
-                        add_3rd_party: false,
-                    },
-                    avatar_url: Some(AvatarUrl::from("https://cdn.example.com/globex.png")),
-                },
-            )
-            .await
-            .expect("the owner saves");
-        assert_eq!(saved.name, "Globex");
-        assert_eq!(saved.slug.as_str(), slug);
-        assert!(!saved.channel_defaults.add_3rd_party);
-        assert_eq!(
-            saved.avatar_url,
-            Some(AvatarUrl::from("https://cdn.example.com/globex.png"))
-        );
-
-        // An unscoped save replaces every field too.
-        let renamed = persistence
-            .update(
-                company.id,
-                CompanyWrite {
-                    name: "Initech".to_string(),
-                    slug: slug.clone(),
-                    ..CompanyWrite::default()
-                },
-            )
-            .await
-            .expect("an unscoped save");
-        assert_eq!(renamed.name, "Initech");
-        assert!(renamed.channel_defaults.add_3rd_party);
-        assert_eq!(renamed.avatar_url, None);
-
-        assert!(
-            persistence
-                .update_for_user(
-                    stranger.0,
-                    company.id,
-                    CompanyWrite {
-                        name: "Stolen".to_string(),
-                        slug,
-                        ..CompanyWrite::default()
-                    },
-                )
-                .await
-                .is_err()
-        );
-        assert_eq!(
-            CompanyPersistence::get_by_id(&persistence, company.id)
-                .await
-                .unwrap()
-                .expect("still there")
-                .name,
-            "Initech"
-        );
-
-        persistence.delete(company.id).await.ok();
-    }
-
-    /// A fresh account, as its id and address.
-    async fn create_account(persistence: &PostgresPersistence, prefix: &str) -> (Uuid, String) {
-        let username = format!("{prefix}_{}", Uuid::new_v4().simple());
-        let email = format!("{username}@example.com");
-        persistence
-            .create_user(&username, &email, "hash")
-            .await
-            .expect("an account");
-
-        let user = persistence
-            .get_by_email(&email)
-            .await
-            .expect("a lookup")
-            .expect("the account just created");
-
-        (user.id, email)
-    }
-
-    async fn accessible_ids(persistence: &PostgresPersistence, user_id: Uuid) -> Vec<Uuid> {
-        persistence
-            .list_accessible_by_user_id(user_id)
-            .await
-            .expect("a listing")
-            .into_iter()
-            .map(|access| access.company.id)
-            .collect()
-    }
-}
+#[path = "company_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "company_access_tests.rs"]
@@ -992,11 +693,16 @@ pub(crate) async fn model_connections_on(
     db: &mut sqlx::PgConnection,
     company_id: Uuid,
 ) -> AppResult<Vec<CompanyModelConnection>> {
-    let rows = sqlx::query_as::<_, (String, Vec<String>, bool, bool)>(
-        r#"SELECT provider, models, is_default, (api_key IS NOT NULL) AS has_api_key
-               FROM company_model_connections
-               WHERE company_id = $1
-               ORDER BY is_default DESC, provider"#,
+    // The root's default first, then each unit's own (Plan07 02A).
+    let rows = sqlx::query_as::<_, (Uuid, Uuid, String, bool, String, Vec<String>, bool, bool)>(
+        r#"SELECT connection.id, connection.unit_id, unit.name, unit.is_root, connection.provider,
+                  connection.models, connection.default_for_unit,
+                  (connection.api_key IS NOT NULL) AS has_api_key
+               FROM company_model_connections AS connection
+               JOIN departments AS unit
+                 ON unit.company_id = connection.company_id AND unit.id = connection.unit_id
+               WHERE connection.company_id = $1
+               ORDER BY (unit.is_root AND connection.default_for_unit) DESC, connection.provider"#,
     )
     .bind(company_id)
     .fetch_all(db)
@@ -1006,11 +712,17 @@ pub(crate) async fn model_connections_on(
     Ok(rows
         .into_iter()
         .map(
-            |(provider, models, is_default, has_api_key)| CompanyModelConnection {
-                provider: ModelProvider::from(provider),
-                models: models.into_iter().map(ModelName::from).collect(),
-                is_default,
-                has_api_key,
+            |(id, unit_id, unit_name, in_root, provider, models, is_default, has_api_key)| {
+                CompanyModelConnection {
+                    id,
+                    unit_id,
+                    unit_name,
+                    in_root,
+                    provider: ModelProvider::from(provider),
+                    models: models.into_iter().map(ModelName::from).collect(),
+                    is_default,
+                    has_api_key,
+                }
             },
         )
         .collect())

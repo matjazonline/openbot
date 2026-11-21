@@ -1,0 +1,1 @@
+memory image passed: non-root, offline/read-only model, RSS budget, database refusal

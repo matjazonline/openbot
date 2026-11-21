@@ -1,0 +1,159 @@
+services/attribution/src/adapters/setup/http_tests.rs:816-848
+816:             &f.setup.admission,
+817:             &h,
+818:             KeyScope::ConversionsWrite,
+819:         )
+820:         .await
+821:         .unwrap();
+822:     assert!(matches!(
+823:         merchant.store(StoreId(Uuid::new_v4())),
+824:         Err(Failure::NotFound)
+825:     ));
+826:     f.setup
+827:         .store
+828:         .mutate(
+829:             &p,
+830:             Mutation::UpdateStore(
+831:                 store,
+832:                 StoreUpdate {
+833:                     name: None,
+834:                     timezone: None,
+835:                     enabled: Some(false),
+836:                 },
+837:             ),
+838:             retry(),
+839:             &f.setup.dns,
+840:         )
+841:         .await
+842:         .unwrap();
+843:     assert!(matches!(
+844:         f.setup.store.begin_merchant(&merchant).await,
+845:         Err(Failure::Forbidden)
+846:     ));
+847:     f.setup
+848:         .store
+services/attribution/src/adapters/setup/http_tests.rs:886-959
+886: async fn attribution_credentials_competing_revoke_and_use_serializes_both_orders() {
+887:     let f = Fixture::new().await;
+888:     let p = principal(&f).await;
+889:     let store = create_store(&f, &p, "Shop").await;
+890:     let issued = issue(&f, &p, store).await;
+891:     let credential: CredentialId =
+892:         serde_json::from_value(issued["credential"]["id"].clone()).unwrap();
+893:     let h = merchant_headers(issued["secret"].as_str().unwrap());
+894:     let merchant = f
+895:         .setup
+896:         .store
+897:         .merchant(
+898:             &f.service,
+899:             &f.setup.admission,
+900:             &h,
+901:             KeyScope::ConversionsWrite,
+902:         )
+903:         .await
+904:         .unwrap();
+905:     {
+906:         let tx = f.setup.store.begin_merchant(&merchant).await.unwrap();
+907:         let revoke = f.setup.store.mutate(
+908:             &p,
+909:             Mutation::RevokeCredential(credential),
+910:             retry(),
+911:             &f.setup.dns,
+912:         );
+913:         tokio::pin!(revoke);
+914:         assert!(
+915:             tokio::time::timeout(Duration::from_millis(80), &mut revoke)
+916:                 .await
+917:                 .is_err()
+918:         );
+919:         tx.commit().await.unwrap();
+920:         revoke.await.unwrap();
+921:     }
+922:     assert!(matches!(
+923:         f.setup.store.begin_merchant(&merchant).await,
+924:         Err(Failure::Unauthorized)
+925:     ));
+926:     let issued = issue(&f, &p, store).await;
+927:     let credential: CredentialId =
+928:         serde_json::from_value(issued["credential"]["id"].clone()).unwrap();
+929:     let h = merchant_headers(issued["secret"].as_str().unwrap());
+930:     let merchant = f
+931:         .setup
+932:         .store
+933:         .merchant(
+934:             &f.service,
+935:             &f.setup.admission,
+936:             &h,
+937:             KeyScope::ConversionsWrite,
+938:         )
+939:         .await
+940:         .unwrap();
+941:     {
+942:         let mut revoke_tx = f.setup.store.user_transaction(&p).await.unwrap();
+943:         sqlx::query("UPDATE attribution_credentials SET revoked_at=clock_timestamp() WHERE id=$1")
+944:             .bind(credential.0)
+945:             .execute(&mut *revoke_tx)
+946:             .await
+947:             .unwrap();
+948:         let use_key = f.setup.store.begin_merchant(&merchant);
+949:         tokio::pin!(use_key);
+950:         assert!(
+951:             tokio::time::timeout(Duration::from_millis(80), &mut use_key)
+952:                 .await
+953:                 .is_err()
+954:         );
+955:         revoke_tx.commit().await.unwrap();
+956:         assert!(matches!(use_key.await, Err(Failure::Unauthorized)));
+957:     }
+958:     f.close().await;
+959: }
+services/attribution/src/adapters/setup/http_tests.rs:1250-1279
+1250: async fn attribution_credentials_expiry_overlap_and_expired_metadata_replay() {
+1251:     let f = Fixture::new().await;
+1252:     let p = principal(&f).await;
+1253:     let store = create_store(&f, &p, "Shop").await;
+1254:     let r = retry();
+1255:     let expiry = Utc::now() + chrono::Duration::minutes(5);
+1256:     let mutation = Mutation::CreateCredential(CredentialWrite {
+1257:         store_id: store,
+1258:         label: "Expiring".into(),
+1259:         scopes: vec![KeyScope::ConversionsWrite],
+1260:         expires_at: Some(expiry),
+1261:     });
+1262:     let issued = f
+1263:         .setup
+1264:         .store
+1265:         .mutate(
+1266:             &p,
+1267:             mutation.clone(),
+1268:             Retry {
+1269:                 key: r.key,
+1270:                 created_at: r.created_at,
+1271:             },
+1272:             &f.setup.dns,
+1273:         )
+1274:         .await
+1275:         .unwrap()
+1276:         .body;
+1277:     let old: Credential = serde_json::from_value(issued["credential"].clone()).unwrap();
+1278:     let rotated = f
+1279:         .setup
+services/attribution/src/adapters/setup/http_tests.rs:1334-1351
+1334:                 &merchant_headers(rotated["secret"].as_str().unwrap()),
+1335:                 KeyScope::ConversionsWrite
+1336:             )
+1337:             .await,
+1338:         Err(Failure::Unauthorized)
+1339:     ));
+1340:     sqlx::query("UPDATE attribution_credentials SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1").bind(old.id.0).execute(&f._database.pool).await.unwrap();
+1341:     assert_eq!(
+1342:         f.setup
+1343:             .store
+1344:             .mutate(&p, mutation, r, &f.setup.dns)
+1345:             .await
+1346:             .unwrap()
+1347:             .body["secret_available"],
+1348:         false
+1349:     );
+1350:     f.close().await;
+1351: }

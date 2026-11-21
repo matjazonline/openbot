@@ -1,0 +1,9 @@
+{
+  "actual_openbot_crate_import": [],
+  "raw_quoted_foreign_sql": [],
+  "ordinary_foreign_sql": [
+    "SQL table outside owned migrations/catalog: companies in src/lib.rs"
+  ],
+  "resolved_open_bots_package": [],
+  "nested_local_wrapper_outside_include": []
+}

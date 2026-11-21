@@ -28,6 +28,9 @@ fn create_payload(name: &str) -> DepartmentCreatePayload {
     }
 }
 
+#[path = "root_department_route_tests.rs"]
+mod root;
+
 #[tokio::test]
 async fn department_routes_hide_foreign_companies_and_refuse_members_and_strangers() {
     let Some(f) = Fixture::new().await else {
@@ -141,34 +144,7 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
         )
         .await;
     }
-    // A failing company lookup is a server error, never read as "not yours".
-    let failing = Arc::new(DepartmentUseCases::new(
-        Arc::new(crate::use_cases::company_test_support::MockCompanyPersistence::failing()),
-        Arc::new(
-            crate::adapters::persistence::department::PostgresDepartments::new(
-                f.persistence.as_ref().clone(),
-                crate::adapters::persistence::test_support::provisioning_templates(),
-            ),
-        ),
-    ));
-    denied(
-        create_department_json(
-            State(failing.clone()),
-            Fixture::auth(&f.owner),
-            Path(f.company.id),
-            Json(create_payload("Down")),
-        )
-        .await,
-        StatusCode::INTERNAL_SERVER_ERROR,
-        &f.foreign.name,
-    )
-    .await;
-    denied(
-        list_departments_json(State(failing), Fixture::auth(&f.owner), Path(f.company.id)).await,
-        StatusCode::INTERNAL_SERVER_ERROR,
-        &f.foreign.name,
-    )
-    .await;
+    assert_department_lookup_errors(&f).await;
     // The member can list, and sees none of the departments they are not in.
     let listed = list_departments_json(
         State(departments.clone()),
@@ -182,7 +158,11 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
     let body = axum::body::to_bytes(listed.into_body(), 65536)
         .await
         .unwrap();
-    assert_eq!(body.as_ref(), b"[]");
+    let listed: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["is_root"], true);
+    assert_eq!(listed[0]["company_id"], serde_json::json!(f.company.id));
+    assert_eq!(listed[0]["slug"], serde_json::json!(f.company.slug));
     // And the department survived every refused write.
     assert_eq!(
         departments
@@ -281,6 +261,42 @@ async fn department_routes_round_trip_and_refuse_an_unknown_role() {
     assert_eq!(detail["id"], serde_json::json!(department));
     assert_eq!(detail["members"], serde_json::json!([]));
     assert_eq!(detail["roles"], serde_json::json!([]));
+}
+
+// Both current unit authority and the company read port propagate infrastructure errors.
+async fn assert_department_lookup_errors(f: &Fixture) {
+    let unavailable = sqlx::postgres::PgPoolOptions::new()
+        .connect_lazy("postgres://localhost/unavailable")
+        .unwrap();
+    unavailable.close().await;
+    let unavailable = crate::adapters::persistence::PostgresPersistence::new(unavailable);
+    let failing = Arc::new(DepartmentUseCases::new(
+        Arc::new(crate::use_cases::company_test_support::MockCompanyPersistence::failing()),
+        Arc::new(
+            crate::adapters::persistence::department::PostgresDepartments::new(
+                unavailable,
+                crate::adapters::persistence::test_support::provisioning_templates(),
+            ),
+        ),
+    ));
+    denied(
+        create_department_json(
+            State(failing.clone()),
+            Fixture::auth(&f.owner),
+            Path(f.company.id),
+            Json(create_payload("Down")),
+        )
+        .await,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        &f.foreign.name,
+    )
+    .await;
+    denied(
+        list_departments_json(State(failing), Fixture::auth(&f.owner), Path(f.company.id)).await,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        &f.foreign.name,
+    )
+    .await;
 }
 
 #[tokio::test]

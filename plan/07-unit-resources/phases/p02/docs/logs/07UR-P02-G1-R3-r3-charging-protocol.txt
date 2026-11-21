@@ -1,0 +1,185 @@
+PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit
+== T1 deferral: charged at COMMIT, once per qualifying row; a non-qualifying update charges nothing
+BEGIN
+BEGIN
+UPDATE usage_calls SET settled_at=now() WHERE request_id IN ('10000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002')
+UPDATE 2
+SELECT count(*) AS totals_rows_before_commit FROM unit_spend
+ totals_rows_before_commit 
+---------------------------
+                         0
+(1 row)
+
+COMMIT
+COMMIT
+UPDATE usage_calls SET settled_at=settled_at WHERE request_id='10000000-0000-0000-0000-000000000001'
+UPDATE 1
+  unit  | period | spent | rows 
+--------+--------+-------+------
+ d1     | day    |    12 |    1
+ d1     | month  |    12 |    1
+ parent | day    |    12 |    1
+ parent | month  |    12 |    1
+ root   | day    |    12 |    1
+ root   | month  |    12 |    1
+(6 rows)
+
+== T2 NEW is the committed row: a settled row cannot change later in the same transaction (guard)
+BEGIN
+BEGIN
+UPDATE usage_calls SET settled_at=now() WHERE request_id='10000000-0000-0000-0000-000000000003'
+UPDATE 1
+UPDATE usage_calls SET note='later' WHERE request_id='10000000-0000-0000-0000-000000000003'
+ERROR:  model usage identity and settled usage are immutable
+CONTEXT:  PL/pgSQL function guard_usage_update() line 5 at RAISE
+COMMIT
+ROLLBACK
+call 3 settled after aborted txn: false
+== T3 a failure inside the deferred charge fails only that COMMIT and rolls the settlement back
+BEGIN
+BEGIN
+UPDATE usage_calls SET settled_at=now() WHERE request_id='10000000-0000-0000-0000-000000000003'
+UPDATE 1
+SELECT 'statement ok before commit' AS state
+           state            
+----------------------------
+ statement ok before commit
+(1 row)
+
+COMMIT
+ERROR:  charge failed (test)
+CONTEXT:  PL/pgSQL function fail_charge() line 1 at RAISE
+call 3 settled after failed commit: false
+  unit  | period | spent | rows 
+--------+--------+-------+------
+ d1     | day    |    12 |    1
+ d1     | month  |    12 |    1
+ parent | day    |    12 |    1
+ parent | month  |    12 |    1
+ root   | day    |    12 |    1
+ root   | month  |    12 |    1
+(6 rows)
+
+
+== 3a: charge committing (paused after its locks) while a delete of its unit is attempted
+[delete] timing on
+[delete] Timing is on.
+[delete] BEGIN
+[delete] BEGIN
+[delete] Time: 0.166 ms
+[delete] SELECT id FROM departments WHERE id='00000000-0000-0000-0000-0000000000d3' FOR UPDATE
+[delete]                   id                  
+[delete] --------------------------------------
+[delete]  00000000-0000-0000-0000-0000000000d3
+[delete] (1 row)
+[delete] 
+[delete] Time: 964.751 ms
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d3'
+[delete] DELETE 1
+[delete] Time: 2.202 ms
+[delete] COMMIT
+[delete] COMMIT
+[delete] Time: 1.003 ms
+[settlement] SET test.charge_pause='1.5'
+[settlement] SET
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='20000000-0000-0000-0000-000000000001'
+[settlement] UPDATE 1
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 1507.926 ms (00:01.508)
+  unit  | period | spent | rows 
+--------+--------+-------+------
+ d1     | day    |    12 |    1
+ d1     | month  |    12 |    1
+ parent | day    |   112 |    1
+ parent | month  |   112 |    1
+ root   | day    |   112 |    1
+ root   | month  |   112 |    1
+(6 rows)
+
+
+== 3b: delete holds its unit FOR UPDATE, then deletes (cascading existing totals); the settlement commits meanwhile
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.194 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-000000000001'
+[settlement] UPDATE 1
+[settlement] Time: 2.930 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 965.599 ms
+[delete] BEGIN
+[delete] BEGIN
+[delete] SELECT id FROM departments WHERE id='00000000-0000-0000-0000-0000000000d2' FOR UPDATE
+[delete]                   id                  
+[delete] --------------------------------------
+[delete]  00000000-0000-0000-0000-0000000000d2
+[delete] (1 row)
+[delete] 
+[delete] SELECT pg_sleep(1.5)
+[delete]  pg_sleep 
+[delete] ----------
+[delete]  
+[delete] (1 row)
+[delete] 
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d2'
+[delete] DELETE 1
+[delete] COMMIT
+[delete] COMMIT
+  unit  | period | spent | rows 
+--------+--------+-------+------
+ d1     | day    |    12 |    1
+ d1     | month  |    12 |    1
+ parent | day    |   112 |    1
+ parent | month  |   112 |    1
+ root   | day    |  1112 |    1
+ root   | month  |  1112 |    1
+(6 rows)
+
+
+== 3b': delete commits first, then a call recorded on the deleted unit settles
+UPDATE usage_calls SET settled_at=now() WHERE request_id='30000000-0000-0000-0000-000000000002'
+UPDATE 1
+  unit  | period | spent | rows 
+--------+--------+-------+------
+ d1     | day    |    12 |    1
+ d1     | month  |    12 |    1
+ parent | day    |   112 |    1
+ parent | month  |   112 |    1
+ root   | day    | 11112 |    1
+ root   | month  | 11112 |    1
+(6 rows)
+
+
+== 5: a department write holding the root row FOR UPDATE (as lock_department_on does) stalls a child unit's settlement commit
+[settlement] timing on
+[settlement] Timing is on.
+[settlement] BEGIN
+[settlement] BEGIN
+[settlement] Time: 0.268 ms
+[settlement] UPDATE usage_calls SET settled_at=now() WHERE request_id='50000000-0000-0000-0000-000000000001'
+[settlement] UPDATE 1
+[settlement] Time: 3.545 ms
+[settlement] COMMIT
+[settlement] COMMIT
+[settlement] Time: 1140.836 ms (00:01.141)
+
+== 4: 16 concurrent settlements on sibling units of one company
+  16 exit 0
+ period | root_total | expected 
+--------+------------+----------
+ day    |        136 |      136
+ month  |        136 |      136
+(2 rows)
+
+
+== saturation
+UPDATE usage_calls SET settled_at=now() WHERE request_id='60000000-0000-0000-0000-000000000001'
+UPDATE 1
+root day total: 9223372036854775807

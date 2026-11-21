@@ -300,7 +300,7 @@ async fn workflow_listings_hide_channels_an_admin_cannot_see() {
     let (_, version) = f
         .published(owner, company, example("data.map", Uuid::new_v4()))
         .await;
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         company,
         ChannelWrite {
@@ -313,11 +313,11 @@ async fn workflow_listings_hide_channels_an_admin_cannot_see() {
     .await
     .unwrap()
     .id;
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(channel)
-        .execute(f.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        f.persistence.pool(),
+        channel,
+    )
+    .await;
     let hidden = Uuid::new_v4();
     let (status, configured) = f
         .configure_on(

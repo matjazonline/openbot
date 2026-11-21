@@ -584,26 +584,30 @@ fn resource_fields(form: &BindingFormView<'_>) -> String {
 fn escalation_field(
     policy: Option<crate::application::workflow::binding::EscalationPolicy>,
 ) -> String {
+    use crate::entities::department::DepartmentRole;
     let selected = policy
         .map(|policy| format!("{}:{}", policy.notify, policy.hops.get()))
         .unwrap_or_default();
-    let options: String = [
-        ("", "Use unit default"),
-        ("lead:1", "Lead, one hop"),
-        ("lead:2", "Lead, then parent lead"),
-        ("reviewer:1", "Reviewers, one hop"),
-        ("reviewer:2", "Reviewers, then parent lead"),
-        ("sponsor:1", "Sponsor decider, one hop"),
-        ("sponsor:2", "Sponsor decider, then parent lead"),
-    ]
-    .into_iter()
-    .map(|(value, label)| {
-        format!(
-            r#"<option value="{value}"{}>{label}</option>"#,
-            if value == selected { " selected" } else { "" }
-        )
-    })
-    .collect();
+    let mut options = format!(
+        r#"<option value=""{}>Use unit default</option>"#,
+        if selected.is_empty() { " selected" } else { "" }
+    );
+    for role in DepartmentRole::ALL {
+        let label = match role {
+            DepartmentRole::Lead => "Lead",
+            DepartmentRole::Reviewer => "Reviewers",
+            DepartmentRole::Sponsor => "Sponsor decider",
+            DepartmentRole::Owner => "Owner",
+            DepartmentRole::Admin => "Admins",
+        };
+        for (hops, description) in [(1, "one hop"), (2, "then parent lead")] {
+            let value = format!("{role}:{hops}");
+            options.push_str(&format!(
+                r#"<option value="{value}"{}>{label}, {description}</option>"#,
+                if value == selected { " selected" } else { "" }
+            ));
+        }
+    }
     labelled(
         "Escalation",
         "Available on a department-owned desk.",

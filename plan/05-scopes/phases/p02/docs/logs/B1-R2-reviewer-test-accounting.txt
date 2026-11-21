@@ -1,0 +1,1 @@
+PASS independently parsed runner inventory: baseline 4768, R1 4799, R2 4808; R1→R2 +9/-0. Baseline rename and all 41 additions match retained accounting.

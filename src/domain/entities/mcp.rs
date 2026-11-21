@@ -103,6 +103,8 @@ pub struct CompanyMcpConnection {
     pub access_level: super::access_level::AccessLevel,
     pub id: Uuid,
     pub company_id: Uuid,
+    /// The owning unit (Plan07); `None` only once the connection is deleted.
+    pub unit_id: Option<Uuid>,
     pub slug: crate::entities::value_objects::McpConnectionSlug,
     pub endpoint: McpEndpoint,
     pub enabled: bool,

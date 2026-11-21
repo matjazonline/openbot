@@ -1,0 +1,20 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7m 12s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 5 tests
+test adapters::persistence::department::tests::delegated_administration::manages_unit_reaches_the_eighth_level_and_rejects_a_ninth ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_persistence_refuses_every_sibling_write ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_agent_placements_use_any_managed_unit_and_no_unit_uses_root ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_parent_member_and_role_boundaries ... ok
+test adapters::persistence::department::tests::delegated_administration::manages_unit_current_person_hierarchy_and_tenant_matrix ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4749 filtered out; finished in 1.28s
+

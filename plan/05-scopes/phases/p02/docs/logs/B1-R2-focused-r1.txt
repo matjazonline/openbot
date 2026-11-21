@@ -1,0 +1,317 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 37s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 277 tests
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ignored, exports native authoring responses for the browser gate
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts ... ok
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_routes_mount_in_the_authenticated_application_router ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_malformed_skill_csv_keeps_input_and_does_not_clear_assignments ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_preview_publish_replay_and_deactivation_omit_canonical_payloads ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_connection_pages_are_scoped_bounded_and_complete ... ok
+test adapters::memory_service::tests::memory_scope_foreign_managed_tenant_is_conflict_on_create_and_not_found_on_delete ... ok
+test adapters::memory_service::tests::subject::memory_scope_subject_admin_never_treats_foreign_management_as_an_empty_page ... ok
+test adapters::persistence::agent_authoring::catalog::memory_tests::memory_scope_catalog_offers_memory_tools_only_while_enabled ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes ... ok
+test adapters::memory_service::tests::subject::memory_scope_subject_admin_uses_exact_provenance_and_reports_ambiguous_deletion ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are_not_discovery ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_without_workflow_freezes_remote_name_policy_and_alias ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_request_result_is_immutable_and_company_owned ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_result_cannot_reference_another_agent_or_company ... ok
+test adapters::http::routes::workflows::tests::tool_tests::autonomous_agent_authoring_competing_json_draft_writes_apply_once ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_identical_keys_return_one_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_publishers_choose_one_without_partial_state ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_native_only_needs_no_hosted_connection ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_preview_and_publish_without_a_workflow ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_preserves_unsaved_source_and_selected_agent_outside_page ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_native_permissions_round_trip_freeze_and_library_copy ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_replay_returns_original_after_newer_activation ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_validation_failure_preserves_active_and_history ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_revoke_deactivate_and_delete_preserve_frozen_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_holds_draft_and_shared_text_until_commit ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_refuses_foreign_actor_agent_workflow_and_non_model_step ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_uses_current_hint_and_keeps_model_only_steps_tool_free ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_draft_edit_first_refuses_stale_expected_state ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::memory_tests::memory_scope_company_settings_form_is_owner_admin_only_and_revision_checked ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::registration_authority_tests::autonomous_agent_authoring_workflow_registration_revocation_refuses_admission_without_republishing_workflow ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::autonomous_agent_authoring_usage_refuses_members_and_foreign_agents ... ok
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_filters_company_model_and_ceiling_before_both_ranks ... ok
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_english_text ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_company_delete_creates_then_deletes_and_only_a_200_completes ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_competing_claimants_get_distinct_rows ... ok
+test adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_completion_racing_company_delete_is_lost ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_deleted_tenant_conflict_mints_no_new_namespaces ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_deletion_survives_an_outage ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_disable_and_enable_follow_the_desired_state ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_failed_provisioning_is_redriven_not_permanent ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_fences_stolen_and_superseded_claims ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_foreign_managed_tenant_never_completes_deletion ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_mismatch_refuses_tenant_and_namespace_deletion ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_refuses_a_changed_provisioner_credential_id ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_revokes_strays_and_removes_an_absent_namespace ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_superseded_generation_starts_a_fresh_attempt_budget ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_turns_present_into_absent_when_the_owner_is_gone ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_existing_principal_upsert_and_delete_compete_in_both_orders ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_principal_creation_and_rollback_are_atomic ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_units_create_reparent_membership_retire_and_recreate ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_shape_delivery_retains_target_and_subject_provenance ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_owners ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_subject_namespace_pages_include_retiring_units_and_exclude_principals ... ok
+test adapters::persistence::memory::tests::memory_scope_account_deletion_retires_owned_tenants_and_member_namespaces ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_both_orders ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_disable_enable_and_provisioning_serialize ... ok
+test adapters::persistence::workflow::agent_manifest::tests::autonomous_agent_admission_capacity_refuses_before_lookup_or_retaining_an_extra_member ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_member_removal_and_provisioning_serialize_in_both_orders ... ok
+test adapters::persistence::memory::tests::memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identities ... ok
+test adapters::persistence::workflow::sample_capture::bounds::autonomous_agent_samples_workflow_payload_limit_covers_adapter_cache_and_sealed_input ... ok
+test adapters::persistence::memory::tests::memory_scope_lazy_redrive_skips_definite_failures_and_replaces_a_conflict ... ok
+test adapters::persistence::memory::tests::memory_scope_lifecycle_lease_checks_refuse_incoherent_rows ... ok
+test adapters::persistence::memory::tests::memory_scope_lifecycle_resurrection_is_refused ... ok
+test adapters::persistence::memory::tests::memory_scope_owner_or_admin_opt_in_with_revision_and_disable_epoch ... ok
+test adapters::persistence::memory::tests::memory_scope_owner_removal_retires_namespaces_and_upserts_absent_lifecycles ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_account_deletion_and_company_delete_never_deadlock ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_agent_delete_and_company_delete_never_deadlock ... ok
+test adapters::persistence::memory::tests::memory_scope_returning_member_gets_a_new_namespace_id ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_company_delete_and_enable_serialize_in_both_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::authority_order::autonomous_agent_authority_checkpoint_model_reservation_serializes_with_preview ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::authority_order::autonomous_agent_authority_checkpoint_saved_call_serializes_with_preview ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::autonomous_provisioning::autonomous_agent_provisioning_failed_final_command_rolls_back_initial_revision_then_competing_retries_publish_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::memory_scope_admission_step_own_uses_the_captured_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_active_own_binding_refuses_zero_or_ambiguous_placement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_ancestor_read_never_authorizes_a_root_save_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_company_wide_own_binding_refuses_activation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_competing_append_and_seal_share_the_run_mutex ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_freezes_per_actor_reports_and_retained_labels ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_same_agent_on_two_desks_keeps_their_local_units_separate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_seal_refuses_updates_deletes_late_rows_and_missing_or_foreign_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_fresh_seal_rejects_missing_root_and_unpaired_local_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_valid_looking_rows_cannot_commit_without_the_deferred_seal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::subject_visibility::memory_scope_tools_subject_visibility_accepts_current_thread_externals_and_refuses_other_threads ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_competing_writers_cannot_retarget_a_binding_identity ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_draft_round_trip_order_and_live_grants_are_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_activation_locks_before_competing_revocation ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_retained_reactivation_serializes_revocation ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_revocation_locks_before_competing_activation ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_tests::autonomous_agent_storage_public_mcp_grant_edits_retain_identity_and_require_fresh_review ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_fresh_seal_rejects_foreign_and_ineligible_live_owners ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::races::memory_scope_admission_competing_topology_change_captures_coherent_scopes_in_both_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_authority_reader_serializes_before_source_delete ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_serializes_before_authority_reader ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_workflow_pin_survives_repin_and_revocation_is_permanent ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::view_tests::autonomous_agent_views_bound_agent_and_workflow_dependencies_with_explicit_truncation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_competing_duplicates_and_publication_share_one_complete_selection ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_revisions_are_selected_at_admission_and_replay_before_activation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent_identity ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_workflow_reference_rename_cannot_redirect_an_existing_workflow ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_agent_workflow_reference_checks_eligibility_while_admission_checks_readiness ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_agent_workflow_reference_competing_draft_edit_preserves_reference ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_agent_workflow_reference_step_http_slot_does_not_change_agent_binding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_cycle_refuses_atomically_but_model_only_is_a_leaf ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_combined_depth_is_bounded_across_agent_workflow_edges ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::autonomous_agent_admission_descendant_keeps_the_parent_selection_after_new_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_scope_a_manual_roots_child_inherits_the_user_scope ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_node_limit_covers_the_complete_dynamic_universe ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::scope_snapshots::memory_scope_admission_child_seal_rejects_a_corrupted_copy_and_rolls_back_before_retry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_views_child_call_and_dependency_versions_use_root_manifest ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_children_first_tool_child_keeps_root_selected_agent_and_workflow_after_publication_and_repin ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_accepts_a_real_desk_context ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_refuses_before_root_effects ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_aggregate_draft_bytes_are_bounded_without_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_message_steps_keep_metadata_and_generic_message_tools_stay_forbidden ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_combined_capture_depth_accepts_32_and_refuses_34 ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_install_failure_rolls_back_portable_skills_and_principal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257 ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_missing_local_tool_refuses_the_copy ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::scope_snapshots::memory_scope_admission_real_child_keeps_historical_report_ids_and_labels_after_rename_or_delete ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_requires_explicit_company_local_binding_before_publish ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::e2e::autonomous_agent_e2e_approval_reconstruction_after_publication_keeps_saved_call_and_skill ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_busy_model_is_retryable_without_saving_an_empty_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_competing_observers_keep_one_canonical_result_and_its_exact_stamp ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_empty_corpus_saves_empty_observation_without_classification_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_failure_after_result_and_rise_rolls_back_the_entire_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_forged_fences_and_changed_arguments_fail_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_generic_checkpoint_result_cannot_bypass_classification ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_level_argument_is_a_saved_tool_error_without_embedding_or_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_model_token_limit_is_a_saved_tool_error_without_empty_success_or_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_observation_above_actual_immutable_ceiling_cannot_commit ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_driver_persists_observation_and_classification_before_continuing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_low_ceiling_never_observes_private_exact_content_or_raises ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_replay_uses_the_canonical_result_without_embedding_again ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_authoring_catalog_lists_memory_tools_only_while_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_agent_memory_tools_refuse_once_memory_is_disabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_memory_tools_publish_only_while_memory_is_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_automatic_freeze_bounds_consumption_across_ready_namespaces ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_automatic_freeze_refuses_a_foreign_namespace_even_for_an_empty_pack ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_empty_read_retains_namespace_authority_and_refusal_cannot_replay_revoked_data ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_preparation_freezes_host_scopes_before_provider_calls ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_subject_is_frozen_with_the_producer_and_never_selects_the_target_namespace ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_explicit_unit_save_without_a_local_unit_creates_no_intent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_native_scope_selection_binding_and_content ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_populated_collector_and_company_cascade ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_binding_revocation_preserves_unknown_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_samples_mcp_without_slots_never_opens_the_server ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_dispatch_mcp_without_workflow_slot_and_replay ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_draft_skill_detach_keeps_selection_until_exact_revocation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_model_removal_after_admission_refuses_before_all_peers ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_invalid_required_alias_draft_cannot_replace_active_capabilities ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::races::autonomous_agent_e2e_competing_publication_admission_and_lost_commit_replies ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_binding_revocation_during_discovery_has_no_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_credential_rotation_before_open_keeps_binding_and_replay ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_recovery_mcp_cancellation_closes_session_and_preserves_one_possible_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::revisions::autonomous_agent_e2e_mixed_tools_skills_two_workflows_and_queued_revisions ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::e2e::autonomous_agent_e2e_retargeted_alias_cannot_redirect_saved_call_and_dispatch_races_once ... ok
+test adapters::persistence::workflow::tests::message_tests::autonomous_agent_publication_workflow_tests::autonomous_agent_publication_workflow_pin_is_exact_at_publish_and_retained_after_repin ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::autonomous_agent_dispatch_same_alias_keeps_two_connections_origins_and_receipts_isolated ... ok
+test application::agent::contract_tests::autonomous_agent_contract_alias_and_identity_uniqueness_is_agent_local ... ok
+test application::agent::contract_tests::autonomous_agent_contract_binding_count_and_parameter_bytes_fail_before_execution ... ok
+test application::agent::contract_tests::autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts ... ok
+test application::agent::contract_tests::autonomous_agent_contract_decoded_hash_preserves_canonical_proof_and_schema_validation ... ok
+test application::agent::contract_tests::autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets ... ok
+test application::agent::contract_tests::autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content ... ok
+test application::agent::contract_tests::autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority ... ok
+test application::agent::contract_tests::autonomous_agent_contract_skills_require_local_aliases_without_granting_tools ... ok
+test application::agent::contract_tests::autonomous_agent_contract_target_variants_and_remote_aliases_round_trip ... ok
+test application::agent::resolution_tests::autonomous_agent_native_definition_needs_no_hosted_model_connection ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_alias_collision_and_reserved_spoofing_are_refused ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_needs_no_workflow_slot_channel_or_run ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_requires_exact_binding_identity_source_and_order ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_preserve_order_and_reject_substituted_assignments ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_refuse_foreign_tenant_facts_and_missing_requirements ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_require_explicit_aliases_without_adding_tools ... ok
+test application::knowledge::search::query::tests::knowledge_search_exact_terms_extract_codes_unicode_digits_and_deduplicate ... ok
+test application::knowledge::search::query::tests::knowledge_search_input_rejects_levels_unknown_fields_and_invalid_bounds ... ok
+test application::knowledge::search::query::tests::knowledge_search_limit_is_bounded_and_defaults_to_five ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_discarded_high_passage_does_not_raise_classification ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_exact_hits_survive_below_the_meaning_threshold ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_invalid_vectors_fail_without_fabricating_an_empty_result ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_bound_counts_escaped_json_and_preserves_utf8 ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_omits_levels_ids_and_filename_prefixes ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_rrf_promotes_the_exact_code_when_meaning_is_tied ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_threshold_drops_weak_matches_and_does_not_raise_empty_results ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_top_k_and_score_ties_are_deterministic ... ok
+test application::knowledge::service::tests::queries::knowledge_search_cancellation_retains_the_actual_shared_native_slot ... ok
+test application::knowledge::service::tests::queries::knowledge_search_query_boundary_rejects_oversized_input_and_invalid_model_outputs ... ok
+test application::knowledge::service::tests::queries::knowledge_search_registration_competes_with_shutdown_without_late_consumption ... ok
+test application::knowledge::service::tests::queries::knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop ... ok
+test application::knowledge::service::tests::queries::knowledge_search_timeout_is_an_error_and_retains_the_slot_until_native_completion ... ok
+test application::workflow::actions::tests::autonomous_agent_dispatch_origin_is_part_of_effect_identity_and_has_no_default ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_description_requires_exact_terms_citations_and_dont_have_that ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_schema_rejects_level_extra_fields_and_exact_term_bounds ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets ... ok
+test application::workflow::memory_tools::builtin::tests::memory_scope_builtin_snapshots_are_reserved_and_exactly_trusted ... ok
+test application::workflow::memory_tools::builtin::tests::memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds ... ok
+test application::workflow::memory_tools::builtin::tests::memory_scope_user_scope_eligibility_matrix ... ok
+test application::workflow::memory_tools::runtime::tests::memory_scope_tool_arguments_parse_strictly_with_documented_defaults ... ok
+test application::workflow::memory_tools::runtime::tests::memory_scope_tools_query_proofs_bind_empty_results_and_exact_namespace_references ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::memory_scope_tools_host_context_is_frozen_and_counts_before_history ... ok
+test application::workflow::publication::tests::autonomous_agent_workflow_reference_does_not_resolve_agent_tools_from_step_slots ... ok
+test application::workflow::publication::tests::autonomous_agent_workflow_reference_hashes_identity_and_step_tools_without_behavior ... ok
+test application::workflow::publication::tests::autonomous_agent_workflow_reference_rejects_embedded_behavior_and_wrong_use_mode ... ok
+test application::workflow::publication::tests::capabilities_tests::autonomous_agent_definition_skill_requirements_are_agent_local ... ok
+test application::workflow::publication::tests::diagnostic_tests::autonomous_agent_workflow_reference_unknown_key_identifies_the_field ... ok
+test application::workflow::registry::runtime_tests::memory_scope_step_scope_must_be_a_literal ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_child_binding_requires_explicit_simulated_approval ... ok
+test application::workflow::sample::tests::tools_tests::approvals::autonomous_agent_samples_protected_http_binding_requires_explicit_simulated_approval ... ok
+test infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_manual_queues_exact_selection_and_replays_after_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_messages_select_at_materialization_and_duplicate_processing_keeps_one_run ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_schedule_post_commit_crash_keeps_recorded_revision_and_next_occurrence_selects_new ... ok
+test adapters::persistence::workflow::tests::message_tests::memory_scope_a_manual_run_in_a_channel_has_no_user_scope ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::closure::autonomous_agent_admission_checks_resources_of_agent_owned_child_workflows ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_admission_rejects_a_newly_published_self_workflow_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_keeps_the_child_contract_in_the_agent_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_step_http_alias_cannot_redirect_agent_child ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::e2e::autonomous_agent_e2e_saved_calls_recheck_connection_grant_review_and_peer_schema ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::autonomous_agent_authority_workflow_repoint_requires_new_binding_publication ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_fresh_seal_rejects_foreign_and_ineligible_live_owners stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_fresh_seal_rejects_foreign_and_ineligible_live_owners' (30832738) panicked at src/adapters/persistence/workflow/run_scope_seal_tests.rs:30:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target' (30836286) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:385:10:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references' (30836385) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:385:10:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_fresh_seal_rejects_foreign_and_ineligible_live_owners
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references
+
+test result: FAILED. 273 passed; 3 failed; 1 ignored; 0 measured; 4517 filtered out; finished in 95.81s
+
+error: test failed, to rerun pass `--lib`

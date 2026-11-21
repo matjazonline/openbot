@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "round": "07UR-P01-B3-R1",
+  "artifact": "c7bc9c125cb993f6cd9a3f74d577b7793a52a00961d9a1c7966471b9e0f61892",
+  "checks": [
+    {
+      "criteria": [
+        "decision f",
+        "B2-F9"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_resource",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b2r2 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-unit-resource.txt",
+          "sha256": "7294ea54f5459cfd030df15e076cff53be8fdf28ca78f8fb1b45715fcc1cd1d5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "connection use authority callers (inspect, reconciliation, http_for_action, mcp_use), removed-member refusal, vault"
+      ],
+      "command": "cargo test --locked --offline --lib -- http_tests mcp vault action_ binding reconcil ui_workflow authoring",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b2r2 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-focused.txt",
+          "sha256": "b3fb4824b96699d1614b7624cb02e825c2d33a52fb1cc7a57be483fdcbb47c98"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-clippy.txt",
+          "sha256": "4043e070dd0c9068b92acab8799ed5f0f07fefb95faedbf762c8ba2c86f5516c"
+        }
+      ]
+    }
+  ]
+}

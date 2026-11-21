@@ -1,0 +1,74 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 24s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 59 tests
+test adapters::http::routes::schedule::tests::ui_schedule_form_parses_interval_correctly ... ok
+test adapters::http::routes::schedule::tests::ui_schedule_form_parses_one_off_and_requires_a_binding ... ok
+test adapters::http::routes::ui_schedules::tests::schedule_runs_column_renders_occurrences_with_their_runs ... ok
+test adapters::http::routes::schedule::schedule_channel_tests::schedule_json_body_cannot_request_a_channel_reassignment ... ok
+test adapters::http::routes::ui_schedules::tests::schedule_editor_keeps_channel_fixed_and_creation_keeps_selector ... ok
+test adapters::http::routes::ui_schedules::tests::the_schedule_form_picks_a_binding_and_nothing_it_replaced ... ok
+test adapters::http::routes::schedule::tests::schedule_request_deserializes_json_and_refuses_removed_fields ... ok
+test adapters::http::routes::ui_schedules::tests::create_schedule_form_deserializes_one_off_submission ... ok
+test adapters::http::routes::ui_schedules::tests::create_schedule_form_deserializes_browser_submission ... ok
+test adapters::http::routes::ui_schedules::tests::schedule_pages_only_target_routed_paths ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::boundaries::delegated_admin_unit_lead_cannot_inspect_root_owned_resources ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_persistence_refuses_every_sibling_write ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_department_parent_member_and_role_boundaries ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::knowledge_run_level_schedule_uses_configured_run_as_ceiling ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_agent_lead_transitions_configure_without_conversation_access ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_checks_occurrence_owner_and_association ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::boundaries::delegated_admin_direct_nested_writers_hide_siblings_and_foreign_targets ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::delegated_schedule::delegated_admin_schedule_claim_requires_human_view_before_both_admission_boundaries ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping ... ok
+test adapters::persistence::department::tests::delegated_administration::flows::delegated_admin_competing_lead_removal_precedes_a_locked_management_write ... ok
+test adapters::http::routes::schedule::schedule_channel_tests::schedule_api_creation_selects_channel_and_update_cannot_reassign_it ... ok
+test adapters::http::routes::schedule::schedule_channel_tests::nested_schedule_routes_refuse_another_channels_or_companys_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_control_head_restores_real_message_and_schedule_causality ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_lifecycle_tests::workflow_action_reconciliation_episode_lifecycle_later_schedule_is_distinct ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_schedule_post_commit_crash_keeps_recorded_revision_and_next_occurrence_selects_new ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::history::agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_schedule_refusal_keeps_typed_step_role_and_does_not_retry ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination ... ok
+test adapters::persistence::workflow::tests::schedule_tests::a_captured_one_off_schedule_is_disabled ... ok
+test adapters::persistence::workflow::tests::schedule_tests::a_lapsed_but_unreclaimed_claim_still_records_its_outcome ... ok
+test adapters::persistence::workflow::tests::schedule_tests::an_expired_occurrence_is_reported_when_its_schedule_cannot_name_it ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_department_reply_uses_the_lead_run_as_without_human_view ... ok
+test adapters::persistence::workflow::tests::schedule_tests::channel_path_fk_schedule_binding_names_the_schedule_channel ... ok
+test adapters::persistence::workflow::tests::schedule_tests::binding_reconfiguration_is_refused_by_an_incompatible_schedule ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_current_model_source ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_agent_grant_removal_fences_initial_preparation ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_revocation_blocks_new_replay_and_alias ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_competing_current_model_authority_fences_grant_removal ... ok
+test adapters::persistence::workflow::tests::schedule_tests::claiming_anchors_the_next_run_on_the_slot_not_the_clock ... ok
+test adapters::persistence::workflow::tests::schedule_tests::manual_start_returns_its_run_replays_its_key_and_links_a_rerun ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::delegated_administration::delegated_admin_native_reply_missing_agent_grant_never_enters_the_provider ... ok
+test adapters::persistence::workflow::tests::schedule_tests::retargeting_a_schedule_after_capture_keeps_the_captured_binding ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_binding_must_fit_the_schedule_channel ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_capture_serializes_with_a_rejected_channel_move ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_claim_page_of_n_occurrences_returns_n ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_claim_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test application::workflow::triggers::tests::schedule_trigger_input_renders_utc_seconds ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_edit_keeps_its_next_run_and_pause_unless_the_cadence_changes ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_management_requires_an_owner_or_admin_who_sees_the_channel ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::delegated_model_authority::revocation::delegated_admin_model_source_never_borrows_owned_reply_proof_for_other_runs ... ok
+test adapters::persistence::workflow::tests::schedule_tests::channel_path_fk_schedules_of_both_binding_kinds_leave_with_channel_and_company ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_occurrence_admitted_before_a_crash_replays_its_run ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_occurrence_schema_keeps_scope_identity_and_run ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_outcome_writes_are_fenced_by_the_claim ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_refusal_fails_the_occurrence_and_names_it_on_the_schedule ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_run_now_replays_its_command_key ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_slot_is_admitted_once_under_competing_materializers ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_terminal_failures_and_lost_claims_are_observable ... ok
+
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 4706 filtered out; finished in 28.61s
+

@@ -21,6 +21,9 @@ pub struct Skill {
     /// `None` identifies an operator-managed definition in the global skill library.
     #[serde(default)]
     pub company_id: Option<Uuid>,
+    /// The unit that owns a company skill (Plan07); `None` exactly for library skills.
+    #[serde(default)]
+    pub unit_id: Option<Uuid>,
     pub slug: SkillSlug,
     pub name: String,
     /// The subtitle a picker shows.
@@ -37,6 +40,8 @@ pub struct Skill {
 pub struct SkillSummary {
     pub id: Uuid,
     pub company_id: Option<Uuid>,
+    #[serde(default)]
+    pub unit_id: Option<Uuid>,
     pub slug: SkillSlug,
     pub name: String,
     pub description: String,
@@ -64,6 +69,7 @@ impl From<&Skill> for SkillSummary {
         Self {
             id: skill.id,
             company_id: skill.company_id,
+            unit_id: skill.unit_id,
             slug: skill.slug.clone(),
             name: skill.name.clone(),
             description: skill.description.clone(),
@@ -130,6 +136,7 @@ mod tests {
 
     fn skill(instructions: &str) -> Skill {
         Skill {
+            unit_id: None,
             files: Vec::new(),
             id: Uuid::new_v4(),
             company_id: Some(Uuid::new_v4()),

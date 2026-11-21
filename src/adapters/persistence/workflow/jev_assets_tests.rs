@@ -5,7 +5,6 @@ use crate::adapters::{
     storage::{BucketKind, FileStorage, test_support::FakeStorage},
     workflow_jev::{JevAssetReader, tests::server},
 };
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::jev::assets::tests as images;
 use crate::application::workflow::jev::*;
@@ -25,7 +24,7 @@ pub(super) struct Attachment {
 pub(super) async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {
     let p = &f.persistence;
     let company = f.target.company.as_uuid();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         company,
         ChannelWrite {
@@ -228,18 +227,15 @@ async fn jev_assets_current_actor_channel_visibility_and_missing_file() {
         crate::entities::company_member::CompanyAccessRole::Admin,
     )
     .await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
-        .bind(f.target.company.as_uuid())
-        .bind(
-            attachment.reference["channel_id"]
-                .as_str()
-                .unwrap()
-                .parse::<Uuid>()
-                .unwrap(),
-        )
-        .execute(f.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        f.persistence.pool(),
+        attachment.reference["channel_id"]
+            .as_str()
+            .unwrap()
+            .parse::<Uuid>()
+            .unwrap(),
+    )
+    .await;
     assert!(matches!(
         reader.read(&claim).await,
         Err(JevAssetError::Unauthorized)

@@ -5,6 +5,9 @@ use crate::entities::mcp::{McpAuth, McpDiscoveredTool};
 use serde_json::json;
 use std::sync::Mutex;
 
+#[path = "delegated_binding_management_tests.rs"]
+mod delegated;
+
 #[derive(Clone)]
 struct Capture {
     persistence: PostgresPersistence,
@@ -144,7 +147,14 @@ impl BindingFixture {
         let connection = self
             .fixture
             .persistence
-            .create_mcp_connection(self.target.company.as_uuid(), mcp_write(slot))
+            .create_mcp_connection(
+                self.target.company.as_uuid(),
+                self.fixture
+                    .persistence
+                    .test_root_unit(self.target.company.as_uuid())
+                    .await,
+                mcp_write(slot),
+            )
             .await
             .unwrap();
         self.resources.insert(
@@ -378,9 +388,15 @@ async fn workflow_binding_sql_mcp_revocation_readiness_and_contract_scope() {
     assert!(status.supported_contracts.is_empty());
     let mut write = mcp_write("service");
     write.auth = McpAuth::Bearer;
-    p.update_mcp_connection(f.target.company.as_uuid(), id, 1, write)
-        .await
-        .unwrap();
+    p.update_mcp_connection(
+        f.target.company.as_uuid(),
+        p.test_root_unit(f.target.company.as_uuid()).await,
+        id,
+        1,
+        write,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         p.inspect(f.target.company, f.target.actor, RuntimeResourceId::new(id))
             .await
@@ -445,7 +461,11 @@ async fn workflow_binding_sql_changed_configuration_roundtrips_without_mutating_
     let mut write = mcp_write("service");
     write.slug = "replacement".into();
     let replacement = p
-        .create_mcp_connection(f.target.company.as_uuid(), write)
+        .create_mcp_connection(
+            f.target.company.as_uuid(),
+            p.test_root_unit(f.target.company.as_uuid()).await,
+            write,
+        )
         .await
         .unwrap();
     let mut request = f.request(Some(active.revision));
@@ -490,4 +510,157 @@ async fn workflow_binding_sql_changed_configuration_roundtrips_without_mutating_
         active.configuration.resources()[&ResourceName::parse("service").unwrap()].as_uuid(),
         old_resource
     );
+}
+
+/// Plan07 01B.4: a move names active bindings whose current configuration maps a slot to the
+/// connection, not those that mapped it in an earlier configuration.
+#[tokio::test]
+async fn unit_resource_move_lists_active_bindings_of_the_current_configuration() {
+    let mut f = BindingFixture::new(json!([{"slot":"service","kind":"mcp"}])).await;
+    let old_resource = f.mcp().await;
+    let configured = f.service().configure(f.request(None)).await.unwrap();
+    let active = f
+        .service()
+        .activate(SetBindingActivity {
+            target: f.target,
+            expected: configured.revision,
+        })
+        .await
+        .unwrap();
+    let p = &f.fixture.persistence;
+    let company = f.target.company.as_uuid();
+    let owner = f.target.actor.user_id();
+    let billing = p.test_unit(company, "billing").await;
+    let moved = p
+        .move_mcp_connection(owner, company, old_resource, billing)
+        .await
+        .unwrap();
+    assert_eq!(
+        moved
+            .uses
+            .iter()
+            .map(|used| (used.kind, used.id))
+            .collect::<Vec<_>>(),
+        vec![(
+            crate::application::ports::unit_resources::ResourceUseKind::Binding,
+            f.target.binding.as_uuid()
+        )]
+    );
+    // Reconfigured onto another connection, the binding no longer uses the old one.
+    let mut write = mcp_write("service");
+    write.slug = "replacement".into();
+    let replacement = p
+        .create_mcp_connection(company, p.test_root_unit(company).await, write)
+        .await
+        .unwrap();
+    let mut request = f.request(Some(active.revision));
+    request.resources.insert(
+        ResourceName::parse("service").unwrap(),
+        RuntimeResourceId::new(replacement.id),
+    );
+    f.service().configure(request).await.unwrap();
+    let root = p.test_root_unit(company).await;
+    let moved = p
+        .move_mcp_connection(owner, company, old_resource, root)
+        .await
+        .unwrap();
+    assert!(moved.uses.is_empty() && moved.more_uses == 0, "{moved:?}");
+    let moved = p
+        .move_mcp_connection(owner, company, replacement.id, billing)
+        .await
+        .unwrap();
+    assert_eq!(moved.uses.len(), 1);
+}
+
+fn unit_refusal(error: &AppError, code: &str, resource: Uuid) -> bool {
+    matches!(error, AppError::ResourceOutsideUnit(refusal)
+        if refusal.code() == code && refusal.resource == resource)
+}
+
+/// Plan07 D8/D9a: a company-wide binding reaches only the root's connections, so a slot mapped to
+/// a connection moved into a department is refused at save and at admission, with nothing written.
+#[tokio::test]
+async fn unit_resource_selection_binding_and_admission_refuse_a_slot_connection_out_of_reach() {
+    let mut f = BindingFixture::new(json!([{"slot":"service","kind":"mcp"}])).await;
+    let connection = f.mcp().await;
+    let p = f.fixture.persistence.clone();
+    let company = f.target.company.as_uuid();
+    let owner = f.target.actor.user_id();
+    let root = p.test_root_unit(company).await;
+    let billing = p.test_unit(company, "billing").await;
+    p.move_mcp_connection(owner, company, connection, billing)
+        .await
+        .unwrap();
+    let refused = f.service().configure(f.request(None)).await;
+    assert!(
+        refused
+            .as_ref()
+            .err()
+            .is_some_and(|error| matches!(error, LifecycleError::Application(error)
+                if unit_refusal(error, "binding.resource_outside_unit", connection))),
+        "{:?}",
+        refused.err()
+    );
+    let revisions: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM workflow_binding_revisions WHERE company_id=$1 AND binding_id=$2",
+    )
+    .bind(company)
+    .bind(f.target.binding.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(revisions, 0, "a refused save writes no configuration");
+    // Moved up to the root, the same binding saves and activates.
+    p.move_mcp_connection(owner, company, connection, root)
+        .await
+        .unwrap();
+    let configured = f.service().configure(f.request(None)).await.unwrap();
+    f.service()
+        .activate(SetBindingActivity {
+            target: f.target,
+            expected: configured.revision,
+        })
+        .await
+        .unwrap();
+    // Moved out again, admission refuses before any run exists.
+    p.move_mcp_connection(owner, company, connection, billing)
+        .await
+        .unwrap();
+    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
+    let request = AdmitWorkflowRequest {
+        history_session: None,
+        company_id: f.target.company,
+        actor: f.target.actor,
+        association: RelatedAssociation::Company,
+        trigger: TriggerRef::new(
+            f.target.company,
+            TriggerId::new(Uuid::new_v4()),
+            TriggerSource::Manual,
+        )
+        .unwrap(),
+        correlation_id: crate::domain::entities::correlation::CorrelationId::new(),
+        binding_id: f.target.binding,
+        idempotency_key: IdempotencyKey::parse("unit-out-of-reach").unwrap(),
+        input: json!({}),
+        rerun_of: None,
+        delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+        expected_binding_revision: None,
+        admission_claim: None,
+    };
+    let refused = service.admit(request).await;
+    assert!(
+        refused.as_ref().err().is_some_and(|error| unit_refusal(
+            error,
+            "admission.resource_outside_unit",
+            connection
+        )),
+        "{:?}",
+        refused.err()
+    );
+    let runs: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
+        .bind(company)
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    assert_eq!(runs, 0);
 }

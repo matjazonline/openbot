@@ -1,0 +1,215 @@
+start 2026-11-21T18:20:46Z HEAD b154b3cc5bed59ed39894e12d236c4878f601bf9; tools: ripgrep 15.0.0 (rev 3a612f88b8); Python 3.13.18; node v24.21.0
+NOTICE:  database "openbot_p07_final_doop" does not exist, skipping
+NOTICE:  database "openbot_p07_final_doop_test" does not exist, skipping
+Applied 20260817000000/migrate init schema (547.2455ms)
+Applied 20260817000000/migrate init schema (577.608ms)
+
+==> Managed Doop service and private integration
+Google Chrome 157.0.8103.79 
+Installing pinned Doop test dependencies; this first step needs network access.
+
+added 2 packages in 4s
+bun install v1.3.10 (30e609e0)
+
++ @commitlint/cli@21.2.2
++ @commitlint/config-conventional@21.2.2
++ @storybook/addon-a11y@10.6.3
++ @storybook/addon-docs@10.6.3
++ @storybook/react-vite@10.6.3
++ @tailwindcss/vite@4.3.3
++ @types/express@4.17.25
++ @types/node@20.19.43
++ @types/nodemailer@8.0.1
++ @types/pg@8.23.1
++ @types/react@18.3.31
++ @types/react-dom@18.3.7
++ @types/ws@8.18.1
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @vitejs/plugin-react@6.1.2
++ concurrently@8.2.2
++ drizzle-kit@0.31.10
++ esbuild@0.28.2
++ eslint@10.9.1
++ happy-dom@20.14.5
++ husky@9.1.7
++ lint-staged@17.4.1
++ mcp-remote@0.15.1
++ oxlint@1.87.0
++ oxlint-tsgolint@7.0.2003
++ prettier@3.9.6
++ shadcn@4.19.0
++ storybook@10.6.3
++ tailwindcss@4.3.3
++ tw-animate-css@1.4.0
++ typescript@5.9.3
++ typescript-eslint@8.68.0
++ vite@8.3.4
++ vitest@5.0.3
++ @anthropic-ai/sdk@0.115.0
++ @aws-sdk/client-s3@3.1120.0
++ @electric-sql/pglite@0.5.8
++ @modelcontextprotocol/sdk@1.30.0
++ @radix-ui/react-alert-dialog@1.1.23
++ @radix-ui/react-collapsible@1.1.20
++ @radix-ui/react-context-menu@2.3.7
++ @radix-ui/react-dialog@1.1.23
++ @radix-ui/react-dropdown-menu@2.1.24
++ @radix-ui/react-popover@1.3.1
++ @radix-ui/react-progress@1.1.16
++ @radix-ui/react-select@2.3.7
++ @radix-ui/react-slot@1.3.3
++ @radix-ui/react-switch@1.3.7
++ @radix-ui/react-tabs@1.1.21
++ @radix-ui/react-toggle-group@1.1.19
++ @radix-ui/react-tooltip@1.2.16
++ better-auth@1.6.26
++ class-variance-authority@0.7.1
++ clsx@2.1.1
++ drizzle-orm@0.45.2
++ envalid@8.2.0
++ express@4.22.2
++ jose@6.2.10
++ jszip@3.10.2
++ lucide-react@1.59.0
++ mupdf@1.28.1
++ nanoid@5.1.16
++ nodemailer@9.0.6
++ parse5@8.0.1
++ pdf-lib@1.17.1
++ pg@8.23.0
++ posthog-js@1.422.1
++ puppeteer-core@25.9.0
++ react@18.3.1
++ react-dom@18.3.1
++ sharp@0.34.3
++ stripe@21.0.1
++ tailwind-merge@3.6.0
++ tsx@4.23.12
++ undici@8.10.2
++ ws@8.21.3
++ zod@3.25.76
++ zustand@4.5.7
+
+841 packages installed [893.00ms]
+Ready: /private/tmp/openbot-check.2XlECZ/doop/source
+bun install v1.3.10 (30e609e0)
+
++ @commitlint/cli@21.2.2
++ @commitlint/config-conventional@21.2.2
++ @storybook/addon-a11y@10.6.3
++ @storybook/addon-docs@10.6.3
++ @storybook/react-vite@10.6.3
++ @tailwindcss/vite@4.3.3
++ @types/css-tree@3.2.0
++ @types/express@4.17.25
++ @types/node@20.19.43
++ @types/nodemailer@8.0.1
++ @types/pg@8.23.1
++ @types/react@18.3.31
++ @types/react-dom@18.3.7
++ @types/ws@8.18.1
++ @typescript/native-preview@7.0.0-dev.20260707.2
++ @vitejs/plugin-react@6.1.2
++ concurrently@8.2.2
++ drizzle-kit@0.31.10
++ esbuild@0.28.2
++ eslint@10.9.1
++ happy-dom@20.14.5
++ husky@9.1.7
++ lint-staged@17.4.1
++ mcp-remote@0.15.1
++ oxlint@1.87.0
++ oxlint-tsgolint@7.0.2003
++ prettier@3.9.6
++ shadcn@4.19.0
++ storybook@10.6.3
++ tailwindcss@4.3.3
++ tw-animate-css@1.4.0
++ typescript@5.9.3
++ typescript-eslint@8.68.0
++ vite@8.3.4
++ vitest@5.0.3
++ @anthropic-ai/sdk@0.115.0
++ @aws-sdk/client-s3@3.1120.0
++ @electric-sql/pglite@0.5.8
++ @modelcontextprotocol/sdk@1.30.0
++ @radix-ui/react-alert-dialog@1.1.23
++ @radix-ui/react-collapsible@1.1.20
++ @radix-ui/react-context-menu@2.3.7
++ @radix-ui/react-dialog@1.1.23
++ @radix-ui/react-dropdown-menu@2.1.24
++ @radix-ui/react-popover@1.3.1
++ @radix-ui/react-progress@1.1.16
++ @radix-ui/react-select@2.3.7
++ @radix-ui/react-slot@1.3.3
++ @radix-ui/react-switch@1.3.7
++ @radix-ui/react-tabs@1.1.21
++ @radix-ui/react-toggle-group@1.1.19
++ @radix-ui/react-tooltip@1.2.16
++ better-auth@1.6.26
++ class-variance-authority@0.7.1
++ clsx@2.1.1
++ css-tree@3.1.0
++ drizzle-orm@0.45.2
++ envalid@8.2.0
++ express@4.22.2
++ jose@6.2.10
++ jszip@3.10.2
++ lucide-react@1.59.0
++ mupdf@1.28.1
++ nanoid@5.1.16
++ nodemailer@9.0.6
++ parse5@8.0.1
++ pdf-lib@1.17.1
++ pg@8.23.0
++ posthog-js@1.422.1
++ puppeteer-core@25.9.0
++ react@18.3.1
++ react-dom@18.3.1
++ sharp@0.34.3
++ srcset@5.0.2
++ stripe@21.0.1
++ tailwind-merge@3.6.0
++ tsx@4.23.12
++ undici@8.10.2
++ ws@8.21.3
++ zod@3.25.76
++ zustand@4.5.7
+
+845 packages installed [17.43s]
+Managed source ready: 351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f
+npm notice
+npm notice New major version of npm available! 11.19.0 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice
+Doop gate: /private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun install --frozen-lockfile --ignore-scripts
+Doop gate: /private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun run format:check
+Doop gate: /private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun run typecheck
+Doop gate: /private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun run lint
+Doop gate: /private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun run doc-lint
+Doop gate: /private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun run test -- --maxWorkers=2
+::error::Doop gate failed: /private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun run test -- --maxWorkers=2%0Aage.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m534:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22moffers no resize handles on #individual-rotate%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22moffers no resize handles on #ancestor-rotate%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22moffers no resize handles on #ancestor-skew%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22moffers no resize handles on #ancestor-half-turn%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22moffers no resize handles on #ancestor-3d%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m548:7[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22mremoves handles after the Rotation control rotates an element%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m558:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22mstill resizes through positive ancestor scales and a zero individual rotation%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m568:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22moffers no grips on an inline run or a locked layer%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m576:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22m⇧-click picks several elements in the frame, outlining each, and a plain click narrows back to one%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m585:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22mkeeps the shell's grips, ring and badge on a standalone element whose own shape is picked%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m621:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22mwithholds the shell's grips from a standalone element whose shape is locked%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m636:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/elementResizeBrowser.test.ts[2m > [22melement resize handles[2m > [22moutlines a layer wider than its frame in full, hovered and selected, while the frame clips its content%0A[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'deselect')[39m%0A[90m [2m❯[22m evaluate evaluate at reset (/private/tmp/openbot-check.2XlECZ/doop/source/managed-source/tests/elementResizeBrowser.test.ts:72:14), <anonymous>:[2m0:34[22m[39m%0A[90m [2m❯[22m #evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m473:13[22m[39m%0A[90m [2m❯[22m ExecutionContext.evaluate node_modules/puppeteer-core/src/cdp/ExecutionContext.ts:[2m310:12[22m[39m%0A[90m [2m❯[22m IsolatedWorld.evaluate node_modules/puppeteer-core/src/cdp/IsolatedWorld.ts:[2m206:12[22m[39m%0A[90m [2m❯[22m CdpFrame.evaluate node_modules/puppeteer-core/src/api/Frame.ts:[2m512:12[22m[39m%0A[90m [2m❯[22m CdpPage.evaluate node_modules/puppeteer-core/src/api/Page.ts:[2m2440:12[22m[39m%0A[36m [2m❯[22m reset tests/elementResizeBrowser.test.ts:[2m99:5[22m[39m%0A    [90m 97|[39m   /* every case starts from the seeded document, with the frame select…%0A    [90m 98|[39m   async function reset(html = HTML) {%0A    [90m 99|[39m     await page.evaluate(() => window.elementPanelHarness.deselect())%0A    [90m   |[39m     [31m^[39m%0A    [90m100|[39m     await page.waitForFunction(() => !document.querySelector('[data-re…%0A    [90m101|[39m     const updatedAt = saved.updatedAt + 1%0A[90m [2m❯[22m tests/elementResizeBrowser.test.ts:[2m648:5[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/44]⎯[22m[39m%0A%0A[41m[1m FAIL [22m[49m [30m[46m parallel [49m[39m tests/privatePdfRendering.test.ts[2m > [22mrenders real private images and an embedded font on both PDF pages through bucket storage%0A[31m[1mError[22m: Private S3 fixture requires Docker, Python3, the pinned Garage image and a Docker-shared checkout parent; setup failed[39m%0A[36m [2m❯[22m startPrivateStorageFixture tests/privateStorageFixture.ts:[2m96:11[22m[39m%0A    [90m 94|[39m   } catch {%0A    [90m 95|[39m     await close()%0A    [90m 96|[39m     throw new Error(%0A    [90m   |[39m           [31m^[39m%0A    [90m 97|[39m       'Private S3 fixture requires Docker, Python3, the pinned Garage …%0A    [90m 98|[39m     )%0A[90m [2m❯[22m tests/privatePdfRendering.test.ts:[2m16:42[22m[39m%0A%0A[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/44]⎯[22m[39m%0A%0A%0A[2m Test Files [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m298 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (303)[39m%0A[2m      Tests [22m [1m[31m42 failed[39m[22m[2m | [22m[1m[32m2660 passed[39m[22m[2m | [22m[33m26 skipped[39m[90m (2728)[39m%0A[2m   Start at [22m 19:21:28%0A[2m   Duration [22m 385.89s[2m (tests 87%25, import 10%25, environment 1%25, transform 1%25)[22m%0A%0Aclose timed out after 10000ms%0ATests closed successfully but something prevents 2 Vite servers from exiting%0AYou can try to identify the cause by enabling "hanging-process" reporter. See https://vitest.dev/guide/reporters.html#hanging-process-reporter%0Aerror: script "test" exited with code 1%0A
+::error::Doop gate failed: check-doop.py%0ACommand '('/private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun', 'run', 'test', '--', '--maxWorkers=2')' returned non-zero exit status 1.
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/plan06/scripts/check-doop.py", line 145, in <module>
+    main()
+    ~~~~^^
+  File "/Users/mac02/orca/workspaces/openbot/plan06/scripts/check-doop.py", line 122, in main
+    service_gate(runner, setup, output, chrome, database)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mac02/orca/workspaces/openbot/plan06/scripts/check-doop.py", line 63, in service_gate
+    run(*command, cwd=source, env=environment, timeout=1200,
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        stdout=log, stderr=subprocess.STDOUT)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mac02/orca/workspaces/openbot/plan06/scripts/check-doop.py", line 32, in run
+    subprocess.run(args, cwd=cwd, check=True, **kwargs)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '('/private/tmp/openbot-check.2XlECZ/doop/source/tools/node_modules/.bin/bun', 'run', 'test', '--', '--maxWorkers=2')' returned non-zero exit status 1.
+
+==> Summary
+FAIL 437s  Managed Doop service and private integration

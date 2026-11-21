@@ -182,7 +182,7 @@ impl ReviewerAssignment {
     pub fn canonical_content(&self) -> AppResult<Vec<u8>> {
         self.validate()?;
         let mut value = self.clone();
-        value.roles.sort_unstable_by_key(|role| role.role);
+        value.roles.sort_unstable_by_key(|role| role.role.as_str());
         value
             .reviewers
             .sort_unstable_by_key(|reviewer| reviewer.ordinal);
@@ -295,5 +295,34 @@ mod tests {
         assert!(ReviewerAssignment::decode(&serde_json::to_vec(&source).unwrap()).is_err());
         assert!(ReviewerAssignmentRevision::try_from(0).is_err());
         assert!(ReviewerAssignmentRevision::try_from(i64::MAX as u64 + 1).is_err());
+    }
+
+    #[test]
+    fn root_membership_assignment_canonical_roles_follow_stored_strings() {
+        let mut value = assignment();
+        let reference = value.roles[0].clone();
+        value.roles = DepartmentRole::ALL
+            .into_iter()
+            .map(|role| AssignmentRoleReference {
+                role,
+                ..reference.clone()
+            })
+            .collect();
+        let canonical = value.canonical_content().unwrap();
+        let restored = ReviewerAssignment::decode(&canonical).unwrap();
+        assert_eq!(
+            restored
+                .roles
+                .iter()
+                .map(|entry| entry.role.as_str())
+                .collect::<Vec<_>>(),
+            ["admin", "lead", "owner", "reviewer", "sponsor"]
+        );
+        for _ in 0..value.roles.len() {
+            value.roles.rotate_left(1);
+            assert_eq!(value.canonical_content().unwrap(), canonical);
+            value.roles.reverse();
+            assert_eq!(value.canonical_content().unwrap(), canonical);
+        }
     }
 }

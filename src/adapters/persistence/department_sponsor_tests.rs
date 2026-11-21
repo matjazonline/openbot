@@ -198,9 +198,16 @@ async fn department_sponsor_retirement_never_promotes_and_person_repairs_the_gap
         )
         .await
         .unwrap();
-    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
-        .await
-        .unwrap();
+    CompanyInvitePersistence::remove_member(
+        &f.persistence,
+        crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.owner,
+            company_id: f.company,
+            member_user_id: f.member,
+        },
+    )
+    .await
+    .unwrap();
     let holders = f.roles(unit.id).await;
     assert_eq!(holders.len(), 1);
     assert!(!holders[0].decider);

@@ -16,6 +16,7 @@ async fn autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live
     ];
     f.p.update_company(
         f.scope.company.as_uuid(),
+        f.p.test_root_unit(f.scope.company.as_uuid()).await,
         skill.id,
         SkillWrite {
             slug: skill.slug.as_str().into(),
@@ -35,6 +36,7 @@ async fn autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live
             .unwrap();
     f.p.update_company(
         f.scope.company.as_uuid(),
+        f.p.test_root_unit(f.scope.company.as_uuid()).await,
         skill.id,
         SkillWrite {
             files: Some(vec![

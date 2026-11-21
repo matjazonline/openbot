@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "round": "07UR-P02-B2-R2",
+  "artifact": "60e2c15f4935ce5371b485a604069eb4ada4f6add0ec3358466e97af4ea11929",
+  "checks": [
+    {
+      "criteria": [
+        "B2-F1",
+        "02B.2",
+        "02B.3",
+        "D5",
+        "D7",
+        "D8"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_budget run_retention storage_ model_usage message_admission jev_runtime autonomous_agent_admission",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b2 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-focused.txt",
+          "sha256": "e65bd64353c94b0aafeb8f7a921b3a2426ddbd128bdda3809bb1596cd5c169ea"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-F1 discrimination (lock order)"
+      ],
+      "command": "forget_unit_spend without its ordered PERFORM; cargo test --locked --offline --lib -- unit_budget_competing_delete_takes_totals (expected deadlock); schema restored",
+      "fixture": "throwaway openbot_p07_p02neg (+ _test), dropped",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-R2-negative-unordered-delete.txt",
+          "sha256": "0dd92c620b967bb384f73990c5266f6621c8f613ad0d4010bba1a16315024944"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-clippy.txt",
+          "sha256": "072079c7fe9eacd56dad1b8ea1f286b782bf192f0dc2600203848b5392f8a6b0"
+        }
+      ]
+    }
+  ]
+}

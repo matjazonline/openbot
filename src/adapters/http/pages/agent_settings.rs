@@ -160,7 +160,12 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
         ),
-        run_counts = super::run_counts::run_counts_bar(company.id),
+        // Run counts are a company-wide read view (Plan06 U4): company administrators only.
+        run_counts = if page.user.company_membership.administers_company() {
+            super::run_counts::run_counts_bar(company.id)
+        } else {
+            String::new()
+        },
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );
@@ -871,26 +876,39 @@ fn company_model_selection(fields: &AgentFields<'_>, id_prefix: &str) -> String 
     let draft = fields.draft;
     let (blank_choice, help) = match fields.agent_id {
         None => (
-            "Company default",
-            "Leave both blank to use the company's default model for the new agent's direct workflow. Creating an agent requires a model connection with an API key.",
+            "Default for its department",
+            "Leave both blank to pin the default model of the agent's department, or of the nearest department above it, for its direct workflow. Creating an agent requires a model connection with an API key.",
         ),
         Some(_) => (
             "No hosted model",
             "Leave both blank for native profiles. Hosted workflows require an explicit provider/model pair; invalid pairs are refused on save.",
         ),
     };
+    // The company default is the root's; a department's own default is not the company's
+    // (Plan07 02A).
+    let company_default = connections
+        .iter()
+        .find(|connection| connection.is_default && connection.in_root)
+        .map(|connection| connection.id);
     let provider_options: String = connections
         .iter()
         .map(|connection| {
             format!(
-                r#"<option value="{provider}"{selected}>{provider}{default}</option>"#,
+                r#"<option value="{provider}"{selected}>{provider}{unit}{default}</option>"#,
                 provider = escape_html_attr(connection.provider.as_str()),
+                // Which department owns it: an agent may use only its own department's or one
+                // above it (Plan07 02A).
+                unit = if connection.in_root || connection.unit_name.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {}", escape_html_attr(&connection.unit_name))
+                },
                 selected = if connection.provider.as_str() == draft.provider {
                     " selected"
                 } else {
                     ""
                 },
-                default = if connection.is_default {
+                default = if Some(connection.id) == company_default {
                     " (default)"
                 } else {
                     ""
@@ -1075,6 +1093,7 @@ mod capability_tests {
 
     fn skill(company_id: Option<Uuid>, name: &str) -> SkillSummary {
         Skill {
+            unit_id: None,
             files: Vec::new(),
             id: Uuid::new_v4(),
             company_id,

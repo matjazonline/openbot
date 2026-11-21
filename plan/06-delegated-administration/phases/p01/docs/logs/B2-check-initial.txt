@@ -1,0 +1,535 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+error[E0433]: cannot find `RelatedChannelId` in `workflow`
+   --> src/adapters/persistence/channel.rs:493:42
+    |
+493 |                 crate::domain::workflow::RelatedChannelId::new(id),
+    |                                          ^^^^^^^^^^^^^^^^ could not find `RelatedChannelId` in `workflow`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::application::workflow::RelatedChannelId;
+    |
+help: if you import `RelatedChannelId`, refer to it directly
+    |
+493 -                 crate::domain::workflow::RelatedChannelId::new(id),
+493 +                 RelatedChannelId::new(id),
+    |
+
+error[E0433]: cannot find `RelatedChannelId` in `workflow`
+   --> src/adapters/persistence/channel_edit.rs:116:38
+    |
+116 |             crate::domain::workflow::RelatedChannelId::new(request.channel_id),
+    |                                      ^^^^^^^^^^^^^^^^ could not find `RelatedChannelId` in `workflow`
+    |
+help: consider importing this struct through its public re-export
+    |
+ 16 + use crate::application::workflow::RelatedChannelId;
+    |
+help: if you import `RelatedChannelId`, refer to it directly
+    |
+116 -             crate::domain::workflow::RelatedChannelId::new(request.channel_id),
+116 +             RelatedChannelId::new(request.channel_id),
+    |
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/http/routes/authorization_test_support.rs:13:5
+   |
+13 | use crate::application::ports::channel::ChannelPersistence;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/http/routes/channel_authorization_tests.rs:61:9
+   |
+61 |     use crate::application::ports::channel::ChannelPersistence;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+ --> src/adapters/http/routes/ui_local_agents_tests.rs:3:15
+  |
+3 |     channel::{ChannelPersistence, ChannelWrite},
+  |               ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/http/routes/schedule_channel_tests.rs:6:5
+  |
+6 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/http/routes/ui_stream_tests.rs:23:5
+   |
+23 | use crate::application::ports::channel::ChannelPersistence;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+   --> src/adapters/http/routes/ui_profile_session_tests.rs:317:39
+    |
+317 |         application::ports::channel::{ChannelPersistence, ChannelWrite},
+    |                                       ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/http/routes/ui_run_counts_tests.rs:69:5
+   |
+69 | use crate::application::ports::channel::ChannelPersistence;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+   --> src/adapters/http/routes/workflows/ui/authoring/tests.rs:168:13
+    |
+168 |         use crate::application::ports::channel::ChannelPersistence;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+ --> src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs:3:42
+  |
+3 | use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+  |                                          ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+   --> src/adapters/http/routes/workflows/ui/runs/runs_tests.rs:275:13
+    |
+275 |         use crate::application::ports::channel::ChannelPersistence;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/http/routes/workflows/tests.rs:12:5
+   |
+12 | use crate::application::ports::channel::ChannelPersistence;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/persistence/agent_retire_tests.rs:10:5
+   |
+10 | use crate::application::ports::channel::ChannelPersistence;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/persistence/dashboard_tests.rs:17:5
+   |
+17 | use crate::application::ports::channel::ChannelPersistence;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/persistence/delivery/tests.rs:23:5
+   |
+23 | use crate::application::ports::channel::ChannelPersistence;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+ --> src/adapters/persistence/local_agents/test_support.rs:2:42
+  |
+2 | use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+  |                                          ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/onboarding/tests.rs:5:5
+  |
+5 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `company_owner_actor`
+  --> src/adapters/persistence/test_support.rs:47:31
+   |
+47 | pub(crate) use managed_desk::{company_owner_actor, create_channel};
+   |                               ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/thread/test_support.rs:9:5
+  |
+9 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/workflow/admission_history_tests.rs:2:5
+  |
+2 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/workflow/decision_authority_tests.rs:6:5
+  |
+6 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/workflow/action_reconciliation_association_tests.rs:5:5
+  |
+5 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:585:46
+    |
+585 |     use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+    |                                              ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+  --> src/adapters/persistence/workflow/http_test_support.rs:76:17
+   |
+76 |             use crate::application::ports::channel::ChannelPersistence;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+ --> src/adapters/persistence/workflow/reviewer_action_tests.rs:2:42
+  |
+2 | use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+  |                                          ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+ --> src/adapters/persistence/workflow/local_agent_continuation_tests.rs:3:42
+  |
+3 | use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+  |                                          ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/workflow/message_test_support.rs:6:5
+  |
+6 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+    --> src/adapters/persistence/workflow/message_intent_tests.rs:1794:9
+     |
+1794 |     use crate::application::ports::channel::ChannelPersistence;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/workflow/job_schema_tests.rs:3:5
+  |
+3 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+   --> src/adapters/persistence/workflow/run_schema_tests.rs:258:13
+    |
+258 |         use crate::application::ports::channel::ChannelPersistence;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/workflow/schedule_tests.rs:9:5
+  |
+9 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::application::ports::channel::ChannelPersistence`
+ --> src/adapters/persistence/workflow/jev_assets_tests.rs:8:5
+  |
+8 | use crate::application::ports::channel::ChannelPersistence;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/department_tests.rs:270:55
+    |
+270 |         ChannelPersistence::delete(&self.persistence, self.desk_of(department).await)
+    |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `WorkflowActor`, found `Uuid`
+    |
+help: try wrapping the expression in `application::workflow::authorization::WorkflowActor` (its field is private, but it's local to this crate and its privacy can be changed)
+    |
+270 |         ChannelPersistence::delete(&self.persistence, application::workflow::authorization::WorkflowActor { user_id: self.desk_of(department).await })
+    |                                                       ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                +
+
+error[E0061]: this function takes 4 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/department_tests.rs:270:9
+    |
+270 |         ChannelPersistence::delete(&self.persistence, self.desk_of(department).await)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^--------------------------------------------------- two arguments of type `uuid::Uuid` and `uuid::Uuid` are missing
+    |
+note: method defined here
+   --> src/application/ports/channel.rs:92:14
+    |
+ 92 |     async fn delete(
+    |              ^^^^^^
+...
+ 95 |         company_id: Uuid,
+    |         ----------
+ 96 |         id: Uuid,
+    |         --
+help: provide the arguments
+    |
+270 |         ChannelPersistence::delete(&self.persistence, self.desk_of(department).await, /* Uuid */, /* Uuid */)
+    |                                                                                     ++++++++++++++++++++++++
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/thread/inbound_tests.rs:614:5
+    |
+614 |     ChannelUpdate {
+    |     ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/workflow/relay_authority_race_tests.rs:43:13
+   |
+43 |             ChannelUpdate {
+   |             ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/workflow/follow_visibility_tests.rs:14:9
+   |
+14 |         ChannelUpdate {
+   |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/knowledge_e2e_support.rs:142:9
+    |
+142 |         ChannelUpdate {
+    |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs:136:9
+    |
+136 |         crate::application::ports::channel::ChannelUpdate {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/workflow/agent_history_channel_release_tests.rs:22:9
+   |
+22 |         crate::application::ports::channel::ChannelUpdate {
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/public_desk_private_agent_tests.rs:150:9
+    |
+150 |         crate::application::ports::channel::ChannelUpdate {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/channel_tests.rs:11:5
+   |
+11 |     ChannelUpdate {
+   |     ^^^^^^^^^^^^^ missing `actor`
+
+error[E0061]: this function takes 4 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/channel_tests.rs:161:9
+    |
+161 |         ChannelPersistence::delete(&persistence, channel.id).await,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^--------------------------
+    |                                   |              |
+    |                                   |              argument #2 of type `application::workflow::authorization::WorkflowActor` is missing
+    |                                   argument #4 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/channel.rs:92:14
+    |
+ 92 |     async fn delete(
+    |              ^^^^^^
+ 93 |         &self,
+ 94 |         actor: crate::application::workflow::WorkflowActor,
+    |         -----
+ 95 |         company_id: Uuid,
+ 96 |         id: Uuid,
+    |         --
+help: provide the arguments
+    |
+161 -         ChannelPersistence::delete(&persistence, channel.id).await,
+161 +         ChannelPersistence::delete(&persistence, /* WorkflowActor */, channel.id, /* Uuid */).await,
+    |
+
+error[E0061]: this function takes 4 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/channel_tests.rs:177:5
+    |
+177 |     ChannelPersistence::delete(&persistence, channel.id)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^--------------------------
+    |                               |              |
+    |                               |              argument #2 of type `application::workflow::authorization::WorkflowActor` is missing
+    |                               argument #4 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/channel.rs:92:14
+    |
+ 92 |     async fn delete(
+    |              ^^^^^^
+ 93 |         &self,
+ 94 |         actor: crate::application::workflow::WorkflowActor,
+    |         -----
+ 95 |         company_id: Uuid,
+ 96 |         id: Uuid,
+    |         --
+help: provide the arguments
+    |
+177 -     ChannelPersistence::delete(&persistence, channel.id)
+177 +     ChannelPersistence::delete(&persistence, /* WorkflowActor */, channel.id, /* Uuid */)
+    |
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/channel_allowlist_tests.rs:10:5
+   |
+10 |     ChannelUpdate {
+   |     ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/channel_edit_tests.rs:83:9
+   |
+83 |         ChannelUpdate {
+   |         ^^^^^^^^^^^^^ missing `actor`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/integration/tests.rs:788:17
+    |
+788 |                 crate::application::ports::channel::ChannelUpdate {
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/integration/tests.rs:838:9
+    |
+838 |         crate::application::ports::channel::ChannelUpdate {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `actor`
+
+error[E0061]: this function takes 4 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/provisioning_directory_tests.rs:178:5
+    |
+178 |     ChannelPersistence::delete(f.persistence(), plain)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^------------------------
+    |                               |                 |
+    |                               |                 argument #2 of type `application::workflow::authorization::WorkflowActor` is missing
+    |                               argument #4 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/channel.rs:92:14
+    |
+ 92 |     async fn delete(
+    |              ^^^^^^
+ 93 |         &self,
+ 94 |         actor: crate::application::workflow::WorkflowActor,
+    |         -----
+ 95 |         company_id: Uuid,
+ 96 |         id: Uuid,
+    |         --
+help: provide the arguments
+    |
+178 -     ChannelPersistence::delete(f.persistence(), plain)
+178 +     ChannelPersistence::delete(f.persistence(), /* WorkflowActor */, plain, /* Uuid */)
+    |
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:224:9
+    |
+224 |         ChannelUpdate {
+    |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:252:13
+    |
+252 |             ChannelUpdate {
+    |             ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_binding_tests.rs:122:18
+    |
+122 |     let update = ChannelUpdate {
+    |                  ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/workflow/role_binding_tests.rs:203:18
+    |
+203 |     let update = ChannelUpdate {
+    |                  ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+  --> src/adapters/persistence/workflow/escalation_binding_tests.rs:73:18
+   |
+73 |     let update = ChannelUpdate {
+   |                  ^^^^^^^^^^^^^ missing `actor`
+
+error[E0061]: this function takes 4 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/workflow/tenant_fk_intent_tests.rs:92:19
+   |
+92 |     let refused = ChannelPersistence::delete(s.p(), s.channel).await;
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^------------------
+   |                                             |       |
+   |                                             |       argument #2 of type `application::workflow::authorization::WorkflowActor` is missing
+   |                                             argument #4 of type `uuid::Uuid` is missing
+   |
+note: method defined here
+  --> src/application/ports/channel.rs:92:14
+   |
+92 |     async fn delete(
+   |              ^^^^^^
+93 |         &self,
+94 |         actor: crate::application::workflow::WorkflowActor,
+   |         -----
+95 |         company_id: Uuid,
+96 |         id: Uuid,
+   |         --
+help: provide the arguments
+   |
+92 -     let refused = ChannelPersistence::delete(s.p(), s.channel).await;
+92 +     let refused = ChannelPersistence::delete(s.p(), /* WorkflowActor */, s.channel, /* Uuid */).await;
+   |
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/address_tests.rs:214:9
+    |
+214 |         ChannelUpdate {
+    |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0063]: missing field `actor` in initializer of `application::ports::channel::ChannelUpdate`
+   --> src/adapters/persistence/address_tests/notifications.rs:328:9
+    |
+328 |         ChannelUpdate {
+    |         ^^^^^^^^^^^^^ missing `actor`
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/application/use_cases/thread/address_resolution_tests.rs:22:20
+   |
+22 |         self.desks.create(company_id, write).await
+   |                    ^^^^^^ ---------- argument #1 of type `application::workflow::authorization::WorkflowActor` is missing
+   |
+note: method defined here
+  --> src/application/ports/channel.rs:50:14
+   |
+50 |     async fn create(
+   |              ^^^^^^
+51 |         &self,
+52 |         actor: crate::application::workflow::WorkflowActor,
+   |         -----
+help: provide the argument
+   |
+22 |         self.desks.create(/* WorkflowActor */, company_id, write).await
+   |                           ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 1 argument was supplied
+  --> src/application/use_cases/thread/address_resolution_tests.rs:85:20
+   |
+85 |         self.desks.delete(id).await
+   |                    ^^^^^^----
+   |                          ||
+   |                          |argument #1 of type `application::workflow::authorization::WorkflowActor` is missing
+   |                          argument #3 of type `uuid::Uuid` is missing
+   |
+note: method defined here
+  --> src/application/ports/channel.rs:92:14
+   |
+92 |     async fn delete(
+   |              ^^^^^^
+93 |         &self,
+94 |         actor: crate::application::workflow::WorkflowActor,
+   |         -----
+95 |         company_id: Uuid,
+96 |         id: Uuid,
+   |         --
+help: provide the arguments
+   |
+85 -         self.desks.delete(id).await
+85 +         self.desks.delete(/* WorkflowActor */, id, /* Uuid */).await
+   |
+
+warning: unused import: `ChannelPersistence`
+ --> src/adapters/persistence/department_agent_desks_tests.rs:7:42
+  |
+7 | use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+  |                                          ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ChannelPersistence`
+ --> src/adapters/persistence/department_lead_desk_tests.rs:5:42
+  |
+5 | use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
+  |                                          ^^^^^^^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0061, E0063, E0308, E0433.
+For more information about an error, try `rustc --explain E0061`.
+warning: `open_bots` (lib test) generated 33 warnings
+error: could not compile `open_bots` (lib test) due to 29 previous errors; 33 warnings emitted

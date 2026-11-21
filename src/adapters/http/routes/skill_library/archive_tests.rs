@@ -86,6 +86,7 @@ fn zip(files: &[(&str, &[u8], u32)]) -> Vec<u8> {
 fn skill(write: SkillWrite) -> Skill {
     let now = chrono::Utc::now();
     Skill {
+        unit_id: None,
         id: uuid::Uuid::new_v4(),
         company_id: Some(uuid::Uuid::new_v4()),
         slug: SkillSlug::parse(&write.slug).unwrap(),

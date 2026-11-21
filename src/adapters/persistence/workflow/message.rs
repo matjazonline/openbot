@@ -44,7 +44,7 @@ impl action_dispatch::SqlActionAuthority for MessageActionAuthority {
         }
         let kind =
             MessageKind::parse(request.contract.contract.name.as_str()).ok_or_else(missing)?;
-        let current = current_message_on(tx, request.scope.company, authority.actor, kind).await?;
+        let current = current_message_on(tx, request.scope, authority.actor, kind).await?;
         let run = run_route_on(tx, request.scope).await?;
         association::authorize_association(
             tx,
@@ -70,11 +70,13 @@ impl action_dispatch::SqlActionAuthority for MessageActionAuthority {
 /// Each caller must establish its own invocation grant before using this resource authority.
 pub(super) async fn current_message_on(
     db: &mut PgConnection,
-    company: CompanyId,
+    scope: ActionScope,
     actor: WorkflowActor,
     kind: MessageKind,
 ) -> AppResult<action_dispatch::LockedActionAuthority> {
-    authority::authorize_company(db, company, actor).await?;
+    let company = scope.company;
+    management::authorize_run_with_locks(db, company, scope.run, actor, row_locks::RowLocks::Wait)
+        .await?;
     Ok(action_dispatch::LockedActionAuthority {
         resource: messaging_status(company)?,
         policy: CurrentActionPolicy {
@@ -410,10 +412,10 @@ pub(super) async fn member_on(
         ""
     };
     let row: Option<(Uuid, String)> = sqlx::query_as(&format!(
-        "SELECT principal.id, account.email FROM company_members AS member \
-         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
-         JOIN users AS account ON account.id=member.user_id \
-         WHERE member.company_id=$1 AND member.user_id=$2{lock}"
+        "SELECT principal.id, account.email FROM department_members AS member \
+         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id \
+         JOIN users AS account ON account.id=member.root_user_id \
+         WHERE member.company_id=$1 AND member.root_user_id=$2{lock}"
     ))
     .bind(company.as_uuid())
     .bind(user)

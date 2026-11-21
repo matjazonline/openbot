@@ -1,0 +1,21 @@
+--- B1/src/adapters/http/routes/ui_local_agents_tests.rs
++++ B2/src/adapters/http/routes/ui_local_agents_tests.rs
+@@ -1,8 +1,5 @@
+ use super::*;
+-use crate::application::ports::{
+-    channel::{ChannelPersistence, ChannelWrite},
+-    thread::ThreadPersistence,
+-};
++use crate::application::ports::{channel::ChannelWrite, thread::ThreadPersistence};
+ 
+ fn form_request(path: &str, cookie: &HeaderValue, fields: &[(&str, String)]) -> Request<Body> {
+     let mut result = request(Method::POST, path, cookie, json!({}));
+@@ -80,7 +77,7 @@
+ }
+ 
+ async fn readable_conversation(f: &Fixture) -> crate::domain::entities::thread::Thread {
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         f.persistence.as_ref(),
+         f.company,
+         ChannelWrite {

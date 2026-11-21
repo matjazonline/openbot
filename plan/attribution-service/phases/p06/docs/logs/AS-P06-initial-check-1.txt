@@ -1,0 +1,2 @@
+    Checking attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 3.70s

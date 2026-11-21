@@ -391,7 +391,7 @@ pub(super) async fn connection_on(
     company: Uuid,
     id: Uuid,
 ) -> CompanyMcpConnection {
-    McpPersistence::list_mcp_connections(p, company)
+    McpPersistence::list_mcp_connections(p, company, &p.test_all_units(company).await)
         .await
         .unwrap()
         .into_iter()
@@ -433,11 +433,16 @@ pub(in crate::adapters::persistence::workflow) async fn configured(
     let p = &fixture.persistence;
     let company = fixture.target.company;
     let connection = p
-        .create_mcp_connection(company.as_uuid(), connection_write(url))
+        .create_mcp_connection(
+            company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
+            connection_write(url),
+        )
         .await
         .unwrap();
     p.replace_mcp_token(
         company.as_uuid(),
+        p.test_root_unit(company.as_uuid()).await,
         connection.id,
         connection.revision,
         Some(SecretString::from(TOKEN)),

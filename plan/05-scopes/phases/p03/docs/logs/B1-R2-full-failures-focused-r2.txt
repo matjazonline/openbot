@@ -1,0 +1,15 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.71s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_role_writer_gate_contention_defers_then_admits_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4818 filtered out; finished in 24.12s
+

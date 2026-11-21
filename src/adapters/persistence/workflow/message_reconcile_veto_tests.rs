@@ -276,11 +276,11 @@ async fn workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_for
 async fn workflow_message_reconcile_wrong_association_actor_is_refused() {
     let (setup, _, unknown) = Box::pin(uncertain()).await;
     let company = setup.scope().company.as_uuid();
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(setup.channel)
-        .execute(setup.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        setup.pool(),
+        setup.channel,
+    )
+    .await;
     let admin = member(&setup.fixture, "admin").await;
     // Isolate channel-grant authorization from the separate current-email proof guard.
     sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")

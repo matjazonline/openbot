@@ -1,0 +1,1 @@
+error: while executing migration 1: error returned from database: pgvector is not installed in this database; run scripts/provision-db.sh

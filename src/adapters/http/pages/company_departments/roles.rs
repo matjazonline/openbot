@@ -28,7 +28,7 @@ pub(super) fn sponsors_card(section: &DepartmentSection<'_>, view: &DepartmentVi
     } else {
         ""
     };
-    let add = if section.editable {
+    let add = if section.assigns_roles(&view.detail.department) {
         format!(
             r##"<form class="mt-3 flex flex-wrap items-end gap-2" hx-post="{endpoint}" hx-target="#department-section" hx-swap="outerHTML" data-submit="busy-once" data-pending-label="Saving…">
             <label class="form-control flex-1"><span class="label text-xs">Sponsor</span><select class="select select-sm w-full" name="principal_id" required>{options}</select></label>
@@ -64,7 +64,7 @@ fn sponsor_controls(
     sponsors: &[&DepartmentRoleHolder],
     endpoint: &str,
 ) -> String {
-    if section.editable {
+    if section.assigns_roles(&view.detail.department) {
         let promote = if holder.decider {
             String::new()
         } else {
@@ -110,7 +110,7 @@ fn sponsor_controls(
 }
 
 fn escalation_form(section: &DepartmentSection<'_>, department: &Department) -> String {
-    if section.editable {
+    if section.manages_placement(department) {
         let roles = DepartmentRole::ALL
             .into_iter()
             .map(|role| {

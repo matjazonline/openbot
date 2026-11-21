@@ -60,10 +60,13 @@ impl PostgresIntegrationBindings {
             .execute(&mut *tx)
             .await?;
         users_on(&mut tx, vec![actor]).await?;
-        crate::adapters::persistence::workflow::authority::authorize_company(
+        // Reading a connection's credential source is its configuration: its unit manager's.
+        crate::adapters::persistence::unit_resources::authorize_resource_on(
             &mut tx,
-            CompanyId::new(target.company),
             WorkflowActor::authenticated(actor)?,
+            CompanyId::new(target.company),
+            target.kind.unit_resource(),
+            target.connection,
         )
         .await?;
         let current = source_on(&mut tx, target).await?;

@@ -225,13 +225,12 @@ mod tests {
             slug: slug.into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
-            access_mode: ChannelAccessMode::Team,
+            access_mode: ChannelAccessMode::Members,
             principal_grants: Vec::new(),
             created_by: CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         }
     }
 

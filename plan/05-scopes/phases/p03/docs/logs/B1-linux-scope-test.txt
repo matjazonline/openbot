@@ -1,0 +1,8 @@
+PASS: both concurrent entrypoints isolate descendants and preserve supervisor/UID/environment/status
+PASS: changing only the selector to UID blocks the supervisor
+PASS: INT/TERM after actual group/chain creation preserve status and clean both entrypoints
+PASS: cleanup deadline and visible failure for entrypoint0 (3.57s)
+PASS: cleanup deadline and visible failure for entrypoint1 (3.58s)
+PASS: real group/chain/hook mutations followed by error/timeout clean both entrypoints and preserve unrelated objects
+PASS: preexisting groups/chains survive and failed absence probes never authorize mutation
+PASS: setup, partial firewall and guarded-preflight failures leave no command or resources

@@ -52,12 +52,14 @@ async fn knowledge_view_current_run_and_step_stamp_controls_payloads() {
         assert!(html.contains("started"));
     }
     assert!(!html.contains("The run finished."));
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(scope.company.as_uuid())
-        .bind(setup.user)
-        .execute(setup.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(setup.user)
+    .execute(setup.pool())
+    .await
+    .unwrap();
     for user in [setup.user, setup.owner] {
         let view = p.run_view(read_scope(&setup, user)).await.unwrap().unwrap();
         assert!(!view.payload_restricted && !view.input.is_null());
@@ -99,12 +101,14 @@ async fn wait_for_blocked_readers(pool: &sqlx::PgPool, blocker: i32) {
 async fn knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts() {
     let setup = Box::pin(send(&[To::Channel])).await;
     production_guards(&setup).await;
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(setup.scope().company.as_uuid())
-        .bind(setup.user)
-        .execute(setup.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(setup.scope().company.as_uuid())
+    .bind(setup.user)
+    .execute(setup.pool())
+    .await
+    .unwrap();
     // This fixture owns its entire database. Hold the payload table until both reads have begun.
     let mut transaction = setup.pool().begin().await.unwrap();
     sqlx::query("LOCK TABLE workflow_executions IN ACCESS EXCLUSIVE MODE")
@@ -133,12 +137,14 @@ async fn knowledge_view_competing_readers_demotion_and_content_raise_use_final_f
         )
     });
     wait_for_blocked_readers(setup.pool(), blocker).await;
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(low_scope.company.as_uuid())
-        .bind(setup.user)
-        .execute(setup.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(low_scope.company.as_uuid())
+    .bind(setup.user)
+    .execute(setup.pool())
+    .await
+    .unwrap();
     // The same transaction owns the table lock, so production guards can read it while raising.
     knowledge::raise_content_level_on(
         &mut transaction,

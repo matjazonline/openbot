@@ -23,11 +23,41 @@ pub struct MailboxUser<'a> {
     pub is_operator: bool,
     /// What this account is to the company currently anchoring the rail.
     pub company_membership: CompanyMembership,
+    /// Whether they manage at least one unit there, which opens the unit configuration
+    /// workspaces in the rail. A rendering hint; every page checks its own targets.
+    pub administers_units: bool,
 }
 
 impl MailboxUser<'_> {
     pub fn with_company_membership(mut self, membership: CompanyMembership) -> Self {
         self.company_membership = membership;
+        self.administers_units = membership.administers_company();
+        self
+    }
+
+    /// Whether the rail opens the unit workspaces, from [`CompanyAccess::administers_units`].
+    ///
+    /// [`CompanyAccess::administers_units`]: crate::entities::company::CompanyAccess::administers_units
+    pub fn with_unit_hint(mut self, administers_units: bool) -> Self {
+        self.administers_units = administers_units;
+        self
+    }
+
+    /// [`Self::with_company_access`] when a company is selected; no membership otherwise.
+    pub fn with_company_option(
+        self,
+        access: Option<&crate::entities::company::CompanyAccess>,
+    ) -> Self {
+        match access {
+            Some(access) => self.with_company_access(access),
+            None => self.with_company_membership(CompanyMembership::None),
+        }
+    }
+
+    /// The rail as this company's access describes it, including unit management.
+    pub fn with_company_access(mut self, access: &crate::entities::company::CompanyAccess) -> Self {
+        self.company_membership = access.membership;
+        self.administers_units = access.administers_units;
         self
     }
 }
@@ -995,9 +1025,7 @@ document.addEventListener('input', function (event) {
         case 'slugify': syncSlugField(control); break;
         case 'agent-address-preview': updateAgentAddressPreview(control); break;
         case 'agent-simple-address-preview': updateSimpleAgentAddressPreview(control); break;
-        case 'spam-warning': toggleSpamWarning(control); break;
         case 'channel-spam-confirm': toggleChannelSpamConfirm(control); break;
-        case 'desk-members-only': toggleDeskMembersOnly(control); break;
         case 'auto-grow-composer': autoGrowComposer(control); break;
     }
 });
@@ -1675,17 +1703,16 @@ impl RailDestination {
 /// The rail mirrors route authorization instead of advertising workspaces the caller cannot open.
 fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
     match section {
-        UiSection::Mailbox | UiSection::Knowledge | UiSection::Work => user.company_membership.is_team(),
-        UiSection::Channels
-        | UiSection::Agents
-        | UiSection::Workflows
-        // `ui.company` on the runs routes: owners and admins.
-        | UiSection::Runs
-        | UiSection::Schedules
-        | UiSection::Deliveries => user.company_membership.manages_company_operations(),
-        UiSection::Dashboard => {
-            user.company_membership.manages_company_operations() || user.is_operator
+        UiSection::Mailbox | UiSection::Knowledge | UiSection::Work => {
+            user.company_membership.is_team()
         }
+        // Unit configuration: anyone who manages a unit (Plan06 02A).
+        UiSection::Channels | UiSection::Agents | UiSection::Workflows | UiSection::Schedules => {
+            user.administers_units
+        }
+        // Company-wide read views stay with company administration (Plan06 U4).
+        UiSection::Runs | UiSection::Deliveries => user.company_membership.administers_company(),
+        UiSection::Dashboard => user.company_membership.administers_company() || user.is_operator,
         // Company settings are readable by the team, while their edit controls remain owner-only.
         UiSection::Companies => user.company_membership.is_team(),
         UiSection::Invites | UiSection::Notifications | UiSection::Profile => false,
@@ -2335,7 +2362,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         local_agent = if let Some(desk) = pane
             .inbox
             .desk()
-            .filter(|_| pane.viewer_membership.manages_company_operations())
+            .filter(|_| pane.viewer_membership.administers_company())
         {
             format!(
                 r#"<a class="btn btn-ghost btn-sm" href="/ui/companies/{}/local-agents?channel={}&amp;conversation={}">Run locally</a>"#,

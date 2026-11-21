@@ -1,0 +1,46 @@
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+warning: unused import: `sqlx::Row`
+ --> src/adapters/identity/../commerce/http_tests.rs:9:5
+  |
+9 | use sqlx::Row;
+  |     ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `attribution_service` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 7.73s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 14 tests
+test adapters::identity::http_tests::commerce_tests::attribution_merchant_ingress_competing_event_retries_and_conflicting_envelopes ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_order_paid_business_identity_immutable_lines_and_checkout ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_reconciliation_refund_before_paid_and_cancellation_converge ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_refund_independent_business_identity_and_exact_balances ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_atomic_failure_and_real_commit_ack_loss ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_auth_before_body_and_strict_money ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_original_horizon_survives_pruning ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_order_competing_business_facts_count_once ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_policy_frozen_checkout_reasons_and_exact_window ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_competing_balances_money_only_and_units_only ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_competing_claims_crash_recovery_and_stale_token ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_currencies_unknown_line_time_and_atomic_rejection ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_final_lease_fence_rolls_back_financial_effect ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_deadline_attempts_manual_retry_and_receipt ... FAILED
+
+failures:
+
+---- adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_deadline_attempts_manual_retry_and_receipt stdout ----
+
+thread 'adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_deadline_attempts_manual_retry_and_receipt' (23764258) panicked at src/adapters/identity/../commerce/recovery_tests.rs:52:5:
+assertion `left == right` failed: {"code":"invalid_request","correlation_id":"349ed7df-1598-428d-8390-0a8641fb2874","message":"Invalid request"}
+  left: 400
+ right: 200
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_deadline_attempts_manual_retry_and_receipt
+
+test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 3.21s
+
+error: test failed, to rerun pass `--lib`

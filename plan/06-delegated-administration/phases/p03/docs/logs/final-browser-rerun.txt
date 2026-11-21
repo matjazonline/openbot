@@ -1,0 +1,30 @@
+✔ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (2617.415917ms)
+✔ actual history HTML: dark keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (2067.712917ms)
+✔ actual history HTML: light keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (1113.598625ms)
+✔ form feedback and another member’s team autocomplete stay text under production CSP (2562.995041ms)
+ℹ desk-classic-create: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-classic-edit: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-modern-create: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-modern-edit: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+✔ library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable (2020.18975ms)
+✔ local profile and session forms escape native output and acknowledge accepted writes (1579.562625ms)
+✔ an Auto agent on an Auto-only provider saves the unchanged unsupported fallback and clearing the agent restores validation (472.305ms)
+✔ capture forms are labelled, refuse a blank reason, post the policy and swap in the saved section (1437.733042ms)
+✔ failed password change preserves the browser; a committed change clears its cookie and navigates to login (1360.364417ms)
+✔ skill ZIP uploads retain multipart bytes and show progress, success and failure in both themes (1532.617792ms)
+✔ served team autocomplete renders account strings as text and keeps selection working (1132.250709ms)
+✔ vault dark: native picker progress, escaped private metadata and recoverable consent (1189.533708ms)
+✔ vault light: native picker progress, escaped private metadata and recoverable consent (846.700917ms)
+✔ vault dark: owner secrets start blank and reconnect failures remain recoverable (621.254917ms)
+✔ vault light: owner secrets start blank and reconnect failures remain recoverable (390.076208ms)
+✔ workflow agent choices preserve source and ignore transformations after editing or navigation (2064.683583ms)
+✔ reviewer roles and people update unsaved source with visible progress and stale-response protection (1209.259ms)
+✔ comment preserves the unfinished exact decision; queued submission settles without stale replacement (1596.178666ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3730.061083

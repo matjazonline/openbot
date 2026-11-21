@@ -1,0 +1,16 @@
+   Compiling ring v0.17.14
+   Compiling aws-lc-sys v0.47.0
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.17
+   Compiling aws-lc-rs v1.19.0
+   Compiling sqlx-core v0.8.6
+   Compiling sqlx-postgres v0.8.6
+   Compiling tokio-rustls v0.26.6
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.4
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 1m 02s

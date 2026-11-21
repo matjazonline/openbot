@@ -2,7 +2,6 @@ use super::*;
 use crate::adapters::persistence::test_support::OwnDatabase;
 use crate::adapters::persistence::test_support::own_database;
 use crate::adapters::workflow_source::WorkflowSourceDecoder;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::services::harness::ClassificationRequest;
 use crate::application::services::harness::TextClassifier;
@@ -299,7 +298,7 @@ async fn onboarding_second_principal_workflow_error_rolls_back_every_effect() {
 #[tokio::test]
 async fn agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing() {
     let f = Fixture::new(false).await;
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         f.persistence.as_ref(),
         f.company,
         ChannelWrite {
@@ -532,16 +531,14 @@ async fn onboarding_denials_and_invalid_selection_have_no_provider_effects() {
             .unwrap()
             .id;
         if role != "outsider" {
-            sqlx::query(
-                "INSERT INTO company_members (company_id, user_id, role, id) VALUES ($1, $2, $3, $4)",
+            crate::adapters::persistence::test_support::insert_root_member(
+                &f.db.pool,
+                crate::domain::workflow::CompanyId::new(f.company),
+                user,
+                (role).parse().expect("fixture role"),
+                crate::entities::access_level::AccessLevel::PUBLIC,
             )
-            .bind(f.company)
-            .bind(user)
-            .bind(role)
-            .bind(Uuid::new_v4())
-            .execute(&f.db.pool)
-            .await
-            .unwrap();
+            .await;
         }
         let result = f
             .service
@@ -550,16 +547,9 @@ async fn onboarding_denials_and_invalid_selection_have_no_provider_effects() {
         let begin = PostgresOnboarding::new(f.persistence.as_ref().clone(), templates())
             .begin(user, f.company)
             .await;
-        if role == "outsider" {
-            assert!(matches!(begin, Err(AppError::NotFound(_))));
-        } else {
-            assert!(matches!(begin, Err(AppError::Forbidden(_))));
-        }
-        if role == "outsider" {
-            assert!(matches!(result, Err(AppError::NotFound(_))));
-        } else {
-            assert!(matches!(result, Err(AppError::Forbidden(_))));
-        }
+        // Everyone but the owner is told nothing (Plan06 02A.4).
+        assert!(matches!(begin, Err(AppError::NotFound(_))), "{role}");
+        assert!(matches!(result, Err(AppError::NotFound(_))), "{role}");
         assert!(matches!(
             f.service
                 .onboard(
@@ -792,7 +782,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
              FROM departments AS department \
              JOIN department_members AS member ON member.department_id = department.id \
              JOIN principals AS principal ON principal.id = member.principal_id \
-             WHERE department.company_id = $1",
+             WHERE department.company_id = $1 AND principal.kind='agent'",
         )
         .bind(f.company)
         .fetch_all(&f.db.pool)
@@ -824,7 +814,29 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
             .fetch_one(&f.db.pool)
             .await
             .unwrap();
-    assert_eq!(departments, 1);
+    assert_eq!(
+        departments, 2,
+        "the company root plus the onboarded department"
+    );
+    // Plan06 02B: the owner's onboarding records the department's creation and its placement,
+    // once; the replays above recorded nothing more.
+    let history: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT event.transition_kind, event.acting_role FROM department_administration_events AS event \
+         JOIN departments AS department ON department.id = event.department_id \
+         WHERE event.company_id = $1 AND NOT department.is_root ORDER BY event.created_at, event.id",
+    )
+    .bind(f.company)
+    .fetch_all(&f.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        history,
+        [
+            ("department_created".to_owned(), Some("owner".to_owned())),
+            ("member_added".to_owned(), Some("owner".to_owned())),
+        ],
+        "{history:?}"
+    );
 
     // A department whose address another department already holds refuses the submission.
     let taken = completed(
@@ -872,13 +884,13 @@ async fn agent_default_desk_onboarding_without_a_keyed_model_is_rejected() {
         "{outcome:?}"
     );
     assert_eq!(f.totals().await, (0, 0, 0));
-    let departments: i64 =
-        sqlx::query_scalar("SELECT count(*) FROM departments WHERE company_id = $1")
+    let departments: Vec<bool> =
+        sqlx::query_scalar("SELECT is_root FROM departments WHERE company_id = $1")
             .bind(f.company)
-            .fetch_one(&f.db.pool)
+            .fetch_all(&f.db.pool)
             .await
             .unwrap();
-    assert_eq!(departments, 0);
+    assert_eq!(departments, vec![true], "only the preexisting root remains");
 }
 
 /// 01DEP-P03-B1-F6: a resubmission under the same key that names a department for the first time
@@ -908,7 +920,7 @@ async fn agent_default_desk_onboarding_names_the_department_on_a_resubmission() 
         "SELECT department.slug::text, principal.agent_id FROM departments AS department \
          JOIN department_members AS member ON member.department_id = department.id \
          JOIN principals AS principal ON principal.id = member.principal_id \
-         WHERE department.company_id = $1",
+         WHERE department.company_id = $1 AND principal.kind='agent'",
     )
     .bind(f.company)
     .fetch_all(&f.db.pool)

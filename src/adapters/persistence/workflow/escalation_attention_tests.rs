@@ -149,7 +149,11 @@ async fn workflow_escalation_attention_actual_retirement_hands_waiting_work_to_t
     let owner_principal = owner(&f).await;
     for user in &f.people.users {
         f.p()
-            .remove_member(f.scope.company.as_uuid(), *user)
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.people.role.admission.binding.target.actor.user_id(),
+                company_id: f.scope.company.as_uuid(),
+                member_user_id: *user,
+            })
             .await
             .unwrap();
     }

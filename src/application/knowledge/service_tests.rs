@@ -23,13 +23,39 @@ impl KnowledgeDocuments for Documents {
     async fn access(&self, _: KnowledgeScope) -> AppResult<LevelActor> {
         Ok(actor())
     }
-    async fn list(&self, _: KnowledgeScope) -> AppResult<KnowledgeLibraryView> {
+    async fn preflight_search(
+        &self,
+        _: KnowledgeScope,
+        _: Option<crate::entities::department::DepartmentId>,
+    ) -> AppResult<()> {
+        panic!("unused")
+    }
+    async fn unit_choices(
+        &self,
+        _: KnowledgeScope,
+        _: KnowledgeUnitQuery,
+    ) -> AppResult<KnowledgeUnitPage> {
+        panic!("unused")
+    }
+    async fn list(
+        &self,
+        _: KnowledgeScope,
+        _: Option<crate::entities::department::DepartmentId>,
+    ) -> AppResult<KnowledgeLibraryView> {
         Ok(KnowledgeLibraryView {
             actor: actor(),
             layers: vec![],
+            upload_units: vec![],
+            writable_units: vec![],
+            default_unit: None,
+            units_truncated: false,
         })
     }
-    async fn preflight_upload(&self, _: KnowledgeScope, _: &[KnowledgeLayerSize]) -> AppResult<()> {
+    async fn preflight_upload(
+        &self,
+        _: KnowledgeUploadTarget,
+        _: &[KnowledgeLayerSize],
+    ) -> AppResult<()> {
         self.preflights.fetch_add(1, Ordering::SeqCst);
         if let Some(gate) = &self.preflight_gate {
             gate.entered.notify_one();
@@ -39,13 +65,22 @@ impl KnowledgeDocuments for Documents {
     }
     async fn replace(
         &self,
-        _: KnowledgeScope,
+        _: KnowledgeUploadTarget,
         _: &[PreparedKnowledgeDocument],
     ) -> AppResult<Vec<KnowledgeDocumentLayer>> {
         self.writes.fetch_add(1, Ordering::SeqCst);
         Ok(vec![])
     }
     async fn delete(&self, _: DeleteKnowledgeLayer) -> AppResult<()> {
+        panic!("unused")
+    }
+    async fn search_manual(
+        &self,
+        _: ManualKnowledgeQuery,
+    ) -> AppResult<Vec<search::StoredKnowledgeChunk>> {
+        panic!("unused")
+    }
+    async fn move_document(&self, _: MoveKnowledgeDocument) -> AppResult<()> {
         panic!("unused")
     }
 }
@@ -59,6 +94,12 @@ fn scope() -> KnowledgeScope {
     KnowledgeScope {
         company: CompanyId::new(Uuid::new_v4()),
         actor_id: Uuid::new_v4(),
+    }
+}
+fn target() -> KnowledgeUploadTarget {
+    KnowledgeUploadTarget {
+        scope: scope(),
+        unit: crate::entities::department::DepartmentId::new(Uuid::new_v4()),
     }
 }
 fn file(text: &str) -> KnowledgeUploadFile {
@@ -149,12 +190,13 @@ async fn knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_
     });
     let service = Arc::new(KnowledgeLibrary::new(docs.clone(), model));
     let first_service = service.clone();
-    let first = tokio::spawn(async move { first_service.upload(scope(), vec![file("one")]).await });
+    let first =
+        tokio::spawn(async move { first_service.upload(target(), vec![file("one")]).await });
     gate.entered.notified().await;
     first.abort();
     assert!(first.await.unwrap_err().is_cancelled());
     assert!(matches!(
-        service.upload(scope(), vec![file("two")]).await,
+        service.upload(target(), vec![file("two")]).await,
         Err(AppError::ServiceUnavailable(_))
     ));
     let shutting_down = service.clone();
@@ -175,7 +217,7 @@ async fn knowledge_upload_validates_all_chunks_before_embedding_and_rejects_bad_
     assert!(
         library
             .upload(
-                scope(),
+                target(),
                 vec![file("valid"), file(&format!("# {}", "x".repeat(129)))]
             )
             .await
@@ -185,11 +227,11 @@ async fn knowledge_upload_validates_all_chunks_before_embedding_and_rejects_bad_
     assert_eq!(docs.writes.load(Ordering::SeqCst), 0);
     for output in [Output::Missing, Output::NonFinite] {
         let library = KnowledgeLibrary::new(docs.clone(), Arc::new(Model::new(output)));
-        assert!(library.upload(scope(), vec![file("text")]).await.is_err());
+        assert!(library.upload(target(), vec![file("text")]).await.is_err());
     }
     assert_eq!(docs.writes.load(Ordering::SeqCst), 0);
     library
-        .upload(scope(), vec![file(&"long paragraph ".repeat(200))])
+        .upload(target(), vec![file(&"long paragraph ".repeat(200))])
         .await
         .unwrap();
     assert!(model.calls.load(Ordering::SeqCst) > 1);
@@ -227,7 +269,7 @@ async fn knowledge_upload_shutdown_competes_with_preflight_and_refuses_later_mod
     let model = Arc::new(Model::new(Output::Valid));
     let library = Arc::new(KnowledgeLibrary::new(documents.clone(), model.clone()));
     let uploading = library.clone();
-    let request = tokio::spawn(async move { uploading.upload(scope(), vec![file("text")]).await });
+    let request = tokio::spawn(async move { uploading.upload(target(), vec![file("text")]).await });
     gate.entered.notified().await;
     library.shutdown().await.unwrap();
     gate.release.notify_one();
@@ -250,12 +292,12 @@ async fn knowledge_upload_deadline_cancels_the_result_and_retains_permit_until_t
     });
     let library = Arc::new(KnowledgeLibrary::new(documents.clone(), model));
     let uploading = library.clone();
-    let request = tokio::spawn(async move { uploading.upload(scope(), vec![file("text")]).await });
+    let request = tokio::spawn(async move { uploading.upload(target(), vec![file("text")]).await });
     gate.entered.notified().await;
     tokio::time::advance(INDEXING_DEADLINE + Duration::from_secs(1)).await;
     assert!(matches!(request.await.unwrap(), Err(AppError::Timeout(_))));
     assert!(matches!(
-        library.upload(scope(), vec![file("retry")]).await,
+        library.upload(target(), vec![file("retry")]).await,
         Err(AppError::ServiceUnavailable(_))
     ));
     gate.release();

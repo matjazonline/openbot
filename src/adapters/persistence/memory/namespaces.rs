@@ -1,5 +1,5 @@
-//! Lazy namespace provisioning and the owner-removal hook (E2, E9), in the shared lock order
-//! (users → company → membership → agent → tenant → namespace → lifecycle).
+//! Owner creation/backstop provisioning and retirement in the shared lock order:
+//! account → company → agent (when applicable) → principal/unit → tenant → namespace → lifecycle.
 use super::*;
 use crate::adapters::persistence::PostgresPersistence;
 use crate::application::memory::{
@@ -9,88 +9,149 @@ use crate::application::workflow::CompanyId;
 use async_trait::async_trait;
 use sqlx::PgConnection;
 
-/// The stored shape of an owner: scope kind, agent id, user id, and the lifecycle owner id.
-struct OwnerColumns {
-    kind: &'static str,
-    agent: Option<Uuid>,
-    user: Option<Uuid>,
+/// The database key of one unit or principal namespace.
+pub(crate) struct OwnerColumns {
+    pub kind: &'static str,
+    pub unit: Option<Uuid>,
+    pub principal: Option<Uuid>,
     owner_id: Uuid,
 }
 
-fn columns(company: Uuid, owner: NamespaceOwner) -> OwnerColumns {
+pub(crate) fn columns(owner: NamespaceOwner) -> OwnerColumns {
     match owner {
-        NamespaceOwner::Company => OwnerColumns {
-            kind: "company",
-            agent: None,
-            user: None,
-            owner_id: company,
+        NamespaceOwner::Unit(unit) => OwnerColumns {
+            kind: "unit",
+            unit: Some(unit.as_uuid()),
+            principal: None,
+            owner_id: unit.as_uuid(),
         },
-        NamespaceOwner::Agent(agent) => OwnerColumns {
-            kind: "agent",
-            agent: Some(agent),
-            user: None,
-            owner_id: agent,
-        },
-        NamespaceOwner::User(user) => OwnerColumns {
-            kind: "user",
-            agent: None,
-            user: Some(user),
-            owner_id: user,
+        NamespaceOwner::Principal(principal) => OwnerColumns {
+            kind: "principal",
+            unit: None,
+            principal: Some(principal.as_uuid()),
+            owner_id: principal.as_uuid(),
         },
     }
 }
 
-/// The owner rows `FOR SHARE`, in order; `false` when any is missing or in another company.
-/// Deleting the owner takes `FOR UPDATE` on the same row, so it serializes with this.
 async fn lock_owner(
     db: &mut PgConnection,
     company: Uuid,
     owner: NamespaceOwner,
 ) -> AppResult<bool> {
-    if let NamespaceOwner::User(user) = owner {
-        let account: Option<Uuid> =
-            sqlx::query_scalar("SELECT id FROM users WHERE id = $1 FOR SHARE")
-                .bind(user)
-                .fetch_optional(&mut *db)
-                .await?;
-        if account.is_none() {
-            return Ok(false);
-        }
-    }
-    let live: Option<Uuid> = sqlx::query_scalar("SELECT id FROM companies WHERE id = $1 FOR SHARE")
-        .bind(company)
-        .fetch_optional(&mut *db)
-        .await?;
-    if live.is_none() {
-        return Ok(false);
-    }
-    let found: Option<Uuid> = match owner {
-        NamespaceOwner::Company => Some(company),
-        NamespaceOwner::User(user) => {
-            sqlx::query_scalar(
-                "SELECT member.id FROM company_members AS member \
-                 WHERE member.company_id = $1 AND member.user_id = $2 FOR SHARE",
-            )
+    let key = columns(owner);
+    Ok(
+        sqlx::query_scalar("SELECT memory_lock_namespace_owner($1,$2,$3)")
             .bind(company)
-            .bind(user)
-            .fetch_optional(&mut *db)
-            .await?
-        }
-        NamespaceOwner::Agent(agent) => {
-            sqlx::query_scalar(
-                "SELECT agent.id FROM agents AS agent \
-                 WHERE agent.id = $1 AND agent.company_id = $2 FOR SHARE",
-            )
-            .bind(agent)
-            .bind(company)
-            .fetch_optional(&mut *db)
-            .await?
-        }
-    };
-    Ok(found.is_some())
+            .bind(key.unit)
+            .bind(key.principal)
+            .fetch_one(db)
+            .await?,
+    )
 }
 
-pub(super) async fn ensure_on(
+impl super::super::PostgresPersistence {
+    /// Operator cleanup includes retiring unit namespaces, and never principal
+    /// namespaces. A missing company is an error, rather than an empty success.
+    pub async fn memory_unit_namespace_page(
+        &self,
+        company: crate::domain::workflow::CompanyId,
+        after: Option<Uuid>,
+    ) -> AppResult<Vec<crate::application::memory::NamespaceExternalId>> {
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM companies WHERE id=$1)")
+            .bind(company.as_uuid())
+            .fetch_one(&self.pool)
+            .await?;
+        if !exists {
+            return Err(AppError::NotFound("Memory company".into()));
+        }
+        let ids: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM memory_namespaces
+            WHERE company_id=$1 AND scope_kind='unit' AND ($2::uuid IS NULL OR id>$2)
+            ORDER BY id LIMIT 100",
+        )
+        .bind(company.as_uuid())
+        .bind(after)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(ids
+            .into_iter()
+            .map(crate::application::memory::NamespaceExternalId)
+            .collect())
+    }
+}
+
+pub(crate) struct ReadyNamespace {
+    pub namespace: crate::application::memory::NamespaceExternalId,
+    pub owner: NamespaceOwner,
+}
+
+/// Caller owns its company/run authority prefix. Keep tenant before namespaces,
+/// just as ordinary reads do, and never confuse a retired owner with provisioning.
+pub(crate) async fn ready_for_owners_on(
+    db: &mut PgConnection,
+    company: crate::domain::workflow::CompanyId,
+    owners: &[NamespaceOwner],
+) -> AppResult<Option<Vec<ReadyNamespace>>> {
+    let enabled: Option<bool> = sqlx::query_scalar(
+        "SELECT state='enabled' FROM memory_tenants WHERE company_id=$1 FOR SHARE",
+    )
+    .bind(company.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?;
+    if enabled != Some(true) {
+        return Ok(None);
+    }
+    let units: Vec<_> = owners
+        .iter()
+        .filter_map(|owner| match owner {
+            NamespaceOwner::Unit(id) => Some(id.as_uuid()),
+            _ => None,
+        })
+        .collect();
+    let principals: Vec<_> = owners
+        .iter()
+        .filter_map(|owner| match owner {
+            NamespaceOwner::Principal(id) => Some(id.as_uuid()),
+            _ => None,
+        })
+        .collect();
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: Uuid,
+        unit_id: Option<Uuid>,
+        principal_id: Option<Uuid>,
+    }
+    let rows:Vec<Row>=sqlx::query_as("SELECT namespace.id,namespace.unit_id,namespace.principal_id FROM memory_namespaces AS namespace
+        WHERE namespace.company_id=$1 AND namespace.state='ready'
+            AND ((namespace.scope_kind='unit' AND namespace.unit_id=ANY($2) AND EXISTS(
+                SELECT 1 FROM departments AS owner WHERE owner.company_id=namespace.company_id AND owner.id=namespace.unit_id))
+            OR (namespace.scope_kind='principal' AND namespace.principal_id=ANY($3) AND EXISTS(
+                SELECT 1 FROM principals AS owner WHERE owner.company_id=namespace.company_id AND owner.id=namespace.principal_id AND owner.kind IN ('person','agent'))))
+        ORDER BY namespace.id FOR SHARE OF namespace")
+        .bind(company.as_uuid()).bind(units).bind(principals).fetch_all(db).await?;
+    let ready = rows
+        .into_iter()
+        .map(|row| {
+            let owner = match (row.unit_id, row.principal_id) {
+                (Some(id), None) => {
+                    NamespaceOwner::Unit(crate::entities::department::DepartmentId::new(id))
+                }
+                (None, Some(id)) => {
+                    NamespaceOwner::Principal(crate::entities::transport::PrincipalId::new(id))
+                }
+                _ => return Err(AppError::Internal("Invalid memory namespace owner".into())),
+            };
+            Ok(ReadyNamespace {
+                namespace: crate::application::memory::NamespaceExternalId(row.id),
+                owner,
+            })
+        })
+        .collect::<AppResult<_>>()?;
+    Ok(Some(ready))
+}
+
+pub(crate) async fn ensure_on(
     db: &mut PgConnection,
     company: Uuid,
     owner: NamespaceOwner,
@@ -112,17 +173,17 @@ pub(super) async fn ensure_on(
         return Ok(NamespaceReadiness::NotEnabled);
     };
     let scope = owner;
-    let owner = columns(company, owner);
+    let owner = columns(owner);
     let existing: Option<(Uuid, String)> = sqlx::query_as(
         "SELECT namespace.id, namespace.state FROM memory_namespaces AS namespace \
          WHERE namespace.company_id = $1 AND namespace.scope_kind = $2 \
-           AND namespace.agent_id IS NOT DISTINCT FROM $3 \
-           AND namespace.user_id IS NOT DISTINCT FROM $4 AND namespace.state <> 'removing'",
+           AND namespace.unit_id IS NOT DISTINCT FROM $3 \
+           AND namespace.principal_id IS NOT DISTINCT FROM $4 AND namespace.state <> 'removing'",
     )
     .bind(company)
     .bind(owner.kind)
-    .bind(owner.agent)
-    .bind(owner.user)
+    .bind(owner.unit)
+    .bind(owner.principal)
     .fetch_optional(&mut *db)
     .await?;
     match existing {
@@ -162,14 +223,14 @@ pub(super) async fn ensure_on(
     // A concurrent provisioner of the same scope waits on the unique live index and then
     // inserts nothing: one namespace and one lifecycle per scope.
     let inserted: Option<Uuid> = sqlx::query_scalar(
-        "INSERT INTO memory_namespaces (company_id, id, scope_kind, agent_id, user_id, state) \
+        "INSERT INTO memory_namespaces (company_id, id, scope_kind, unit_id, principal_id, state) \
          VALUES ($1, $2, $3, $4, $5, 'provisioning') ON CONFLICT DO NOTHING RETURNING id",
     )
     .bind(company)
     .bind(Uuid::new_v4())
     .bind(owner.kind)
-    .bind(owner.agent)
-    .bind(owner.user)
+    .bind(owner.unit)
+    .bind(owner.principal)
     .fetch_optional(&mut *db)
     .await?;
     let Some(namespace) = inserted else {
@@ -217,14 +278,14 @@ pub(crate) async fn retire_namespaces_on(
     company: Uuid,
     owner: NamespaceOwner,
 ) -> AppResult<u64> {
-    let owner = columns(company, owner);
+    let owner = columns(owner);
     let retired = sqlx::query(
         "WITH retired AS ( \
            UPDATE memory_namespaces AS namespace SET state = 'removing', credential_id = NULL, \
              credential_envelope = NULL \
            WHERE namespace.company_id = $1 AND namespace.scope_kind = $2 \
-             AND namespace.agent_id IS NOT DISTINCT FROM $3 \
-             AND namespace.user_id IS NOT DISTINCT FROM $4 AND namespace.state <> 'removing' \
+             AND namespace.unit_id IS NOT DISTINCT FROM $3 \
+             AND namespace.principal_id IS NOT DISTINCT FROM $4 AND namespace.state <> 'removing' \
            RETURNING namespace.company_id, namespace.id) \
          INSERT INTO memory_lifecycles (id, company_id, resource, namespace_id, owner_kind, \
            owner_id, provisioner_credential_id, desired, observed, generation, fence, state, \
@@ -241,8 +302,8 @@ pub(crate) async fn retire_namespaces_on(
     )
     .bind(company)
     .bind(owner.kind)
-    .bind(owner.agent)
-    .bind(owner.user)
+    .bind(owner.unit)
+    .bind(owner.principal)
     .bind(owner.owner_id)
     .execute(&mut *db)
     .await?;
@@ -251,13 +312,13 @@ pub(crate) async fn retire_namespaces_on(
     let removing: Vec<Uuid> = sqlx::query_scalar(
         "SELECT namespace.id FROM memory_namespaces AS namespace \
          WHERE namespace.company_id = $1 AND namespace.scope_kind = $2 \
-           AND namespace.agent_id IS NOT DISTINCT FROM $3 \
-           AND namespace.user_id IS NOT DISTINCT FROM $4 AND namespace.state = 'removing'",
+           AND namespace.unit_id IS NOT DISTINCT FROM $3 \
+           AND namespace.principal_id IS NOT DISTINCT FROM $4 AND namespace.state = 'removing'",
     )
     .bind(company)
     .bind(owner.kind)
-    .bind(owner.agent)
-    .bind(owner.user)
+    .bind(owner.unit)
+    .bind(owner.principal)
     .fetch_all(&mut *db)
     .await?;
     super::deliveries::cancel_removed_on(db, company, &removing).await?;

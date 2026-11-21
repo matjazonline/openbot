@@ -1,0 +1,10 @@
+Current root binary, own fresh same-clock PG18 database; two full-run failures.
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4255 filtered out; finished in 49.74s
+
+Exit: 0

@@ -91,12 +91,14 @@ async fn agent_history_identity_manual_starter_owns_session_and_ceiling_not_bind
     let f = AdmissionFixture::new().await;
     let original = admitted(&f, "owner", None).await;
     let admin = super::super::message_tests::support::member(&f.binding.fixture, "admin").await;
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.binding.target.company.as_uuid())
-        .bind(admin)
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.binding.target.company.as_uuid())
+    .bind(admin)
+    .execute(f.persistence().pool())
+    .await
+    .unwrap();
     let mut request = f.request("actual-starter", f.manual());
     request.actor = WorkflowActor::authenticated(admin).unwrap();
     let command = f.prepare(request).await;

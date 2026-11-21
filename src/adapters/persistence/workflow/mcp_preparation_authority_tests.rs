@@ -206,6 +206,7 @@ async fn race(configuration: bool, disable: bool, wait: Wait) {
         if disable {
             p.update_mcp_connection(
                 current.company_id,
+                p.test_root_unit(current.company_id).await,
                 current.id,
                 current.revision,
                 crate::application::use_cases::mcp::McpConnectionWrite {

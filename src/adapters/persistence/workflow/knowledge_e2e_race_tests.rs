@@ -52,7 +52,7 @@ async fn change_audience(j: &SalesJourney, member: Uuid, thread: Uuid, change: A
             );
         }
         AudienceChange::MemberDemotion => {
-            let affected = sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2 AND access_level=5")
+            let affected = sqlx::query("UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2 AND access_level=5")
                 .bind(company).bind(member).execute(j.d.p().pool()).await.unwrap().rows_affected();
             assert_eq!(affected, 1, "actual current recipient was lowered");
         }

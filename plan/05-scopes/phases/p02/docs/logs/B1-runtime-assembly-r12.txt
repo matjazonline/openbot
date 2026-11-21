@@ -1,0 +1,19 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 27s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 6 tests
+test application::workflow::memory_tools::runtime::tests::memory_access_level_bounded_hits_record_exactly_what_is_shown ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_agent_memory_search_is_ceilinged_recorded_once_and_replayed ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_details_and_timeline_stay_within_the_ceiling ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4779 filtered out; finished in 4.55s
+

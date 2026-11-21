@@ -666,6 +666,16 @@ pub trait Store: MemoryStore + SearchStore + RecallStore + GenerationStore + Sen
         tenant: &str,
         cap: u64,
     ) -> Result<TenantView, ServiceError>;
+    async fn list_subject(
+        &self,
+        actor: Actor,
+        request: &super::contract::SubjectListRequest,
+    ) -> Result<super::contract::SubjectPage, ServiceError>;
+    async fn delete_subject(
+        &self,
+        actor: Actor,
+        request: &super::contract::SubjectDeleteRequest,
+    ) -> Result<super::contract::SubjectDeleted, ServiceError>;
     async fn create_namespace(
         &self,
         actor: Actor,

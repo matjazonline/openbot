@@ -24,7 +24,7 @@ async fn access_level_sql_domain_owner_and_defaults_are_enforced() {
     };
     let f = Fixture::new(pool).await;
     for invalid in [-1_i16, 10] {
-        let error = sqlx::query("UPDATE company_members SET access_level=$3::smallint WHERE company_id=$1 AND user_id=$2")
+        let error = sqlx::query("UPDATE department_members SET access_level=$3::smallint WHERE company_id=$1 AND root_user_id=$2")
             .bind(f.company_id).bind(f.member.id).bind(invalid).execute(&f.pool).await.unwrap_err();
         assert_eq!(
             error.as_database_error().unwrap().code().as_deref(),
@@ -41,7 +41,7 @@ async fn access_level_sql_domain_owner_and_defaults_are_enforced() {
     }
     assert!(
         sqlx::query(
-            "UPDATE company_members SET access_level=8 WHERE company_id=$1 AND role='owner'"
+            "UPDATE department_members SET access_level=8 WHERE company_id=$1 AND EXISTS (SELECT 1 FROM companies AS owner_company WHERE owner_company.id = department_members.company_id AND owner_company.user_id = department_members.root_user_id)"
         )
         .bind(f.company_id)
         .execute(&f.pool)
@@ -50,7 +50,7 @@ async fn access_level_sql_domain_owner_and_defaults_are_enforced() {
     );
     assert!(
         sqlx::query(
-            "UPDATE company_members SET access_level=NULL WHERE company_id=$1 AND role='owner'"
+            "UPDATE department_members SET access_level=NULL WHERE company_id=$1 AND EXISTS (SELECT 1 FROM companies AS owner_company WHERE owner_company.id = department_members.company_id AND owner_company.user_id = department_members.root_user_id)"
         )
         .bind(f.company_id)
         .execute(&f.pool)
@@ -59,15 +59,14 @@ async fn access_level_sql_domain_owner_and_defaults_are_enforced() {
     );
     assert_eq!(f.level(f.owner.id).await, AccessLevel::MAX);
     let user = account(&f.persistence, "default").await;
-    sqlx::query(
-        "INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,'member')",
+    crate::adapters::persistence::test_support::insert_root_member(
+        &f.pool,
+        crate::domain::workflow::CompanyId::new(f.company_id),
+        user.id,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(f.company_id)
-    .bind(user.id)
-    .execute(&f.pool)
-    .await
-    .unwrap();
+    .await;
     assert_eq!(f.level(user.id).await, AccessLevel::PUBLIC);
     let level: i16 = sqlx::query_scalar("INSERT INTO company_invites(id,company_id,email,role) VALUES($1,$2,'default@example.test','member') RETURNING access_level::smallint")
         .bind(Uuid::new_v4()).bind(f.company_id).fetch_one(&f.pool).await.unwrap();
@@ -266,7 +265,13 @@ async fn access_level_joint_readers_external_observed_and_former_members_are_pub
         .unwrap();
     assert_eq!(observed.membership, CompanyMembership::None);
     assert_eq!(observed.access_level, AccessLevel::PUBLIC);
-    p.remove_member(f.company_id, f.admin.id).await.unwrap();
+    p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+        actor_id: f.owner.id,
+        company_id: f.company_id,
+        member_user_id: f.admin.id,
+    })
+    .await
+    .unwrap();
     let former = p
         .access_context_for_identity(f.company_id, &email(&f.admin.email))
         .await

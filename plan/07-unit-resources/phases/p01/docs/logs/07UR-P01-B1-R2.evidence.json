@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "round": "07UR-P01-B1-R2",
+  "artifact": "c8c0b6d3b7f4634542ffc65305506e2e6d26f1ecaf163029e6156bf354e08cfd",
+  "checks": [
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "F3",
+        "F5",
+        "01A.1-schema",
+        "01A.1-default",
+        "D2-authority",
+        "01A.3-delete",
+        "01B.4-move"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_resource",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases), Node 24.22.3 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-unit-resource-tests.txt",
+          "sha256": "af4dac4ea3ddb53696cf4596e6995ffe6f333688f7e7c4bf5ae4e689d3863ab6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-existing"
+      ],
+      "command": "cargo test --locked --offline --lib -- skill department connection_level mcp http_connection integration_binding vault ui_agents agent_authoring binding_tests http_tests ui_companies",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases), Node 24.22.3 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused.txt",
+          "sha256": "f1c9aa7bcb187a93ecec53f94f6fd85d48e47ac14ad0706b247c4d09c3952b22"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "6b0ef80c60b4b0f33ce29e765b0be9404a7a9e0c9ba720b298b5c199f9c7d658"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F3"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_resource_authority_vault",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_b1 (+ _test and per-test own databases), Node 24.22.3 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-vault-after-clippy-fix.txt",
+          "sha256": "c666fd9687a428e9b4175b2a69f69e8f9d95cb1dde0fc301ef3ad557c8086c84"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sqlx-metadata"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh migrated openbot_p07_sqlx @55407 (R1 evidence; no query changed since)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-check.txt",
+          "sha256": "357cbe4433b3d6bac33784de4ff815a65d958df57584f6d67cf8f30d28043c46"
+        }
+      ]
+    }
+  ]
+}

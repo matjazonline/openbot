@@ -1,0 +1,82 @@
+checking 39 changed files against 29 learnings and 4 skills
+
+● migrations/20260817000000_init_schema.sql:15871
+  brings back shared company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/memory/namespaces.rs:1
+  brings back agent retirement principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: The old agent retirement test inserted a principal and
+  waited for its concurrent agent deletion to block.
+● src/adapters/persistence/memory/namespaces.rs:1
+  brings back shared account company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/memory/tests.rs:31
+  brings back department principal root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● src/adapters/persistence/participant.rs:347
+  brings back account company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/participant.rs:482
+  brings back agent principal deletion, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: The old agent retirement test inserted a principal and
+  waited for its concurrent agent deletion to block.
+● src/adapters/persistence/workflow/memory_steps.rs:68
+  brings back role selector step, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The role-selector helper test passed while the real
+  mcp_step_request boundary still blocked; the new genuine
+  originating-workflow test and PostgreSQL wait sampling exposed it.
+● src/adapters/persistence/workflow/memory_steps.rs:74
+  brings back department principal root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● src/adapters/persistence/workflow/role_snapshot_tests.rs:319
+  brings back role selector test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The role-selector helper test passed while the real
+  mcp_step_request boundary still blocked; the new genuine
+  originating-workflow test and PostgreSQL wait sampling exposed it.
+● src/adapters/persistence/workflow/role_snapshot_tests.rs:320
+  brings back channel department root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: When a referenced-row race relies on a foreign-key lock,
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ migrations/20260817000000_init_schema.sql
+  follows skill implement-opus-2_3-system-improvement: It reads `AGENTS.md` only
+✓ migrations/20260817000000_init_schema.sql
+  follows skill implement-opus-2_4-system-improvement: It reads `AGENTS.md` only
+✓ src/adapters/persistence/agent.rs
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ src/adapters/persistence/company/member_retirement.rs
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ src/adapters/persistence/department/lifecycle.rs
+  follows Mac02's learning: This leaves its company/desk/principal/capability/provenance identity unchanged while giving PostgreSQL
+✓ src/adapters/persistence/department/lifecycle.rs
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ src/adapters/persistence/memory/namespaces.rs
+  follows Mac02's learning: Exercise real populated workflow-native and direct-native histories through company
+✓ src/adapters/persistence/participant.rs
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+
+· no conflicts · 10 worth a look

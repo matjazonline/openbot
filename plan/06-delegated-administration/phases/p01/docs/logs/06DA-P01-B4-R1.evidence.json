@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B4-R1",
+  "artifact": "2c9a298f7c0fb765c1fbfd6858d2c80a245039f9d4699b1de7e39647463b691b",
+  "checks": [
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "git diff --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-sqlx-prepare-check.txt",
+          "sha256": "5cbb2b1edd5c3ccfb2eb9e2b9183902385fc7140b67894b61157535f4af7cfe7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-source-modules.txt",
+          "sha256": "88f9cac4f649804f15fbc2fa9bbc4886f1ddb6132891d85bba675eab0f1dfbed"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "01B.6",
+        "01B.7",
+        "B4-REGRESSION"
+      ],
+      "command": "cargo test --locked --offline --lib -- company_invite ui_team_authorization company_access_level company_owner company_tests:: root_unit root_competing account_identity access_mode_scale knowledge delegated_admin memory_scope workflow_and_transport_depend department_ manages_unit",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-focused-final.txt",
+          "sha256": "82122af00f72af6146c5560f685652c67b5c9d89de16f3b337d56285585b5482"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-DISCOVERY"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list (compared with merge-baseline names)",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-discovery-before.txt",
+          "sha256": "b2f9096a49bc75fdac46b50408899b01d7d3d436385350f286b351ac6edfed25"
+        },
+        {
+          "path": "logs/B4-discovery-after.txt",
+          "sha256": "936a9947d012f3f24b4725f9de8ff9f6ab87ebdd49da83db4b3edf00d1cc7ec1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "PLAN05-MERGE"
+      ],
+      "command": "cargo test --lib --no-fail-fast (merge baseline 174c83b3)",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/M1-merge-lib-tests.txt",
+          "sha256": "db2b48a414a54bb3c9f19383faf515874df1f5ff6fc23a1c555a569335730362"
+        },
+        {
+          "path": "logs/M1-isolated-reruns.txt",
+          "sha256": "33628341401c206e204652991839416f7d5046c6b62bda87acb83f6d7a6d3b1b"
+        }
+      ]
+    }
+  ]
+}

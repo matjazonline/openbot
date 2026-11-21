@@ -1,0 +1,15 @@
+# cmd: SQLX_OFFLINE=true TEST_DATABASE_URL/DATABASE_URL=postgres://mac02@127.0.0.1:55406/openbot_p06_merge05 MEMORY_TEST_DATABASE_URL=postgres://mac02@127.0.0.1:55406/postgres scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_admin_ authorization_tests ui_team company::tests onboarding skill_library::http_bundle local_machines pairing_tests company_invite_level department_ui team_level ui_departments bindings_tests manages_unit_ desk_wording knowledge_tests workflow_conversation binding_association
+# artifact 6248bc8cd74f200a4e11f9ba2d00fd37eee979cfc341cb09f363d7e05814897d HEAD 5874dfb1
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.70s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4902 filtered out; finished in 0.00s
+

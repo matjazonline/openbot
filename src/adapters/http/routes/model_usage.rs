@@ -32,6 +32,9 @@ struct Filters {
     agent: Option<Uuid>,
     #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
     workflow: Option<Uuid>,
+    /// One department's calls, for the drill-down by desk (Plan07 02C).
+    #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
+    unit: Option<Uuid>,
 }
 impl Filters {
     fn query(self, scope: UsageScope) -> AppResult<UsageQuery> {
@@ -43,9 +46,15 @@ impl Filters {
             "model" => UsageGrouping::Model,
             "workflow" => UsageGrouping::Workflow,
             "department" => UsageGrouping::Department,
+            "desk" if self.unit.is_some() => UsageGrouping::Desk,
+            "desk" => {
+                return Err(AppError::BadRequest(
+                    "Grouping by desk needs a department".into(),
+                ));
+            }
             _ => {
                 return Err(AppError::BadRequest(
-                    "Group must be model, workflow or department".into(),
+                    "Group must be model, workflow, department or desk".into(),
                 ));
             }
         };
@@ -57,6 +66,7 @@ impl Filters {
             grouping,
             agent: self.agent,
             workflow: self.workflow,
+            unit: self.unit,
         })
     }
 }
@@ -175,6 +185,7 @@ mod tests {
                 grouping: query.grouping,
                 groups: vec![UsageGroup {
                     department: None,
+                    desk: None,
                     provider: Some("<script>".into()),
                     model: Some("\"onfocus=\"evil".into()),
                     workflow: None,
@@ -199,7 +210,13 @@ mod tests {
                     revision: 1,
                 }],
                 prices_truncated: false,
+                budgets: Vec::new(),
+                budgets_truncated: false,
+                prices_editable: true,
             })
+        }
+        async fn unit_spend(&self, _: UsageScope) -> AppResult<(Vec<UnitBudgetStatus>, bool)> {
+            Ok((Vec::new(), false))
         }
         async fn save_model_price(&self, write: PriceWrite) -> AppResult<()> {
             write.validate()?;

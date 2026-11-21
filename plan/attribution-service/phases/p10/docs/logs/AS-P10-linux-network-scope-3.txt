@@ -1,0 +1,7 @@
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+debconf: delaying package configuration, since apt-utils is not installed
+PASS: concurrent standalone guards isolate descendants and preserve supervisor/UID/environment/status; cleanup complete
+PASS: changing only the selector to UID blocks the supervisor

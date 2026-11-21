@@ -1,0 +1,1005 @@
+tools: /private/tmp/claude-501/-Users-mac02-orca-workspaces-openbot-plan06/b36d9dc4-495e-4131-9804-05ebcc381915/scratchpad/toolshim/python3 Python 3.13.18; node v24.22.3; HEAD 46c53d01 + working tree
+
+==> Knowledge preparation osx-arm64 (runtime package downloaded)
+Verified local knowledge artifacts: /Users/mac02/orca/workspaces/openbot/plan06/target/knowledge-model
+
+==> Knowledge preparation linux-x64 (extract and verify only)
+Verified local knowledge artifacts: /Users/mac02/orca/workspaces/openbot/plan06/target/ort-repin-check/linux-x64
+
+==> Knowledge preparation linux-aarch64 (extract and verify only)
+Verified local knowledge artifacts: /Users/mac02/orca/workspaces/openbot/plan06/target/ort-repin-check/linux-aarch64
+
+==> Knowledge model check (native ORT load and probe)
+   Compiling serde v1.0.229
+   Compiling zeroize v1.8.1
+   Compiling zerofrom v0.1.6
+   Compiling futures-util v0.3.31
+   Compiling tracing v0.1.41
+   Compiling thiserror v2.0.20
+   Compiling darling_core v0.20.11
+   Compiling string_cache_codegen v0.5.4
+   Compiling ref-cast v1.0.26
+   Compiling string_cache_codegen v0.6.1
+   Compiling yoke v0.8.0
+   Compiling thiserror v1.0.69
+   Compiling pin-project v1.1.13
+   Compiling generic-array v0.14.7
+   Compiling rustls-pki-types v1.12.0
+   Compiling aws-lc-rs v1.18.1
+   Compiling der v0.7.10
+   Compiling markup5ever v0.12.1
+   Compiling web_atoms v0.2.6
+   Compiling monostate v0.1.18
+   Compiling zerovec v0.11.4
+   Compiling smallvec v1.15.1
+   Compiling zerotrie v0.2.2
+   Compiling parking_lot_core v0.9.11
+   Compiling either v1.15.0
+   Compiling parking_lot v0.12.4
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling ahash v0.8.12
+   Compiling digest v0.10.7
+   Compiling tokio v1.50.0
+   Compiling serde_urlencoded v0.7.1
+   Compiling chrono v0.4.45
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling spki v0.7.3
+   Compiling sha1 v0.10.6
+   Compiling tinystr v0.8.1
+   Compiling potential_utf v0.1.2
+   Compiling rustls-webpki v0.103.4
+   Compiling pkcs8 v0.10.2
+   Compiling icu_locale_core v2.0.0
+   Compiling icu_collections v2.0.0
+   Compiling futures-intrusive v0.5.0
+   Compiling string_cache v0.8.9
+   Compiling darling_macro v0.20.11
+   Compiling webpki-roots v1.0.2
+   Compiling sec1 v0.7.3
+   Compiling rustls v0.23.31
+   Compiling darling v0.20.11
+   Compiling icu_provider v2.0.0
+   Compiling futures-executor v0.3.31
+   Compiling icu_normalizer v2.0.0
+   Compiling icu_properties v2.0.1
+   Compiling futures v0.3.31
+   Compiling derive_builder_core v0.20.2
+   Compiling string_cache v0.9.0
+   Compiling inout v0.1.4
+   Compiling crypto-bigint v0.5.5
+   Compiling cipher v0.4.4
+   Compiling webpki-roots v0.26.11
+   Compiling tungstenite v0.26.2
+   Compiling itertools v0.14.0
+   Compiling rayon v1.12.0
+   Compiling serde_path_to_error v0.1.17
+   Compiling aes v0.8.4
+   Compiling idna_adapter v1.2.1
+   Compiling derive_builder_macro v0.20.2
+   Compiling markup5ever v0.39.0
+   Compiling idna v1.1.0
+   Compiling elliptic-curve v0.13.8
+   Compiling tracing-futures v0.2.5
+   Compiling derive_builder v0.20.2
+   Compiling xml5ever v0.18.1
+   Compiling html5ever v0.27.0
+   Compiling url v2.5.8
+   Compiling multer v3.1.0
+   Compiling pbkdf2 v0.12.2
+   Compiling hkdf v0.12.4
+   Compiling rfc6979 v0.4.0
+   Compiling signature v2.2.0
+   Compiling sqlx-core v0.8.6
+   Compiling md-5 v0.10.6
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling rayon-cond v0.4.0
+   Compiling dary_heap v0.3.9
+   Compiling email_address v0.2.9
+   Compiling schemars v1.2.2
+   Compiling compact_str v0.9.1
+   Compiling fluent-uri v0.3.2
+   Compiling spm_precompiled v0.1.4
+   Compiling async-stream v0.3.6
+   Compiling axum-core v0.5.2
+   Compiling hashify v0.2.9
+   Compiling granit-parser v1.3.0
+   Compiling zip v2.4.2
+   Compiling ort v2.0.0-rc.13
+   Compiling tokio-util v0.7.19
+   Compiling tower v0.5.2
+   Compiling tokio-rustls v0.24.1
+   Compiling hickory-proto v0.24.4
+   Compiling tokio-rustls v0.26.4
+   Compiling h2 v0.4.15
+   Compiling tower-http v0.6.11
+   Compiling tokio-stream v0.1.17
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling tokio-tungstenite v0.26.2
+   Compiling mail-parser v0.10.2
+   Compiling referencing v0.33.0
+   Compiling tokenizers v0.23.2
+   Compiling safetensors v0.8.0
+   Compiling ecdsa v0.16.9
+   Compiling markup5ever_rcdom v0.3.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling primeorder v0.13.6
+   Compiling html5ever v0.39.0
+   Compiling sse-stream v0.2.5
+   Compiling blake2 v0.10.6
+   Compiling quick_cache v0.6.24
+   Compiling cssparser v0.37.0
+   Compiling rustls-pemfile v2.2.0
+   Compiling tracing-serde v0.2.0
+   Compiling simple_asn1 v0.6.4
+   Compiling jsonschema v0.33.0
+   Compiling tracing-subscriber v0.3.19
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling jsonwebtoken v9.3.1
+   Compiling ammonia v4.1.4
+   Compiling lettre v0.11.23
+   Compiling hickory-resolver v0.24.4
+   Compiling serde-saphyr v1.3.0
+   Compiling hyper v1.7.0
+   Compiling argon2 v0.5.3
+   Compiling icu_casemap v2.0.0
+   Compiling mail-auth v0.6.1
+   Compiling p256 v0.13.2
+   Compiling hyper-util v0.1.16
+   Compiling htmd v0.1.6
+   Compiling chrono-tz v0.10.4
+   Compiling fastembed v7.1.1
+   Compiling sqlx-macros-core v0.8.6
+   Compiling oauth2 v5.0.0
+   Compiling secrecy v0.10.3
+   Compiling hyper-rustls v0.27.9
+   Compiling axum v0.8.4
+   Compiling sqlx-macros v0.8.6
+   Compiling reqwest v0.13.4
+   Compiling sqlx v0.8.6
+   Compiling rig-core v0.42.0
+   Compiling rmcp v1.8.0
+   Compiling axum-extra v0.10.1
+   Compiling rig-agent v0.42.0
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (bin "open_bots") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 14s
+     Running `target/debug/open_bots knowledge model-check`
+{"model_id":"intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384","dimensions":384,"norm":1.0000000162263665,"translation_score":0.8418708013514999,"unrelated_score":0.7169436551792845,"load_ms":23111,"probe_ms":9310,"peak_rss_bytes":1878851584,"batch_size":4,"batch_tokens":512,"chunk_count":7,"largest_chunk_tokens":381,"oversized_query_and_batch_refused":true,"retrieval":{"threshold":0.75,"questions":16,"matched":16,"exact_first_checks":3,"exact_first_passed":3,"min_expected_similarity":0.8030392,"max_unrelated_similarity":0.7431378,"bounded_corpus_chunks":8192,"outcomes":[{"query":"How long can I return a product for a refund?","expected_file":"returns.md","returned_files":["returns.md","warranty.md","payments.md","support.md","ax4401.md"],"expected_similarity":0.8374708,"matched":true,"exact_first":true},{"query":"¿Cuánto tiempo tengo para devolver un producto y recuperar el dinero?","expected_file":"returns.md","returned_files":["returns.md","shipping.md","warranty.md","support.md","payments.md"],"expected_similarity":0.8299237,"matched":true,"exact_first":true},{"query":"Quanto dura la garanzia dei prodotti?","expected_file":"warranty.md","returned_files":["warranty.md","returns.md","international.md","shipping.md","ax4401.md"],"expected_similarity":0.87181044,"matched":true,"exact_first":true},{"query":"How long does the product warranty last?","expected_file":"warranty.md","returned_files":["warranty.md","ax4401.md","ax4410.md","returns.md","delta-pro.md"],"expected_similarity":0.85695094,"matched":true,"exact_first":true},{"query":"¿Cuánto tarda en llegar un pedido nacional?","expected_file":"shipping.md","returned_files":["shipping.md","support.md","warranty.md","international.md","returns.md"],"expected_similarity":0.9180797,"matched":true,"exact_first":true},{"query":"Quels sont les horaires de l’assistance ?","expected_file":"support.md","returned_files":["support.md","shipping.md","warranty.md","ax4401.md","returns.md"],"expected_similarity":0.8754769,"matched":true,"exact_first":true},{"query":"When must a business invoice be paid?","expected_file":"payments.md","returned_files":["payments.md","shipping.md","support.md","international.md","pricing.md"],"expected_similarity":0.9002544,"matched":true,"exact_first":true},{"query":"What is the minimum quantity for a wholesale order?","expected_file":"bulk.md","returned_files":["bulk.md","pricing.md","warranty.md","international.md","delta-basic.md"],"expected_similarity":0.9144393,"matched":true,"exact_first":true},{"query":"Quale sconto si applica a un ordine di cento unità?","expected_file":"pricing.md","returned_files":["warranty.md","pricing.md","international.md","bulk.md","support.md"],"expected_similarity":0.8030392,"matched":true,"exact_first":true},{"query":"What is the battery life of the AX-4410 scanner?","expected_file":"ax4410.md","returned_files":["ax4410.md","ax4401.md","warranty.md"],"expected_similarity":0.92960906,"matched":true,"exact_first":true},{"query":"¿Cuánto dura la batería del AX-4401?","expected_file":"ax4401.md","returned_files":["ax4401.md","ax4410.md","warranty.md","shipping.md","support.md"],"expected_similarity":0.87891287,"matched":true,"exact_first":true},{"query":"What motor power does Delta Pro have?","expected_file":"delta-pro.md","returned_files":["delta-pro.md","delta-basic.md","ax4401.md","ax4410.md"],"expected_similarity":0.8769004,"matched":true,"exact_first":true},{"query":"Quale Incoterms usate per gli ordini internazionali?","expected_file":"international.md","returned_files":["international.md","warranty.md","shipping.md"],"expected_similarity":0.8955252,"matched":true,"exact_first":true},{"query":"Innerhalb welcher Frist kann ich Waren zurückgeben?","expected_file":"returns.md","returned_files":["returns.md","warranty.md","support.md","shipping.md","international.md"],"expected_similarity":0.8775569,"matched":true,"exact_first":true},{"query":"How many moons orbit Neptune?","expected_file":null,"returned_files":[],"expected_similarity":null,"matched":true,"exact_first":true},{"query":"Qual è la capitale dell’Islanda?","expected_file":null,"returned_files":[],"expected_similarity":null,"matched":true,"exact_first":true}]}}
+
+==> Memory model preparation
+
+==> Memory extracted service suite
+extracted: /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//memory-extracted.t3UlKY/memory (--cached)
+
+==> Formatting
+
+==> Boundary (with poisoned-parent probe)
+boundary: ok (with poisoned-parent probe)
+
+==> Fetch locked dependencies
+
+==> Offline compilation
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling libc v0.2.190
+   Compiling serde v1.0.229
+   Compiling serde_core v1.0.229
+    Checking cfg-if v1.0.5
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling autocfg v1.5.1
+   Compiling version_check v0.9.5
+    Checking memchr v2.8.3
+    Checking itoa v1.0.18
+    Checking pin-project-lite v0.2.17
+    Checking once_cell v1.21.4
+    Checking futures-core v0.3.34
+   Compiling zmij v1.0.23
+   Compiling zerocopy v0.8.56
+   Compiling icu_properties_data v2.3.0
+   Compiling generic-array v0.14.7
+   Compiling pkg-config v0.3.34
+   Compiling icu_normalizer_data v2.3.0
+   Compiling num-traits v0.2.19
+    Checking bytes v1.12.1
+    Checking stable_deref_trait v1.2.1
+    Checking futures-sink v0.3.34
+   Compiling parking_lot_core v0.9.12
+    Checking futures-channel v0.3.34
+   Compiling fs_extra v1.3.0
+    Checking futures-io v0.3.34
+   Compiling dunce v1.0.5
+    Checking slab v0.4.12
+    Checking futures-task v0.3.34
+   Compiling serde_json v1.0.151
+    Checking rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling crossbeam-utils v0.8.22
+    Checking litemap v0.8.3
+   Compiling syn v3.0.6
+   Compiling syn v2.0.119
+   Compiling jobserver v0.1.35
+    Checking errno v0.3.14
+    Checking mio v1.2.2
+    Checking socket2 v0.6.5
+    Checking getrandom v0.2.17
+    Checking signal-hook-registry v1.4.8
+   Compiling thiserror v2.0.21
+    Checking zeroize v1.9.0
+    Checking writeable v0.6.4
+   Compiling cc v1.6.0
+    Checking log v0.4.34
+   Compiling typenum v1.20.1
+    Checking percent-encoding v2.3.2
+    Checking subtle v2.6.1
+    Checking bitflags v2.13.2
+   Compiling aws-lc-rs v1.18.1
+    Checking core-foundation-sys v0.8.7
+    Checking utf8_iter v1.0.4
+    Checking rustls-pki-types v1.15.1
+    Checking http v1.5.0
+    Checking tracing-core v0.1.36
+    Checking untrusted v0.9.0
+   Compiling getrandom v0.3.4
+    Checking num-integer v0.1.46
+   Compiling cmake v0.1.58
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+    Checking http-body v1.0.1
+   Compiling digest v0.10.7
+    Checking equivalent v1.0.2
+   Compiling rustls v0.23.43
+    Checking form_urlencoded v1.2.2
+    Checking aho-corasick v1.1.4
+   Compiling crossbeam-epoch v0.9.21
+    Checking allocator-api2 v0.2.21
+    Checking tower-service v0.3.3
+    Checking scopeguard v1.2.0
+   Compiling fnv v1.0.7
+   Compiling strsim v0.11.1
+    Checking regex-syntax v0.8.11
+    Checking base64 v0.22.1
+   Compiling ident_case v1.0.1
+    Checking lock_api v0.4.14
+   Compiling ring v0.17.14
+   Compiling aws-lc-sys v0.45.0
+    Checking uuid v1.27.0
+   Compiling httparse v1.10.1
+   Compiling darling_core v0.20.11
+   Compiling crossbeam-deque v0.8.8
+   Compiling synstructure v0.14.0
+   Compiling foldhash v0.1.5
+   Compiling tinyvec_macros v0.1.1
+    Checking regex-automata v0.4.18
+    Checking ppv-lite86 v0.2.21
+   Compiling ref-cast v1.0.27
+   Compiling iana-time-zone v0.1.65
+   Compiling hashbrown v0.15.5
+   Compiling tinyvec v1.12.0
+   Compiling tokio v1.53.2
+   Compiling webpki-roots v1.0.9
+   Compiling tracing-attributes v0.1.31
+   Compiling rand_core v0.6.4
+    Checking num-complex v0.4.6
+   Compiling cpufeatures v0.2.17
+   Compiling ahash v0.8.12
+   Compiling rayon-core v1.13.0
+   Compiling serde_derive v1.0.229
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.6
+   Compiling displaydoc v0.2.7
+   Compiling tokio-macros v2.7.2
+   Compiling futures-macro v0.3.34
+   Compiling thiserror-impl v2.0.21
+    Checking tracing v0.1.44
+   Compiling darling_macro v0.20.11
+    Checking futures-util v0.3.34
+   Compiling ref-cast-impl v1.0.27
+    Checking try-lock v0.2.5
+    Checking zerofrom v0.1.8
+   Compiling crc-catalog v2.5.0
+   Compiling hashbrown v0.17.1
+   Compiling parking v2.2.1
+   Compiling rustversion v1.0.22
+    Checking yoke v0.8.3
+   Compiling indexmap v2.14.1
+    Checking zerovec v0.11.8
+    Checking zerotrie v0.2.5
+   Compiling tokio-stream v0.1.19
+    Checking tinystr v0.8.4
+    Checking icu_locale_core v2.3.0
+    Checking potential_utf v0.1.6
+    Checking icu_collections v2.3.0
+   Compiling event-listener v5.4.2
+    Checking smallvec v1.16.2
+    Checking either v1.17.0
+    Checking icu_provider v2.3.1
+    Checking chrono v0.4.45
+    Checking parking_lot v0.12.5
+    Checking icu_properties v2.3.0
+    Checking icu_normalizer v2.3.0
+   Compiling futures-intrusive v0.5.0
+   Compiling crc v3.4.0
+   Compiling rand_chacha v0.3.1
+    Checking want v0.3.2
+   Compiling darling v0.20.11
+   Compiling sha2 v0.10.9
+   Compiling webpki-roots v0.26.11
+   Compiling crossbeam-queue v0.3.13
+   Compiling hashlink v0.10.0
+    Checking idna_adapter v1.2.2
+   Compiling unicode-normalization v0.1.25
+   Compiling onig_sys v69.9.3
+    Checking idna v1.1.0
+   Compiling hmac v0.12.1
+    Checking http-body-util v0.1.3
+    Checking url v2.5.8
+   Compiling matrixmultiply v0.3.11
+    Checking sync_wrapper v1.0.2
+   Compiling unicode-properties v0.1.4
+    Checking httpdate v1.0.3
+    Checking ryu v1.0.23
+    Checking atomic-waker v1.1.2
+    Checking tower-layer v0.3.3
+   Compiling unicode-bidi v0.3.18
+   Compiling rustix v1.1.4
+    Checking pin-utils v0.1.0
+   Compiling stringprep v0.1.5
+    Checking hyper v1.8.1
+   Compiling rustls-webpki v0.103.14
+   Compiling hkdf v0.12.4
+   Compiling derive_builder_core v0.20.2
+   Compiling rand v0.8.7
+   Compiling atoi v2.0.0
+    Checking rand_core v0.9.5
+   Compiling md-5 v0.10.6
+   Compiling ort-sys v2.0.0-rc.13
+    Checking minimal-lexical v0.2.1
+    Checking ipnet v2.12.2
+    Checking rawpointer v0.2.1
+   Compiling pastey v0.2.3
+   Compiling dotenvy v0.15.7
+   Compiling paste v1.0.15
+   Compiling byteorder v1.5.0
+    Checking lazy_static v1.5.0
+   Compiling whoami v1.6.1
+   Compiling esaxx-rs v0.1.10
+   Compiling hex v0.4.3
+   Compiling home v0.5.12
+   Compiling derive_builder_macro v0.20.2
+    Checking castaway v0.2.4
+    Checking hyper-util v0.1.20
+    Checking nom v7.1.3
+    Checking rand_chacha v0.9.0
+    Checking rayon v1.12.0
+    Checking tower v0.5.3
+    Checking itertools v0.14.0
+    Checking regex v1.13.1
+   Compiling monostate-impl v0.1.18
+   Compiling serde_derive_internals v0.30.0
+    Checking security-framework-sys v2.17.0
+    Checking core-foundation v0.10.1
+    Checking foldhash v0.2.0
+   Compiling heck v0.5.0
+    Checking fastrand v2.5.0
+   Compiling macro_rules_attribute-proc_macro v0.2.3
+    Checking static_assertions v1.1.0
+    Checking base64 v0.13.1
+    Checking unicode-segmentation v1.13.3
+    Checking tempfile v3.27.0
+    Checking compact_str v0.9.1
+    Checking monostate v0.1.18
+    Checking security-framework v3.7.0
+    Checking spm_precompiled v0.1.4
+    Checking hashbrown v0.16.1
+    Checking rand v0.9.5
+    Checking ndarray v0.17.2
+    Checking macro_rules_attribute v0.2.3
+    Checking derive_builder v0.20.2
+   Compiling schemars_derive v1.2.2
+    Checking rayon-cond v0.4.0
+    Checking unicode-normalization-alignments v0.1.12
+    Checking dary_heap v0.3.9
+    Checking futures-executor v0.3.34
+    Checking num-bigint v0.4.8
+    Checking chacha20 v0.10.2
+    Checking libloading v0.9.0
+    Checking dyn-clone v1.0.20
+   Compiling sqlx-core v0.8.6
+    Checking mime v0.3.17
+   Compiling anyhow v1.0.104
+   Compiling rmcp v1.8.0
+    Checking daachorse v3.0.3
+    Checking unicode_categories v0.1.1
+    Checking axum-core v0.5.6
+    Checking rand v0.10.3
+    Checking futures v0.3.34
+    Checking safetensors v0.8.0
+    Checking tower-http v0.6.11
+    Checking sharded-slab v0.1.7
+    Checking num-rational v0.4.2
+    Checking serde_urlencoded v0.7.1
+    Checking sse-stream v0.2.5
+    Checking tokio-util v0.7.19
+    Checking tracing-serde v0.2.0
+    Checking matchers v0.2.0
+   Compiling async-trait v0.1.92
+    Checking num-iter v0.1.45
+    Checking schemars v1.2.2
+    Checking serde_path_to_error v0.1.20
+    Checking thread_local v1.1.9
+    Checking borrow-or-share v0.2.4
+    Checking matchit v0.8.4
+    Checking bit-vec v0.8.0
+    Checking nu-ansi-term v0.50.3
+    Checking fluent-uri v0.3.2
+    Checking num v0.4.3
+    Checking bit-set v0.8.0
+    Checking tracing-subscriber v0.3.22
+    Checking outref v0.5.2
+    Checking axum v0.8.8
+    Checking vsimd v0.8.0
+    Checking fancy-regex v0.16.2
+    Checking referencing v0.33.0
+    Checking ort v2.0.0-rc.13
+    Checking uuid-simd v0.8.0
+   Compiling sqlx-postgres v0.8.6
+    Checking fraction v0.15.4
+    Checking email_address v0.2.9
+    Checking bytecount v0.6.9
+    Checking num-cmp v0.1.0
+    Checking jsonschema v0.33.0
+    Checking onig v6.5.3
+    Checking tokenizers v0.23.2
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+    Checking fastembed v7.1.1
+    Checking tokio-rustls v0.26.6
+    Checking rustls-platform-verifier v0.7.1
+    Checking hyper-rustls v0.27.10
+    Checking reqwest v0.13.4
+    Checking sqlx v0.8.6
+    Checking memory-service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/memory-extracted.t3UlKY/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 28.90s
+
+==> Clippy
+    Checking memory-service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/memory-extracted.t3UlKY/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.67s
+
+==> Migrations as the owner role
+Applied 1/migrate init (34.434792ms)
+
+==> SQLx metadata matches the schema
+    Checking memory-service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/memory-extracted.t3UlKY/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.46s
+
+==> Model manifest
+manifest ok: intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384
+
+==> Model artifacts (sizes and SHA-256)
+
+==> Compile tests
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling pin-project-lite v0.2.17
+   Compiling itoa v1.0.18
+   Compiling once_cell v1.21.4
+   Compiling futures-core v0.3.34
+   Compiling libc v0.2.190
+   Compiling serde_core v1.0.229
+   Compiling stable_deref_trait v1.2.1
+   Compiling bytes v1.12.1
+   Compiling zerofrom v0.1.8
+   Compiling litemap v0.8.3
+   Compiling writeable v0.6.4
+   Compiling futures-task v0.3.34
+   Compiling yoke v0.8.3
+   Compiling futures-io v0.3.34
+   Compiling typenum v1.20.1
+   Compiling slab v0.4.12
+   Compiling utf8_iter v1.0.4
+   Compiling zmij v1.0.23
+   Compiling zeroize v1.9.0
+   Compiling percent-encoding v2.3.2
+   Compiling num-traits v0.2.19
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling icu_normalizer_data v2.3.0
+   Compiling log v0.4.34
+   Compiling rustls-pki-types v1.15.1
+   Compiling icu_properties_data v2.3.0
+   Compiling futures-sink v0.3.34
+   Compiling core-foundation-sys v0.8.7
+   Compiling untrusted v0.9.0
+   Compiling futures-channel v0.3.34
+   Compiling zerocopy v0.8.56
+   Compiling serde v1.0.229
+   Compiling jobserver v0.1.35
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling errno v0.3.14
+   Compiling cc v1.6.0
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling generic-array v0.14.7
+   Compiling getrandom v0.2.17
+   Compiling icu_locale_core v2.3.0
+   Compiling icu_collections v2.3.0
+   Compiling signal-hook-registry v1.4.8
+   Compiling futures-util v0.3.34
+   Compiling rand_core v0.10.1
+   Compiling scopeguard v1.2.0
+   Compiling equivalent v1.0.2
+   Compiling tokio v1.53.2
+   Compiling lock_api v0.4.14
+   Compiling subtle v2.6.1
+   Compiling getrandom v0.4.3
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling smallvec v1.16.2
+   Compiling allocator-api2 v0.2.21
+   Compiling bitflags v2.13.2
+   Compiling crossbeam-utils v0.8.22
+   Compiling iana-time-zone v0.1.65
+   Compiling http v1.5.0
+   Compiling tracing-core v0.1.36
+   Compiling thiserror v2.0.21
+   Compiling icu_provider v2.3.1
+   Compiling cmake v0.1.58
+   Compiling digest v0.10.7
+   Compiling icu_properties v2.3.0
+   Compiling tracing v0.1.44
+   Compiling num-integer v0.1.46
+   Compiling cpufeatures v0.2.17
+   Compiling http-body v1.0.1
+   Compiling serde_json v1.0.151
+   Compiling foldhash v0.1.5
+   Compiling icu_normalizer v2.3.0
+   Compiling getrandom v0.3.4
+   Compiling webpki-roots v1.0.9
+   Compiling hashbrown v0.15.5
+   Compiling form_urlencoded v1.2.2
+   Compiling aho-corasick v1.1.4
+   Compiling ring v0.17.14
+   Compiling aws-lc-sys v0.45.0
+   Compiling either v1.17.0
+   Compiling tower-service v0.3.3
+   Compiling regex-syntax v0.8.11
+   Compiling parking v2.2.1
+   Compiling crc-catalog v2.5.0
+   Compiling hashbrown v0.17.1
+   Compiling tinyvec_macros v0.1.1
+   Compiling base64 v0.22.1
+   Compiling idna_adapter v1.2.2
+   Compiling tinyvec v1.12.0
+   Compiling idna v1.1.0
+   Compiling crc v3.4.0
+   Compiling event-listener v5.4.2
+   Compiling ppv-lite86 v0.2.21
+   Compiling indexmap v2.14.1
+   Compiling hashlink v0.10.0
+   Compiling parking_lot_core v0.9.12
+   Compiling webpki-roots v0.26.11
+   Compiling uuid v1.27.0
+   Compiling rand_core v0.6.4
+   Compiling parking_lot v0.12.5
+   Compiling rand_chacha v0.3.1
+   Compiling crossbeam-epoch v0.9.21
+   Compiling unicode-normalization v0.1.25
+   Compiling regex-automata v0.4.18
+   Compiling num-complex v0.4.6
+   Compiling unicode-properties v0.1.4
+   Compiling try-lock v0.2.5
+   Compiling unicode-bidi v0.3.18
+   Compiling want v0.3.2
+   Compiling ref-cast v1.0.27
+   Compiling url v2.5.8
+   Compiling crossbeam-deque v0.8.8
+   Compiling crossbeam-queue v0.3.13
+   Compiling rand v0.8.7
+   Compiling stringprep v0.1.5
+   Compiling futures-intrusive v0.5.0
+   Compiling httparse v1.10.1
+   Compiling chrono v0.4.45
+   Compiling onig_sys v69.9.3
+   Compiling http-body-util v0.1.3
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling sync_wrapper v1.0.2
+   Compiling pin-utils v0.1.0
+   Compiling byteorder v1.5.0
+   Compiling hex v0.4.3
+   Compiling home v0.5.12
+   Compiling tokio-stream v0.1.19
+   Compiling atomic-waker v1.1.2
+   Compiling httpdate v1.0.3
+   Compiling whoami v1.6.1
+   Compiling dotenvy v0.15.7
+   Compiling ryu v1.0.23
+   Compiling tower-layer v0.3.3
+   Compiling hyper v1.8.1
+   Compiling hkdf v0.12.4
+   Compiling rayon-core v1.13.0
+   Compiling ahash v0.8.12
+   Compiling atoi v2.0.0
+   Compiling rand_core v0.9.5
+   Compiling md-5 v0.10.6
+   Compiling rawpointer v0.2.1
+   Compiling minimal-lexical v0.2.1
+   Compiling ipnet v2.12.2
+   Compiling lazy_static v1.5.0
+   Compiling matrixmultiply v0.3.11
+   Compiling rand_chacha v0.9.0
+   Compiling hyper-util v0.1.20
+   Compiling nom v7.1.3
+   Compiling rayon v1.12.0
+   Compiling castaway v0.2.4
+   Compiling tower v0.5.3
+   Compiling rustix v1.1.4
+   Compiling regex v1.13.1
+   Compiling itertools v0.14.0
+   Compiling num-bigint v0.4.8
+   Compiling rustls v0.23.43
+   Compiling security-framework-sys v2.17.0
+   Compiling core-foundation v0.10.1
+   Compiling foldhash v0.2.0
+   Compiling fastrand v2.5.0
+   Compiling static_assertions v1.1.0
+   Compiling unicode-segmentation v1.13.3
+   Compiling base64 v0.13.1
+   Compiling compact_str v0.9.1
+   Compiling tempfile v3.27.0
+   Compiling security-framework v3.7.0
+   Compiling macro_rules_attribute v0.2.3
+   Compiling hashbrown v0.16.1
+   Compiling num-rational v0.4.2
+   Compiling rayon-cond v0.4.0
+   Compiling spm_precompiled v0.1.4
+   Compiling rustls-webpki v0.103.14
+   Compiling monostate v0.1.18
+   Compiling derive_builder v0.20.2
+   Compiling ndarray v0.17.2
+   Compiling rand v0.9.5
+   Compiling esaxx-rs v0.1.10
+   Compiling ort-sys v2.0.0-rc.13
+   Compiling futures-executor v0.3.34
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling dary_heap v0.3.9
+   Compiling num-iter v0.1.45
+   Compiling chacha20 v0.10.2
+   Compiling libloading v0.9.0
+   Compiling mime v0.3.17
+   Compiling daachorse v3.0.3
+   Compiling bit-vec v0.8.0
+   Compiling dyn-clone v1.0.20
+   Compiling unicode_categories v0.1.1
+   Compiling borrow-or-share v0.2.4
+   Compiling bit-set v0.8.0
+   Compiling axum-core v0.5.6
+   Compiling schemars v1.2.2
+   Compiling fluent-uri v0.3.2
+   Compiling rand v0.10.3
+   Compiling num v0.4.3
+   Compiling futures v0.3.34
+   Compiling safetensors v0.8.0
+   Compiling tower-http v0.6.11
+   Compiling sharded-slab v0.1.7
+   Compiling serde_urlencoded v0.7.1
+   Compiling matchers v0.2.0
+   Compiling sse-stream v0.2.5
+   Compiling tokio-util v0.7.19
+   Compiling tracing-serde v0.2.0
+   Compiling serde_path_to_error v0.1.20
+   Compiling thread_local v1.1.9
+   Compiling vsimd v0.8.0
+   Compiling matchit v0.8.4
+   Compiling outref v0.5.2
+   Compiling nu-ansi-term v0.50.3
+   Compiling referencing v0.33.0
+   Compiling rmcp v1.8.0
+   Compiling uuid-simd v0.8.0
+   Compiling fraction v0.15.4
+   Compiling axum v0.8.8
+   Compiling tracing-subscriber v0.3.22
+   Compiling fancy-regex v0.16.2
+   Compiling anyhow v1.0.104
+   Compiling email_address v0.2.9
+   Compiling bytecount v0.6.9
+   Compiling num-cmp v0.1.0
+   Compiling sqlx-core v0.8.6
+   Compiling jsonschema v0.33.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling ort v2.0.0-rc.13
+   Compiling onig v6.5.3
+   Compiling tokenizers v0.23.2
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling fastembed v7.1.1
+   Compiling aws-lc-rs v1.18.1
+   Compiling tokio-rustls v0.26.6
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.4
+   Compiling sqlx v0.8.6
+   Compiling memory-service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/memory-extracted.t3UlKY/memory)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 44.08s
+  Executable unittests src/lib.rs (target/debug/deps/memory_service-ae31e76356c4111f)
+  Executable unittests src/main.rs (target/debug/deps/memory_service-e860426865951a80)
+
+==> Test suite (network isolated)
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected; test PostgreSQL at 127.0.0.1:55407 reachable
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (target/debug/deps/memory_service-ae31e76356c4111f)
+
+running 180 tests
+test adapters::embedding::artifacts::tests::memory_startup_model_artifacts_fail_on_missing_modified_resized_or_symlinked_files ... ok
+test adapters::http::contract_tests::memory_contract_capacity_bound_refuses_instead_of_queueing ... ok
+test adapters::anthropic::tests::memory_observation_anthropic_adapter_sends_the_d9_request_and_parses_output ... ok
+test adapters::anthropic::tests::memory_observation_anthropic_errors_map_to_retry_terminal_or_unknown ... ok
+test adapters::http::contract_tests::memory_contract_registry_covers_every_operation_on_both_transports ... ok
+test adapters::http::contract_tests::memory_contract_openapi_is_current ... ok
+test adapters::http::contract_tests::memory_contract_http_errors_are_explicit_and_unimplemented_is_never_success ... ok
+test adapters::http::contract_tests::memory_contract_write_deadlines_publish_their_retry_identity ... ok
+test adapters::http::contract_tests::memory_contract_search_refuses_a_query_over_the_model_token_limit ... ok
+test adapters::http::contract_tests::memory_mcp_tools_mirror_http_with_identical_authority ... ok
+kill: 50711: No such process
+test adapters::http::contract_tests::memory_contract_request_deadline_answers_timeout ... ok
+test adapters::http::contract_tests::memory_mcp_requests_and_tool_calls_have_a_deadline ... ok
+test adapters::http::contract_tests::memory_mcp_bounds_bodies_like_http ... ok
+test adapters::http::contract_tests::memory_contract_published_schemas_carry_the_d6_bounds ... ok
+test adapters::http::contract_tests::memory_contract_examples_validate_against_openapi_and_mcp_schemas ... ok
+test adapters::postgres::authority_tests::memory_authority_bootstrap_recovers_when_no_usable_operator_remains ... ok
+test adapters::postgres::authority_tests::memory_authority_bootstrap_is_single_and_audited ... ok
+test adapters::postgres::authority_tests::memory_authority_disable_races_competing_claimers_without_revival ... ok
+test adapters::postgres::authority_tests::memory_authority_admin_creates_are_idempotent_by_external_id ... ok
+test adapters::postgres::authority_tests::memory_authority_namespace_delete_races_grant_issue_and_leaves_no_grant ... ok
+test adapters::postgres::authority_tests::memory_authority_admin_revocation_races_competing_admin_writes ... ok
+test adapters::postgres::authority_tests::memory_authority_disable_cancels_queued_work_and_enable_never_revives_it ... ok
+test adapters::postgres::authority_tests::memory_authority_credentials_verify_expire_and_revoke ... ok
+test adapters::postgres::authority_tests::memory_authority_operator_disable_is_sticky_against_provisioner_disable_then_enable ... ok
+test adapters::postgres::authority_tests::memory_authority_cancellation_releases_each_reservation_once ... ok
+test adapters::postgres::authority_tests::memory_authority_client_revocation_races_competing_saves ... ok
+test adapters::postgres::authority_tests::memory_authority_admin_writes_recheck_their_credential_against_revocation ... ok
+test adapters::postgres::authority_tests::memory_authority_tenants_are_isolated_and_foreign_ids_reveal_nothing ... ok
+test adapters::postgres::authority_tests::memory_authority_provisioner_is_bounded_to_tenants_it_created ... ok
+test adapters::postgres::authority_tests::memory_authority_settings_listing_admin_revocation_and_repeated_delete ... ok
+test adapters::postgres::generation_tests::memory_generation_lease_loss_aborts_the_call_and_stale_workers_cannot_commit ... ok
+test adapters::postgres::generation_tests::memory_generation_competing_claimants_keep_one_in_flight_per_tenant_fairly ... ok
+test adapters::postgres::generation_tests::memory_generation_competing_sweepers_split_the_work_exactly ... ok
+test adapters::postgres::authority_tests::memory_authority_overlapping_cancellations_complete_and_release_once ... ok
+test adapters::postgres::generation_tests::memory_generation_ambiguity_retries_and_terminal_errors_never_resend ... ok
+test adapters::postgres::generation_tests::memory_generation_acceptance_is_atomic_private_and_idempotent ... ok
+test adapters::postgres::generation_tests::memory_generation_retention_does_not_stall_behind_recently_reused_evidence ... ok
+test adapters::postgres::generation_tests::memory_generation_write_up_grants_cannot_probe_unreadable_revisions ... ok
+test adapters::postgres::generation_tests::memory_generation_worker_saves_labelled_output_once_and_indexes_it ... ok
+test adapters::postgres::generation_tests::memory_generation_retention_races_acceptance_and_dispatch_safely ... ok
+test adapters::postgres::generation_tests::memory_generation_spend_cap_is_terminal_and_overshoot_is_counted ... ok
+test adapters::postgres::generation_tests::memory_generation_shutdown_aborts_in_flight_calls_and_returns_claims ... ok
+test adapters::postgres::index_tests::memory_storage_index_commits_recheck_the_tenant ... ok
+test adapters::postgres::index_tests::memory_storage_index_fences_reject_stale_commits_and_expired_leases ... ok
+test adapters::postgres::index_tests::memory_storage_competing_indexers_claim_disjoint_rows_and_index_each_once ... ok
+test adapters::postgres::generation_tests::memory_generation_revocation_expiry_and_deletion_stop_operations ... ok
+test adapters::postgres::migration_tests::memory_startup_migration_without_pgvector_fails_explicitly ... ok
+test adapters::postgres::migration_tests::memory_storage_sources_are_frozen_and_links_carry_the_source_level ... ok
+test adapters::postgres::migration_tests::memory_startup_migration_applies_as_non_superuser_owner_and_is_idempotent ... ok
+test adapters::postgres::observability_tests::memory_operations_correlation_ids_reach_audit_and_operations ... ok
+test adapters::postgres::generation_tests::memory_generation_reaper_frees_a_dispatched_slot_only_after_lease_and_grace ... ok
+test adapters::postgres::migration_tests::memory_boundary_separate_database_roles_cannot_cross ... ok
+test adapters::postgres::operations_tests::memory_operations_a_stale_indexer_commit_after_removal_writes_nothing ... ok
+test adapters::postgres::operations_tests::memory_operations_after_restore_finishes_every_unfinished_operation ... ok
+test adapters::postgres::observability_tests::memory_operations_logs_never_carry_content_or_secrets ... ok
+test adapters::postgres::operations_tests::memory_operations_backup_restore_keeps_content_and_never_replays ... ignored, needs pg_dump and pg_restore; run by scripts/backup-restore-check.sh
+test adapters::postgres::generation_tests::memory_generation_stalled_heartbeat_with_a_slow_provider_never_doubles_calls ... ok
+test adapters::postgres::operations_tests::memory_operations_credential_listing_pages_by_label_and_activity ... ok
+test adapters::postgres::operations_tests::memory_operations_audit_and_spend_rows_age_out_at_400_days ... ok
+test adapters::postgres::generation_tests::memory_generation_restart_never_resends_and_labels_stay_frozen ... ok
+test adapters::postgres::generation_tests::memory_generation_reaper_racing_live_heartbeats_never_reaps_a_held_lease ... ok
+test adapters::postgres::generation_tests::memory_generation_retention_is_bounded_spares_live_inputs_and_backs_off ... ok
+test adapters::postgres::operations_tests::memory_operations_a_saved_settlement_without_its_credential_row_is_a_stop ... ok
+test adapters::postgres::operations_tests::memory_operations_purge_leaves_a_cross_namespace_copy_and_drops_its_parent_link ... ok
+test adapters::postgres::operations_tests::memory_operations_representative_load_is_measured ... ignored, a measurement; run by hand and record its output
+test adapters::postgres::operations_tests::memory_operations_reassign_moves_tenants_in_batches_and_refuses_bad_targets ... ok
+test adapters::postgres::operations_tests::memory_operations_expired_observations_are_removed_once_by_competing_sweepers ... ok
+test adapters::postgres::operations_tests::memory_operations_auth_breaker_pauses_competing_workers_and_closes_on_success ... ok
+test adapters::postgres::operations_tests::memory_operations_tenant_removal_blanks_every_credential_label_beyond_one_batch ... ok
+test adapters::postgres::operations_tests::memory_operations_unreferenced_operations_and_nulled_sources_age_out ... ok
+test adapters::postgres::operations_tests::memory_operations_idempotency_records_age_out_and_keys_never_execute_twice ... ok
+test adapters::postgres::operations_tests::memory_operations_reassign_waits_for_in_flight_requests_and_races_old_writes ... ok
+test adapters::postgres::recall_tests::memory_context_pack_meets_exact_budgets_and_counts_only_visible_omissions ... ok
+test adapters::postgres::recall_tests::memory_context_pack_is_deterministic_and_validates_after_correction_deletion_and_revocation ... ok
+test adapters::postgres::recall_tests::memory_context_stored_instructions_stay_escaped_untrusted_data ... ok
+test adapters::postgres::recall_tests::memory_context_query_pack_follows_search_and_detail ... ok
+test adapters::postgres::recall_tests::memory_context_full_pack_selects_on_exact_sizes_before_loading_bodies ... ok
+test adapters::postgres::operations_tests::memory_operations_identical_purges_race_to_one_execution_and_one_replay ... ok
+test adapters::postgres::operations_tests::memory_operations_purge_cancels_inference_then_removes_every_content_row ... ok
+test adapters::postgres::index_tests::memory_startup_run_stops_the_indexer_within_the_shutdown_grace ... ok
+test adapters::postgres::observability_tests::memory_operations_metrics_export_is_operator_only_and_counts_requests ... ok
+test adapters::postgres::recall_tests::memory_recall_cross_scope_id_injection_is_refused_on_every_read ... ok
+test adapters::postgres::recall_tests::memory_context_validate_and_valid_until_follow_visible_provenance ... ok
+test adapters::postgres::recall_tests::memory_observation_recorded_sources_are_redacted_before_storage ... ok
+test adapters::postgres::recall_tests::memory_recall_snippet_and_provenance_metadata_set_the_exposed_level ... ok
+test adapters::postgres::recall_tests::memory_recall_independent_python_client_completes_save_search_fetch_and_context ... ok
+test adapters::postgres::recall_tests::memory_mcp_recall_and_context_match_http_with_identical_denials ... ok
+test adapters::postgres::recall_tests::memory_observation_source_identity_is_hashed_after_privacy ... ok
+test adapters::postgres::recall_tests::memory_recall_progressive_disclosure_index_timeline_then_selected_details ... ok
+test adapters::postgres::search_tests::memory_search_failed_indexing_and_invalid_vectors_keep_keyword_recall ... ok
+test adapters::postgres::search_tests::memory_search_filters_both_legs_before_limits_and_ceiling_six_is_unchanged_by_seven_and_nine ... ok
+test adapters::postgres::search_tests::memory_search_never_compares_vectors_of_another_model ... ok
+test adapters::postgres::search_tests::memory_search_keyword_leg_keeps_identifiers_inside_sentences ... ok
+test adapters::postgres::storage_tests::memory_access_level_copies_and_corrections_never_declassify ... ok
+test adapters::postgres::search_tests::memory_search_fixed_corpus_recalls_ids_paraphrases_long_notes_and_languages ... ok
+test adapters::postgres::recall_tests::memory_recall_timeline_skips_restricted_neighbours_without_counts_or_gaps ... ok
+test adapters::postgres::search_tests::memory_search_reports_partial_semantic_results_above_the_exact_cap ... ok
+test adapters::postgres::storage_tests::memory_mcp_correction_and_copy_denials_match_http ... ok
+test adapters::postgres::storage_tests::memory_access_level_save_labels_follow_the_contract_and_persist_evidence ... ok
+test adapters::postgres::storage_tests::memory_authority_citation_needs_read_authority_and_deletion_write_authority ... ok
+test adapters::postgres::storage_tests::memory_authority_client_writes_recheck_namespace_credential_and_tenant ... ok
+test adapters::postgres::storage_tests::memory_contract_memory_operations_map_errors_to_statuses ... ok
+test adapters::postgres::index_tests::memory_storage_indexer_deadline_heartbeat_and_heartbeat_loss ... ok
+test adapters::postgres::storage_tests::memory_mcp_memory_operations_match_http_over_postgres ... ok
+test adapters::postgres::storage_tests::memory_storage_cross_tenant_foreign_keys_reject_borrowed_rows ... ok
+test adapters::postgres::storage_tests::memory_storage_cross_tenant_keys_cover_sessions_parent_links_and_parts ... ok
+test adapters::postgres::storage_tests::memory_storage_carried_labels_source_retention_and_reference_bounds ... ok
+test adapters::postgres::storage_tests::memory_storage_correction_and_delete_clean_parts_and_links ... ok
+test adapters::postgres::storage_tests::memory_storage_delete_races_writes_without_resurrection ... ok
+test adapters::postgres::storage_tests::memory_idempotency_concurrent_identical_saves_create_one_observation ... ok
+test adapters::postgres::storage_tests::memory_storage_fetch_filters_before_returning_and_reports_provenance ... ok
+test application::generation::tests::memory_observation_labels_inherit_trusted_classification_only ... ok
+test application::generation::tests::memory_observation_outcomes_distinguish_skip_empty_malformed_and_provider_errors ... ok
+test application::generation::tests::memory_observation_privacy_only_input_never_reaches_the_provider ... ok
+test application::generation::tests::memory_observation_useful_window_yields_typed_labelled_observations ... ok
+test application::generation::tests::memory_observation_windows_are_ordered_bounded_and_summaries_scoped ... ok
+test adapters::postgres::storage_tests::memory_storage_fetch_omits_provenance_the_reader_cannot_see ... ok
+test adapters::postgres::storage_tests::memory_storage_sources_and_sessions_are_immutable_grouped_and_bounded ... ok
+test adapters::postgres::subject_tests::memory_subject_competing_purgers_and_save_serialize_without_resurrection ... ok
+test boundary_tests::memory_boundary_environment_probe ... ok
+test application::service::tests::memory_authority_grants_must_be_usable_as_issued ... ok
+test domain::access_level::tests::memory_access_level_ceiling_reads_are_ordered_across_all_ten_levels ... ok
+test domain::access_level::tests::memory_access_level_contract_table_rows ... ok
+test domain::access_level::tests::memory_access_level_correction_never_declassifies ... ok
+test domain::access_level::tests::memory_access_level_exposed_level_is_the_returned_maximum ... ok
+test adapters::postgres::subject_tests::memory_subject_http_pages_bounds_foreign_management_and_client_authentication ... ok
+test domain::access_level::tests::memory_access_level_forged_lower_expected_label_is_refused ... ok
+test domain::access_level::tests::memory_access_level_inherited_level_six_context_with_public_recall_saves_at_six ... ok
+test domain::access_level::tests::memory_access_level_missing_trusted_ceiling_refuses_rather_than_saving_public ... ok
+test domain::access_level::tests::memory_access_level_proven_public_input_saves_at_zero ... ok
+test domain::access_level::tests::memory_access_level_range_is_exactly_zero_through_nine ... ok
+test domain::access_level::tests::memory_access_level_replayed_inputs_derive_the_identical_label ... ok
+test domain::access_level::tests::memory_access_level_sources_raise_but_never_lower_the_label ... ok
+test domain::access_level::tests::memory_access_level_write_grant_bounds_the_label ... ok
+test domain::admin_policy::tests::memory_authority_provisioner_bounds_are_pure_policy ... ok
+test domain::correlation::tests::memory_operations_correlation_ids_accept_only_the_id_alphabet ... ok
+test domain::error::tests::memory_contract_error_codes_map_to_distinct_statuses ... ok
+test domain::credential::tests::memory_authority_tokens_round_trip_and_reject_tampering ... ok
+test domain::error::tests::memory_contract_external_ids_are_opaque_and_bounded ... ok
+test domain::generation::tests::memory_observation_provider_schema_is_provider_safe ... ok
+test domain::generation::tests::memory_observation_output_validation_distinguishes_empty_malformed_and_valid_skip ... ok
+test adapters::postgres::subject_tests::memory_subject_http_preserves_provenance_corrections_and_exact_disabled_expired_cleanup ... ok
+test domain::grant::tests::memory_authority_namespace_list_bounds ... ok
+test domain::grant::tests::memory_authority_operation_classification_is_total_and_writes_need_write_authority ... ok
+test domain::grant::tests::memory_authority_operation_names_round_trip ... ok
+test domain::grant::tests::memory_authority_request_fields_narrow_but_never_widen ... ok
+test domain::packing::tests::memory_context_byte_budget_boundary_is_inclusive_and_binds_below_half_the_tokens ... ok
+test domain::packing::tests::memory_context_empty_and_tiny_budgets_expose_nothing ... ok
+test domain::packing::tests::memory_context_greedy_selection_skips_what_does_not_fit_and_continues ... ok
+test domain::packing::tests::memory_context_selection_is_deterministic_and_valid_until_is_the_earliest_expiry ... ok
+test domain::packing::tests::memory_context_token_budget_boundary_is_inclusive ... ok
+test domain::generation::tests::memory_observation_redaction_strips_private_spans_and_secrets_idempotently ... ok
+test domain::retrieval::tests::memory_search_chunking_keeps_short_notes_whole_and_blank_bodies_as_the_title ... ok
+test domain::generation::tests::memory_observation_redaction_leaves_prose_and_catches_values_around_markers ... ok
+test domain::retrieval::tests::memory_search_chunking_splits_long_notes_by_paragraph_sentence_and_token_cuts ... ok
+test domain::retrieval::tests::memory_search_fusion_is_reciprocal_rank_with_deterministic_ties ... ok
+test domain::retrieval::tests::memory_search_identifier_tokens_come_from_the_raw_query ... ok
+test domain::retrieval::tests::memory_search_snippets_are_bounded_at_character_boundaries ... ok
+test domain::retrieval::tests::memory_search_vector_plan_retries_full_scans_and_sends_short_ones_to_the_exact_scan ... ok
+test domain::retrieval::tests::memory_search_vectors_are_validated_and_normalized ... ok
+test infra::config::tests::memory_startup_config_defaults_and_bounds ... ok
+test infra::config::tests::memory_startup_config_requires_a_database_url_and_reports_every_problem ... ok
+test infra::config::tests::memory_startup_generation_config_is_validated_and_the_key_never_printed ... ok
+test infra::config::tests::memory_startup_non_loopback_bind_requires_explicit_mcp_hosts ... ok
+test infra::config::tests::memory_startup_stack_default_matches_the_libtest_setting ... ok
+test infra::startup::tests::memory_startup_missing_model_fails_explicitly ... ok
+test infra::startup::tests::memory_startup_readiness_reflects_the_store_and_shutdown ... ok
+test infra::startup::tests::memory_startup_ready_when_store_reachable_and_cancellation_is_bounded ... ok
+test boundary_tests::memory_boundary_sources_do_not_reach_outside_the_service ... ok
+test adapters::postgres::observability_tests::memory_operations_overload_is_refused_fast_and_recovers ... ok
+test domain::retrieval::tests::memory_search_chunking_refuses_instead_of_truncating ... ok
+test application::indexer::tests::memory_startup_indexer_supervisor_restarts_after_a_panic ... ok
+test domain::retrieval::tests::memory_search_chunking_gives_long_titles_room_for_text ... ok
+test application::provider_breaker::tests::memory_operations_breaker_opens_probes_once_doubles_and_closes ... ok
+test adapters::postgres::storage_tests::memory_idempotency_conflicts_expiry_and_scope ... ok
+test infra::startup::tests::memory_startup_unreachable_database_fails_explicitly_without_leaking_the_url ... ok
+test adapters::postgres::search_tests::memory_search_real_model_retrieval_acceptance ... ok
+test application::embedding::tests::memory_search_embedding_pool_reserves_a_query_slot_and_bounds_waiting ... ok
+test adapters::postgres::storage_tests::memory_storage_concurrent_corrections_serialize_on_the_revision ... ok
+test adapters::postgres::search_tests::memory_search_returns_eligible_rows_behind_twenty_thousand_nearer_ineligible_parts ... ok
+
+test result: ok. 178 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 23.47s
+
+     Running unittests src/main.rs (target/debug/deps/memory_service-e860426865951a80)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+verify: all gates passed
+
+==> Memory backup and restore
+test adapters::postgres::operations_tests::memory_operations_backup_restore_keeps_content_and_never_replays ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 179 filtered out; finished in 0.71s
+
+==> Memory standalone journey
+standalone-journey: building the extracted copy in /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//memory-journey.ixZcTL/memory
+memory_standalone_provision ok
+memory_standalone_save ok
+memory_standalone_search ok
+memory_standalone_classification ok
+memory_standalone_fetch ok
+memory_standalone_timeline ok
+memory_standalone_context ok
+memory_standalone_mcp ok
+memory_standalone_generation outcome=saved memories=1
+memory_standalone_generation ok
+memory_standalone_correct ok
+memory_standalone_delete ok
+memory_standalone_purge ok
+memory_standalone_tenant_delete ok
+memory_standalone journey passed
+memory_generation_settled_total{state="completed",outcome="saved"} 1
+memory_provider_tokens_total{kind="input"} 50
+memory_provider_tokens_total{kind="output"} 40
+standalone-journey: 13 steps passed (stand-in provider)
+
+==> OpenBot and memory integration
+building the memory service in /Users/mac02/orca/workspaces/openbot/plan06/services/memory
+   Compiling memory-service v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06/services/memory)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.12s
+provisioned database memory_live_8f5e472f5359 owned by memory_live_8f5e472f5359
+isolation: neither role can read the other's database
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (bin "open_bots") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.40s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 7 tests
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_tampered_labels_and_missing_authority_save_nothing ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_competing_delivery_workers_deliver_each_intent_once ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_provisioning_save_recall_capture_and_disable ... ok
+test adapters::persistence::memory::live_tests::subjects::memory_e2e_subject_delivery_and_operator_purge_page_units_and_preserve_personal_records ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4907 filtered out; finished in 12.36s
+
+memory integration: live tests passed against the real service
+
+==> Summary
+PASS 12s  Knowledge preparation osx-arm64 (runtime package downloaded)
+PASS 1s  Knowledge preparation linux-x64 (extract and verify only)
+PASS 1s  Knowledge preparation linux-aarch64 (extract and verify only)
+PASS 170s  Knowledge model check (native ORT load and probe)
+PASS 12s  Memory model preparation
+PASS 162s  Memory extracted service suite
+PASS 6s  Memory backup and restore
+PASS 51s  Memory standalone journey
+PASS 64s  OpenBot and memory integration

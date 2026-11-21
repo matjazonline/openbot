@@ -1,0 +1,8 @@
+
+added 1 package, removed 2 packages, and changed 2 packages in 11s
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   node@24.21.0 (preinstall: node installArchSpecificPackage)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+Exit: 0

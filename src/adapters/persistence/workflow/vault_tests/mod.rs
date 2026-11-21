@@ -144,8 +144,14 @@ async fn member(setup: &Setup) -> Uuid {
         .execute(p.pool())
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',0)")
-        .bind(Uuid::new_v4()).bind(setup.fixture.target.company.as_uuid()).bind(user).execute(p.pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(setup.fixture.target.company.as_uuid()),
+        user,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     restore_principal(
         &setup.fixture.persistence,
         setup.fixture.target.company.as_uuid(),

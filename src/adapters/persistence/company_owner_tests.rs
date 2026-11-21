@@ -1,6 +1,6 @@
 //! Ownership is one fact held in two columns, and invites cannot rewrite either.
 //!
-//! `companies.user_id` and the owner's `company_members` row are checked against each other at
+//! `companies.user_id` and the owner's root membership and role are checked against each other at
 //! commit, and the invite writes are conditional in SQL, so all of it is asserted on a real
 //! database.
 
@@ -89,7 +89,7 @@ impl OwnedCompany {
 
     async fn role_of(&self, user_id: Uuid) -> Option<String> {
         sqlx::query_scalar(
-            "SELECT role FROM company_members WHERE company_id = $1 AND user_id = $2",
+            "SELECT role FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2",
         )
         .bind(self.company_id)
         .bind(user_id)
@@ -109,16 +109,21 @@ impl OwnedCompany {
     /// Run `statement` in its own transaction and return the constraint the commit names.
     async fn commit_refusal(&self, statement: &str, user_id: Uuid) -> Option<String> {
         let mut transaction = self.persistence.pool().begin().await.unwrap();
-        sqlx::query(statement)
+        let refused = match sqlx::query(statement)
             .bind(self.company_id)
             .bind(user_id)
             .execute(&mut *transaction)
             .await
-            .expect("deferred: the statement itself succeeds");
-        let refused = transaction
-            .commit()
-            .await
-            .expect_err("the commit is refused");
+        {
+            Ok(_) => transaction
+                .commit()
+                .await
+                .expect_err("the commit is refused"),
+            Err(error) => {
+                transaction.rollback().await.unwrap();
+                error
+            }
+        };
         refused
             .as_database_error()
             .and_then(|error| error.constraint())
@@ -174,13 +179,13 @@ async fn company_owner_row_cannot_be_demoted_by_hand() {
     let fixture = OwnedCompany::new(pool).await;
     let constraint = fixture
         .commit_refusal(
-            "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+            "UPDATE department_roles AS holder SET role = 'lead' FROM department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='owner' AND member.company_id=$1 AND member.root_user_id=$2",
             fixture.owner.id,
         )
         .await;
     assert_eq!(
         constraint.as_deref(),
-        Some("companies_owner_member_agreement")
+        Some("companies_root_owner_agreement")
     );
     assert_eq!(
         fixture.role_of(fixture.owner.id).await.as_deref(),
@@ -197,14 +202,18 @@ async fn company_owner_row_cannot_be_deleted_by_hand() {
     let fixture = OwnedCompany::new(pool).await;
     let constraint = fixture
         .commit_refusal(
-            "DELETE FROM company_members WHERE company_id = $1 AND user_id = $2",
+            "DELETE FROM department_members WHERE company_id = $1 AND root_user_id = $2",
             fixture.owner.id,
         )
         .await;
     assert!(
         matches!(
             constraint.as_deref(),
-            Some("companies_owner_member_fk" | "companies_owner_member_agreement")
+            Some(
+                "companies_owner_member_fk"
+                    | "principals_company_user_fk"
+                    | "companies_root_owner_agreement"
+            )
         ),
         "refused by {constraint:?}"
     );
@@ -215,58 +224,61 @@ async fn company_owner_row_cannot_be_deleted_by_hand() {
     fixture.cleanup().await;
 }
 
-/// Pointing `companies.user_id` at someone else without moving the owner row fails, whether the
-/// new name is a member or nobody in the company at all.
+/// The company owner fact drives the root mirror; a stranger still cannot take ownership.
 #[tokio::test]
-async fn company_owner_column_cannot_change_alone() {
+async fn root_department_owner_role_follows_company_owner() {
     let Some(pool) = test_pool().await else {
         return;
     };
     let fixture = OwnedCompany::new(pool).await;
     let member = fixture.member("admin", CompanyAccessRole::Admin).await;
     let stranger = OwnedCompany::account(&fixture.persistence, "stranger").await;
-
-    let to_member = fixture
-        .commit_refusal("UPDATE companies SET user_id = $2 WHERE id = $1", member.id)
-        .await;
+    sqlx::query("UPDATE companies SET user_id = $2 WHERE id = $1")
+        .bind(fixture.company_id)
+        .bind(member.id)
+        .execute(fixture.persistence.pool())
+        .await
+        .unwrap();
+    assert_eq!(fixture.owner_column().await, member.id);
+    assert_eq!(fixture.role_of(member.id).await.as_deref(), Some("owner"));
     assert_eq!(
-        to_member.as_deref(),
-        Some("companies_owner_member_agreement")
+        fixture.role_of(fixture.owner.id).await.as_deref(),
+        Some("member")
     );
-    let to_stranger = fixture
+    let level: i16 = sqlx::query_scalar("SELECT access_level::smallint FROM membership_of($1,$2)")
+        .bind(member.id)
+        .bind(fixture.company_id)
+        .fetch_one(fixture.persistence.pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        level, 9,
+        "ownership raises the root membership to the owner floor"
+    );
+    let refused = fixture
         .commit_refusal(
             "UPDATE companies SET user_id = $2 WHERE id = $1",
             stranger.id,
         )
         .await;
-    assert!(
-        matches!(
-            to_stranger.as_deref(),
-            Some("companies_owner_member_fk" | "companies_owner_member_agreement")
-        ),
-        "refused by {to_stranger:?}"
-    );
-    assert_eq!(fixture.owner_column().await, fixture.owner.id);
-
-    // The complete transfer, in one transaction, is the shape that commits.
+    assert_eq!(refused.as_deref(), Some("companies_root_owner_agreement"));
+    assert_eq!(fixture.owner_column().await, member.id);
     transfer_company_ownership(
         fixture.persistence.pool(),
         fixture.company_id,
-        member.id,
+        fixture.owner.id,
         CompanyAccessRole::Admin,
     )
     .await;
-    assert_eq!(fixture.owner_column().await, member.id);
-    assert_eq!(fixture.role_of(member.id).await.as_deref(), Some("owner"));
+    assert_eq!(fixture.owner_column().await, fixture.owner.id);
     assert_eq!(
         fixture.role_of(fixture.owner.id).await.as_deref(),
-        Some("admin")
+        Some("owner")
     );
+    assert_eq!(fixture.role_of(member.id).await.as_deref(), Some("admin"));
     fixture.cleanup().await;
 }
 
-/// The use case refuses an invite to the owner's own address on create and on edit, whatever its
-/// case, and a malformed address is a form error rather than an internal one.
 #[tokio::test]
 async fn company_invite_refuses_the_owner_address_and_malformed_ones() {
     let Some(pool) = test_pool().await else {
@@ -488,3 +500,6 @@ async fn company_invite_edit_of_an_invite_accepted_after_the_read_is_refused() {
     assert_eq!(stored.role, CompanyAccessRole::Member);
     fixture.cleanup().await;
 }
+
+#[path = "root_unit_tests.rs"]
+mod root_unit;

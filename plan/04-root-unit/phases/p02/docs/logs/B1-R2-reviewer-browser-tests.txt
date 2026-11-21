@@ -1,0 +1,14 @@
+✔ form feedback and another member’s team autocomplete stay text under production CSP (1415.830792ms)
+ℹ desk-classic-create: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-classic-edit: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-modern-create: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-modern-edit: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+✔ served team autocomplete renders account strings as text and keeps selection working (209.766958ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1593.168

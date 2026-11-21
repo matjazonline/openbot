@@ -150,7 +150,7 @@ impl Deployment {
         .await
         .unwrap();
         let agent = created.agent;
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &p,
             company,
             ChannelWrite {
@@ -503,15 +503,14 @@ async fn verified_member(fixture: &Fixture) -> (Uuid, String) {
     .execute(pool)
     .await
     .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'member')",
+    crate::adapters::persistence::test_support::insert_root_member(
+        pool,
+        crate::domain::workflow::CompanyId::new(company),
+        user,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(company)
-    .bind(user)
-    .execute(pool)
-    .await
-    .unwrap();
+    .await;
     let mut connection = pool.acquire().await.unwrap();
     crate::adapters::persistence::participant::create_person_principal_on(
         &mut connection,

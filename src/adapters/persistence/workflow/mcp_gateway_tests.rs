@@ -301,12 +301,14 @@ async fn vault_workflow_mcp_another_administrator_cannot_discover_the_owners_acc
         )
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES(gen_random_uuid(),$1,$2,'admin')")
-        .bind(f.setup.company().as_uuid())
-        .bind(user.id)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(f.setup.company().as_uuid()),
+        user.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     let mut tx = p.pool().begin().await.unwrap();
     crate::adapters::persistence::participant::create_person_principal_on(
         &mut tx,

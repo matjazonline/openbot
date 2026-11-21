@@ -176,12 +176,14 @@ async fn workflow_escalation_decision_restricted_source_keeps_safe_history_and_d
 {
     let f = Box::pin(GuardFixture::new(Some(policy()))).await;
     let actor = f.people.users[0];
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.scope.company.as_uuid())
-        .bind(actor)
-        .execute(f.p().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(actor)
+    .execute(f.p().pool())
+    .await
+    .unwrap();
     let mut tx = f.p().pool().begin().await.unwrap();
     sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
         .bind(f.scope.company.as_uuid())
@@ -211,12 +213,14 @@ async fn workflow_escalation_decision_restricted_source_keeps_safe_history_and_d
     assert_eq!(f.worker().drain_once().await.unwrap(), 1);
     let decision = current(&f).await;
     assert!(view(&f, decision, actor).await.can_acknowledge);
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.scope.company.as_uuid())
-        .bind(actor)
-        .execute(f.p().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(actor)
+    .execute(f.p().pool())
+    .await
+    .unwrap();
     let restricted = view(&f, decision, actor).await;
     assert!(restricted.payload_restricted);
     assert!(

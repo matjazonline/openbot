@@ -39,8 +39,8 @@ pub(in crate::adapters::persistence) async fn lock_account_on(
         .map_err(AppError::from)?;
     let touched: Vec<(Uuid, bool)> = sqlx::query_as(
         "SELECT company.id, company.user_id = $1 FROM companies AS company \
-         WHERE company.user_id = $1 OR EXISTS (SELECT 1 FROM company_members AS member \
-           WHERE member.company_id = company.id AND member.user_id = $1 AND member.role <> 'owner') \
+         WHERE company.user_id = $1 OR EXISTS (SELECT 1 FROM membership_of($1, company.id) AS member \
+           WHERE member.role <> 'owner') \
          ORDER BY company.id",
     )
     .bind(user)
@@ -64,8 +64,21 @@ pub(in crate::adapters::persistence) async fn lock_account_on(
             owned.push(company);
         }
     }
-    let memberships = sqlx::query_scalar::<_,Uuid>("SELECT company_id FROM company_members WHERE user_id=$1 AND role<>'owner' ORDER BY company_id FOR UPDATE")
-        .bind(user).fetch_all(&mut **tx).await.map_err(AppError::from)?;
+    sqlx::query("SELECT id FROM principals WHERE user_id = $1 ORDER BY id FOR UPDATE")
+        .bind(user)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(AppError::from)?;
+    let memberships = sqlx::query_scalar::<_, Uuid>(
+        "SELECT member.company_id FROM department_members AS member \
+         JOIN companies AS company ON company.id = member.company_id \
+         WHERE member.root_user_id = $1 AND company.user_id <> $1 \
+         ORDER BY member.company_id FOR UPDATE OF member",
+    )
+    .bind(user)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
     Ok(AccountLocks { owned, memberships })
 }
 
@@ -80,50 +93,34 @@ pub(in crate::adapters::persistence) async fn finish_account_deletion_on(
         owned: companies,
         memberships,
     } = locks;
-    for company in &memberships {
-        let company = *company;
-        lifecycle::revoke_membership_on(&mut *tx, &owner_for_user(user), &company_binding(company))
-            .await
-            .map_err(AppError::from)?;
-        let notice_recipient =
-            super::delivery::cancellation::member_notice_recipient_on(tx, company, user).await?;
-        super::delivery::cancellation::cancel_member_notices_on(tx, company, notice_recipient)
-            .await?;
-        super::memory::retire_namespaces_on(
-            &mut *tx,
-            company,
-            crate::application::memory::NamespaceOwner::User(user),
-        )
-        .await?;
-    }
-    sqlx::query("UPDATE principals SET kind='external',user_id=NULL,updated_at=clock_timestamp() WHERE user_id=$1")
-        .bind(user).execute(&mut **tx).await.map_err(AppError::from)?;
-    lifecycle::retire_owner_on(tx, &owner_for_user(user))
-        .await
-        .map_err(AppError::from)?;
+    // Owned tenants disappear first; their root owner mirror stays valid until the parent goes.
     for company in companies {
         lifecycle::revoke_company_on(tx, &client_namespace(), &company_binding(company))
             .await
             .map_err(AppError::from)?;
-        super::memory::retire_company_on(&mut *tx, company).await?;
-        sqlx::query("DELETE FROM companies WHERE id=$1 AND user_id=$2")
+        super::memory::retire_company_on(tx, company).await?;
+        sqlx::query("DELETE FROM companies WHERE id = $1 AND user_id = $2")
             .bind(company)
             .bind(user)
             .execute(&mut **tx)
             .await
             .map_err(AppError::from)?;
     }
+    for company in memberships {
+        super::company::retire_member_on(
+            tx,
+            crate::domain::workflow::CompanyId::new(company),
+            user,
+        )
+        .await?;
+    }
+    lifecycle::retire_owner_on(tx, &owner_for_user(user))
+        .await
+        .map_err(AppError::from)?;
     sqlx::query("DELETE FROM users WHERE id=$1")
         .bind(user)
         .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
-    for company in memberships {
-        Box::pin(super::workflow::refresh_member_dependents_on(
-            tx,
-            crate::domain::workflow::CompanyId::new(company),
-        ))
-        .await?;
-    }
     Ok(())
 }

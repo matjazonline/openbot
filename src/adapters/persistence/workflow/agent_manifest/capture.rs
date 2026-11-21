@@ -29,6 +29,13 @@ impl Closure {
         {
             return Err(invalid());
         }
+        // Agent workflow tools add workflows beyond PublishedBundle.children.
+        // Check every selected workflow against the same admitted base context.
+        if self.context_department_id.is_none()
+            && crate::application::workflow::memory::needs_local_unit(&bundle)
+        {
+            return Err(super::super::role_binding::memory_needs_department());
+        }
         // Every reachable workflow uses the root's explicitly bound STEP resources.
         // Validate its current contracts before any root/run/provider can exist.
         super::super::resources::check_readiness(
@@ -37,6 +44,9 @@ impl Closure {
                 company: self.company,
                 bundle: &bundle,
                 resources: &self.resources,
+                // The same admitted base context as the root (learning 2026-11-17).
+                reach: self.context_department_id,
+                stage: crate::app_error::UnitCheckStage::Admission,
             },
         )
         .await?;
@@ -75,6 +85,27 @@ impl Closure {
         .await?
         .ok_or_else(refused)?;
         super::super::agent_authority::check_definition_on(tx, &revision.definition, mode).await?;
+        crate::adapters::persistence::unit_resources::check_agent_model_reach_on(
+            tx,
+            self.company,
+            agent.as_uuid(),
+            revision.definition.model.as_ref(),
+            crate::app_error::UnitCheckStage::Admission,
+        )
+        .await?;
+        // An agent's own tools and skills must be in its own reach now (Plan07 decision d), for
+        // the use mode that runs them: model-only uses expose neither.
+        if mode == AgentUseMode::Tools {
+            crate::adapters::persistence::unit_resources::check_agent_reach_on(
+                tx,
+                self.company,
+                agent.as_uuid(),
+                &revision.definition.tools,
+                &revision.definition.skills,
+                crate::app_error::UnitCheckStage::Admission,
+            )
+            .await?;
+        }
         Ok(crate::application::agent::dependency::agent_edges(
             &revision.definition,
             mode,

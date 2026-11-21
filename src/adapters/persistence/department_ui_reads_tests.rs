@@ -91,7 +91,7 @@ async fn department_ui_reads_name_people_and_agents_and_list_owned_desks() {
     assert_eq!((desks[0].id, desks[0].slug.as_str()), (desk, "sales"));
     assert!(desks[0].own, "the department's own desk is marked");
     // A second desk the department owns is listed after its own, unmarked.
-    let extra = crate::application::ports::channel::ChannelPersistence::create(
+    let extra = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.company,
         crate::application::ports::channel::ChannelWrite {

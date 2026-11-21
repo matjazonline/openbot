@@ -1,0 +1,58 @@
+time="2026-11-16T15:57:56+01:00" level=info msg="starting colima [profile=as-attribution-integration]"
+time="2026-11-16T15:57:56+01:00" level=info msg="runtime: docker"
+time="2026-11-16T15:57:56+01:00" level=info msg="creating and starting ..." context=vm
+time="2026-11-16T15:57:56+01:00" level=info msg="Terminal is not available, proceeding without opening an editor"
+time="2026-11-16T15:57:56+01:00" level=info msg="field `additionalDisks[0].name`: `colima-as-attribution-integration` is too long for the ext4 filesystem label; the label will be truncated to `lima-colima-as-a`. The disk itself is unaffected: Lima does not identify it by label."
+time="2026-11-16T15:57:57+01:00" level=info msg="Starting the instance `colima-as-attribution-integration` with internal VM driver `vz`"
+time="2026-11-16T15:57:57+01:00" level=info msg="field `additionalDisks[0].name`: `colima-as-attribution-integration` is too long for the ext4 filesystem label; the label will be truncated to `lima-colima-as-a`. The disk itself is unaffected: Lima does not identify it by label."
+time="2026-11-16T15:57:57+01:00" level=info msg="Attempting to download the image" arch=aarch64 digest= location=/Users/mac02/Library/Caches/colima/caches/b0992ab88f5a3c0c436bbb3065c01466f20dc1dd0eb0a60299d410176f21a1c3
+time="2026-11-16T15:57:57+01:00" level=info msg="Decompressing the image (b0992ab88f5a3c0c436bbb3065c01466f20dc1dd0eb0a60299d410176f21a1c3)"
+time="2026-11-16T15:57:57+01:00" level=info msg="decompressing  with external \"gzip\""
+time="2026-11-16T15:57:59+01:00" level=info msg="Downloaded the image from `/Users/mac02/Library/Caches/colima/caches/b0992ab88f5a3c0c436bbb3065c01466f20dc1dd0eb0a60299d410176f21a1c3`"
+time="2026-11-16T15:57:59+01:00" level=info msg="Resize instance colima-as-attribution-integration's disk from 3.5GiB to 8GiB"
+time="2026-11-16T15:57:59+01:00" level=info msg="[hostagent] field `additionalDisks[0].name`: `colima-as-attribution-integration` is too long for the ext4 filesystem label; the label will be truncated to `lima-colima-as-a`. The disk itself is unaffected: Lima does not identify it by label."
+time="2026-11-16T15:57:59+01:00" level=info msg="[hostagent] hostagent socket created at /Users/mac02/.colima/_lima/colima-as-attribution-integration/ha.sock"
+time="2026-11-16T15:57:59+01:00" level=info msg="[hostagent] Starting VZ (hint: to watch the boot progress, see `/Users/mac02/.colima/_lima/colima-as-attribution-integration/serial*.log`)"
+time="2026-11-16T15:57:59+01:00" level=info msg="[hostagent] Mounting disk `colima-as-attribution-integration` on `/mnt/lima-colima-as-attribution-integration`"
+time="2026-11-16T15:57:59+01:00" level=info msg="[hostagent] Converting `/Users/mac02/.colima/_lima/_disks/colima-as-attribution-integration/datadisk` (raw) to a raw disk `/Users/mac02/.colima/_lima/_disks/colima-as-attribution-integration/datadisk`"
+time="2026-11-16T15:58:00+01:00" level=info msg="[hostagent] [VZ] - vm state change: running"
+time="2026-11-16T15:58:04+01:00" level=info msg="[hostagent] SSH server does not seem to be running on vsock port, using usernet forwarder"
+time="2026-11-16T15:58:05+01:00" level=info msg="SSH Local Port: 64305"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 1/5) 🕐 SSH connection (essential)"
+time="2026-11-16T15:58:05+01:00" level=info msg="[hostagent] Pinning the SSH host key of the guest (SHA256:1O8pOJyB3D78XjUr91uinWDBuYVK6T7RSmc6rXIsj6I) in `ssh.known_hosts`"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 1/5) ✅ SSH connection"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 2/5) 🕐 User session to be ready for SSH (essential)"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 2/5) ✅ User session to be ready for SSH"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 3/5) 🕐 Persistent SSH ControlMaster (essential)"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 3/5) ✅ Persistent SSH ControlMaster"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 4/5) 🕐 Guest agent to be running"
+time="2026-11-16T15:58:05+01:00" level=info msg="[hostagent] Forwarding `/var/run/docker.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/docker.sock` (host)"
+time="2026-11-16T15:58:05+01:00" level=info msg="[hostagent] Forwarding `/var/run/containerd/containerd.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/containerd.sock` (host)"
+time="2026-11-16T15:58:05+01:00" level=info msg="[hostagent] Guest agent is running"
+time="2026-11-16T15:58:05+01:00" level=info msg="[hostagent] Time sync: guest agent is alive, starting time synchronization"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 4/5) ✅ Guest agent to be running"
+time="2026-11-16T15:58:05+01:00" level=info msg="( 5/5) 🕐 Boot scripts to be finished"
+time="2026-11-16T15:58:05+01:00" level=info msg="[hostagent] Not forwarding TCP 0.0.0.0:22"
+time="2026-11-16T15:58:05+01:00" level=info msg="[hostagent] Not forwarding TCP [::]:22"
+time="2026-11-16T15:58:10+01:00" level=info msg="[hostagent] Time sync: guest clock adjusted (was 378ms off)"
+time="2026-11-16T15:58:14+01:00" level=info msg="( 5/5) ✅ Boot scripts to be finished"
+time="2026-11-16T15:58:14+01:00" level=info msg="READY. Run `limactl shell colima-as-attribution-integration` to open the shell."
+installing: 386 OK
+installing: amd64 OK
+{
+  "supported": [
+    "linux/arm64",
+    "linux/amd64",
+    "linux/386"
+  ],
+  "emulators": [
+    "python3.12",
+    "qemu-i386",
+    "qemu-x86_64"
+  ]
+}
+time="2026-11-16T15:58:15+01:00" level=info msg="provisioning ..." context=docker
+colima-as-attribution-integration
+Successfully created context "colima-as-attribution-integration"
+time="2026-11-16T15:58:17+01:00" level=info msg="starting ..." context=docker
+time="2026-11-16T15:58:18+01:00" level=info msg=done

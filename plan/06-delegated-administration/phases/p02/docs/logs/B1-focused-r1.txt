@@ -1,0 +1,38 @@
+
+running 33 tests
+test adapters::http::pages::team_level_tests::access_level_both_team_pages_give_admins_only_level_controls ... ok
+test adapters::http::pages::tests::department_ui::delegated_admin_ui_pane_offers_each_control_only_where_its_server_rule_passes ... ok
+test adapters::http::pages::tests::delegated_admin_ui_lead_rail_and_read_only_desk_rows ... ok
+test adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors ... ok
+test adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_json_is_numeric_bounded_and_rejects_role_injection ... ok
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members ... ok
+test adapters::http::routes::company::authorization_tests::delegated_admin_routes_company_settings_hide_from_leads_and_admins ... ok
+test adapters::http::routes::channel::authorization_tests::delegated_admin_routes_desk_workspace_lists_managed_then_readable_only_desks ... ok
+test adapters::http::routes::agent::authorization_tests::delegated_admin_routes_unit_leads_and_root_admins_reach_the_agents_page ... ok
+test adapters::http::routes::company_invite::authorization_tests::delegated_admin_routes_legacy_invite_pages_hide_from_unit_leads ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::channel::authorization_tests::delegated_admin_routes_desk_pages_list_only_managed_desks_and_hide_the_rest ... ok
+test adapters::http::routes::onboarding::authorization_tests::delegated_admin_routes_onboarding_hides_from_leads_and_admins ... ok
+test application::use_cases::company::tests::only_owners_and_admins_receive_company_management_access ... ok
+test application::use_cases::company::tests::only_the_owner_may_update_or_delete_and_everyone_else_is_told_nothing ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_noninviters_are_told_nothing ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger ... ok
+test adapters::http::routes::ui_departments::tests::delegated_admin_routes_department_writes_follow_the_lead_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_lists_departments_visible_managed_and_picker_scopes ... ok
+test adapters::persistence::department::tests::delegated_administration::delegated_admin_lists_unit_entry_gate_and_hint_follow_the_predicate ... ok
+test adapters::http::routes::skill_library::http_tests::bundles::skill_bundle_http_members_cannot_upload_and_admins_keep_read_access ... ok
+test adapters::http::routes::local_machines::tests::cloudroom_company_http_session_csrf_and_foreign_object_guards ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_company_live_issuer_revocation_and_management_scope ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::delegated_admin_authoring_lead_edits_a_definition_bound_in_their_unit_and_cannot_bind_outside ... ok
+test adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 4869 filtered out; finished in 3.81s
+

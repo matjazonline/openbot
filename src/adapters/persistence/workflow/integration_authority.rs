@@ -201,7 +201,7 @@ impl HostDispatchAuthority {
         if !permitted {
             return Err(missing());
         }
-        let member:Option<Uuid>=sqlx::query_scalar(&prefix.locks.sql("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal"))
+        let member:Option<Uuid>=sqlx::query_scalar(&prefix.locks.sql("SELECT member.root_user_id FROM department_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id WHERE member.company_id=$1 AND member.root_user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal"))
             .bind(self.request.scope().company.as_uuid()).bind(self.owner).fetch_optional(&mut **tx).await
             .map_err(|error| prefix.error(error.into()))?;
         if member.is_none() {

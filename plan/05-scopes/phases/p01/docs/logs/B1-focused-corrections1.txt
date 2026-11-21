@@ -1,0 +1,19 @@
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 13s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 5 tests
+test adapters::persistence::tests::the_memory_provider_schema_is_gone ... ok
+test adapters::persistence::memory::delivery_tests::memory_integration_delivery_claims_are_fair_across_companies ... ok
+test adapters::persistence::memory::delivery_tests::memory_integration_delivery_fences_competing_claimants_and_bounds_attempts ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_capture_a_child_branch_is_never_captured ... ok
+test adapters::persistence::memory::delivery_tests::memory_integration_delivery_lanes_send_companies_concurrently ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4749 filtered out; finished in 4.63s
+

@@ -1,0 +1,1 @@
+error: error returned from database: database "pa05_p02_memory_schema" does not exist

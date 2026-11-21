@@ -59,30 +59,18 @@ async fn enable_model(f: &AdmissionFixture) {
     .unwrap();
 }
 
-/// A claimed job of a manual root (or of its child), in a company with a usable model.
-async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
-    let (f, scope) = if child {
-        child_fixture().await
-    } else {
-        fixture().await
-    };
-    let claim = f
-        .persistence()
-        .settled()
-        .claim_io(scope, worker(), policy())
-        .await
-        .unwrap()
-        .unwrap();
+/// Freeze built-ins and model configuration before starting a worker lease.
+async fn prepare_provisioning(f: &AdmissionFixture, scope: ActivationRequest) {
     // The run's frozen bundle carries the trusted built-ins, as a Builder's publication would.
     let bundle: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id = $1")
-        .bind(claim.fence.scope.run.as_uuid())
+        .bind(scope.run.as_uuid())
         .fetch_one(f.persistence().pool())
         .await
         .unwrap();
     let bundle = publication::restore_bundle(&bundle, &WorkflowSourceDecoder).unwrap();
     let frozen = publication::freeze(
         crate::adapters::workflow_source::decode(bundle.compiled().source()).unwrap(),
-        company(&f),
+        company(f),
         bundle.compiled().graph().definition().version_id,
         DependencySnapshots {
             tools: [
@@ -91,7 +79,7 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
                 ProvisioningKind::CreateDeskForAgent,
             ]
             .into_iter()
-            .map(|kind| builtin_provisioning_snapshot(company(&f), kind).unwrap())
+            .map(|kind| builtin_provisioning_snapshot(company(f), kind).unwrap())
             .collect(),
             ..Default::default()
         },
@@ -100,11 +88,33 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
     .unwrap();
     replace_run_bundle(
         f.persistence().pool(),
-        claim.fence.scope.run.as_uuid(),
+        scope.run.as_uuid(),
         &store_bundle(&frozen).unwrap(),
     )
     .await;
-    enable_model(&f).await;
+    enable_model(f).await;
+}
+
+async fn provisioning_fixture() -> (AdmissionFixture, ActivationRequest) {
+    let (f, scope) = fixture().await;
+    prepare_provisioning(&f, scope).await;
+    (f, scope)
+}
+
+async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
+    let (f, scope) = if child {
+        child_fixture().await
+    } else {
+        fixture().await
+    };
+    prepare_provisioning(&f, scope).await;
+    let claim = f
+        .persistence()
+        .settled()
+        .claim_io(scope, worker(), policy())
+        .await
+        .unwrap()
+        .unwrap();
     (f, claim)
 }
 
@@ -223,16 +233,15 @@ async fn person(f: &AdmissionFixture, role: &str) -> WorkflowActor {
         .execute(pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,$4)")
-        .bind(Uuid::new_v4())
-        .bind(company(f).as_uuid())
-        .bind(user)
-        .bind(role)
-        .execute(pool)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'member')")
-        .bind(Uuid::new_v4()).bind(company(f).as_uuid()).bind(user).execute(pool).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        pool,
+        crate::domain::workflow::CompanyId::new(company(f).as_uuid()),
+        user,
+        (role).parse().expect("fixture role"),
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
+
     WorkflowActor::authenticated(user).unwrap()
 }
 
@@ -450,14 +459,13 @@ async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
     let pool = f.persistence().pool();
     let mut rival = pool.begin().await.unwrap();
     let rival_channel = Uuid::new_v4();
-    let write = ChannelWrite {
-        name: "Rival".into(),
-        slug: "raced".into(),
-        ..ChannelWrite::default()
-    };
-    insert_channel_row_on(&mut rival, company(&f).as_uuid(), rival_channel, &write)
-        .await
-        .unwrap();
+    // The production creator now takes the company lock. Deliberate direct SQL models
+    // a namespace competitor outside that protocol, so this still reaches the unique
+    // constraint after the service's pre-check instead of merely waiting before it.
+    sqlx::query("INSERT INTO channels(id,company_id,name,enabled,created_by,department_id) VALUES($1,$2,'Rival',false,$3,(SELECT id FROM departments WHERE company_id=$2 AND is_root))")
+        .bind(rival_channel).bind(company(&f).as_uuid())
+        .bind(serde_json::to_value(crate::entities::creation::CreationProvenance::system()).unwrap())
+        .execute(&mut *rival).await.unwrap();
     insert_desk_addresses(
         &mut rival,
         company(&f).as_uuid(),
@@ -472,24 +480,17 @@ async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
         let request = request.clone();
         async move { service.dispatch_local(&request).await }
     });
-    // Wait until the provisioning insert is blocked on the rival's address.
-    for _ in 0..100 {
-        let waiting: i64 = sqlx::query_scalar(
-            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' \
-             AND query LIKE '%INSERT INTO addresses%' AND datname = current_database()",
-        )
-        .fetch_one(pool)
-        .await
-        .unwrap();
-        if waiting > 0 {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    crate::adapters::persistence::test_support::wait_until_backends_are_blocked(pool, 1).await;
+    let waiting:i64=sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%INSERT INTO addresses%' AND datname=current_database()")
+        .fetch_one(pool).await.unwrap();
     rival.commit().await.unwrap();
     let LocalDispatchResult::Committed(receipt) = provisioning.await.unwrap().unwrap() else {
         panic!("the refusal is committed")
     };
+    assert!(
+        waiting > 0,
+        "the actual address INSERT must have competed after pre-check"
+    );
     assert_eq!(receipt.result["error"]["code"], PROVISIONING_CONFLICT);
     // Only the rival's address is new.
     assert_eq!(
@@ -541,9 +542,15 @@ async fn provisioning_lists_agents_and_models() {
         json!([{"slug": "support", "name": "Support", "description": "Answers customers.",
             "provider": "openai", "model": "gpt-4o-mini", "departments": [], "address": null}])
     );
+    let root_name: String =
+        sqlx::query_scalar("SELECT name FROM departments WHERE company_id = $1 AND is_root")
+            .bind(company(&f).as_uuid())
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
     assert_eq!(
         listed["models"],
-        json!([{"provider": "openai", "model": "gpt-4o-mini"}])
+        json!([{"provider": "openai", "model": "gpt-4o-mini", "department": root_name}])
     );
     assert_eq!(listed["truncated"], false);
     // P08-D3 §D3.4: the local provisioning marker exists but no reconciliation names it, so the
@@ -640,6 +647,52 @@ async fn command_fixture() -> AdmissionFixture {
 
 fn service(f: &AdmissionFixture) -> AssistantChannelService {
     AssistantChannelService::new(f.persistence().clone(), templates())
+}
+
+#[tokio::test]
+async fn access_mode_provisioned_assistant_has_root_audience_from_initial_commit() {
+    use crate::application::ports::channel::ChannelPersistence;
+    use crate::application::ports::participant::PrincipalAccessPersistence;
+
+    let f = command_fixture().await;
+    let member = person(&f, "member").await;
+    let created = service(&f)
+        .create_assistant_channel(company(&f), owner(&f), command("root-audience", "desk"))
+        .await
+        .unwrap()
+        .unwrap();
+    let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
+    let desk = sqlx::query_scalar("SELECT channel_id FROM workflow_bindings WHERE id=$1")
+        .bind(binding)
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap();
+    let desk = ChannelPersistence::get_by_id(f.persistence(), desk)
+        .await
+        .unwrap()
+        .unwrap();
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(company(&f).as_uuid())
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+    assert_eq!(desk.department_id.as_uuid(), root);
+    let viewer = f
+        .persistence()
+        .access_context_for_user(company(&f).as_uuid(), member.user_id())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(desk.viewer_access(viewer));
+    assert!(desk.participant_access(viewer).authorized);
+    for capability in ["participate", "view"] {
+        assert!(desk.principal_grants.iter().any(|grant| {
+            Some(grant.principal_id) == viewer.principal_id
+                && grant.capability.as_str() == capability
+                && grant.provenance.as_str() == "department_membership"
+        }));
+    }
 }
 
 /// D2.4, F041: the command record decides replay and conflict; a retry returns the stored result
@@ -902,3 +955,94 @@ mod builder;
 
 #[path = "provisioning_directory_tests.rs"]
 mod directory;
+
+/// Plan07 decision d: the Agent Builder resolves a spec's skills within the reach of the
+/// department the agent joins (the root's when none), so another unit's skill reads as absent.
+#[tokio::test]
+async fn unit_resource_selection_agent_builder_skills_follow_the_placement_reach() {
+    let (f, claim) = claimed(false).await;
+    let pool = f.persistence().pool();
+    let tenant = company(&f).as_uuid();
+    let billing = f.persistence().test_unit(tenant, "billing").await;
+    // A sibling the agent could join instead.
+    f.persistence().test_unit(tenant, "support").await;
+    sqlx::query("INSERT INTO skills(id,company_id,slug,name,description,instructions,created_by,required_tools,unit_id) VALUES(gen_random_uuid(),$1,'billing-policy','Billing','Billing policy','Bill politely.','{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}','{}',$2)")
+        .bind(tenant).bind(billing).execute(pool).await.unwrap();
+    let with = |slug: &str, department: Option<&str>| {
+        let mut arguments = spec(slug);
+        arguments["skills"] = json!(["billing-policy"]);
+        if let Some(department) = department {
+            arguments["department"] = json!(department);
+        }
+        arguments
+    };
+    for (slug, department) in [("rooted", None), ("sibling", Some("support"))] {
+        let before = written(&f).await;
+        let request = call(
+            &f,
+            &claim,
+            ProvisioningKind::CreateAgent,
+            with(slug, department),
+        )
+        .await;
+        let refused = committed(&dispatch(&f), &request).await;
+        assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
+        assert_eq!(grew(&before, &written(&f).await)["agents"], 0, "{slug}");
+    }
+    let request = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgent,
+        with("billed", Some("billing")),
+    )
+    .await;
+    let created = committed(&dispatch(&f), &request).await;
+    assert_eq!(created["agent"]["slug"], "billed", "{created}");
+    let linked: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM agent_skills AS link JOIN agents AS agent \
+         ON agent.company_id=link.company_id AND agent.id=link.agent_id \
+         JOIN skills AS skill ON skill.company_id=link.company_id AND skill.id=link.skill_id \
+         WHERE agent.company_id=$1 AND agent.slug='billed' AND skill.slug='billing-policy'",
+    )
+    .bind(tenant)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(linked, 1);
+}
+
+/// Plan07 02A (B1-F1): the Agent Builder refuses an explicit model whose connection belongs
+/// outside the created agent's department, and provisions it inside.
+#[tokio::test]
+async fn unit_model_default_agent_builder_model_follows_the_placement_reach() {
+    let (f, claim) = claimed(false).await;
+    let tenant = company(&f).as_uuid();
+    let billing = f.persistence().test_unit(tenant, "billing").await;
+    CompanyPersistence::replace_unit_model_connections_for_user(
+        f.persistence(),
+        owner(&f).user_id(),
+        tenant,
+        billing,
+        vec![CompanyModelConnectionWrite {
+            provider: "anthropic".into(),
+            api_key: Some("billing-key".into()),
+            models: vec!["claude-billing".into()],
+            is_default: true,
+        }],
+    )
+    .await
+    .unwrap();
+    let mut outside = spec("outside");
+    outside["provider"] = json!("anthropic");
+    outside["model"] = json!("claude-billing");
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, outside).await;
+    let refused = committed(&dispatch(&f), &request).await;
+    assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
+    let mut inside = spec("inside");
+    inside["provider"] = json!("anthropic");
+    inside["model"] = json!("claude-billing");
+    inside["department"] = json!("billing");
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, inside).await;
+    let created = committed(&dispatch(&f), &request).await;
+    assert_eq!(created["agent"]["slug"], "inside", "{created}");
+}

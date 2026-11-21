@@ -356,7 +356,8 @@ async fn cloudroom_company_http_session_csrf_and_foreign_object_guards() {
             .await
             .unwrap()
             .status(),
-        StatusCode::FORBIDDEN
+        // Local agents are company administration; a member is told nothing (Plan06 02A.4).
+        StatusCode::NOT_FOUND
     );
     let stranger = cookie(&f, &authority, f.stranger).await;
     assert_eq!(

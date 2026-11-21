@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B1-R1-S2",
+  "artifact": "c0c9cc0500609a1dc6d28d4e7b70092481f1331eeb49e34c41afcb64ea3ace00",
+  "checks": [
+    {
+      "criteria": [
+        "PREDICATE",
+        "DEPARTMENT",
+        "NESTED-RUNTIME",
+        "GRANT-RACE",
+        "PROVENANCE",
+        "PRIVACY"
+      ],
+      "command": "TEST_DATABASE_URL=<owned-v2> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_admin_ manages_unit_ department_routes_hide_foreign root_membership_department_routes root_membership_roles_and_equivalent channel_reply_authoring_private department_lead_desk_refuses_lead workflow_binding_sql_grant_revocation channel_reply_binding_separates",
+      "fixture": "Plan06-owned PostgreSQL18 port55406 database openbot_p06_b1_v2; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-corrections-focused-third.txt",
+          "sha256": "03d0f18f0c69fb1b658b6e6e2b95ec0f9b1684d938b7ea2aaf0343392bc3b6f5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "SQLX",
+        "COMPILE"
+      ],
+      "command": "DATABASE_URL=<owned-v2> SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "Plan06-owned PostgreSQL18 port55406 database openbot_p06_b1_v2; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare.txt",
+          "sha256": "1ef21dbc46585ed7529f938e21c4795a5dd8e30a8112dc52de697e213ea90608"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FRESH-SCHEMA"
+      ],
+      "command": "DATABASE_URL=<owned-v2> cargo sqlx migrate run",
+      "fixture": "Plan06-owned PostgreSQL18 port55406 database openbot_p06_b1_v2; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migration-v2.txt",
+          "sha256": "148e2fc21619d877214dfe4fa0ada237b100ca104b25eab1d320ee90bb53b450"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AUTHORIZATION-REGRESSION"
+      ],
+      "command": "TEST_DATABASE_URL=<owned-v2> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- manages_unit_ delegated_admin_ department_ root_ workflow_authorization workflow_binding_ native_mcp_ channel_reply_",
+      "fixture": "Plan06-owned v2 database where required; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-integrated-corrected.txt",
+          "sha256": "59a3c3b1376f0525b0a53f90cdf5b2b763f469828c763f385c5759423d461d77"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "LINT-DELTA"
+      ],
+      "command": "TEST_DATABASE_URL=<owned-v2> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_admin_agent_lead_transitions department_lead_desk_refuses_lead workflow_binding_sql_grant_revocation channel_reply_binding_separates",
+      "fixture": "Plan06-owned v2 database where required; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-lint-affected-tests.txt",
+          "sha256": "e968a3ca5caa28c3101bd5db3dec0ed6894eec4ab4e3ba222cac51707298a411"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CLIPPY"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Plan06-owned v2 database where required; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-clippy-corrected.txt",
+          "sha256": "940468ffaa2ec3b8631a427441aea2b71c5b0a14154e73899c4177158ec68e7b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "COMPILE"
+      ],
+      "command": "SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "Plan06-owned v2 database where required; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-offline-check.txt",
+          "sha256": "a6dab1a98df2eb6aae2f8378b033bbc611c8304b6504b093d18ac8443101b0ff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REACHABILITY"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --test source_modules",
+      "fixture": "Plan06-owned v2 database where required; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-source-modules.txt",
+          "sha256": "7fae742d18393477324dbdff02ca0756863f9eee73c2ba04971773baf81b73a3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FORMAT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Plan06-owned v2 database where required; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "WHITESPACE"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "Plan06-owned v2 database where required; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}

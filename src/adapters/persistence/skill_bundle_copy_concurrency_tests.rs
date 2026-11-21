@@ -40,7 +40,7 @@ async fn request(p: &PostgresPersistence, path: CopyPath) -> CopyRequest {
     let library_agent = match path {
         CopyPath::Standalone => None,
         CopyPath::LibraryAgent => {
-            sqlx::query("INSERT INTO company_model_connections(company_id,provider,api_key,models,is_default) VALUES($1,'openai','fixture-key','{gpt-test}',true)")
+            sqlx::query("INSERT INTO company_model_connections(company_id,unit_id,provider,api_key,models,default_for_unit) VALUES($1,(SELECT id FROM departments WHERE company_id=$1 AND is_root),'openai','fixture-key','{gpt-test}',true)")
                 .bind(company).execute(p.pool()).await.unwrap();
             let mut input = agent_write("library-copy");
             input.skill_ids = vec![source.id];
@@ -91,6 +91,7 @@ async fn copy(p: &PostgresPersistence, request: &CopyRequest) -> Skill {
     } else {
         p.copy_library_to_company(
             request.company,
+            p.test_root_unit(request.company).await,
             request.source.id,
             CreationProvenance::system(),
         )
@@ -110,7 +111,7 @@ async fn skill_bundle_competing_editor_and_both_copy_paths_keep_one_revision_dur
         let mut blocker = database.pool.begin().await.unwrap();
         insert_skill(
             &mut *blocker,
-            Some(request.company),
+            Some((request.company, p.test_root_unit(request.company).await)),
             &skill_write("coherent-copy"),
         )
         .await

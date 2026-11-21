@@ -1,0 +1,121 @@
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 500 changed files against 28 learnings and 4 skills
+
+✗ migrations/20260817000000_init_schema.sql:14087
+  brings back separate local key, which Mac02's learning ruled out
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● assets/app.css:2
+  brings back input valid selected, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Inputs therefore still looked valid while every
+  selected option vanished from its select.
+● assets/app.css:2
+  brings back key tab full, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● assets/app.css:2
+  brings back selector step request, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The role-selector helper test passed while the real
+  mcp_step_request boundary still blocked; the new genuine
+  originating-workflow test and PostgreSQL wait sampling exposed it.
+● assets/app.css:2
+  brings back active time zero, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Verbose output showed 100% active time and zero sleep
+  despite real CPU exceeding 100%; this was not a signal permission
+  issue.
+● docs/departments.md:8
+  brings back company owner single, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● docs/departments.md:64
+  brings back department root tree, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● docs/departments.md:68
+  brings back therefore every select, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Inputs therefore still looked valid while every
+  selected option vanished from its select.
+● docs/transport_architecture.md:160
+  brings back channel department principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● docs/transport_architecture.md:160
+  brings back independent one read, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Independent review paused one real Chromium tab
+  between reading candidates and cleanup, let another tab persist a
+  new click, then resumed cleanup: the newer click was deleted.
+● docs/transport_architecture.md:160
+  brings back source account company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● migrations/20260817000000_init_schema.sql:648
+  brings back four call one, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Treating all four local-call native peers as one
+  cross-owner group then passed both actual teardown paths.
+● migrations/20260817000000_init_schema.sql:648
+  brings back company ownership owner, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● plan/04-root-unit/COORDINATION.md:1
+  brings back order department principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● plan/04-root-unit/COORDINATION.md:3
+  brings back openbot boundary way, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 14: A literal like `<escalation-{id}@openbot.invalid>`
+  built in persistence breaks the transport boundary in two ways: it
+  is a synthetic `.invalid` identity, and it is an RFC id made outside
+  the email adapter.
+● plan/04-root-unit/COORDINATION.md:9
+  brings back original schema company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: The original 64 KiB cap rejected a schema-valid
+  100-company page with 120 four-byte Unicode characters per name: the
+  reviewer measured 73,530 serialized bytes before adding a cursor.
+● plan/04-root-unit/COORDINATION.md:11
+  brings back source earlier account, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/04-root-unit/COORDINATION.md:13
+  brings back direct service exact, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Direct LaunchServices navigation downloaded the exact
+  artifact successfully within seconds.
+● plan/04-root-unit/COORDINATION.md:14
+  brings back actual compet test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/04-root-unit/COORDINATION.md:16
+  brings back failed production desk, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: A populated temporary clone failed to reproduce
+  repeated production desk creation because its statistics and
+  generic-plan shape differed.
+
+· 1 conflict · fix it, or say why in the commit message or PR description

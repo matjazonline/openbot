@@ -1,0 +1,12 @@
+--- B2/src/adapters/persistence/workflow/provisioning_department.rs
++++ B3/src/adapters/persistence/workflow/provisioning_department.rs
+@@ -389,7 +389,8 @@
+         },
+         previous.origin().cloned(),
+     );
+-    super::definitions::save_draft_on(tx, &draft, actor, Some(previous.revision()), false).await?;
++    super::definitions::save_draft_on(tx, &draft, actor, Some(previous.revision()), false, None)
++        .await?;
+     let version = VersionId::new(Uuid::new_v4());
+     let bundle = match compiled(tx, templates, &decoder, &draft, version).await? {
+         Ok(bundle) => Arc::new(bundle),

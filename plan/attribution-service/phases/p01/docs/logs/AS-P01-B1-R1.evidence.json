@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "round": "AS-P01-B1-R1",
+  "artifact": "21bacb27bc5ba0b0d0394310910cbc41e2fc8ba448934876a5a4e9d8196b9001",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4",
+        "AC5-contract",
+        "AC7-fixture"
+      ],
+      "command": "ATTRIBUTION_CONTRACT_PYTHON=/tmp/attribution-service-contract-env/bin/python services/attribution/scripts/check-contracts.sh --list; same command without --list",
+      "fixture": "Python 3.9 virtualenv; pinned contract/requirements.lock; local schemas only; 9 selected/executed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P01-B1-tests-list.txt",
+          "sha256": "54ab04a8034517422b523f503a93cd98a497c27594b71f93dcdea33a728fd264"
+        },
+        {
+          "path": "logs/AS-P01-B1-tests-final.txt",
+          "sha256": "bea7d2ecfcf6e5ff412af8bfbad64af244f4f6adec54ff889b32ce1c38b9e2d7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1-portable"
+      ],
+      "command": "copy only services/attribution to temporary directory; python contract/test_contracts.py --list; python contract/test_contracts.py",
+      "fixture": "isolated temporary service copy, removed after success; same venv; 9 selected/executed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P01-B1-portable-contracts.txt",
+          "sha256": "2eed90723762d7527d584476bb537f848a6609e5ae63ba24963e7ebc8dc84faf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1-owner-copy",
+        "plan-integrity"
+      ],
+      "command": "inline Python plan-link/policy/startup registration and canonical-copy audit; git diff --check",
+      "fixture": "repository documentation and wire contracts",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P01-B1-doc-audit.txt",
+          "sha256": "a6bae26a86f27bbb93aed386ad26a4d70b2850c7404689ec6777781a79224d28"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "learning-consistency"
+      ],
+      "command": "trail check",
+      "fixture": "repository and personal learnings; no source lock changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P01-B1-trail-check.txt",
+          "sha256": "a980ce38bdc11d7b12cec95b35344c63d83413e570d9082fedf3008ed0ace0d0"
+        }
+      ]
+    }
+  ]
+}

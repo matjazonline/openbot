@@ -88,10 +88,8 @@ pub fn email_allowlist_policy(
     let grants = email_allowlist_grants(company_id, &listed);
     let mode = if is_public {
         ChannelAccessMode::Public
-    } else if grants.is_empty() {
-        ChannelAccessMode::Team
     } else {
-        ChannelAccessMode::Allowlist
+        ChannelAccessMode::Members
     };
     (mode, grants)
 }
@@ -121,9 +119,24 @@ pub fn email_allowlist_grants(company_id: Uuid, addresses: &[&str]) -> Vec<Chann
         .collect()
 }
 
+/// Materialized membership rows for the finite audience declared by a desk fixture.
+/// Real persistence derives these from department placement, not from email syntax.
+pub fn department_membership_grants(
+    company_id: Uuid,
+    members: &[&str],
+) -> Vec<ChannelPrincipalGrant> {
+    email_allowlist_grants(company_id, members)
+        .into_iter()
+        .map(|mut grant| {
+            grant.provenance = GrantProvenance::DepartmentMembership;
+            grant
+        })
+        .collect()
+}
+
 /// How a test states who is on a company's team.
 ///
-/// Production answers this by joining a principal to its `company_members` row, inside the same
+/// Production answers this by reading the principal's root membership, inside the same
 /// query that resolves the identity. An in-memory directory has no join to make, so the scenario's
 /// own company double answers instead — which keeps the team stated once, where the test already
 /// listed it. It is deliberately test-only: nothing in production decides anything from an address.
@@ -502,6 +515,94 @@ impl PrincipalAccessPersistence for FailingParticipantDirectory {
         _company_id: Uuid,
         _user_id: Uuid,
     ) -> AppResult<Option<PrincipalAccessContext>> {
+        Err(outage())
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::application::ports::administration::AdministrationPersistence
+    for InMemoryParticipantDirectory
+{
+    async fn management_role(
+        &self,
+        actor: uuid::Uuid,
+        company: crate::domain::workflow::CompanyId,
+        _target: crate::application::ports::administration::ManagementTarget,
+    ) -> crate::app_error::AppResult<
+        Option<crate::application::ports::administration::ManagementRole>,
+    > {
+        use crate::application::ports::administration::ManagementRole;
+        use crate::entities::company_member::CompanyMembership;
+        let membership = match &self.team {
+            Some(team) => team.company_access(actor, company.as_uuid()).await?,
+            None => None,
+        };
+        Ok(match membership.map(|access| access.membership) {
+            Some(CompanyMembership::Owner) => Some(ManagementRole::Owner),
+            Some(CompanyMembership::Admin) => Some(ManagementRole::Admin),
+            _ => None,
+        })
+    }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(Vec::new())
+    }
+    async fn managed_unit_choices(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::application::ports::administration::ManagedUnit>>
+    {
+        // This double models no departments.
+        Ok(Vec::new())
+    }
+    async fn default_resource_unit(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Option<crate::entities::department::DepartmentId>> {
+        Ok(None)
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::application::ports::administration::AdministrationPersistence
+    for FailingParticipantDirectory
+{
+    async fn management_role(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+        _target: crate::application::ports::administration::ManagementTarget,
+    ) -> crate::app_error::AppResult<
+        Option<crate::application::ports::administration::ManagementRole>,
+    > {
+        Err(outage())
+    }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
+        Err(outage())
+    }
+    async fn managed_unit_choices(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::application::ports::administration::ManagedUnit>>
+    {
+        Err(outage())
+    }
+    async fn default_resource_unit(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Option<crate::entities::department::DepartmentId>> {
         Err(outage())
     }
 }

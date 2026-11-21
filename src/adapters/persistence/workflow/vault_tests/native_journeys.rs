@@ -237,7 +237,7 @@ async fn as_nonowner_admin(f: &mut Journey) {
     // Manual admission requires an owner/admin. This actor's authority comes
     // from a removable membership, while the private account owner stays separate.
     sqlx::query(
-        "UPDATE company_members SET role='admin',access_level=9 WHERE company_id=$1 AND user_id=$2",
+        "WITH updated AS (UPDATE department_members AS member SET access_level=9 WHERE member.company_id=$1 AND member.root_user_id=$2 RETURNING member.company_id, member.department_id, member.principal_id) INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT company_id, department_id, principal_id, 'admin' FROM updated ON CONFLICT DO NOTHING",
     )
     .bind(f.setup.fixture.target.company.as_uuid())
     .bind(user)
@@ -296,9 +296,24 @@ async fn mutate(
                 .unwrap();
         }
         Mutation::Membership => {
-            p.remove_member(company.as_uuid(), actor.user_id())
-                .await
-                .unwrap();
+            let company_owner: Uuid =
+                sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1")
+                    .bind(company.as_uuid())
+                    .fetch_one(p.pool())
+                    .await
+                    .unwrap();
+            assert_ne!(
+                company_owner,
+                actor.user_id(),
+                "membership revocation targets a nonowner"
+            );
+            p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: company_owner,
+                company_id: company.as_uuid(),
+                member_user_id: actor.user_id(),
+            })
+            .await
+            .unwrap();
         }
         Mutation::Operation => {
             let current = p

@@ -67,9 +67,9 @@ async fn company_import(
     Path(company): Path<Uuid>,
     multipart: Multipart,
 ) -> AppResult<Response> {
-    skills.verify_company_owner(user.id, company).await?;
+    skills.verify_skill_manager(user.id, company).await?;
     let result = match upload(multipart).await {
-        Ok(write) => skills.create_company(user.id, company, write).await,
+        Ok(write) => skills.create_company(user.id, company, None, write).await,
         Err(error) => Err(error),
     };
     company_result(
@@ -90,7 +90,7 @@ async fn company_replace(
     Path((company, id)): Path<(Uuid, Uuid)>,
     multipart: Multipart,
 ) -> AppResult<Response> {
-    skills.verify_company_owner(user.id, company).await?;
+    skills.verify_skill_manager(user.id, company).await?;
     let existing = skills
         .get_company(user.id, company, id)
         .await?

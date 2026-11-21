@@ -29,7 +29,16 @@ A large database can exceed the query budget; collection failure is explicit, ne
 | `reconciliation_runs`, `unknown_actions` | Parked reconciliation runs; action states needing reconciliation or applied without a result. An in-flight possible dispatch is not counted as known uncertainty. |
 | `unknown_deliveries`, `delivered_last24h`, `dead_deliveries_last24h` | Delivery outcome unknown; accepted deliveries by delivered time; currently dead-lettered deliveries updated in the last 24 hours. Includes non-workflow mail handled by the shared delivery worker. Acceptance is not proof the recipient read the message. |
 | `model_reserved_tokens`, `model_charged_tokens_last24h` | Outstanding input/output reservations; actual usage where known, otherwise conservative reserved usage for calls requested in the last 24 hours. These can overlap. |
-| `model_reserved_estimated_usd`, `model_charged_estimated_usd_last24h`, `unpriced_model_calls` | Those amounts at current company/provider/model prices; unpriced calls in the same live/24-hour scope. Missing prices are excluded from the monetary sums, so a zero estimate is not free usage. Historical price changes affect estimates. This is not a bill or an enforced monetary budget. |
+| `model_reserved_estimated_usd`, `model_charged_estimated_usd_last24h`, `unpriced_model_calls` | Those amounts at current company/provider/model prices; unpriced calls in the same live/24-hour scope. Missing prices are excluded from the monetary sums, so a zero estimate is not free usage. Historical price changes affect estimates. This is not a bill; department spend caps (below) are enforced separately from their own counted totals. |
+
+Two budgets bound model work. A run's root budget caps its own activations, model calls,
+repetitions and tokens and is enforced during the run: exhausting it fails the run with
+`workflow.root_budget_exhausted`, except that a token allowance may instead park the run for a
+reviewer's approval. A department's spend caps (per UTC day and month, see
+[Departments](departments.md#spend-caps)) are checked when a run is admitted: from the run's
+department upward, the first department whose counted spend reached a cap refuses the run with
+`budget.unit_exhausted`, and a refused schedule occurrence or message records that code. Admitted
+runs are not stopped by a cap.
 
 Use the company Workflows/Runs page to filter failures/waits and open the exact run, execution,
 action and decision. The authenticated read API is
@@ -178,7 +187,8 @@ fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-i
 
 The desk's **Automatic response** card chooses one active message binding and a version1
 subject/body projection from its final business result. Other bindings observe. Selection requires
-current company administration, desk visibility, run-as visibility and resource readiness.
+current management of the desk's department ([Administration](departments.md#administration)),
+desk visibility, run-as visibility and resource readiness.
 `GET` and `PUT /api/companies/{company_id}/channels/{channel_id}/response` use the same checks.
 PUT carries `expected_revision` (null for the first save), `responder` (null to clear), and optional
 `approval_policy`. A responder contains `binding_id`, `expected_binding_state_revision`, and
@@ -282,8 +292,8 @@ retry until their expiry; switching capture off stops new windows, not ones alre
 Private memory is reachable only from a person's own manual start in a private session (not in a
 desk or thread), and from children of that run run as the same person. Scheduled and
 message-triggered runs never reach it. The author of the workflow, its binding or its agent is not
-checked: an owner or admin who manually runs a colleague's workflow lets that workflow's agent read
-their private memory, and the workflow can send what it read wherever its author chose. Run only
+checked: a person who manually runs a colleague's workflow lets that workflow's agent read their
+private memory, and the workflow can send what it read wherever its author chose. Run only
 workflows you trust with your private memory, as authorized admins can already inspect a private
 run.
 

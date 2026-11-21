@@ -86,7 +86,7 @@ pub struct LevelActor {
 }
 impl LevelActor {
     pub fn manages_levels(self) -> bool {
-        self.membership.manages_company_operations()
+        self.membership.administers_company()
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,6 +124,25 @@ pub fn may_assign_level(
     let LevelTarget::Assignable(current) = target_current else {
         return Err(LevelRefusal::OwnerFixed);
     };
+    if actor.membership.is_owner() {
+        return Ok(());
+    }
+    if current > actor.access_level {
+        return Err(LevelRefusal::TargetAboveActor);
+    }
+    if requested > actor.access_level {
+        return Err(LevelRefusal::RequestedAboveActor);
+    }
+    Ok(())
+}
+
+/// A connection's access level (Plan07): whoever manages the connection's unit may set it within
+/// their own level, the owner without bound. Unit management is the caller's check.
+pub fn may_assign_connection_level(
+    actor: LevelActor,
+    current: AccessLevel,
+    requested: AccessLevel,
+) -> Result<(), LevelRefusal> {
     if actor.membership.is_owner() {
         return Ok(());
     }
@@ -207,9 +226,8 @@ pub enum HumanInputClass {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExactnessTarget {
     Run,
-    AgentScope,
-    UserScope,
-    CompanyScope,
+    PrincipalScope,
+    UnitScope,
 }
 
 /// Whether human input of `class` leaves a level exact for `target`. The one place U2 lives:
@@ -219,10 +237,10 @@ pub const fn human_input_exactness(class: HumanInputClass, target: ExactnessTarg
         (HumanInputClass::ConversationalInput, _) => false,
         // Other agents recall company memories in audiences that never received this agent's
         // configuration (U2 addendum).
-        (HumanInputClass::AuthoredConfiguration, ExactnessTarget::CompanyScope) => false,
+        (HumanInputClass::AuthoredConfiguration, ExactnessTarget::UnitScope) => false,
         (
             HumanInputClass::AuthoredConfiguration,
-            ExactnessTarget::Run | ExactnessTarget::AgentScope | ExactnessTarget::UserScope,
+            ExactnessTarget::Run | ExactnessTarget::PrincipalScope,
         ) => true,
     }
 }

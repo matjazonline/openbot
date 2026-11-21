@@ -1,0 +1,20 @@
+                    datname                     | wait_event_type | wait_event  |       age       |                                           query                                           
+------------------------------------------------+-----------------+-------------+-----------------+-------------------------------------------------------------------------------------------
+ open_bots_own_b6d03d5ce8f3445889a0bddfe5c956b4 | IO              | BuffileRead | 00:00:01.585581 |                                                                                          +
+                                                |                 |             |                 |     WITH desired AS (                                                                    +
+                                                |                 |             |                 |         SELECT audience.channel_id, audience.principal_id, capability.value AS capability+
+                                                |                 |             |                 |           FROM unnest($3::uuid[], $4::uuid[]) AS audience(channel_id, principal_id)      +
+                                                |                 |             |                 |           CROSS JOIN unnest($5::text[]) AS capability(value)                             +
+                                                |                 |             |                 |     )                                                                                    +
+                                                |                 |             |                 |     INSERT INTO channel_principal_grants                                                 +
+                                                |                 |             |                 |         (company_id, channel_id, principal_id, capability, provenance)                   +
+                                                |                 |             |                 |     SELECT $1, desired.channel_id, desired.principal_id, desired.capability, $6          +
+                                                |                 |             |                 |       FROM desired WHERE desired.channel_id=ANY($2)                                      +
+                                                |                 |             |                 |        AND NOT EXISTS (SELECT 1 FROM channel_principal_grants AS permission              +
+                                                |                 |             |                 |             WHERE permission.company_id=$1 AND permission.channel_id=desired.channel_id  +
+                                                |                 |             |                 |               AND permission.principal_id=desired.principal_id                           +
+                                                |                 |             |                 |               AND permission.capability=desired.capability AND permission.provenance=$6) +
+                                                |                 |             |                 |     ON CONFLICT (company_id, channel_id, principal_id, capability, provenance) DO NOTHING+
+                                                |                 |             |                 | 
+(1 row)
+

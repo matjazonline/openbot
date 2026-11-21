@@ -609,3 +609,52 @@ use source_validation::validate_source;
 
 #[path = "tests/snapshot_cases.rs"]
 mod snapshot_cases;
+
+#[async_trait::async_trait]
+impl crate::application::ports::administration::AdministrationPersistence for MemoryStore {
+    async fn management_role(
+        &self,
+        actor: uuid::Uuid,
+        company: crate::domain::workflow::CompanyId,
+        _target: crate::application::ports::administration::ManagementTarget,
+    ) -> crate::app_error::AppResult<
+        Option<crate::application::ports::administration::ManagementRole>,
+    > {
+        use crate::application::ports::administration::ManagementRole;
+        use crate::application::ports::participant::PrincipalAccessPersistence;
+        use crate::entities::company_member::CompanyMembership;
+        let context = self
+            .access_context_for_user(company.as_uuid(), actor)
+            .await?;
+        Ok(match context.map(|context| context.membership) {
+            Some(CompanyMembership::Owner) => Some(ManagementRole::Owner),
+            Some(CompanyMembership::Admin) => Some(ManagementRole::Admin),
+            _ => None,
+        })
+    }
+    async fn managed_units(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(Vec::new())
+    }
+    async fn managed_unit_choices(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Vec<crate::application::ports::administration::ManagedUnit>>
+    {
+        // This double models no departments.
+        Ok(Vec::new())
+    }
+    async fn default_resource_unit(
+        &self,
+        _actor: uuid::Uuid,
+        _company: crate::domain::workflow::CompanyId,
+    ) -> crate::app_error::AppResult<Option<crate::entities::department::DepartmentId>> {
+        // This double models no departments.
+        Ok(None)
+    }
+}

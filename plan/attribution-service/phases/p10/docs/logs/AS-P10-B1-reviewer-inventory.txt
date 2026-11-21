@@ -1,0 +1,1 @@
+20 declared paths verified:15 archive/main preimages,5 new source files; all168 unchanged p09 paths match main. EXTRA snapshot path services/attribution/target is nonignored absolute cache symlink -> /tmp/as-attribution-target.

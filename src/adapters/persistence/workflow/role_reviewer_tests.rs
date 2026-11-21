@@ -1,8 +1,13 @@
 use super::*;
+
 #[path = "escalation_guard_tests.rs"]
 mod escalation_guards;
 #[path = "escalation_recipient_storage_tests.rs"]
 mod escalation_recipients;
+#[path = "root_escalation_tests.rs"]
+mod root_escalation;
+#[path = "root_role_consumer_tests.rs"]
+mod root_roles;
 use crate::adapters::persistence::workflow::tests::approval_test_support::notices;
 use crate::application::workflow::activation::{ActivationRequest, WorkflowJobId};
 use crate::application::workflow::decisions::{
@@ -452,11 +457,20 @@ async fn workflow_reviewer_principal_owner_and_missing_member_removal_keep_revie
     let notice:Uuid=sqlx::query_scalar("SELECT reviewer.notice_delivery_id FROM workflow_decision_reviewers AS reviewer JOIN workflow_decisions AS decision ON decision.company_id=reviewer.company_id AND decision.id=reviewer.decision_id WHERE decision.company_id=$1 AND decision.run_id=$2")
         .bind(scope.company.as_uuid()).bind(run.as_uuid()).fetch_one(f.role.p().pool()).await.unwrap();
     for user in [owner, Uuid::new_v4()] {
-        f.role
+        let removed = f
+            .role
             .p()
-            .remove_member(f.role.company().as_uuid(), user)
-            .await
-            .unwrap();
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.role.admission.binding.target.actor.user_id(),
+                company_id: f.role.company().as_uuid(),
+                member_user_id: user,
+            })
+            .await;
+        if user == owner {
+            assert!(matches!(removed, Err(AppError::BadRequest(_))));
+        } else {
+            removed.unwrap();
+        }
         let pending:bool=sqlx::query_scalar("SELECT status='pending' AND cancellation_requested_at IS NULL FROM message_deliveries WHERE company_id=$1 AND id=$2")
             .bind(scope.company.as_uuid()).bind(notice).fetch_one(f.role.p().pool()).await.unwrap();
         assert!(pending);

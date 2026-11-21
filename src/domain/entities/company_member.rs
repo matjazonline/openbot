@@ -63,9 +63,9 @@ impl FromStr for CompanyAccessRole {
 pub enum CompanyMembership {
     /// The account named by `companies.user_id`.
     Owner,
-    /// A `company_members` row whose access role is `admin`.
+    /// The root department's `admin` role.
     Admin,
-    /// A `company_members` row whose access role is `member`.
+    /// Membership in the root department.
     Member,
     /// Neither: as far as this company is concerned, a stranger.
     None,
@@ -81,9 +81,22 @@ impl CompanyMembership {
         matches!(self, Self::Owner)
     }
 
-    /// Whether this account may manage the company's operational workspaces and automation.
-    pub fn manages_company_operations(self) -> bool {
+    /// Company-level administration: the owner or a root admin. This is distinct from unit
+    /// management — a person who leads the root manages every unit through
+    /// `unit_management_role`, yet does not administer the company (Plan06 U5): team levels,
+    /// invitations, connections, memory settings and the company-wide read views stay here.
+    pub fn administers_company(self) -> bool {
         matches!(self, Self::Owner | Self::Admin)
+    }
+
+    /// Inviting into the company is root management; an invite carrying a root role is a root
+    /// role assignment, which only the owner makes.
+    pub fn may_invite_as(self, role: CompanyAccessRole) -> bool {
+        match self {
+            Self::Owner => true,
+            Self::Admin => role == CompanyAccessRole::Member,
+            Self::Member | Self::None => false,
+        }
     }
 }
 

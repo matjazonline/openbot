@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "round": "AS-P09-B1-R1",
+  "artifact": "868a58789f2d34aa43c62256bd6a480c8096613ba7f2dd70b496b6d2561d2339",
+  "checks": [
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_limits_operational_signals_ -- --nocapture",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-signals-2.txt",
+          "sha256": "cb0110a97482d68bc12f14e5a64cca9c58b2a46e6116b85343dd1e23ecfba419"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_retention_ -- --nocapture",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-retention-4.txt",
+          "sha256": "5209011e12cfa59f014b4db49928f9f214d8d28b7a195fb04e8db2d93f004a99"
+        },
+        {
+          "path": "logs/AS-P09-cutoffs-1.txt",
+          "sha256": "4a51bc460540ab0bf0a32a61c8e0ee0686d1a57e6e5f3230ce543f4fffa50ed0"
+        },
+        {
+          "path": "logs/AS-P09-retirement-race-1.txt",
+          "sha256": "aee3d524663a8187be6f3ab348df849c00918ad63c592ec1ec19224f33b48802"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_recovery_retention_ -- --nocapture",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-recovery-2.txt",
+          "sha256": "e0001e18e561e6c8a03564b53e710bcb0463db537e351426b3850c59e8d93e72"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_recovery_real_dump_restore_ -- --nocapture",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-restore-3.txt",
+          "sha256": "4a81d126eb8fa0d930752af3426e55d62c813de2913a001f28d48daf4c9f161c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "docker build --tag as-attribution-production:local services/attribution",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-attribution-image-3.txt",
+          "sha256": "d5cb4b9dff1bfeb9930bf2b70aca619bedda50964f95424791616e752cebcde1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "python3 services/attribution/scripts/container-smoke.py",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-container-smoke-1.txt",
+          "sha256": "b05ff87b3ab96adbc907d7af71e307940e1f63bfd784f4dd0eee6a659d8b854c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6",
+        "AC8"
+      ],
+      "command": "python3 scripts/extracted-build.py foundation",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-extracted-2.txt",
+          "sha256": "b06ca9a5254a01770c2530a43a2768ceb320746913700a3107aaaa255cba5e59"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6",
+        "AC7"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-topologies-11.txt",
+          "sha256": "3a4dd4e4706b30e575c800953bfc75efe4a4b6b22b9230e333265e8d60d9fc45"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7",
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_company_lifecycle_",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-lifecycle-regression-1.txt",
+          "sha256": "c1443e97f084e40f893dcdf0fdaa18522223a5b7bf5fd202bc604380a2dee7a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib commerce_tests; focused startup/storage-boundary tests",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-focused-remaining-1.txt",
+          "sha256": "f0eab551342761811d659903a3c8479501c64dc23dc3d1148c1646e3e2be8ad5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "python3 scripts/boundary.py; python3 scripts/test_boundary.py; scripts/check-contracts.sh",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-boundary-final-1.txt",
+          "sha256": "9c2a4b7d8f035ffbfc4cf63806bb48591e34b2e7cb7449d274e6d595eaae730b"
+        },
+        {
+          "path": "logs/AS-P09-contracts-1.txt",
+          "sha256": "8ab9215ce5b9bc3c81b0ac86281c7ace51b7005880d30163a3c90f9ded8621ee"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_dashboard_browser_ -- --ignored --nocapture",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-dashboard-browser-1.txt",
+          "sha256": "a45969bfc17142cf8d812db275fe82a913a63aa77f470ae371da0d4a28700035"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_redirect_",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-redirect-regression-1.txt",
+          "sha256": "acda43e647657f3098ca8318ce09130b9caa73524637f3d4e0d2bf60531de3a3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "docker build attribution image and extracted build first attempts (disk exhaustion, corrected via task-owned cache cleanup)",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P09-attribution-image-2.txt",
+          "sha256": "1836bf40b764ad03eeafbc2f5d3a8e06f92013f7a5bf64c062f9f0ce368f9559"
+        },
+        {
+          "path": "logs/AS-P09-extracted-1.txt",
+          "sha256": "ae7d5b194d63df26037639ad7e1d8efe6e0ab33da2b0a3d460fd34a7e153f79f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6",
+        "AC7"
+      ],
+      "command": "python3 scripts/attribution/topology.py prior fixture attempts",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P09-topologies-1.txt",
+          "sha256": "89a6e343dd15d041d9dea7c7d421974c98268ed96c9c56cb70c69a53bf0dd693"
+        },
+        {
+          "path": "logs/AS-P09-topologies-2.txt",
+          "sha256": "07376216732218cd1a1bb06e58f4b864d1589722f8f37810f30803361afdd4ce"
+        },
+        {
+          "path": "logs/AS-P09-topologies-3.txt",
+          "sha256": "1e756e7c838bad034e03aa4d7d59cb16bf45ac490d3065d94bd1a9c450983eda"
+        },
+        {
+          "path": "logs/AS-P09-topologies-4.txt",
+          "sha256": "41b695908d9e8f811c6560307b096bb2301886562d59db84754f0e2408ab6f11"
+        },
+        {
+          "path": "logs/AS-P09-topologies-5.txt",
+          "sha256": "af1d1270b206df328b3b23b5b8ea3897bf0ab63d6b394e1730d5461ce3be01e5"
+        },
+        {
+          "path": "logs/AS-P09-topologies-6.txt",
+          "sha256": "83b6cb9ad84de429def3c90a19973c2c942b5e03f0920deedc3ca91ed12ce730"
+        },
+        {
+          "path": "logs/AS-P09-topologies-7.txt",
+          "sha256": "98578484285eb103798edc630b65685ad0c661285b0ee40bd51cf40f6e698e5f"
+        },
+        {
+          "path": "logs/AS-P09-topologies-8.txt",
+          "sha256": "23fc2167f6535749fc461b9169f3d60780b4287431c113cd42bba05f6b46d960"
+        },
+        {
+          "path": "logs/AS-P09-topologies-9.txt",
+          "sha256": "8b3073ed86649d62f23bdf75086e6885ddeebaa203ec241e569548a1f5c5e127"
+        },
+        {
+          "path": "logs/AS-P09-topologies-10.txt",
+          "sha256": "2439ad7adc0498f4264908a772985dbd5248d8046a9408858c187c44856d5685"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "python3 scripts/verify.py foundation before SQL boundary fixture correction",
+      "fixture": "UUID-owned nonprivileged PostgreSQL databases; Rust1.95/stock2MiB; local test targets only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P09-foundation-3.txt",
+          "sha256": "a94f60737ea8552c2220aa0d12324f525a7bb278934bef0f95029bd12cd60542"
+        }
+      ]
+    }
+  ]
+}

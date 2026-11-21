@@ -42,11 +42,10 @@ fn knowledge_run_level_domain_keeps_content_within_the_admission_ceiling() {
 fn memory_access_level_human_input_exactness_follows_u2() {
     use ExactnessTarget::*;
     use HumanInputClass::*;
-    for target in [Run, AgentScope, UserScope, CompanyScope] {
+    for target in [Run, PrincipalScope, UnitScope] {
         assert!(!human_input_exactness(ConversationalInput, target));
     }
     assert!(human_input_exactness(AuthoredConfiguration, Run));
-    assert!(human_input_exactness(AuthoredConfiguration, AgentScope));
-    assert!(human_input_exactness(AuthoredConfiguration, UserScope));
-    assert!(!human_input_exactness(AuthoredConfiguration, CompanyScope));
+    assert!(human_input_exactness(AuthoredConfiguration, PrincipalScope));
+    assert!(!human_input_exactness(AuthoredConfiguration, UnitScope));
 }

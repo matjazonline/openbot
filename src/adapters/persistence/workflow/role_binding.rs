@@ -18,12 +18,14 @@ pub(super) async fn check_on(
     association: RelatedAssociation,
 ) -> AppResult<()> {
     let reference = configuration.bundle().first_role_reference();
+    let memory_own = crate::application::workflow::memory::needs_local_unit(configuration.bundle());
     let error = || match reference {
         _ if configuration.escalation().is_some() => escalation_needs_department(),
         Some(reference) => needs_department(reference),
+        None if memory_own => memory_needs_department(),
         None => invalid(),
     };
-    if reference.is_none() && configuration.escalation().is_none() {
+    if reference.is_none() && configuration.escalation().is_none() && !memory_own {
         return Ok(());
     }
     if context_on(tx, configuration.company_id(), association)
@@ -33,16 +35,6 @@ pub(super) async fn check_on(
         return Err(error());
     }
     Ok(())
-}
-
-/// Both ownership writers call this only when removing an existing department, with the
-/// company write lock and channel UPDATE lock held. Concurrent activation shares these locks.
-pub(crate) async fn check_detach_on(
-    tx: &mut PgConnection,
-    company: CompanyId,
-    channel: Uuid,
-) -> AppResult<()> {
-    check_without_context_on(tx, company, AddressTarget::Desk(channel)).await
 }
 
 /// Roster mutations hold the company write lock, just like activation. Validate the final
@@ -124,11 +116,20 @@ async fn check_without_context_on(
     }
     for version in versions {
         let bundle = read_version(&mut *tx, company, VersionId::new(version)).await?;
+        if crate::application::workflow::memory::needs_local_unit(&bundle) {
+            return Err(memory_needs_department());
+        }
         if let Some(reference) = bundle.first_role_reference() {
             return Err(needs_department(reference));
         }
     }
     Ok(())
+}
+
+pub(super) fn memory_needs_department() -> AppError {
+    AppError::BadRequest(
+        "binding.memory_scope_needs_desk: own memory requires an unambiguous department".into(),
+    )
 }
 
 fn escalation_needs_department() -> AppError {

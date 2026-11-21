@@ -1,0 +1,111 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+error[E0609]: no field `id` on type `application::agent::definition::ResolvedAgentSkill`
+   --> src/adapters/persistence/delegated_agent_management_tests.rs:193:47
+    |
+193 |     assert_eq!(published.definition.skills[0].id, skill.id);
+    |                                               ^^ unknown field
+    |
+    = note: available fields are: `assignment_id`, `skill`
+
+error[E0599]: no variant, associated function, or constant named `Tool` found for enum `application::agent::publication::AgentGrantIdentity` in the current scope
+   --> src/adapters/persistence/delegated_agent_management_tests.rs:198:33
+    |
+198 |             AgentGrantIdentity::Tool(published.definition.tools[0].binding.id),
+    |                                 ^^^^ variant, associated function, or constant not found in `application::agent::publication::AgentGrantIdentity`
+    |
+   ::: src/application/agent/publication.rs:69:1
+    |
+ 69 | pub enum AgentGrantIdentity {
+    | --------------------------- variant, associated function, or constant `Tool` not found for this enum
+
+error[E0277]: `application::agent::publication::AgentPreview` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/delegated_agent_management_tests.rs:290:9
+    |
+289 |       hidden(
+    |       ------ required by a bound introduced by this call
+290 | /         m.p()
+291 | |             .preview_agent(m.scope(m.actor(), unplaced.agent.id))
+292 | |             .await,
+    | |__________________^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Debug` is not implemented for `application::agent::publication::AgentPreview`
+   --> src/application/agent/publication.rs:54:1
+    |
+ 54 | pub struct AgentPreview {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `application::agent::publication::AgentPreview` or manually `impl std::fmt::Debug for application::agent::publication::AgentPreview`
+note: required by a bound in `persistence::department::tests::delegated_administration::hidden`
+   --> src/adapters/persistence/delegated_administration_tests.rs:61:14
+    |
+ 61 | fn hidden<T: std::fmt::Debug>(result: AppResult<T>) {
+    |              ^^^^^^^^^^^^^^^ required by this bound in `hidden`
+
+error[E0277]: `application::agent::publication::AgentPreview` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/delegated_agent_management_tests.rs:395:12
+    |
+395 |     hidden(m.p().preview_agent(m.scope(sibling, own.agent.id)).await);
+    |     ------ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |     |
+    |     required by a bound introduced by this call
+    |
+help: the trait `std::fmt::Debug` is not implemented for `application::agent::publication::AgentPreview`
+   --> src/application/agent/publication.rs:54:1
+    |
+ 54 | pub struct AgentPreview {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `application::agent::publication::AgentPreview` or manually `impl std::fmt::Debug for application::agent::publication::AgentPreview`
+note: required by a bound in `persistence::department::tests::delegated_administration::hidden`
+   --> src/adapters/persistence/delegated_administration_tests.rs:61:14
+    |
+ 61 | fn hidden<T: std::fmt::Debug>(result: AppResult<T>) {
+    |              ^^^^^^^^^^^^^^^ required by this bound in `hidden`
+
+error[E0609]: no field `other_company` on type `persistence::department::tests::Departments`
+   --> src/adapters/persistence/delegated_agent_management_tests.rs:399:47
+    |
+399 |                 company: CompanyId::new(m.d.f.other_company),
+    |                                               ^^^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `persistence`, `departments`, `use_cases`, `company`, `owner` ... and 10 others
+
+error[E0609]: no field `agent` on type `persistence::department::tests::Departments`
+   --> src/adapters/persistence/delegated_agent_management_tests.rs:407:52
+    |
+407 |                 WorkflowActor::authenticated(m.d.f.agent).unwrap(),
+    |                                                    ^^^^^ unknown field
+    |
+    = note: available fields are: `persistence`, `departments`, `use_cases`, `company`, `owner` ... and 10 others
+
+error[E0609]: no field `other_company` on type `persistence::department::tests::Departments`
+   --> src/adapters/persistence/delegated_agent_management_tests.rs:420:38
+    |
+420 |                 CompanyId::new(m.d.f.other_company),
+    |                                      ^^^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `persistence`, `departments`, `use_cases`, `company`, `owner` ... and 10 others
+
+error[E0277]: `application::agent::publication::AgentPreview` doesn't implement `std::fmt::Debug`
+  --> src/adapters/persistence/delegated_agent_race_tests.rs:70:9
+   |
+69 |       hidden(
+   |       ------ required by a bound introduced by this call
+70 | /         m.p()
+71 | |             .preview_agent(m.scope(m.actor(), agent.agent.id))
+72 | |             .await,
+   | |__________________^ unsatisfied trait bound
+   |
+help: the trait `std::fmt::Debug` is not implemented for `application::agent::publication::AgentPreview`
+  --> src/application/agent/publication.rs:54:1
+   |
+54 | pub struct AgentPreview {
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(Debug)]` to `application::agent::publication::AgentPreview` or manually `impl std::fmt::Debug for application::agent::publication::AgentPreview`
+note: required by a bound in `persistence::department::tests::delegated_administration::hidden`
+  --> src/adapters/persistence/delegated_administration_tests.rs:61:14
+   |
+61 | fn hidden<T: std::fmt::Debug>(result: AppResult<T>) {
+   |              ^^^^^^^^^^^^^^^ required by this bound in `hidden`
+
+Some errors have detailed explanations: E0277, E0599, E0609.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 8 previous errors

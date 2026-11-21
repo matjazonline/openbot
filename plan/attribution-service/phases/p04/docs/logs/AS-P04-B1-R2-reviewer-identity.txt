@@ -1,0 +1,11 @@
+Source start/end: a5e729a610b120f50fb43acddf1c3bd7cda8c7b8a3cc5ae8d394e971607c7275
+HEAD: 2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+Branch: attribution-service
+Decision AS-P04-D1/r1 unchanged: PASS
+Coordination revision6 pinned byte comparison: PASS
+AS-C001/r1, AS-C002/r1, AS-C003/r1 unchanged
+git diff --check: PASS
+AS-P04-B1-R2-reviewer-end.snapshot.txt: 4a2bb6cd8a995c2fcaef22312aff591e5b082d2a84b8497cbf15407de3fd0478
+AS-P04-B1-R2-reviewer-manifest.txt: 5a111886fb7891a269958badf114d53f0f86940b61f9582d7f7184352e33388c
+AS-P04-B1-R2-reviewer-setup.txt: 2158d43f8239478f6d02cc13d9628cad76637d6fc6e5b4086d2b7798ebec6c29
+AS-P04-B1-R2-reviewer-start.snapshot.txt: 4a2bb6cd8a995c2fcaef22312aff591e5b082d2a84b8497cbf15407de3fd0478

@@ -247,7 +247,7 @@ async fn skill_bundle_http_tenant_operator_and_csrf_guards() {
 }
 
 #[tokio::test]
-async fn skill_bundle_http_members_cannot_upload_and_admins_keep_read_access() {
+async fn skill_bundle_http_members_cannot_upload_and_root_admins_manage_root_skills() {
     let Some(f) = Fixture::new().await else {
         return;
     };
@@ -256,7 +256,9 @@ async fn skill_bundle_http_members_cannot_upload_and_admins_keep_read_access() {
     let (_, archive) = source(&app, &owner).await;
     let id = import(&app, &f, &owner, &archive).await;
     let uri = format!("/ui/companies/{}/skills/{id}/bundle", f.company);
-    for (actor, read_status) in [(f.member, StatusCode::FORBIDDEN), (f.admin, StatusCode::OK)] {
+    // Refusals tell nothing (Plan06 02A.4). A root skill is configured by whoever manages the root
+    // (Plan07 user decision a): a root admin reads and imports it, a member does neither.
+    for (actor, status) in [(f.member, StatusCode::NOT_FOUND), (f.admin, StatusCode::OK)] {
         let actor = cookie(&f, &authority, actor).await;
         for suffix in ["", "/files"] {
             assert_eq!(
@@ -271,7 +273,7 @@ async fn skill_bundle_http_members_cannot_upload_and_admins_keep_read_access() {
                     .await
                     .unwrap()
                     .status(),
-                read_status
+                status
             );
         }
         for destination in [&uri, &format!("/ui/companies/{}/skills/import", f.company)] {
@@ -287,8 +289,8 @@ async fn skill_bundle_http_members_cannot_upload_and_admins_keep_read_access() {
                     .await
                     .unwrap()
                     .status(),
-                StatusCode::FORBIDDEN,
-                "company membership does not grant owner-only import"
+                status,
+                "a malformed upload is refused on the form for a root manager only"
             );
         }
     }

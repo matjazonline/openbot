@@ -125,16 +125,17 @@ async fn authorize_channel(
         .fetch_one(&mut *tx)
         .await?;
     match mode.as_str() {
-        "team" | "public" => {}
-        "allowlist" if owner => {}
-        "allowlist" => {
+        "public" => {}
+        "members" if owner => {}
+        "members" => {
             sqlx::query_scalar::<_, Uuid>(&locks.sql(
                 "SELECT access_grant.principal_id FROM channel_principal_grants AS access_grant \
                  JOIN principals AS principal ON principal.company_id = access_grant.company_id \
                    AND principal.id = access_grant.principal_id \
                  JOIN users AS account ON account.id = principal.user_id \
                  WHERE access_grant.company_id = $1 AND access_grant.channel_id = $2 \
-                   AND principal.user_id = $3 AND account.email_verified_at IS NOT NULL \
+                   AND principal.user_id = $3 \
+                   AND (access_grant.provenance='department_membership' OR account.email_verified_at IS NOT NULL) \
                    AND access_grant.capability = 'view' \
                  FOR SHARE OF access_grant, account",
             ))

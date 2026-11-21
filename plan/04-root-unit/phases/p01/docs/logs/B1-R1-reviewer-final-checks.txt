@@ -1,0 +1,6 @@
+entry/final snapshots identical: PASS
+HEAD matches: PASS
+branch matches: PASS
+D1/r7 SHA matches: PASS
+coordination pin matches: PASS
+git diff --check passes: PASS

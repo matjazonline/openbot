@@ -5,7 +5,7 @@ async fn related_ids_and_thread_channel_must_match_loaded_records() {
     let company_id = company();
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 128));
-    let channel = channel(company_id, ChannelAccessMode::Team);
+    let channel = channel(company_id, ChannelAccessMode::Members);
     reject_mismatched_channel_records(&store, company_id, version_id, &channel).await;
     reject_mismatched_thread_records(&store, company_id, version_id, &channel).await;
 }

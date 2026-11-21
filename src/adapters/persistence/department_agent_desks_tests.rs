@@ -4,7 +4,7 @@
 use super::*;
 use crate::adapters::persistence::company_agent::CompanyAgentService;
 use crate::adapters::persistence::test_support::provisioning_templates;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::entities::participant::PrincipalCapability;
 use crate::use_cases::agent::{
     AgentPersistence, AgentPlacement, AgentWrite, CompanyAgents, CreatedAgent,
@@ -241,7 +241,7 @@ async fn agent_direct_address_refuses_a_taken_address_or_slug() {
         return;
     };
     connect(&f).await;
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.company,
         ChannelWrite {
@@ -370,17 +370,14 @@ async fn agent_direct_address_places_the_agent_and_its_lead_role_with_grants() {
         ("escalation-room", child.id),
     ] {
         desks.push(
-            ChannelPersistence::create(
+            crate::adapters::persistence::test_support::create_channel(
                 &f.persistence,
                 f.company,
                 ChannelWrite {
                     name: slug.into(),
                     slug: slug.into(),
                     enabled: true,
-                    ownership: Some(ChannelOwnershipWrite {
-                        department_id: Some(Some(owner)),
-                        members_only: Some(true),
-                    }),
+                    department_id: Some(owner),
                     ..ChannelWrite::default()
                 },
             )
@@ -532,21 +529,17 @@ async fn agent_direct_address_competing_lead_creation_takes_its_desk_gates_once(
     connect(&f).await;
     let parent = f.create("Operations", None).await;
     let department = f.create("Support", Some(parent.id)).await;
-    let members_only = |department: DepartmentId| ChannelOwnershipWrite {
-        department_id: Some(Some(department)),
-        members_only: Some(true),
-    };
     let mut desks = Vec::new();
     for slug in ["room-a", "room-b"] {
         desks.push(
-            ChannelPersistence::create(
+            crate::adapters::persistence::test_support::create_channel(
                 &f.persistence,
                 f.company,
                 ChannelWrite {
                     name: slug.into(),
                     slug: slug.into(),
                     enabled: true,
-                    ownership: Some(members_only(parent.id)),
+                    department_id: Some(parent.id),
                     ..ChannelWrite::default()
                 },
             )
@@ -567,7 +560,7 @@ async fn agent_direct_address_competing_lead_creation_takes_its_desk_gates_once(
         &mut moved,
         CompanyId::new(f.company),
         department_desk,
-        &members_only(department.id),
+        department.id,
     )
     .await
     .unwrap();

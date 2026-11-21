@@ -1,0 +1,2 @@
+# psql -X -q -v ON_ERROR_STOP=1 -f migrations/20260817000000_init_schema.sql on fresh openbot_p07_p02b1_schema @55407, 2026-11-21
+exit=0

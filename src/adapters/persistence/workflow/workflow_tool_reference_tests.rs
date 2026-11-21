@@ -71,6 +71,7 @@ async fn autonomous_agent_workflow_reference_step_http_alias_cannot_redirect_age
         .create_http(
             company,
             admin,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://tools.fixture.test").unwrap(),
                 bearer: false,

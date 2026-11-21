@@ -12,6 +12,8 @@ use agent::provision_agent_on;
 mod builder;
 #[path = "provisioning_department.rs"]
 mod department;
+#[path = "provisioning_directory.rs"]
+mod directory;
 use builder::create_agent_on;
 pub(crate) use department::{
     department_desk_key, follow_department_lead_on, provision_department_desk_on,
@@ -42,9 +44,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
-/// Current authority for the built-in provisioning target: the run actor must still be the
-/// company owner or an admin, and the snapshot is exactly the trusted built-in. There is never
-/// an approval (P08-Q5).
+/// A current person manager may enter the exact trusted provisioning built-in. Effects
+/// separately authorize the genuine requester against their actual per-kind target.
 pub struct ProvisioningActionAuthority;
 #[async_trait]
 impl SqlActionAuthority for ProvisioningActionAuthority {
@@ -57,7 +58,13 @@ impl SqlActionAuthority for ProvisioningActionAuthority {
         if provisioning_target(&request.target)? != request.scope.company.as_uuid() {
             return Err(missing());
         }
-        super::authority::authorize_company(tx, request.scope.company, authority.actor).await?;
+        super::management::authorize_target_on(
+            tx,
+            request.scope.company,
+            authority.actor,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
+        )
+        .await?;
         let kind =
             ProvisioningKind::parse(request.contract.contract.name.as_str()).ok_or_else(missing)?;
         Ok(LockedActionAuthority {
@@ -215,7 +222,8 @@ impl SqlLocalAction for ProvisioningEffects {
         }
         match kind {
             ProvisioningKind::ListAgents => {
-                list_on(tx, &self.templates, company, &request.arguments).await
+                directory::list_on(tx, &self.templates, company, requester, &request.arguments)
+                    .await
             }
             ProvisioningKind::CreateAgent => {
                 let spec = CreateAgent::parse(&request.arguments)?;
@@ -237,6 +245,20 @@ impl SqlLocalAction for ProvisioningEffects {
                 )
             }
             ProvisioningKind::CreateDeskForAgent => {
+                match super::management::authorize_target_on(
+                    tx,
+                    company,
+                    requester,
+                    crate::application::ports::administration::ManagementTarget::Root,
+                )
+                .await
+                {
+                    Ok(_) => {}
+                    Err(AppError::NotFound(_)) => {
+                        return Ok(ProvisioningRefusal::Forbidden.tool_error());
+                    }
+                    Err(error) => return Err(error),
+                }
                 let spec = CreateDeskForAgent::parse(&request.arguments)?;
                 let provisioning = Provisioning {
                     company,
@@ -266,7 +288,14 @@ async fn authorize_requester(
     company: CompanyId,
     requester: WorkflowActor,
 ) -> AppResult<Provisioned<()>> {
-    match super::authority::authorize_company(tx, company, requester).await {
+    match super::management::authorize_target_on(
+        tx,
+        company,
+        requester,
+        crate::application::ports::administration::ManagementTarget::AnyUnit,
+    )
+    .await
+    {
         Ok(_) => Ok(Ok(())),
         Err(AppError::NotFound(_)) => Ok(Err(ProvisioningRefusal::Forbidden)),
         Err(error) => Err(error),
@@ -372,119 +401,6 @@ fn requester_source(source_key: &str) -> RequesterSource {
     }
 }
 
-/// One listed agent: id, slug, name, description, provider and model.
-type ListedAgent = (
-    Uuid,
-    String,
-    String,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-);
-
-/// The company's agents by slug -- with their departments and desks, only one department's
-/// members and role holders when `department` names it (01DEP-P03-D10) -- and its keyed models.
-async fn list_on(
-    tx: &mut Transaction<'_, Postgres>,
-    templates: &ProvisioningDeployment,
-    company: CompanyId,
-    arguments: &Value,
-) -> AppResult<Value> {
-    use crate::adapters::persistence::department_roster::{
-        CompanyAddresses, agent_addresses_on, agent_departments_on,
-    };
-    let department = match arguments.get("department").and_then(Value::as_str) {
-        None => None,
-        Some(slug) => {
-            let id: Option<Uuid> = sqlx::query_scalar(
-                "SELECT id FROM departments WHERE company_id = $1 AND slug = $2",
-            )
-            .bind(company.as_uuid())
-            .bind(slug)
-            .fetch_optional(&mut **tx)
-            .await?;
-            match id {
-                Some(id) => Some(id),
-                None => {
-                    return Ok(ProvisioningRefusal::Invalid(format!(
-                        "No department has the slug '{slug}'"
-                    ))
-                    .tool_error());
-                }
-            }
-        }
-    };
-    let mut budget = MAX_LISTING_BYTES;
-    let mut truncated = false;
-    let mut fits = |entry: &Value| {
-        let size = entry.to_string().len() + 1;
-        let fit = size <= budget;
-        if fit {
-            budget -= size;
-        }
-        fit
-    };
-    let mut models = Vec::new();
-    for (provider, model) in ready_models_on(tx, company).await? {
-        let entry = json!({"provider": provider, "model": model});
-        if models.len() == MAX_LISTED_MODELS || !fits(&entry) {
-            truncated = true;
-            break;
-        }
-        models.push(entry);
-    }
-    let rows: Vec<ListedAgent> = sqlx::query_as(
-        "SELECT agent.id, agent.slug::text, agent.name, agent.description, agent.provider, \
-           agent.model FROM agents AS agent \
-         WHERE agent.company_id = $1 AND ($2::uuid IS NULL OR EXISTS ( \
-           SELECT 1 FROM principals AS principal WHERE principal.company_id = agent.company_id \
-             AND principal.agent_id = agent.id AND ( \
-               EXISTS (SELECT 1 FROM department_members AS member \
-                 WHERE member.company_id = principal.company_id AND member.department_id = $2 \
-                   AND member.principal_id = principal.id) \
-               OR EXISTS (SELECT 1 FROM department_roles AS role \
-                 WHERE role.company_id = principal.company_id AND role.department_id = $2 \
-                   AND role.principal_id = principal.id)))) \
-         ORDER BY agent.slug LIMIT $3",
-    )
-    .bind(company.as_uuid())
-    .bind(department)
-    .bind(MAX_LISTED_AGENTS as i64 + 1)
-    .fetch_all(&mut **tx)
-    .await?;
-    truncated |= rows.len() > MAX_LISTED_AGENTS;
-    let rows: Vec<ListedAgent> = rows.into_iter().take(MAX_LISTED_AGENTS).collect();
-    let ids: Vec<Uuid> = rows.iter().map(|row| row.0).collect();
-    let mut departments = agent_departments_on(tx, company, &ids).await?;
-    let mut addresses = CompanyAddresses::new(company, Some(&templates.app_domain));
-    let mut desks = agent_addresses_on(tx, &mut addresses, &ids).await?;
-    let name = |name: &str| name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>();
-    let mut agents = Vec::new();
-    for (id, slug, agent_name, description, provider, model) in rows {
-        let (placed, more) = departments.remove(&id).unwrap_or_default();
-        truncated |= more;
-        let entry = json!({
-            "slug": slug,
-            "name": name(&agent_name),
-            "description": description
-                .map(|text| text.chars().take(MAX_LISTED_DESCRIPTION_CHARS).collect::<String>()),
-            "provider": provider, "model": model,
-            "departments": placed.iter().map(|department| json!({
-                "slug": department.slug,
-                "name": name(&department.name),
-                "roles": department.roles.iter().map(|role| role.as_str()).collect::<Vec<_>>(),
-            })).collect::<Vec<_>>(),
-            "address": desks.remove(&id).map(|address| json!({"principal_id": address.principal_id, "address": address.address})),
-        });
-        if !fits(&entry) {
-            truncated = true;
-            break;
-        }
-        agents.push(entry);
-    }
-    Ok(json!({"agents": agents, "models": models, "truncated": truncated}))
-}
-
 /// Every enabled model of a connection that has a key, default connection first, each in the
 /// order the connection stores them.
 pub(crate) async fn ready_models_on(
@@ -492,8 +408,11 @@ pub(crate) async fn ready_models_on(
     company: CompanyId,
 ) -> AppResult<Vec<(String, String)>> {
     let connections: Vec<(String, Vec<String>)> = sqlx::query_as(
-        "SELECT provider, models FROM company_model_connections \
-         WHERE company_id = $1 AND api_key IS NOT NULL ORDER BY is_default DESC, provider",
+        "SELECT connection.provider, connection.models FROM company_model_connections AS connection \
+         JOIN departments AS unit ON unit.company_id = connection.company_id \
+          AND unit.id = connection.unit_id \
+         WHERE connection.company_id = $1 AND connection.api_key IS NOT NULL \
+         ORDER BY (unit.is_root AND connection.default_for_unit) DESC, connection.provider",
     )
     .bind(company.as_uuid())
     .fetch_all(&mut **tx)
@@ -625,6 +544,10 @@ async fn agent_write(
         .into_iter()
         .map(
             |(provider, model)| crate::entities::company::CompanyModelConnection {
+                id: Uuid::nil(),
+                unit_id: Uuid::nil(),
+                unit_name: String::new(),
+                in_root: false,
                 provider: provider.into(),
                 models: vec![model.into()],
                 is_default: false,
@@ -654,13 +577,37 @@ async fn agent_write(
             tools.push(name);
         }
     }
+    // The created agent's placement decides what it may use (Plan07 decision d): skills and
+    // tools named in the spec resolve only within that department's reach (the root's when the
+    // spec names none), so another unit's same slug reads as absent.
+    let placement: Option<Uuid> = match &spec.department {
+        Some(slug) => {
+            sqlx::query_scalar("SELECT id FROM departments WHERE company_id = $1 AND slug = $2")
+                .bind(company.as_uuid())
+                .bind(slug)
+                .fetch_optional(&mut **tx)
+                .await?
+        }
+        None => None,
+    };
+    if !super::super::company_agent::model_in_reach_on(tx, company, placement, &spec.provider)
+        .await?
+    {
+        return Ok(Err(ProvisioningRefusal::Invalid(format!(
+            "Model '{}' of provider '{}' belongs to a department outside the agent's department",
+            spec.model, spec.provider
+        ))));
+    }
     let mut skill_ids = Vec::with_capacity(spec.skills.len());
     for slug in &spec.skills {
         let id: Option<Uuid> = sqlx::query_scalar(
-            "SELECT id FROM skills WHERE company_id = $1 AND slug = $2 FOR KEY SHARE",
+            "SELECT id FROM skills WHERE company_id = $1 AND slug = $2 \
+             AND unit_reaches($1, COALESCE($3, (SELECT id FROM departments \
+                 WHERE company_id = $1 AND is_root)), unit_id) FOR KEY SHARE",
         )
         .bind(company.as_uuid())
         .bind(slug)
+        .bind(placement)
         .fetch_optional(&mut **tx)
         .await?;
         match id {
@@ -681,11 +628,12 @@ async fn agent_write(
         system_prompt: Some(spec.system_prompt.clone()),
         description: spec.description.clone(),
         tool_bindings: Some(
-            super::super::agent_binding_selection::resolve_bindings_on(
+            super::super::agent_binding_selection::resolve_bindings_in_reach_on(
                 tx,
                 company.as_uuid(),
                 None,
                 &tools,
+                placement,
             )
             .await?,
         ),
@@ -857,8 +805,7 @@ impl AssistantChannels for AssistantChannelService {
             "SELECT command.result FROM workflow_provisioning_commands AS command \
              JOIN companies AS company ON company.id = command.company_id \
              WHERE command.company_id = $1 AND command.command_key = $2 \
-               AND (company.user_id = $3 OR EXISTS (SELECT 1 FROM company_members AS member \
-                    WHERE member.company_id = $1 AND member.user_id = $3 \
+               AND (company.user_id = $3 OR EXISTS (SELECT 1 FROM membership_of($3, $1) AS member WHERE true \
                       AND member.role = 'admin'))",
         )
         .bind(company.as_uuid())

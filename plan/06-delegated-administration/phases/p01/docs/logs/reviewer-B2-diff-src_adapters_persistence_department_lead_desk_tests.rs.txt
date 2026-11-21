@@ -1,0 +1,20 @@
+--- B1/src/adapters/persistence/department_lead_desk_tests.rs
++++ B2/src/adapters/persistence/department_lead_desk_tests.rs
+@@ -2,7 +2,7 @@
+ //! `department_desk_` for the desk a department is created with and how it follows its lead, and
+ //! `department_lead_desk_competing_` for lead changes that race.
+ use super::*;
+-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
++use crate::application::ports::channel::ChannelWrite;
+ use crate::application::workflow::compiler::agent_reference_steps;
+ use crate::application::workflow::templates::REPLY_AGENT_STEP;
+ use crate::application::workflow::{RelatedAssociation, RelatedChannelId};
+@@ -250,7 +250,7 @@
+     let Some(f) = Departments::new().await else {
+         return;
+     };
+-    ChannelPersistence::create(
++    crate::adapters::persistence::test_support::create_channel(
+         &f.persistence,
+         f.company,
+         ChannelWrite {

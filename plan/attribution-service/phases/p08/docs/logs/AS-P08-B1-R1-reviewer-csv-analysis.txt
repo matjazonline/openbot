@@ -1,0 +1,9 @@
+Duplicate column names: {'attributed_paid_orders': 2}
+Attributed-order columns (zero-based): [9, 16]
+Expected group total:2; expected per-currency total:1
+Actual first row values: ['2', '1']
+Name-keyed reader retains only: 1
+Product rows/context raw_clicks: [('product-x', 'EUR', '1'), ('product-x', 'USD', ''), ('product-y', 'EUR', '1'), ('product-y', 'USD', '')]
+Same one contextual click appears for product-x and product-y.
+No group_by, scope/basis or nonadditivity label in CSV headers: ['group', 'start_utc', 'end_utc', 'timezone', 'raw_clicks', 'eligible_clicks', 'image_loads', 'landing_page_loads', 'visible_placements', 'attributed_paid_orders', 'unattributed_paid_orders', 'unattributed_reasons', 'period_conversion_rate', 'rate_denominator', 'currency', 'paid_orders', 'attributed_paid_orders', 'sold_units', 'returned_units', 'merchandise_amount', 'refunded_merchandise_amount', 'net_merchandise_amount', 'tax_amount', 'shipping_amount', 'refunded_tax_amount', 'refunded_shipping_amount', 'refunds']
+Serializer input intentionally represents two product groups/two currencies; actual production export.rs is compiled directly with production Analytics types. This probes CSV representation, not SQL/ingress.

@@ -1,0 +1,140 @@
+--- B2R1/src/adapters/persistence/workflow/delegated_binding_management_tests.rs
++++ B2R2/src/adapters/persistence/workflow/delegated_binding_management_tests.rs
+@@ -49,14 +49,10 @@
+     publish.version
+ }
+ 
+-#[tokio::test]
+-async fn delegated_admin_binding_service_configures_activates_and_pauses_captured_messaging() {
+-    let f = Fixture::new().await;
+-    let p = &f.persistence;
+-    let actor = lead(&f).await;
+-    let unit = delegated_unit(p, f.target.company, f.target.actor, actor).await;
+-    let desk = ChannelPersistence::create(
+-        p,
++async fn managed_desk(f: &Fixture, actor: WorkflowActor) -> Uuid {
++    let unit = delegated_unit(&f.persistence, f.target.company, f.target.actor, actor).await;
++    ChannelPersistence::create(
++        &f.persistence,
+         actor,
+         f.target.company.as_uuid(),
+         ChannelWrite {
+@@ -67,9 +63,18 @@
+         },
+     )
+     .await
+-    .unwrap();
+-    let version = message_version(&f, desk.id).await;
+-    let association = RelatedAssociation::Channel(RelatedChannelId::new(desk.id));
++    .unwrap()
++    .id
++}
++
++#[tokio::test]
++async fn delegated_admin_binding_service_configures_activates_and_pauses_captured_messaging() {
++    let f = Fixture::new().await;
++    let p = &f.persistence;
++    let actor = lead(&f).await;
++    let desk = managed_desk(&f, actor).await;
++    let version = message_version(&f, desk).await;
++    let association = RelatedAssociation::Channel(RelatedChannelId::new(desk));
+     let authorizer = LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone());
+     assert!(matches!(
+         authorizer
+@@ -145,3 +150,96 @@
+         paused.revision
+     );
+ }
++
++#[tokio::test]
++async fn delegated_admin_binding_activity_hides_current_and_stale_revisions_from_other_units() {
++    use crate::application::workflow::lifecycle::LifecycleError;
++    let f = BindingFixture::new(json!([])).await;
++    let p = &f.fixture.persistence;
++    let state = f.service().configure(f.request(None)).await.unwrap();
++    let stranger = lead(&f.fixture).await;
++    delegated_unit(p, f.target.company, f.target.actor, stranger).await;
++    let real = BindingService::new(
++        LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone()),
++        p.clone(),
++        p.clone(),
++        p.clone(),
++    );
++    let stale = BindingStateRevision::new(state.revision.get() + 1).unwrap();
++    for binding in [f.target.binding, WorkflowBindingId::new(Uuid::new_v4())] {
++        for expected in [state.revision, stale] {
++            let request = SetBindingActivity {
++                target: BindingTarget {
++                    actor: stranger,
++                    binding,
++                    ..f.target
++                },
++                expected,
++            };
++            assert!(matches!(
++                real.activate(request).await,
++                Err(LifecycleError::Application(AppError::NotFound(_)))
++            ));
++            assert!(matches!(
++                real.deactivate(request).await,
++                Err(LifecycleError::Application(AppError::NotFound(_)))
++            ));
++        }
++    }
++    let authorized_stale = SetBindingActivity {
++        target: f.target,
++        expected: stale,
++    };
++    assert!(matches!(
++        real.activate(authorized_stale).await,
++        Err(LifecycleError::Application(AppError::Conflict(_)))
++    ));
++    assert!(matches!(
++        real.deactivate(authorized_stale).await,
++        Err(LifecycleError::Application(AppError::Conflict(_)))
++    ));
++    assert_eq!(
++        p.binding(f.target.company, f.target.binding)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++        state.revision
++    );
++}
++
++#[tokio::test]
++async fn delegated_admin_competing_binding_activity_locks_the_actor_before_the_company() {
++    use crate::adapters::persistence::test_support::assert_actor_before_company;
++    let f = BindingFixture::new(json!([])).await;
++    let state = f.service().configure(f.request(None)).await.unwrap();
++    let p = &f.fixture.persistence;
++    let real = BindingService::new(
++        LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone()),
++        p.clone(),
++        p.clone(),
++        p.clone(),
++    );
++    let command = f.activity(state.revision).await;
++    assert_actor_before_company(
++        p.pool(),
++        f.target.company.as_uuid(),
++        f.target.actor.user_id(),
++        p.save_binding(command),
++    )
++    .await
++    .unwrap();
++    let active = p
++        .binding(f.target.company, f.target.binding)
++        .await
++        .unwrap()
++        .unwrap();
++    let paused = real
++        .deactivate(SetBindingActivity {
++            target: f.target,
++            expected: active.revision,
++        })
++        .await
++        .unwrap();
++    assert!(!paused.active);
++}

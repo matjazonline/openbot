@@ -94,7 +94,7 @@ pub(super) async fn member_on(
     company: Uuid,
     user: Uuid,
 ) -> AppResult<()> {
-    let person:Option<Uuid>=sqlx::query_scalar("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal")
+    let person:Option<Uuid>=sqlx::query_scalar("SELECT member.root_user_id FROM department_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id WHERE member.company_id=$1 AND member.root_user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal")
         .bind(company).bind(user).fetch_optional(&mut **tx).await?;
     person.map(|_| ()).ok_or_else(denied)
 }
@@ -157,10 +157,13 @@ impl IntegrationBindings for PostgresIntegrationBindings {
             .execute(&mut *tx)
             .await?;
         users_on(&mut tx, vec![actor]).await?;
-        super::workflow::authority::authorize_company(
+        // Binding a connection to Vault configures it: its unit manager's (Plan07).
+        super::unit_resources::authorize_resource_on(
             &mut tx,
-            CompanyId::new(c.company),
             WorkflowActor::authenticated(actor)?,
+            CompanyId::new(c.company),
+            c.kind.unit_resource(),
+            c.connection,
         )
         .await?;
         let current = destination_on(&mut tx, c.company, c.connection, c.kind).await?;
@@ -296,10 +299,12 @@ impl PostgresIntegrationBindings {
         users_on(tx, vec![user, row.administrator_id])
             .await
             .map_err(map_error)?;
-        super::workflow::authority::authorize_company(
+        super::unit_resources::authorize_resource_on(
             tx,
-            CompanyId::new(proposal.company),
             WorkflowActor::authenticated(row.administrator_id).map_err(map_error)?,
+            CompanyId::new(proposal.company),
+            proposal.kind.unit_resource(),
+            proposal.connection,
         )
         .await
         .map_err(map_error)?;

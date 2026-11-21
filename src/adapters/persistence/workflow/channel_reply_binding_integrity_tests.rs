@@ -2,7 +2,7 @@ use super::*;
 use crate::entities::correlation::CorrelationId;
 
 #[tokio::test]
-async fn channel_reply_binding_rechecks_current_run_as_private_channel_visibility() {
+async fn channel_reply_binding_separates_management_from_current_run_as_visibility() {
     let s = Intents::new().await;
     let run_as = member(&s.fixture, "admin").await;
     sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
@@ -11,31 +11,16 @@ async fn channel_reply_binding_rechecks_current_run_as_private_channel_visibilit
         .await
         .unwrap();
     let binding = s.binding(MessageTrigger::Any, Some(run_as)).await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
-        .bind(s.fixture.target.company.as_uuid())
-        .bind(s.channel)
-        .execute(s.pool())
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        s.pool(),
+        s.channel,
+    )
+    .await;
+    let selected = s
+        .p()
+        .configure_channel_reply(selection(&s, binding, None).await)
         .await
         .unwrap();
-    assert!(
-        s.p()
-            .configure_channel_reply(selection(&s, binding, None).await)
-            .await
-            .is_err()
-    );
-    assert!(
-        s.p()
-            .channel_reply_settings(
-                s.fixture.target.company,
-                crate::entities::address::AddressTarget::Desk(
-                    (RelatedChannelId::new(s.channel)).as_uuid()
-                ),
-                s.owner()
-            )
-            .await
-            .unwrap()
-            .is_none()
-    );
     let principal: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
             .bind(s.fixture.target.company.as_uuid())
@@ -46,25 +31,22 @@ async fn channel_reply_binding_rechecks_current_run_as_private_channel_visibilit
     sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) \
         VALUES($1,$2,$3,'view','manager')")
         .bind(s.fixture.target.company.as_uuid()).bind(s.channel).bind(principal).execute(s.pool()).await.unwrap();
-    let selected = select(&s, binding).await;
+
     sqlx::query("DELETE FROM channel_principal_grants WHERE company_id=$1 AND channel_id=$2 AND principal_id=$3")
         .bind(s.fixture.target.company.as_uuid()).bind(s.channel).bind(principal).execute(s.pool()).await.unwrap();
     let mut change = selection(&s, binding, Some(selected.revision)).await;
     change.responder.as_mut().unwrap().contract = literal_contract("Changed");
-    assert!(s.p().configure_channel_reply(change).await.is_err());
-    assert_eq!(
-        s.p()
-            .channel_reply_settings(
-                s.fixture.target.company,
-                crate::entities::address::AddressTarget::Desk(
-                    (RelatedChannelId::new(s.channel)).as_uuid()
-                ),
-                s.owner()
-            )
-            .await
-            .unwrap()
-            .unwrap(),
-        selected
+    let updated = s.p().configure_channel_reply(change).await.unwrap();
+    assert_eq!(updated.revision.get(), selected.revision.get() + 1);
+    assert!(
+        crate::adapters::persistence::workflow::association::authorize_association(
+            &mut s.pool().acquire().await.unwrap(),
+            s.fixture.target.company,
+            WorkflowActor::authenticated(run_as).unwrap(),
+            RelatedAssociation::Channel(RelatedChannelId::new(s.channel)),
+        )
+        .await
+        .is_err()
     );
 }
 

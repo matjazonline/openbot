@@ -22,7 +22,10 @@ impl Ui {
             .decode(&detail.source)
             .and_then(|decoded| publication_needs(&decoded));
         let (options, too_many) = match &needs {
-            Ok(needs) => self.editor_options(company, needs).await?,
+            Ok(needs) => {
+                self.editor_options(company, detail.summary.workflow, needs)
+                    .await?
+            }
             Err(_) => (PublicationOptions::default(), false),
         };
         let selections = state.selections.unwrap_or_else(|| {
@@ -59,7 +62,7 @@ pub(super) async fn sample(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     // Form encoding can expand every byte to three characters; bound it before parsing.
     if body.len() > MAX_SAMPLE_BYTES * 3 {
         return Err(AppError::BadRequest("Sample form exceeds 768 KiB".into()).into());
@@ -87,6 +90,9 @@ pub(super) async fn sample(
         Err(WorkflowError::Diagnostic(error)) => state.error = Some(error.message.into()),
         Err(WorkflowError::App(AppError::BadRequest(message) | AppError::Conflict(message))) => {
             state.error = Some(message)
+        }
+        Err(WorkflowError::App(AppError::ResourceOutsideUnit(refusal))) => {
+            state.error = Some(refusal.to_string())
         }
         Err(WorkflowError::App(AppError::NotFound(_))) => state.error = Some("A selected dependency is unavailable to this company. Check the draft and connection selections.".into()),
         Err(error) => return Err(error),

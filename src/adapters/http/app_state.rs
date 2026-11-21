@@ -34,6 +34,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub attribution: Option<Arc<super::attribution::Bridge>>,
     pub local_machine_connections:
         Arc<super::routes::local_machine_connection::LocalMachineConnections>,
     pub local_machines: Arc<crate::application::local_agents::LocalMachineUseCases>,
@@ -287,5 +288,11 @@ impl FromRef<AppState>
 {
     fn from_ref(state: &AppState) -> Self {
         state.integration_bindings.clone()
+    }
+}
+
+impl FromRef<AppState> for Option<Arc<super::attribution::Bridge>> {
+    fn from_ref(state: &AppState) -> Self {
+        state.attribution.clone()
     }
 }

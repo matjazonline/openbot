@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "round": "07UR-P02-B3-R1",
+  "artifact": "6dffa7b3c234814fa0a647f0051fcfc7051ab1702b879d06b60a28336e95ad2c",
+  "checks": [
+    {
+      "criteria": [
+        "02C.1",
+        "02C.2",
+        "D9 r1/r2",
+        "F13 adoptions"
+      ],
+      "command": "cargo test --locked --offline --lib -- model_usage usage department dashboard unit_budget storage_ jev_runtime ui_ pages",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b2 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R1-focused.txt",
+          "sha256": "37fc60b2b27cb0b1a992a85037ad3ca35a1acc442b7397bb7a5a7d61c812b233"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression before the attribution-semantics test updates"
+      ],
+      "command": "same filter",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b2 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-focused.txt",
+          "sha256": "d34fd93c57978a8a0a400a891fbd8bdcaaa45966faf32b4e1dab2133c74a6bca"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-clippy.txt",
+          "sha256": "0c60468e76e0ac6941aab5ee64ed66618069e44a34812f08b67183e89a9b74e0"
+        }
+      ]
+    }
+  ]
+}

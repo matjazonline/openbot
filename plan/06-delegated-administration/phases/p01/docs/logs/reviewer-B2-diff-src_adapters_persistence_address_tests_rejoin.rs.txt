@@ -1,0 +1,11 @@
+--- B1/src/adapters/persistence/address_tests/rejoin.rs
++++ B2/src/adapters/persistence/address_tests/rejoin.rs
+@@ -72,7 +72,7 @@
+     }
+ 
+     async fn outsider_places(&self) -> OutsiderPlaces {
+-        let desk = ChannelPersistence::create(
++        let desk = crate::adapters::persistence::test_support::create_channel(
+             &self.fixture.persistence,
+             self.fixture.company.id,
+             ChannelWrite {

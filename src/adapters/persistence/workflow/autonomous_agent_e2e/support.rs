@@ -40,6 +40,9 @@ impl Journey {
         let skill = SkillManagementPersistence::create_company(
             &f.persistence,
             f.target.company.as_uuid(),
+            f.persistence
+                .test_root_unit(f.target.company.as_uuid())
+                .await,
             SkillWrite {
                 files: None,
                 slug: "mixed-support".into(),
@@ -138,6 +141,10 @@ impl Journey {
         SkillManagementPersistence::update_company(
             &self.f.persistence,
             self.scope.company.as_uuid(),
+            self.f
+                .persistence
+                .test_root_unit(self.scope.company.as_uuid())
+                .await,
             self.skill.id,
             SkillWrite {
                 files: None,

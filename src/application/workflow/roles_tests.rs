@@ -285,8 +285,7 @@ fn workflow_role_resolve_sponsor_no_decider_stops_at_the_nearest_unit() {
 }
 
 #[test]
-fn workflow_role_sponsor_admission_selector_bound_includes_three_roles_and_still_rejects_overflow()
-{
+fn workflow_role_sponsor_admission_selector_bound_includes_every_role_and_still_rejects_overflow() {
     let mut selectors: Vec<_> = (0..crate::application::workflow::registry::MAX_REVIEWERS)
         .map(|_| json!({"kind":"principal","id":Uuid::new_v4()}))
         .collect();
@@ -295,12 +294,13 @@ fn workflow_role_sponsor_admission_selector_bound_includes_three_roles_and_still
             .into_iter()
             .map(|role| json!(role.as_str())),
     );
-    assert_eq!(selectors.len(), 19);
+    let bound = crate::application::workflow::reviewers::MAX_REVIEWER_SELECTORS;
+    assert_eq!(selectors.len(), bound);
     assert_eq!(
         crate::application::workflow::reviewers::parse_reviewers(&json!(selectors))
             .unwrap()
             .len(),
-        19
+        bound
     );
     selectors.push(json!("sponsor"));
     assert!(crate::application::workflow::reviewers::parse_reviewers(&json!(selectors)).is_err());

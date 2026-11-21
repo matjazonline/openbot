@@ -1,0 +1,14 @@
+{
+  "artifact": "fd40f4807955c2e19c00ab9d864c2a0ce84566088e99743b84f9338a7ce7d30c",
+  "coordination_revision": 4,
+  "coordination_pinned_copy_match": true,
+  "decision_r2_sha256": "6968a1aa538ec5817939a92198ff2f111da8a581ac7bd17a1d2529645430b722",
+  "reviewer_logs": {
+    "AS-P03-B1-R2-reviewer-end.snapshot.txt": "102b43b0cc76e2bf11c79fb5e2f4b625d2f035f59efa5a45852ae19d5badda04",
+    "AS-P03-B1-R2-reviewer-root.txt": "902a5b64c25f0b3fab9491f0052d5f758fb792f6a21c7cc8a6b53510cbde5428",
+    "AS-P03-B1-R2-reviewer-runtime-probe.py": "92ac037627d4ce0f87bd1cf9d95491510ca0fc89e11c99ba77a8b0e345c1d908",
+    "AS-P03-B1-R2-reviewer-runtime-probe.txt": "f3e7180dffdd833db356447c75bfbe33e7be1b3c9dcd6aa21f90d975d3e5d067",
+    "AS-P03-B1-R2-reviewer-service.txt": "628866ab567d11049969fa0c0fc89a85df2b0ca54668db82a6b6ef9fcc7f52b3",
+    "AS-P03-B1-R2-reviewer-start.snapshot.txt": "102b43b0cc76e2bf11c79fb5e2f4b625d2f035f59efa5a45852ae19d5badda04"
+  }
+}

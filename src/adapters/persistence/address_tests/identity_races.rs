@@ -126,6 +126,7 @@ fn mail(
 fn mutation(state: &State, change: Change, invite: Option<Uuid>) -> BoxFuture<'static, Outcome> {
     let store = state.f.persistence.clone();
     let company = state.f.company.id;
+    let removing_owner = state.f.owner;
     let user = state.user;
     let old = state.old.clone();
     let next = state.new.clone();
@@ -167,7 +168,11 @@ fn mutation(state: &State, change: Change, invite: Option<Uuid>) -> BoxFuture<'s
             }
             Change::Remove => {
                 store
-                    .remove_member(company, user)
+                    .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                        actor_id: removing_owner,
+                        company_id: company,
+                        member_user_id: user,
+                    })
                     .await
                     .expect("removal must commit");
             }

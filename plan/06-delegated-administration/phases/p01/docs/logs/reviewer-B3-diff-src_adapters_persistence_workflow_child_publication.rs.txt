@@ -1,0 +1,19 @@
+--- B2/src/adapters/persistence/workflow/child_publication.rs
++++ B3/src/adapters/persistence/workflow/child_publication.rs
+@@ -1,4 +1,3 @@
+-use super::http::begin_http;
+ use super::*;
+ use crate::application::workflow::lifecycle::{PublicationDependencies, PublicationDirectory};
+ use std::collections::BTreeSet;
+@@ -22,8 +21,9 @@
+         draft: &CompanyWorkflowDraft,
+     ) -> AppResult<PublicationDependencies> {
+         let captured = self.inner.capture(actor, draft).await?;
+-        let mut tx = begin_http(&self.persistence).await?;
+-        authority::authorize_company(&mut tx, draft.company(), actor).await?;
++        let mut tx = management::begin(&self.persistence, draft.company(), actor).await?;
++        management::authorize_publication_on(&mut tx, draft.company(), actor, draft.workflow())
++            .await?;
+         let captured = capture_on(&mut tx, draft, captured).await?;
+         tx.commit().await?;
+         Ok(captured)

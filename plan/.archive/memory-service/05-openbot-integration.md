@@ -49,6 +49,22 @@ select a lower level or discard earlier exposure. Do not reset the watermark mid
 lower label. When the exact consumed level is unavailable, the ceiling fallback takes the same
 role. Namespace grants, write authorization and existing egress checks still apply.
 
+## Root membership context (Plan04, 2026-11-17)
+
+The company remains the memory tenant. Current company membership and classification clearance
+come from membership and access levels on its canonical root department. The current application
+namespace-owner mapping is:
+
+| Workflow scope | Namespace owner within the company tenant |
+| --- | --- |
+| Company | `NamespaceOwner::Company` |
+| Agent | `NamespaceOwner::Agent(agent_uuid)` |
+| User | `NamespaceOwner::User(account_uuid)` |
+
+These are the variants in `src/application/memory/settings.rs`. The company scope selects the
+company-owned namespace within its tenant; root membership supplies organization clearance. Audience,
+credential-grant, consumed-level and lifecycle checks described below apply to memory requests.
+
 ## Batch 05A Connect current OpenBot capabilities to the service
 
 1. Trace current workflow preparation, action authorization, checkpoint consumption and company

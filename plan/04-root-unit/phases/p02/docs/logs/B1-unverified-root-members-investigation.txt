@@ -1,0 +1,23 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 1 test
+
+thread 'adapters::http::routes::ui::stream_tests::message_source_tests::security_email_identity_unverified_team_keeps_attention_and_internal_notes' (28459829) panicked at src/adapters/http/routes/ui_message_tests.rs:250:5:
+assertion failed: attention.visible_channel_ids.contains(&h.channel_id)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::routes::ui::stream_tests::message_source_tests::security_email_identity_unverified_team_keeps_attention_and_internal_notes ... FAILED
+
+failures:
+
+failures:
+    adapters::http::routes::ui::stream_tests::message_source_tests::security_email_identity_unverified_team_keeps_attention_and_internal_notes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4743 filtered out; finished in 0.39s
+
+error: test failed, to rerun pass `--lib`

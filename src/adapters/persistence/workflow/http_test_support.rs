@@ -73,9 +73,8 @@ pub(super) async fn setup_scoped(origin: &str, entrance: Entrance, scope: HttpTe
     let association = match scope {
         HttpTestScope::Company => RelatedAssociation::Company,
         HttpTestScope::PrivateChannel => {
-            use crate::application::ports::channel::ChannelPersistence;
             use crate::application::ports::channel::ChannelWrite;
-            let channel = ChannelPersistence::create(
+            let channel = crate::adapters::persistence::test_support::create_channel(
                 &fixture.persistence,
                 fixture.target.company.as_uuid(),
                 ChannelWrite {
@@ -87,11 +86,11 @@ pub(super) async fn setup_scoped(origin: &str, entrance: Entrance, scope: HttpTe
             )
             .await
             .unwrap();
-            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-                .bind(channel.id)
-                .execute(fixture.persistence.pool())
-                .await
-                .unwrap();
+            crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+                fixture.persistence.pool(),
+                channel.id,
+            )
+            .await;
             RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(
                 channel.id,
             ))
@@ -130,6 +129,7 @@ pub(in crate::adapters::persistence::workflow::tests) async fn configured(
         .create_http(
             company,
             actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse(origin).unwrap(),
                 bearer: true,

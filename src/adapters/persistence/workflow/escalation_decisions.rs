@@ -207,7 +207,7 @@ async fn options_on(
 )> {
     let mut rows: Vec<(Uuid,String)> = sqlx::query_as("SELECT principal.id,principal.display_label FROM principals AS principal \
         WHERE principal.company_id=$1 AND (principal.kind='agent' OR (principal.kind='person' AND EXISTS ( \
-        SELECT 1 FROM company_members AS member WHERE member.company_id=principal.company_id AND member.user_id=principal.user_id))) \
+        SELECT 1 FROM membership_of(principal.user_id, principal.company_id) AS member WHERE true))) \
         ORDER BY principal.display_label,principal.id LIMIT 201")
         .bind(company.as_uuid()).fetch_all(db).await?;
     let truncated = rows.len() > 200;

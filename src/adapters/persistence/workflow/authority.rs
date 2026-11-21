@@ -19,10 +19,11 @@ pub(super) async fn authorize_reviewer_on(
         .await?
         .ok_or_else(missing)?;
     let (principal, role): (Uuid, String) = sqlx::query_as(
-        "SELECT principal.id, member.role FROM company_members AS member \
+        "SELECT principal.id, facts.role FROM department_members AS member \
+         JOIN LATERAL membership_of(member.root_user_id, member.company_id) AS facts ON facts.id = member.id \
          JOIN principals AS principal ON principal.company_id = member.company_id \
-           AND principal.user_id = member.user_id AND principal.kind = 'person' \
-         WHERE member.company_id = $1 AND member.user_id = $2 \
+           AND principal.user_id = member.root_user_id AND principal.kind = 'person' \
+         WHERE member.company_id = $1 AND member.root_user_id = $2 \
          ORDER BY principal.id LIMIT 1 \
          FOR SHARE OF member, principal",
     )
@@ -56,6 +57,24 @@ pub(in crate::adapters::persistence) async fn authorize_company_with_locks(
     actor: WorkflowActor,
     locks: super::row_locks::RowLocks,
 ) -> AppResult<crate::entities::access_level::LevelActor> {
+    let level = authorize_person_with_locks(db, company, actor, locks).await?;
+    super::super::administration::management_role_on(
+        db,
+        actor.user_id(),
+        company,
+        crate::application::ports::administration::ManagementTarget::Root,
+    )
+    .await?
+    .ok_or_else(missing)?;
+    Ok(level)
+}
+
+pub(in crate::adapters::persistence) async fn authorize_person_with_locks(
+    db: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<crate::entities::access_level::LevelActor> {
     use crate::adapters::persistence::participant::{membership_from_db, reader_level};
     use crate::entities::access_level::LevelActor;
     let owner: Uuid = sqlx::query_scalar(
@@ -71,19 +90,17 @@ pub(in crate::adapters::persistence) async fn authorize_company_with_locks(
         access_level: i16,
     }
     let facts=sqlx::query_as::<_,MemberAuthority>(
-        &locks.sql("SELECT member.role, member.access_level::smallint AS access_level FROM company_members AS member \
-         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
-         WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' \
+        &locks.sql("SELECT facts.role, facts.access_level::smallint AS access_level FROM department_members AS member \
+         JOIN LATERAL membership_of(member.root_user_id, member.company_id) AS facts ON facts.id = member.id \
+         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id \
+         WHERE member.company_id=$1 AND member.root_user_id=$2 AND principal.kind='person' \
          FOR SHARE OF member,principal"))
-        .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(db).await?.ok_or_else(missing)?;
+        .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(&mut *db).await?.ok_or_else(missing)?;
     let membership = membership_from_db(Some(&facts.role))?;
     if membership.is_owner() != (owner == actor.user_id()) {
         return Err(invalid());
     }
     let access_level = reader_level(actor.user_id(), membership, Some(facts.access_level))?;
-    if !membership.manages_company_operations() {
-        return Err(missing());
-    }
     Ok(LevelActor {
         membership,
         access_level,
@@ -154,11 +171,23 @@ pub(super) async fn supported_publication(
                 ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
                 ToolKind::Memory => builtin_memory_tool(tx, tool, check).await?,
                 ToolKind::Http => {
-                    http::registered_on(tx, current.company_id(), tool).await?;
+                    http::registered_on(
+                        tx,
+                        current.company_id(),
+                        tool,
+                        http::ConnectionReach::Company,
+                    )
+                    .await?;
                 }
                 ToolKind::Slot(slot) => match resources::slot_kind(definition, slot) {
                     Some("http") => {
-                        http::registered_on(tx, current.company_id(), tool).await?;
+                        http::registered_on(
+                            tx,
+                            current.company_id(),
+                            tool,
+                            http::ConnectionReach::Company,
+                        )
+                        .await?;
                     }
                     Some("mcp") => {
                         mcp::registered_on(tx, current.company_id(), tool).await?;

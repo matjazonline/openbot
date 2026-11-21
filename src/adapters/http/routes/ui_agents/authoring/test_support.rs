@@ -10,7 +10,7 @@ pub(super) struct Fixture {
 impl Fixture {
     pub async fn new() -> Option<Self> {
         let f = ScopeFixture::new().await?;
-        sqlx::query("INSERT INTO company_model_connections(company_id,provider,api_key,models) VALUES ($1,'openai','authoring-secret-never-return','{gpt-test}')")
+        sqlx::query("INSERT INTO company_model_connections(company_id,unit_id,provider,api_key,models,default_for_unit) VALUES ($1,(SELECT id FROM departments WHERE company_id=$1 AND is_root),'openai','authoring-secret-never-return','{gpt-test}',true)")
             .bind(f.company.id).execute(f.persistence.pool()).await.unwrap();
         let agent = AgentPersistence::create(
             f.persistence.as_ref(),
@@ -77,6 +77,7 @@ impl Fixture {
             .create_company(
                 self.f.owner.id,
                 self.f.company.id,
+                None,
                 crate::use_cases::skill::SkillWrite {
                     files: None,
                     slug: name.into(),

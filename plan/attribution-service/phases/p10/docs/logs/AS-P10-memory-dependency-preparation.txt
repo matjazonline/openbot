@@ -1,0 +1,4 @@
+ Downloading crates ...
+  Downloaded wit-bindgen v0.57.1
+  Downloaded zerocopy-derive v0.8.56
+  Downloaded wasip2 v1.0.4+wasi-0.2.12

@@ -335,3 +335,65 @@ async fn native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback() {
         "a rolled-back poison candidate must not be immediately reclaimed"
     );
 }
+
+/// Plan07 decision d (G1 F4, F14): every native path selects the agent's bundle with its reach
+/// check, so a tool connection moved out of the agent's reach refuses both a native MCP call in a
+/// running session and a new session, before anything is written or sent.
+#[tokio::test]
+async fn unit_resource_selection_native_session_and_mcp_call_refuse_a_moved_connection() {
+    let f = McpSetup::new().await;
+    let p = &f.s.f.persistence;
+    let pool = &f.s.f.database.pool;
+    let connection: Uuid = sqlx::query_scalar(
+        "SELECT id FROM company_mcp_connections WHERE company_id=$1 AND deleted_at IS NULL",
+    )
+    .bind(f.s.f.company)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let billing = p.test_unit(f.s.f.company, "billing").await;
+    p.move_mcp_connection(f.s.f.owner, f.s.f.company, connection, billing)
+        .await
+        .unwrap();
+    let outside = |result: AppResult<()>| {
+        assert!(
+            matches!(&result, Err(AppError::ResourceOutsideUnit(refusal))
+                if refusal.code() == "admission.resource_outside_unit"
+                    && refusal.resource == connection),
+            "{result:?}"
+        );
+    };
+    // In a running session the loss reads as the resource gone, which every consumer of the
+    // selected bundle settles definitely (B2-F2); a new session gets the refusal code.
+    let call = p.native_mcp(&f.request(json!({"query":"x"}))).await;
+    assert!(
+        matches!(&call, Err(AppError::NotFound(message)) if message.contains("outside the reach")),
+        "{:?}",
+        call.err()
+    );
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM native_mcp_calls),(SELECT count(*) FROM workflow_runs)",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, (0, 0), "no native call or run row");
+    let operations: i64 = sqlx::query_scalar("SELECT count(*) FROM local_agent_operations")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    outside(p.start_session(&f.s.request()).await.map(|_| ()));
+    let after: i64 = sqlx::query_scalar("SELECT count(*) FROM local_agent_operations")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    assert_eq!(after, operations, "a refused session sends nothing");
+    // Moved back to the root, the same call is admitted.
+    let root = p.test_root_unit(f.s.f.company).await;
+    p.move_mcp_connection(f.s.f.owner, f.s.f.company, connection, root)
+        .await
+        .unwrap();
+    call_with_retry(p, &f.request(json!({"query":"x"})))
+        .await
+        .unwrap();
+}

@@ -22,7 +22,7 @@ async fn verify_admin_visibility(
     version_id: VersionId,
     principal: PrincipalId,
 ) -> Channel {
-    let mut restricted = channel(company_id, ChannelAccessMode::Allowlist);
+    let mut restricted = channel(company_id, ChannelAccessMode::Members);
     store
         .state
         .lock()
@@ -64,7 +64,15 @@ async fn verify_admin_visibility(
             .unwrap(),
         AdmissionResult::Created(_)
     ));
-    let team = channel(company_id, ChannelAccessMode::Team);
+    let mut team = channel(company_id, ChannelAccessMode::Members);
+    team.principal_grants = [PrincipalCapability::Participate, PrincipalCapability::View]
+        .map(|capability| ChannelPrincipalGrant {
+            principal_id: principal,
+            capability,
+            provenance: GrantProvenance::DepartmentMembership,
+            created_at: chrono::Utc::now(),
+        })
+        .into();
     store
         .state
         .lock()
@@ -99,7 +107,7 @@ async fn verify_owner_visibility(
                 company_id,
                 version_id,
                 "owner",
-                related(&channel(company_id, ChannelAccessMode::Allowlist))
+                related(&channel(company_id, ChannelAccessMode::Members))
             ))
             .await,
         Err(AppError::NotFound(_))

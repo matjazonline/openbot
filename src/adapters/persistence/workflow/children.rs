@@ -373,5 +373,6 @@ async fn insert_child_on(
         definition.version_id,
     )
     .await?;
+    super::run_scopes::copy_child_on(db, scope.company, scope.run, child).await?;
     Ok(())
 }

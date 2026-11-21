@@ -31,7 +31,10 @@ async fn autonomous_agent_storage_public_mcp_grant_edits_retain_identity_and_req
     .await
     .unwrap();
     let current = p
-        .list_mcp_connections(company.as_uuid())
+        .list_mcp_connections(
+            company.as_uuid(),
+            &p.test_all_units(company.as_uuid()).await,
+        )
         .await
         .unwrap()
         .remove(0);
@@ -39,6 +42,7 @@ async fn autonomous_agent_storage_public_mcp_grant_edits_retain_identity_and_req
     let retained = p
         .update_mcp_connection(
             company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
             connection,
             current.revision,
             write.clone(),
@@ -51,6 +55,7 @@ async fn autonomous_agent_storage_public_mcp_grant_edits_retain_identity_and_req
     let removed = p
         .update_mcp_connection(
             company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
             connection,
             retained.revision,
             write.clone(),
@@ -63,7 +68,13 @@ async fn autonomous_agent_storage_public_mcp_grant_edits_retain_identity_and_req
     assert_eq!(bindings(&f, agent.id).await, vec![binding.clone()]);
     write.tool_grants = current.tool_grants;
     let regranted = p
-        .update_mcp_connection(company.as_uuid(), connection, removed.revision, write)
+        .update_mcp_connection(
+            company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
+            connection,
+            removed.revision,
+            write,
+        )
         .await
         .unwrap();
     assert_eq!(regranted.tool_grants.len(), 1);

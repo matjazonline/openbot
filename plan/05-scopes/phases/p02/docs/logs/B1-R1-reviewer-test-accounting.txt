@@ -1,0 +1,1 @@
+PASS: baseline 4768, current 4799, removed 1, added 32; all removed names have runner-collected replacements.

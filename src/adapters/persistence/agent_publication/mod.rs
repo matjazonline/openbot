@@ -56,7 +56,13 @@ pub(in crate::adapters::persistence) async fn lock_company_on(
         .fetch_optional(&mut **tx)
         .await?
         .ok_or_else(missing)?;
-    super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await?;
+    super::workflow::management::authorize_target_on(
+        tx,
+        scope.company,
+        scope.actor,
+        crate::application::ports::administration::ManagementTarget::AnyUnit,
+    )
+    .await?;
     Ok(())
 }
 
@@ -71,12 +77,16 @@ impl<'a, 'db> LockedAgentPublication<'a, 'db> {
         tx: &'a mut Transaction<'db, Postgres>,
         scope: AgentPublicationScope,
     ) -> AppResult<Self> {
-        lock_company_on(
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+            .bind(scope.actor.user_id())
+            .fetch_optional(&mut **tx)
+            .await?
+            .ok_or_else(missing)?;
+        super::workflow::management::authorize_target_on(
             tx,
-            AgentCompanyScope {
-                company: scope.company,
-                actor: scope.actor,
-            },
+            scope.company,
+            scope.actor,
+            crate::application::ports::administration::ManagementTarget::Agent(scope.agent),
         )
         .await?;
         sqlx::query_scalar::<_, Uuid>(

@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B4-R2",
+  "artifact": "4228a622933c9bfbf84f4e55fcc2bd71ff3325f5538c80814ec861e1640544df",
+  "checks": [
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R2-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "git diff --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R2-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets; then --check",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R2-sqlx-prepare.txt",
+          "sha256": "4045e9e88218d761bcd4fc813f008628f5b8299e6d642c292c038be5dd78312c"
+        },
+        {
+          "path": "logs/B4-R2-sqlx-prepare-check.txt",
+          "sha256": "a42b37ca612e96d057ec387d9f8aa5e00f610027c0ef6aa15505cc64258cf509"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-CHECKPOINT"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R2-source-modules.txt",
+          "sha256": "5e06901ac5fdbcec3319f771b9aa164420eec335a0d42c89176dab97bfd333fb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "F3",
+        "F4"
+      ],
+      "command": "cargo test --locked --offline --lib -- delegated_admin company_invite company_tests:: company_access_level ui_team_authorization company_owner workflow_and_transport_depend",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R2-invite-tests-2.txt",
+          "sha256": "cb9403ddd71e419eb9e4f35cd7375c4effcf331ac34eee428b9356a71a667d9b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F4-ORDER"
+      ],
+      "command": "same invite families before moving the recheck after the status check",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B4-R2-invite-tests.txt",
+          "sha256": "1865d5b808e53b670538fa89f488759e0563b87c1de009981557e765ea20cb83"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "01B.6",
+        "01B.7",
+        "B4-REGRESSION"
+      ],
+      "command": "cargo test --locked --offline --lib -- company_invite ui_team_authorization company_access_level company_owner company_tests:: root_unit root_competing account_identity access_mode_scale knowledge delegated_admin memory_scope workflow_and_transport_depend department_ manages_unit",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05; SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-R2-focused-final.txt",
+          "sha256": "988691be24a8f52dcefff163fb10dc5c59812b3cf4a681a0a386deeb41da34f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B4-DISCOVERY"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list",
+      "fixture": "worktree-local target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B4-discovery-after.txt",
+          "sha256": "936a9947d012f3f24b4725f9de8ff9f6ab87ebdd49da83db4b3edf00d1cc7ec1"
+        },
+        {
+          "path": "logs/B4-R2-discovery-after.txt",
+          "sha256": "47460152b4354054eed87e2f459f521b34395ef24fc6c21b6aabf75430f8a0d8"
+        }
+      ]
+    }
+  ]
+}

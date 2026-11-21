@@ -3,12 +3,11 @@ use super::*;
 #[path = "decision_business_member_tests.rs"]
 mod business_member_tests;
 use crate::adapters::persistence::test_support::wait_until_a_backend_is_blocked;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 
 async fn channel_fixture() -> (DecisionFixture, Uuid) {
     let mut f = Box::pin(DecisionFixture::new(1, None)).await;
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         f.persistence(),
         f.scope.company.as_uuid(),
         ChannelWrite {
@@ -20,11 +19,11 @@ async fn channel_fixture() -> (DecisionFixture, Uuid) {
     .await
     .unwrap()
     .id;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(channel)
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        f.persistence().pool(),
+        channel,
+    )
+    .await;
     sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) SELECT $1,$2,id,'view','configured_allowlist' FROM principals WHERE company_id=$1 AND user_id=$3")
         .bind(f.scope.company.as_uuid()).bind(channel).bind(f.users[0]).execute(f.persistence().pool()).await.unwrap();
     sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
@@ -125,7 +124,7 @@ async fn workflow_decision_nonmember_and_removed_membership_are_hidden() {
         WorkflowActor::authenticated(outsider.id).unwrap(),
     )
     .await;
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
         .bind(f.scope.company.as_uuid())
         .bind(f.users[0])
         .execute(f.persistence().pool())
@@ -142,7 +141,7 @@ enum Revocation {
 async fn revoke(tx: &mut Transaction<'_, Postgres>, f: &DecisionFixture, kind: Revocation) {
     match kind {
         Revocation::Membership => {
-            sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+            sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
                 .bind(f.scope.company.as_uuid())
                 .bind(f.users[0])
                 .execute(&mut **tx)
@@ -285,7 +284,11 @@ async fn workflow_decision_production_removal_preserves_open_and_settled_history
         }
         let before = history(&f, &view).await;
         f.persistence()
-            .remove_member(f.scope.company.as_uuid(), f.users[0])
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.admission.binding.target.actor.user_id(),
+                company_id: f.scope.company.as_uuid(),
+                member_user_id: f.users[0],
+            })
             .await
             .unwrap();
         assert_eq!(history(&f, &view).await, before);
@@ -306,7 +309,7 @@ async fn await_blocked_removal(pool: &sqlx::PgPool) {
         loop {
             // Removal now locks the company before its principal. Observe either
             // real removal statement, depending on which held decision lock it meets.
-            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND (query LIKE 'UPDATE principals%' OR query='SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE') AND cardinality(pg_blocking_pids(pid))>0)")
+            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND (query LIKE 'UPDATE principals%' OR query IN ('SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE', 'SELECT user_id FROM companies WHERE id=$1 FOR NO KEY UPDATE')) AND cardinality(pg_blocking_pids(pid))>0)")
                 .fetch_one(pool).await.unwrap();
             if blocked { break; }
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
@@ -334,7 +337,15 @@ async fn workflow_decision_submission_blocks_actual_removal_until_commit() {
         f.scope.company.as_uuid(),
         f.users[0],
     );
-    let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+    let removing_owner = f.admission.binding.target.actor.user_id();
+    let removal = tokio::spawn(async move {
+        p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: removing_owner,
+            company_id: company,
+            member_user_id: user,
+        })
+        .await
+    });
     await_blocked_removal(f.persistence().pool()).await;
     blocker.commit().await.unwrap();
     assert_eq!(
@@ -392,7 +403,15 @@ async fn workflow_decision_park_blocks_actual_removal_until_notice_commit() {
         f.scope.company.as_uuid(),
         f.users[0],
     );
-    let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+    let removing_owner = f.admission.binding.target.actor.user_id();
+    let removal = tokio::spawn(async move {
+        p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: removing_owner,
+            company_id: company,
+            member_user_id: user,
+        })
+        .await
+    });
     await_blocked_removal(f.persistence().pool()).await;
     blocker.commit().await.unwrap();
     assert!(park.await.unwrap().unwrap().is_some());
@@ -419,7 +438,11 @@ async fn workflow_decision_removal_before_park_settles_unavailable() {
     use crate::use_cases::company_invite::CompanyInvitePersistence;
     let f = Box::pin(DecisionFixture::new(1, None)).await;
     f.persistence()
-        .remove_member(f.scope.company.as_uuid(), f.users[0])
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.admission.binding.target.actor.user_id(),
+            company_id: f.scope.company.as_uuid(),
+            member_user_id: f.users[0],
+        })
         .await
         .unwrap();
     assert!(
@@ -461,6 +484,7 @@ async fn workflow_decision_membership_delete_preserves_settled_history() {
 async fn workflow_decision_park_loses_to_inflight_member_removal() {
     for convert in [false, true] {
         let f = Box::pin(DecisionFixture::new(1, None)).await;
+        let before = f.counts().await;
         let mut removal = f.persistence().pool().begin().await.unwrap();
         if convert {
             sqlx::query("UPDATE principals SET kind='external',user_id=NULL WHERE company_id=$1 AND user_id=$2")
@@ -472,6 +496,17 @@ async fn workflow_decision_park_loses_to_inflight_member_removal() {
                 wait_until_a_backend_is_blocked(f.persistence().pool()).await;
                 removal.commit().await.unwrap();
             });
+        let parked = match parked {
+            Err(AppError::Conflict(message)) => {
+                assert_eq!(
+                    message,
+                    "Workflow reviewer authority changed during account locking; retry the operation"
+                );
+                assert_eq!(f.counts().await, before, "the stale attempt writes nothing");
+                f.persistence().park_decision(f.scope, &f.notices).await
+            }
+            result => result,
+        };
         assert!(parked.unwrap().is_none());
         assert_failed_without_park(&f).await;
     }

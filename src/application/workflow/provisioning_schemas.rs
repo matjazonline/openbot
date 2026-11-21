@@ -49,8 +49,11 @@ fn listing() -> Value {
             }},
             "models": {"type": "array", "maxItems": MAX_LISTED_MODELS, "items": {
                 "type": "object",
-                "properties": {"provider": {"type": "string"}, "model": {"type": "string"}},
-                "required": ["provider", "model"],
+                // The department owning the model's connection (Plan07 02A): a created agent
+                // may use only its department's or one above it.
+                "properties": {"provider": {"type": "string"}, "model": {"type": "string"},
+                    "department": {"type": "string"}},
+                "required": ["provider", "model", "department"],
                 "additionalProperties": false
             }},
             // More agents or models exist than the listing holds.

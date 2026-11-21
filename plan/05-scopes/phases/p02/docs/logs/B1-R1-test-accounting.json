@@ -1,0 +1,55 @@
+{
+  "baseline": "plan/05-scopes/phases/p01/docs/logs/B1-R1-reviewer-test-list.txt",
+  "current": "plan/05-scopes/phases/p02/docs/logs/B1-pre-review-test-list-r1.txt",
+  "baseline_count": 4768,
+  "current_count": 4799,
+  "removed": [
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_the_thread_level"
+  ],
+  "added": [
+    "adapters::memory_service::tests::scope_requests::memory_integration_many_scope_requests_keep_the_transport_bound_and_input_order",
+    "adapters::memory_service::tests::subject::memory_scope_subject_admin_never_treats_foreign_management_as_an_empty_page",
+    "adapters::memory_service::tests::subject::memory_scope_subject_admin_uses_exact_provenance_and_reports_ambiguous_deletion",
+    "adapters::persistence::memory::live_tests::subjects::memory_e2e_subject_delivery_and_operator_purge_page_units_and_preserve_personal_records",
+    "adapters::persistence::memory::scope_owner_tests::memory_scope_subject_namespace_pages_include_retiring_units_and_exclude_principals",
+    "adapters::persistence::workflow::agent_history::recall::freeze_bounds::memory_preparation_frozen_byte_bound_preserves_whole_items_and_the_carried_label",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_active_own_binding_refuses_zero_or_ambiguous_placement",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_ancestor_read_never_authorizes_a_root_save_effect",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_company_wide_own_binding_refuses_activation",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_competing_append_and_seal_share_the_run_mutex",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_freezes_per_actor_reports_and_retained_labels",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_same_agent_on_two_desks_keeps_their_local_units_separate",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_seal_refuses_updates_deletes_late_rows_and_missing_or_foreign_authority",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::subject_visibility::memory_scope_tools_subject_visibility_accepts_current_thread_externals_and_refuses_other_threads",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::scope_snapshots::memory_scope_admission_child_seal_rejects_a_corrupted_copy_and_rolls_back_before_retry",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::scope_snapshots::memory_scope_admission_real_child_keeps_historical_report_ids_and_labels_after_rename_or_delete",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_automatic_freeze_bounds_consumption_across_ready_namespaces",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_automatic_freeze_refuses_a_foreign_namespace_even_for_an_empty_pack",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_empty_read_retains_namespace_authority_and_refusal_cannot_replay_revoked_data",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_preparation_freezes_host_scopes_before_provider_calls",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_subject_is_frozen_with_the_producer_and_never_selects_the_target_namespace",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::memory_capture_a_thread_exchange_is_captured_into_the_unit_memory_at_the_thread_level",
+    "application::workflow::memory_recall::tests::memory_preparation_namespace_metadata_stays_below_its_budget_at_the_scope_limit",
+    "application::workflow::memory_tools::runtime::tests::memory_scope_tools_query_proofs_bind_empty_results_and_exact_namespace_references",
+    "application::workflow::publication::tests::agent_tests::history_preparation::memory_scope_tools_host_context_is_frozen_and_counts_before_history",
+    "application::workflow::scopes::tests::run_scopes_resolve_absent_or_ambiguous_placement_is_readonly_root",
+    "application::workflow::scopes::tests::run_scopes_resolve_chain_local_writes_and_only_the_acting_leads_direct_children",
+    "application::workflow::scopes::tests::run_scopes_resolve_depth_cycle_chain_metadata_and_read_budget_fail_early",
+    "application::workflow::scopes::tests::run_scopes_resolve_overlapping_report_and_chain_is_one_unit_with_both_relations",
+    "tests::operational_subject_commands_validate_ids_before_startup"
+  ],
+  "dispositions": [
+    {
+      "removed": "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_the_thread_level",
+      "replacement": "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::memory_capture_a_thread_exchange_is_captured_into_the_unit_memory_at_the_thread_level",
+      "reason": "The same thread-capture behavior now writes to the frozen local unit; assertions retained and target label updated. The runner collects the replacement.",
+      "evidence": [
+        "logs/B1-memory-focused-r1.txt",
+        "logs/B1-memory-focused-r2.txt",
+        "logs/B1-pre-review-focused-r1.txt"
+      ]
+    }
+  ]
+}

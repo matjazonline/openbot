@@ -36,29 +36,41 @@ pub struct Department {
     /// What the department is for, shown to its members and leads so they share one framing.
     pub charter: Option<String>,
     pub parent_id: Option<DepartmentId>,
+    pub is_root: bool,
     pub escalation: Option<super::workflow_escalation::EscalationPolicy>,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
 }
 
-/// A role a principal holds in a department. Lead has at most one holder; reviewer and sponsor
-/// may have several. Sponsor selects one deciding holder.
+/// A role a principal holds in a department. Owner and admin are confined to the company root.
+/// Lead and owner have at most one holder; reviewer, sponsor and admin may have several. Sponsor
+/// selects one deciding holder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DepartmentRole {
     Lead,
     Reviewer,
     Sponsor,
+    Owner,
+    Admin,
 }
 
 impl DepartmentRole {
-    pub const ALL: [Self; 3] = [Self::Lead, Self::Reviewer, Self::Sponsor];
+    pub const ALL: [Self; 5] = [
+        Self::Lead,
+        Self::Reviewer,
+        Self::Sponsor,
+        Self::Owner,
+        Self::Admin,
+    ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Lead => "lead",
             Self::Reviewer => "reviewer",
             Self::Sponsor => "sponsor",
+            Self::Owner => "owner",
+            Self::Admin => "admin",
         }
     }
 
@@ -66,8 +78,8 @@ impl DepartmentRole {
     /// role replaces its current holder rather than adding a second.
     pub const fn is_single_holder(self) -> bool {
         match self {
-            Self::Lead => true,
-            Self::Reviewer | Self::Sponsor => false,
+            Self::Lead | Self::Owner => true,
+            Self::Reviewer | Self::Sponsor | Self::Admin => false,
         }
     }
 }
@@ -97,6 +109,8 @@ impl FromStr for DepartmentRole {
             "lead" => Ok(Self::Lead),
             "reviewer" => Ok(Self::Reviewer),
             "sponsor" => Ok(Self::Sponsor),
+            "owner" => Ok(Self::Owner),
+            "admin" => Ok(Self::Admin),
             _ => Err(InvalidDepartmentRole(value.to_string())),
         }
     }
@@ -243,6 +257,78 @@ pub struct DepartmentDesk {
     /// The department's own desk, the one its `department:{id}` record names. A slug edit does
     /// not move it, so its address is this slug, not the department's.
     pub own: bool,
+}
+
+/// How many entries of a department's administration history its pane shows (Plan06 02B.2).
+pub const DEPARTMENT_HISTORY_ENTRIES: usize = 10;
+
+/// What happened in one entry of a department's administration history (Plan06 02B): a person's
+/// management write, or the system retiring a role holder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DepartmentAdministrationAction {
+    Created,
+    Updated,
+    Moved,
+    Deleted,
+    MemberAdded,
+    MemberRemoved,
+    RoleAssigned,
+    RoleCleared,
+    /// The system removed a role holder whose principal lost its standing.
+    Demoted,
+    /// The system removed a role holder whose principal was deleted.
+    Retired,
+}
+
+impl DepartmentAdministrationAction {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Created => "created the department",
+            Self::Updated => "edited the department",
+            Self::Moved => "moved the department",
+            Self::Deleted => "deleted the department",
+            Self::MemberAdded => "added a member",
+            Self::MemberRemoved => "removed a member",
+            Self::RoleAssigned => "assigned a role",
+            Self::RoleCleared => "cleared a role",
+            Self::Demoted => "removed a role holder who lost their standing",
+            Self::Retired => "removed a deleted role holder",
+        }
+    }
+}
+
+impl FromStr for DepartmentAdministrationAction {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Ok(match value {
+            "department_created" => Self::Created,
+            "department_updated" => Self::Updated,
+            "department_moved" => Self::Moved,
+            "department_deleted" => Self::Deleted,
+            "member_added" => Self::MemberAdded,
+            "member_removed" => Self::MemberRemoved,
+            "role_assigned" => Self::RoleAssigned,
+            "role_cleared" => Self::RoleCleared,
+            "demoted" => Self::Demoted,
+            "deleted" => Self::Retired,
+            other => return Err(format!("unknown department administration event '{other}'")),
+        })
+    }
+}
+
+/// One entry of a department's administration history, with the labels it was written with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepartmentAdministrationEntry {
+    pub action: DepartmentAdministrationAction,
+    /// Who acted, as labelled then; `None` for the system.
+    pub actor: Option<String>,
+    /// `owner`, `admin` or `lead:<department id>`: the role that admitted the write.
+    pub acting_role: Option<String>,
+    /// The member or role holder the entry is about, as labelled then.
+    pub subject: Option<String>,
+    pub role: Option<DepartmentRole>,
+    pub created_at: DateTime<Utc>,
 }
 
 /// Which department owns each desk, for the surfaces that group by department (01-departments

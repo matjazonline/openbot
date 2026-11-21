@@ -49,14 +49,14 @@ origin handling, and public endpoint overload. Verify event-type labels against 
    the supplied chosen click when accepting the paid order. Browser form fields alone cannot
    establish order identity or prove payment.
 5. Exercise navigation, return visits within policy, cart persistence, query removal after capture,
-   consent withdrawal, and checkout on the selected merchant platform. A cross-origin checkout
-   handoff must use that platform's supported server-side association, not third-party cookies.
+   consent withdrawal, and checkout through a representative merchant fixture using the documented server API. A later
+   platform adapter must use its supported server-side association, not third-party cookies.
 
 Focused checks: `attribution_checkout_handoff_` and real browser/script tests for Ad A then Ad B,
 expired/foreign/bot candidates, multiple tabs, blocked storage, no consent, and server-side checkout
 freeze. Assert emitted URLs/payloads contain no customer PII or privileged credentials. Record
 limitations caused by blocking or platform placement restrictions as product behavior.
 
-Completion: clicks and observations are independently labeled, click evidence survives the chosen
+Completion: clicks and observations are independently labeled, click evidence survives the documented API
 checkout flow where permitted, and no pixel can create a sale. Record exact batch checks here;
 final full-suite gate is in [10](10-integration-verification-and-pilot.md).

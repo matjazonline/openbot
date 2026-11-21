@@ -134,6 +134,7 @@ async fn configure_actor(d: &Deployment, binding: BindingTarget, admin: Uuid) {
     ChannelPersistence::update(
         d.p(),
         crate::application::ports::channel::ChannelUpdate {
+            actor: d.fixture.target.actor,
             company_id: d.fixture.target.company.as_uuid(),
             channel_id: d.channel,
             write: ChannelWrite {
@@ -202,22 +203,26 @@ async fn agent_history_callers_schedule_uses_current_configured_actor_and_manual
     )
     .await;
     let company = d.fixture.target.company.as_uuid();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(admin)
-        .execute(d.p().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company)
+    .bind(admin)
+    .execute(d.p().pool())
+    .await
+    .unwrap();
     let binding = d.bind(model_source(), None).await;
     configure_actor(&d, binding, admin).await;
     let schedule = schedule(&d, binding).await;
     let high = materialize_next(&d).await;
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(admin)
-        .execute(d.p().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company)
+    .bind(admin)
+    .execute(d.p().pool())
+    .await
+    .unwrap();
     due(&d, schedule).await;
     let low = materialize_next(&d).await;
     let service = d.engine.services().service();

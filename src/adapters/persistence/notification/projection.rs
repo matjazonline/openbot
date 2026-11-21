@@ -197,9 +197,9 @@ async fn recipient_for_source(
                       AS decision_email_enabled
              FROM principals AS principal
              JOIN users AS account ON account.id = principal.user_id
-             JOIN company_members AS member
+             JOIN department_members AS member
                ON member.company_id = principal.company_id
-              AND member.user_id = principal.user_id
+              AND member.root_user_id = principal.user_id
              JOIN companies AS company ON company.id = principal.company_id
              LEFT JOIN channels AS channel
                ON channel.company_id = principal.company_id AND channel.id = $3

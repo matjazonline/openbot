@@ -4,6 +4,7 @@ use crate::{
     domain::workflow::CompanyId,
     entities::{
         access_level::{AccessLevel, LevelActor},
+        department::DepartmentId,
         knowledge::*,
         unicode_sanitization::sanitize_string,
         value_objects::{EmbeddingModelId, KnowledgeDocumentName},
@@ -13,10 +14,18 @@ use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+pub const KNOWLEDGE_SCOPE_LIMIT_EXCEEDED: &str = "knowledge.scope_limit_exceeded";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KnowledgeScope {
     pub company: CompanyId,
     pub actor_id: Uuid,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct KnowledgeUploadTarget {
+    pub scope: KnowledgeScope,
+    pub unit: DepartmentId,
 }
 
 pub struct KnowledgeUploadFile {
@@ -84,6 +93,22 @@ pub struct PreparedKnowledgeDocument {
 pub struct KnowledgeLibraryView {
     pub actor: LevelActor,
     pub layers: Vec<KnowledgeDocumentLayer>,
+    pub upload_units: Vec<KnowledgeUnit>,
+    pub writable_units: Vec<DepartmentId>,
+    pub default_unit: Option<DepartmentId>,
+    pub units_truncated: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct KnowledgeUnitQuery {
+    pub selected: Option<DepartmentId>,
+    pub after: Option<DepartmentId>,
+}
+
+#[derive(Debug, Clone)]
+pub struct KnowledgeUnitPage {
+    pub units: Vec<KnowledgeUnit>,
+    pub next: Option<DepartmentId>,
 }
 #[derive(Debug, Clone, Copy)]
 pub struct DeleteKnowledgeLayer {
@@ -92,22 +117,56 @@ pub struct DeleteKnowledgeLayer {
     pub expected_revision: i64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct MoveKnowledgeDocument {
+    pub scope: KnowledgeScope,
+    pub document_id: Uuid,
+    pub expected_revision: i64,
+    pub target: DepartmentId,
+}
+
+pub struct ManualKnowledgeQuery {
+    pub scope: KnowledgeScope,
+    pub unit: Option<DepartmentId>,
+    pub model: EmbeddingModelId,
+    pub exact_terms: Vec<super::search::ExactKnowledgeTerm>,
+}
+
 /// Every implementation enforces fresh scoped authority and returns no higher-layer metadata.
 #[async_trait]
 pub trait KnowledgeDocuments: Send + Sync {
     async fn access(&self, scope: KnowledgeScope) -> AppResult<LevelActor>;
-    async fn list(&self, scope: KnowledgeScope) -> AppResult<KnowledgeLibraryView>;
-    async fn preflight_upload(
+    async fn preflight_search(
         &self,
         scope: KnowledgeScope,
+        unit: Option<DepartmentId>,
+    ) -> AppResult<()>;
+    async fn unit_choices(
+        &self,
+        scope: KnowledgeScope,
+        query: KnowledgeUnitQuery,
+    ) -> AppResult<KnowledgeUnitPage>;
+    async fn list(
+        &self,
+        scope: KnowledgeScope,
+        unit: Option<DepartmentId>,
+    ) -> AppResult<KnowledgeLibraryView>;
+    async fn search_manual(
+        &self,
+        query: ManualKnowledgeQuery,
+    ) -> AppResult<Vec<super::search::StoredKnowledgeChunk>>;
+    async fn preflight_upload(
+        &self,
+        target: KnowledgeUploadTarget,
         layers: &[KnowledgeLayerSize],
     ) -> AppResult<()>;
     async fn replace(
         &self,
-        scope: KnowledgeScope,
+        target: KnowledgeUploadTarget,
         documents: &[PreparedKnowledgeDocument],
     ) -> AppResult<Vec<KnowledgeDocumentLayer>>;
     async fn delete(&self, command: DeleteKnowledgeLayer) -> AppResult<()>;
+    async fn move_document(&self, command: MoveKnowledgeDocument) -> AppResult<()>;
 }
 
 /// CPU-only synchronous model operations; callers own bounded blocking work and cancellation.

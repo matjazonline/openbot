@@ -15,7 +15,14 @@ async fn verified_sender(c: &Conversation) {
         .execute(setup.pool())
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',5)").bind(Uuid::new_v4()).bind(company).bind(account.id).execute(setup.pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        setup.pool(),
+        crate::domain::workflow::CompanyId::new(company),
+        account.id,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::try_from(5_i16).unwrap(),
+    )
+    .await;
     // The final facts of accepting the observed sender as a member, retaining its historic party.
     sqlx::query("UPDATE principals SET kind='person',user_id=$2 WHERE company_id=$1 AND id IN (SELECT principal_id FROM participant_identities WHERE company_id=$1 AND subject=$3)")
         .bind(company).bind(account.id).bind(CUSTOMER).execute(setup.pool()).await.unwrap();

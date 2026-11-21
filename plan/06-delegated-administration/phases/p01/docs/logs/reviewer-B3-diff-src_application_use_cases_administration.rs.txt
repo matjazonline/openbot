@@ -1,0 +1,20 @@
+--- B2/src/application/use_cases/administration.rs
++++ B3/src/application/use_cases/administration.rs
+@@ -4,7 +4,7 @@
+ 
+ use crate::{
+     app_error::{AppError, AppResult},
+-    domain::workflow::CompanyId,
++    domain::workflow::{CompanyId, WorkflowId},
+     entities::agent_capability::AgentId,
+     entities::department::DepartmentId,
+ };
+@@ -16,6 +16,8 @@
+     Root,
+     Unit(DepartmentId),
+     Agent(AgentId),
++    DefinitionCreation(WorkflowId),
++    Definition(WorkflowId),
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]

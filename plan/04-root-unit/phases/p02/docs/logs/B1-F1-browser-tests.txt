@@ -1,0 +1,37 @@
+✖ form feedback and another member’s team autocomplete stay text under production CSP (1601.540208ms)
+ℹ desk-classic-create: native controls, Public preservation/off/reset, owner and spam interlock passed
+ℹ desk-classic-edit: native controls, Public preservation/off/reset, owner and spam interlock passed
+ℹ desk-modern-create: native controls, Public preservation/off/reset, owner and spam interlock passed
+ℹ desk-modern-edit: native controls, Public preservation/off/reset, owner and spam interlock passed
+✔ served team autocomplete renders account strings as text and keeps selection working (505.749417ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1848.720208
+
+✖ failing tests:
+
+test at scripts/tests/html-injection-browser.mjs:90:1
+✖ form feedback and another member’s team autocomplete stay text under production CSP (1601.540208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   '/ui/workflows/channels/5a20fc43-b2fe-47d2-b0eb-ea9e1cebbe8a/bindings'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///Users/mac02/orca/workspaces/openbot/plan03-04/scripts/tests/html-injection-browser.mjs:202:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '/ui/workflows/channels/5a20fc43-b2fe-47d2-b0eb-ea9e1cebbe8a/bindings' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

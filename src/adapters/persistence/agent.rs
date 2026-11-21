@@ -271,6 +271,7 @@ impl BuiltinAgentLibraryPersistence for PostgresPersistence {
 }
 
 /// Save an agent's settings and capabilities in one transaction.
+#[cfg(test)]
 pub(crate) async fn update_agent(
     persistence: &PostgresPersistence,
     id: Uuid,
@@ -469,6 +470,35 @@ impl AgentPersistence for PostgresPersistence {
         db_list.into_iter().map(TryInto::try_into).collect()
     }
 
+    async fn list_managed_agents(
+        &self,
+        actor: crate::application::workflow::WorkflowActor,
+        company: crate::domain::workflow::CompanyId,
+    ) -> AppResult<Vec<Agent>> {
+        let mut tx = super::workflow::management::begin(self, company, actor).await?;
+        super::workflow::management::authorize_target_on(
+            &mut tx,
+            company,
+            actor,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
+        )
+        .await?;
+        let rows: Vec<AgentDb> = sqlx::query_as(&format!(
+            "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.company_id=$1 \
+             AND agent_management_role($2,$1,agent.id) IS NOT NULL ORDER BY agent.name,agent.id"
+        ))
+        .bind(company.as_uuid())
+        .bind(actor.user_id())
+        .fetch_all(&mut *tx)
+        .await?;
+        let agents = rows
+            .into_iter()
+            .map(Agent::try_from)
+            .collect::<AppResult<Vec<_>>>()?;
+        tx.commit().await?;
+        Ok(agents)
+    }
+
     async fn list_library(&self) -> AppResult<Vec<Agent>> {
         let rows = sqlx::query_as::<_, AgentDb>(&format!(
             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.company_id IS NULL \
@@ -480,6 +510,39 @@ impl AgentPersistence for PostgresPersistence {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
+    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM agents WHERE id=$1 AND company_id IS NULL FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+        let db = update_agent_on(&mut tx, None, id, &write).await?;
+        tx.commit()
+            .await
+            .map_err(super::agent_capability::relationship_error)?;
+        db.try_into()
+    }
+
+    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM agents WHERE id=$1 AND company_id IS NULL FOR UPDATE",
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+        let locks = lock_agent_delete_on(&mut tx, id)
+            .await?
+            .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+        finish_agent_delete_on(&mut tx, locks).await?;
+        tx.commit().await.map_err(agent_delete_error)
+    }
+
+    #[cfg(test)]
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         update_agent(self, id, write).await
     }
@@ -487,6 +550,7 @@ impl AgentPersistence for PostgresPersistence {
     /// Retire the agent: its principal becomes an outsider and keeps everything it wrote and took
     /// part in, then the agent row goes. The database refuses a delete that would take history
     /// with it, so this is the only way an agent that has spoken can be deleted.
+    #[cfg(test)]
     async fn delete(&self, id: Uuid) -> AppResult<()> {
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let Some(locks) = lock_agent_delete_on(&mut transaction, id).await? else {
@@ -560,15 +624,7 @@ pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
     // principal, as `remove_member` leaves a removed member's: with no identity left, no
     // inbound address can reach them.
     if let Some(company_id) = company_id {
-        retire_direct_workflow_on(transaction, company_id, id).await?;
-        // After the agent lock (memory E9): a lazy provisioning holding it `FOR SHARE`
-        // committed first and its namespace is retired here, or it waits and finds no agent.
-        super::memory::retire_namespaces_on(
-            transaction,
-            company_id,
-            crate::application::memory::NamespaceOwner::Agent(id),
-        )
-        .await?;
+        retire_agent_principal_on(transaction, company_id, id).await?;
         sqlx::query!(
             r#"UPDATE principals
                    SET kind = 'external', agent_id = NULL, updated_at = CURRENT_TIMESTAMP
@@ -594,7 +650,7 @@ pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
     Ok(())
 }
 
-async fn retire_direct_workflow_on(
+async fn retire_agent_principal_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company: Uuid,
     agent: Uuid,
@@ -632,11 +688,19 @@ async fn retire_direct_workflow_on(
         .bind(principal)
         .execute(&mut **tx)
         .await?;
+    super::memory::retire_namespaces_on(
+        tx,
+        company,
+        crate::application::memory::NamespaceOwner::Principal(
+            crate::entities::transport::PrincipalId::new(principal),
+        ),
+    )
+    .await?;
     Ok(())
 }
 
 /// Name what still holds an agent instead of reporting every refusal as one cause.
-fn agent_delete_error(error: sqlx::Error) -> AppError {
+pub(super) fn agent_delete_error(error: sqlx::Error) -> AppError {
     let constraint = error
         .as_database_error()
         .and_then(|database| database.constraint())

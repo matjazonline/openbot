@@ -1,6 +1,7 @@
 pub mod agent;
 pub mod app_error;
 pub mod attention;
+pub mod attribution;
 pub mod integrations;
 pub mod knowledge;
 pub mod local_agents;

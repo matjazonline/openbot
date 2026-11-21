@@ -1,0 +1,10 @@
+--- B1/src/adapters/persistence/workflow/escalation_binding_tests.rs
++++ B2/src/adapters/persistence/workflow/escalation_binding_tests.rs
+@@ -71,6 +71,7 @@
+         .await
+         .unwrap();
+     let update = ChannelUpdate {
++        actor: f.target.actor,
+         company_id: f.target.company.as_uuid(),
+         channel_id: channel,
+         write: write(None),

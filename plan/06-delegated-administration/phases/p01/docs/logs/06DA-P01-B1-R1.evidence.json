@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B1-R1",
+  "artifact": "4139979e98f76d7a8a43eaa0f4f5483fae1b21b57f62e15e4646edcacad77d3c",
+  "checks": [
+    {
+      "criteria": [
+        "PREDICATE",
+        "DEPARTMENT",
+        "NESTED-RUNTIME",
+        "GRANT-RACE",
+        "PROVENANCE",
+        "PRIVACY"
+      ],
+      "command": "TEST_DATABASE_URL=<owned-v2> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_admin_ manages_unit_ department_routes_hide_foreign root_membership_department_routes root_membership_roles_and_equivalent channel_reply_authoring_private department_lead_desk_refuses_lead workflow_binding_sql_grant_revocation channel_reply_binding_separates",
+      "fixture": "Plan06-owned PostgreSQL18 port55406 database openbot_p06_b1_v2; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-corrections-focused-third.txt",
+          "sha256": "03d0f18f0c69fb1b658b6e6e2b95ec0f9b1684d938b7ea2aaf0343392bc3b6f5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "SQLX",
+        "COMPILE"
+      ],
+      "command": "DATABASE_URL=<owned-v2> SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "Plan06-owned PostgreSQL18 port55406 database openbot_p06_b1_v2; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare.txt",
+          "sha256": "1ef21dbc46585ed7529f938e21c4795a5dd8e30a8112dc52de697e213ea90608"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FRESH-SCHEMA"
+      ],
+      "command": "DATABASE_URL=<owned-v2> cargo sqlx migrate run",
+      "fixture": "Plan06-owned PostgreSQL18 port55406 database openbot_p06_b1_v2; no external network",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migration-v2.txt",
+          "sha256": "148e2fc21619d877214dfe4fa0ada237b100ca104b25eab1d320ee90bb53b450"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "round": "AS-P02-B1-R1",
+  "artifact": "c6bb668f041e2dd867ef036fde79186a9136397ee5b5d8e0b86ea9be001172f1",
+  "checks": [
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/verify.py prepare (initial fixture attempt)",
+      "fixture": "local PostgreSQL 18.7, unique owned as_test_/as_verify_ databases and roles; isolated /tmp/as-attribution-target",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P02-prepare-initial.txt",
+          "sha256": "3f14f7937200dcf9d5ca28ff3e79469c4725945070ed7b259736a3a0bb4ab13e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/verify.py prepare (fixed fixture)",
+      "fixture": "local PostgreSQL 18.7, unique owned as_test_/as_verify_ databases and roles; isolated /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-prepare-r2.txt",
+          "sha256": "6d13c38236f51a69f369a1ec73148c9e1afb38d2d1ae5cf2946906b8c36dc5ab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "scripts/verify.py foundation",
+      "fixture": "local PostgreSQL 18.7, unique owned as_test_/as_verify_ databases and roles; isolated /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-foundation-r1.txt",
+          "sha256": "69c63c2759b1a08a2edddf472e2574f51f54adb21e3cc55a0e07013fbaeda807"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "scripts/extracted-build.py foundation",
+      "fixture": "local PostgreSQL 18.7, unique owned as_test_/as_verify_ databases and roles; isolated /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-extracted-r1.txt",
+          "sha256": "5ecb537b57457409024f99caa580fef75fefee414327a45cbd0d2011cae4e4cb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "scripts/test_boundary.py && scripts/boundary.py",
+      "fixture": "local PostgreSQL 18.7, unique owned as_test_/as_verify_ databases and roles; isolated /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-boundary-r2.txt",
+          "sha256": "4ae93d67eb07295a49b65deb90ca26b92f79b632943a3a5ec51febe1c7ec6781"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "local PostgreSQL 18.7, unique owned as_test_/as_verify_ databases and roles; isolated /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-clippy.txt",
+          "sha256": "45e48caf0a871e6d51c5c79a3f721b7db718da056b2f157c21282df04077e503"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "docker build --tag attribution-service-ci . && python3 scripts/container-smoke.py",
+      "fixture": "local PostgreSQL 18.7, unique owned as_test_/as_verify_ databases and roles; isolated /tmp/as-attribution-target",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "No container runtime installed; approximately 4 GiB free disk. Request to defer execution to final CI is pending; no acceptance claimed for container behavior."
+    }
+  ]
+}

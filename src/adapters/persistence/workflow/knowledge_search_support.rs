@@ -14,6 +14,11 @@ use crate::{
     services::harness::runs::RunCheckpoint,
 };
 
+enum Placement {
+    Company,
+    LeadDesk,
+}
+
 pub(super) struct SearchFixture {
     pub(super) fixture: Fixture,
     pub(super) agent: Uuid,
@@ -39,16 +44,36 @@ impl SearchFixture {
 
     /// The agent bound to `tools`. Memory tools need memory enabled before the agent is
     /// registered, so the fixture enables it first when any is bound.
-    pub(super) async fn with_tools(
+    pub(super) fn with_tools(
         level: AccessLevel,
         budget: Option<u32>,
         tools: &[AgentBuiltinTool],
+    ) -> impl std::future::Future<Output = Self> + '_ {
+        Self::with_placement(level, budget, tools, Placement::Company)
+    }
+
+    pub(super) fn with_lead_desk_tools(
+        level: AccessLevel,
+        tools: &[AgentBuiltinTool],
+    ) -> impl std::future::Future<Output = Self> + '_ {
+        Self::with_placement(level, None, tools, Placement::LeadDesk)
+    }
+
+    async fn with_placement(
+        level: AccessLevel,
+        budget: Option<u32>,
+        tools: &[AgentBuiltinTool],
+        placement: Placement,
     ) -> Self {
         let mut fixture = Fixture::new().await;
-        fixture.persistence = PostgresPersistence::with_credential_cipher(
+        let persistence = PostgresPersistence::with_credential_cipher(
             fixture.persistence.pool().clone(),
             CredentialCipher::for_test(),
         );
+        fixture.persistence = match &placement {
+            Placement::Company => persistence,
+            Placement::LeadDesk => persistence.with_app_domain("agents.test"),
+        };
         sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
             .execute(fixture.persistence.pool())
             .await
@@ -58,7 +83,7 @@ impl SearchFixture {
         )
         .await;
         sqlx::query(
-            "UPDATE company_members SET access_level=$3 WHERE company_id=$1 AND user_id=$2",
+            "UPDATE department_members SET access_level=$3 WHERE company_id=$1 AND root_user_id=$2",
         )
         .bind(fixture.target.company.as_uuid())
         .bind(actor)
@@ -75,13 +100,15 @@ impl SearchFixture {
                 .unwrap();
         }
         let agent = configure_agent(&fixture, tools).await;
+        let association = match placement {
+            Placement::Company => RelatedAssociation::Company,
+            Placement::LeadDesk => Box::pin(lead_desk(&fixture, agent, actor)).await,
+        };
         let version = publish(&fixture, budget).await;
         let binding = BindingFixture::from_version(fixture, version);
-        let configured = binding
-            .service()
-            .configure(binding.request(None))
-            .await
-            .unwrap();
+        let mut request = binding.request(None);
+        request.association = association;
+        let configured = binding.service().configure(request).await.unwrap();
         binding
             .service()
             .activate(SetBindingActivity {
@@ -90,7 +117,12 @@ impl SearchFixture {
             })
             .await
             .unwrap();
-        let claim = admit(&binding, WorkflowActor::authenticated(actor).unwrap()).await;
+        let claim = admit(
+            &binding,
+            WorkflowActor::authenticated(actor).unwrap(),
+            association,
+        )
+        .await;
         let model = Arc::new(DeterministicTextEmbedder::default());
         let library = Arc::new(KnowledgeLibrary::new(
             Arc::new(binding.fixture.persistence.clone()),
@@ -187,8 +219,13 @@ impl SearchFixture {
         register_scripted_agent_base_url(self.agent, &llm.base_url);
         let outcome =
             Box::pin(runtime.execute(&WorkflowStepKind("agent.run".into()), &self.claim)).await;
+        let finished = llm.finish().await;
+        assert_eq!(
+            finished.as_ref().ok(),
+            Some(&1),
+            "provider preparation: {outcome:?}; script: {finished:?}"
+        );
         assert!(outcome.completed_result().is_err());
-        assert_eq!(llm.finish().await.unwrap(), 1);
         let checkpoint = self.checkpoint().await;
         let pending = checkpoint.pending_call().unwrap();
         let scope = self.claim.fence.scope;
@@ -228,13 +265,51 @@ impl SearchFixture {
             .fetch_one(self.p().pool()).await.unwrap()
     }
 
+    // Protocol-only fixtures: these source identifiers do not prove document retrieval.
+    pub(super) async fn synthetic_observation(
+        &self,
+        text: &str,
+        level: AccessLevel,
+    ) -> crate::application::workflow::knowledge::KnowledgeSearchObservation {
+        use crate::application::knowledge::search::{KnowledgeObservation, KnowledgeSourceItem};
+        let scope = self.claim.fence.scope;
+        let mut db = self.p().pool().acquire().await.unwrap();
+        let units = crate::adapters::persistence::workflow::run_scopes::knowledge_units_on(
+            &mut db,
+            scope.company,
+            scope.run,
+            crate::entities::agent_capability::AgentId::new(self.agent),
+        )
+        .await
+        .unwrap()
+        .expect("fixture has a sealed, available actor projection");
+        let items = vec![KnowledgeSourceItem {
+            document_id: Uuid::from_u128(1),
+            chunk_id: Uuid::from_u128(2),
+            unit_id: units[0],
+            access_level: level,
+        }];
+        crate::application::workflow::knowledge::KnowledgeSearchObservation {
+            queried_units: units,
+            observation: KnowledgeObservation::new(
+                json!({"passages":[{"file":"sales.md","heading":null,"text":text}]}),
+                Some(level),
+                items,
+            ),
+        }
+    }
+
     pub(super) async fn upload_sales(&self) {
         self.library
             .upload(
-                KnowledgeScope {
-                    company: self.fixture.target.company,
-                    actor_id: self.fixture.target.actor.user_id(),
-                },
+                crate::adapters::persistence::knowledge::root_target(
+                    self.p(),
+                    KnowledgeScope {
+                        company: self.fixture.target.company,
+                        actor_id: self.fixture.target.actor.user_id(),
+                    },
+                )
+                .await,
                 vec![
                     KnowledgeUploadFile::from_upload(
                         "0_sales.md",
@@ -325,7 +400,11 @@ pub(super) async fn publish(f: &Fixture, budget: Option<u32>) -> VersionId {
     version
 }
 
-async fn admit(binding: &BindingFixture, actor: WorkflowActor) -> ClaimedWorkflow {
+async fn admit(
+    binding: &BindingFixture,
+    actor: WorkflowActor,
+    association: RelatedAssociation,
+) -> ClaimedWorkflow {
     let f = &binding.fixture;
     let p = &f.persistence;
     let result = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
@@ -333,7 +412,7 @@ async fn admit(binding: &BindingFixture, actor: WorkflowActor) -> ClaimedWorkflo
             history_session: None,
             company_id: f.target.company,
             actor,
-            association: RelatedAssociation::Company,
+            association,
             trigger: TriggerRef::new(
                 f.target.company,
                 TriggerId::new(Uuid::new_v4()),
@@ -400,3 +479,7 @@ pub(super) fn copy_call(call: &KnowledgeToolCall) -> KnowledgeToolCall {
         arguments: call.arguments.clone(),
     }
 }
+
+#[path = "knowledge_scope_fixture.rs"]
+mod topology;
+use topology::lead_desk;

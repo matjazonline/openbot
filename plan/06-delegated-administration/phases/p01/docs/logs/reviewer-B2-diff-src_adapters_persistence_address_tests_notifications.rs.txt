@@ -1,0 +1,10 @@
+--- B1/src/adapters/persistence/address_tests/notifications.rs
++++ B2/src/adapters/persistence/address_tests/notifications.rs
+@@ -326,6 +326,7 @@
+     ChannelPersistence::update(
+         &f.persistence,
+         ChannelUpdate {
++            actor: crate::application::workflow::WorkflowActor::authenticated(f.owner).unwrap(),
+             company_id: f.company.id,
+             channel_id: desk,
+             write: ChannelWrite {

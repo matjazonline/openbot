@@ -1,0 +1,11 @@
+--- B1/src/application/use_cases/administration.rs
++++ B2/src/application/use_cases/administration.rs
+@@ -11,6 +11,8 @@
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub enum ManagementTarget {
++    /// Collection entry only; each returned object still requires its own target check.
++    AnyUnit,
+     Root,
+     Unit(DepartmentId),
+     Agent(AgentId),

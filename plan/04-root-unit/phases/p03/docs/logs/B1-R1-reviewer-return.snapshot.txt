@@ -1,0 +1,27 @@
+base:   4dad1e971e1791f75731da50a7e73e6776177057
+digest: 9b394b31e98b0ede9d281ea7e977a5966ce683692500dc0ba2642369b43e2f0e
+files:
+  .gitattributes
+  .trail/learnings/2026-11-17-deferred-foreign-keys-move-concurrency-checks-mac02.md
+  docs/authentication-operations.md
+  plan/.archive/memory-service/05-openbot-integration.md
+  plan/04-root-unit/02-access-modes.md
+  plan/04-root-unit/03-integration-and-final-verification.md
+  plan/04-root-unit/README.md
+  src/adapters/persistence/account_identity_tests.rs
+  src/adapters/persistence/agent_publication/tests/publication.rs
+  src/adapters/persistence/agent_retire_tests.rs
+  src/adapters/persistence/company/member_retirement.rs
+  src/adapters/persistence/local_agents/test_support.rs
+  src/adapters/persistence/onboarding/tests.rs
+  src/adapters/persistence/thread/inbound_multi_task_tests.rs
+  src/adapters/persistence/thread/inbound_tests.rs
+  src/adapters/persistence/user_lifecycle.rs
+  src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs
+  src/adapters/persistence/workflow/action_tests.rs
+  src/adapters/persistence/workflow/channel_question_release_tests.rs
+  src/adapters/persistence/workflow/channel_reply_views_tests.rs
+  src/adapters/persistence/workflow/control_acceptance_tests.rs
+  src/adapters/persistence/workflow/decision_authority_tests.rs
+  src/adapters/persistence/workflow/harness_store_tests.rs
+  src/application/workflow/provisioning_tests.rs

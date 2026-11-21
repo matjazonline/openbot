@@ -1,0 +1,42 @@
+--- B2R1/src/adapters/persistence/delegated_desk_tests.rs
++++ B2R2/src/adapters/persistence/delegated_desk_tests.rs
+@@ -350,3 +350,39 @@
+         Err(AppError::NotFound(_))
+     ));
+ }
++
++#[tokio::test]
++async fn delegated_admin_competing_desk_crud_locks_the_actor_before_the_company() {
++    let Some(database) = own_database().await else {
++        return;
++    };
++    let d = Delegated::on(database.pool.clone()).await;
++    let p = &d.f.persistence;
++    let actor = d.scope(d.f.member).actor;
++    use crate::adapters::persistence::test_support::assert_actor_before_company;
++    let desk = assert_actor_before_company(
++        d.f.pool(),
++        d.f.company,
++        actor.user_id(),
++        ChannelPersistence::create(p, actor, d.f.company, write(d.unit.id, "Account-first")),
++    )
++    .await
++    .unwrap();
++    assert_actor_before_company(
++        d.f.pool(),
++        d.f.company,
++        actor.user_id(),
++        ChannelPersistence::update(p, edit(&d, actor.user_id(), desk.id, d.unit.id)),
++    )
++    .await
++    .unwrap();
++    assert_actor_before_company(
++        d.f.pool(),
++        d.f.company,
++        actor.user_id(),
++        ChannelPersistence::delete(p, actor, d.f.company, desk.id),
++    )
++    .await
++    .unwrap();
++    assert!(p.get_by_id(desk.id).await.unwrap().is_none());
++}

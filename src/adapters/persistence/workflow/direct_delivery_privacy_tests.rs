@@ -228,7 +228,11 @@ async fn retire_during_read(state: &PersonalDelivery) {
             }
         }).await.expect("real reader loaded the private delivery and reached its parts query");
         f.s.p()
-            .remove_member(f.s.fixture.target.company.as_uuid(), state.recipient)
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.s.fixture.target.actor.user_id(),
+                company_id: f.s.fixture.target.company.as_uuid(),
+                member_user_id: state.recipient,
+            })
             .await
             .unwrap();
         assert!(

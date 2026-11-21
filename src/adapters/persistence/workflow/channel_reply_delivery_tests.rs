@@ -154,7 +154,7 @@ async fn channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_
     .await;
     let receipt = published(&f).await;
     let current = claim_delivery(&f, receipt).await;
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
         .bind(f.scope.company.as_uuid())
         .bind(admin)
         .execute(f.p.pool())

@@ -34,7 +34,7 @@ pub(super) async fn two_channel_request(fixture: &Fixture, rfc: &str) -> Inbound
     });
     request.associations = BoundedVec::parse("thread associations", associations).unwrap();
     let mut intents = request.intents.into_inner();
-    intents.push(intent(second_channel, RecipientRole::Cc));
+    intents.push(intent(fixture, second_channel, RecipientRole::Cc).await);
     request.intents = BoundedVec::parse("admission intents", intents).unwrap();
     request
 }

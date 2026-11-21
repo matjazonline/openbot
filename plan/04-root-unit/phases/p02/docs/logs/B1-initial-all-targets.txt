@@ -1,0 +1,531 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0422]: cannot find struct, variant or union type `ChannelOwnershipWrite` in this scope
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:224:33
+    |
+224 |                 ownership: Some(ChannelOwnershipWrite {
+    |                                 ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0422]: cannot find struct, variant or union type `ChannelOwnershipWrite` in this scope
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:255:37
+    |
+255 |                     ownership: Some(ChannelOwnershipWrite {
+    |                                     ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0308]: mismatched types
+   --> src/adapters/http/pages/tests.rs:149:24
+    |
+149 |         department_id: None,
+    |                        ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/adapters/http/routes/channel.rs:942:28
+    |
+942 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/adapters/http/routes/onboarding.rs:403:28
+    |
+403 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0624]: method `is_public` is private
+   --> src/adapters/http/routes/ui_channels_tests.rs:48:28
+    |
+ 48 |     assert!(opened.draft().is_public());
+    |                            ^^^^^^^^^ private method
+    |
+   ::: src/adapters/http/pages/channel_settings.rs:100:5
+    |
+100 |     fn is_public(&self) -> bool {
+    |     --------------------------- private method defined here
+
+error[E0624]: method `is_public` is private
+   --> src/adapters/http/routes/ui_channels_tests.rs:56:29
+    |
+ 56 |     assert!(!closed.draft().is_public());
+    |                             ^^^^^^^^^ private method
+    |
+   ::: src/adapters/http/pages/channel_settings.rs:100:5
+    |
+100 |     fn is_public(&self) -> bool {
+    |     --------------------------- private method defined here
+
+error[E0560]: struct `application::ports::channel::ChannelWrite` has no field named `ownership`
+   --> src/adapters/persistence/channel.rs:706:17
+    |
+706 |                 ownership: None,
+    |                 ^^^^^^^^^ `application::ports::channel::ChannelWrite` does not have this field
+    |
+    = note: available fields are: `department_id`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/department_lead_desk_tests.rs:185:9
+    |
+185 | /         (
+186 | |             "ops-room".into(),
+187 | |             "Ops Room".into(),
+188 | |             Some(department.id.as_uuid()),
+189 | |             false
+190 | |         )
+    | |_________^ expected a tuple with 3 elements, found one with 4 elements
+    |
+    = note: expected tuple `(std::string::String, std::string::String, uuid::Uuid)`
+               found tuple `(_, _, std::option::Option<uuid::Uuid>, bool)`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/department_lead_desk_tests.rs:225:13
+    |
+225 | /             (
+226 | |                 name.to_lowercase(),
+227 | |                 name.into(),
+228 | |                 Some(department.id.as_uuid()),
+229 | |                 false
+230 | |             )
+    | |_____________^ expected a tuple with 3 elements, found one with 4 elements
+    |
+    = note: expected tuple `(std::string::String, std::string::String, uuid::Uuid)`
+               found tuple `(std::string::String, _, std::option::Option<uuid::Uuid>, bool)`
+
+error[E0560]: struct `application::ports::channel::ChannelWrite` has no field named `ownership`
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:224:17
+    |
+224 |                 ownership: Some(ChannelOwnershipWrite {
+    |                 ^^^^^^^^^ `application::ports::channel::ChannelWrite` does not have this field
+    |
+    = note: available fields are: `description`, `alias_slugs`, `participant_emails`, `add_3rd_party`, `created_by`, `department_id`
+
+error[E0560]: struct `application::ports::channel::ChannelWrite` has no field named `ownership`
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:255:21
+    |
+255 |                     ownership: Some(ChannelOwnershipWrite {
+    |                     ^^^^^^^^^ `application::ports::channel::ChannelWrite` does not have this field
+    |
+    = note: available fields are: `description`, `alias_slugs`, `participant_emails`, `add_3rd_party`, `created_by`, `department_id`
+
+error[E0599]: no method named `is_some` found for struct `domain::entities::department::DepartmentId` in the current scope
+   --> src/adapters/persistence/workflow/role_binding_tests.rs:213:10
+    |
+208 |       let owned = ChannelPersistence::get_by_id(p, desk)
+    |  _________________-
+209 | |         .await
+210 | |         .unwrap()
+211 | |         .unwrap()
+212 | |         .department_id
+213 | |         .is_some();
+    | |         -^^^^^^^ method not found in `domain::entities::department::DepartmentId`
+    | |_________|
+    |
+    |
+   ::: src/domain/entities/transport/mod.rs:185:9
+    |
+185 |           pub struct $name(Uuid);
+    |           ----------------------- method `is_some` not found for this struct
+
+error[E0308]: mismatched types
+    --> src/adapters/smtp/server.rs:1234:32
+     |
+1234 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/adapters/smtp/server.rs:1458:32
+     |
+1458 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/channel.rs:717:28
+    |
+717 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/channel.rs:1283:32
+     |
+1283 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/channel.rs:1300:32
+     |
+1300 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/ingest/commit.rs:233:28
+    |
+233 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:175:32
+    |
+175 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:192:32
+    |
+192 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:268:28
+    |
+268 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:338:28
+    |
+338 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:406:28
+    |
+406 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:485:28
+    |
+485 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:554:28
+    |
+554 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:624:28
+    |
+624 |             department_id: None,
+    |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:699:32
+    |
+699 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:716:32
+    |
+716 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:819:32
+    |
+819 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:836:32
+    |
+836 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:853:32
+    |
+853 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:933:32
+    |
+933 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/tests.rs:950:32
+    |
+950 |                 department_id: None,
+    |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+    |
+    = note: expected struct `domain::entities::department::DepartmentId`
+                 found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1073:28
+     |
+1073 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1196:32
+     |
+1196 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1213:32
+     |
+1213 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1230:32
+     |
+1230 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1349:28
+     |
+1349 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1457:32
+     |
+1457 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1474:32
+     |
+1474 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1546:32
+     |
+1546 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1563:32
+     |
+1563 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1626:32
+     |
+1626 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1643:32
+     |
+1643 |                 department_id: None,
+     |                                ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1713:28
+     |
+1713 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:1894:28
+     |
+1894 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:2068:28
+     |
+2068 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+  --> src/application/use_cases/thread/department_desk_relay_tests.rs:25:24
+   |
+25 |         department_id: None,
+   |                        ^^^^ expected `DepartmentId`, found `Option<_>`
+   |
+   = note: expected struct `domain::entities::department::DepartmentId`
+                found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+  --> src/application/use_cases/thread/department_desk_relay_tests.rs:39:24
+   |
+39 |         department_id: Some(DepartmentId::random()),
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `DepartmentId`, found `Option<DepartmentId>`
+   |
+   = note: expected struct `DepartmentId`
+                found enum `std::option::Option<DepartmentId>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:2884:32
+     |
+2884 |                 department_id: owner,
+     |                                ^^^^^ expected `DepartmentId`, found `Option<DepartmentId>`
+     |
+     = note: expected struct `DepartmentId`
+                  found enum `std::option::Option<DepartmentId>`
+help: consider using `Option::expect` to unwrap the `std::option::Option<domain::entities::department::DepartmentId>` value, panicking if the value is an `Option::None`
+     |
+2884 |                 department_id: owner.expect("REASON"),
+     |                                     +++++++++++++++++
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:3416:28
+     |
+3416 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:3516:28
+     |
+3516 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+    --> src/application/use_cases/thread/tests.rs:3596:28
+     |
+3596 |             department_id: None,
+     |                            ^^^^ expected `DepartmentId`, found `Option<_>`
+     |
+     = note: expected struct `domain::entities::department::DepartmentId`
+                  found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+  --> src/application/workflow/tests/authorization_cases/mod.rs:27:24
+   |
+27 |         department_id: None,
+   |                        ^^^^ expected `DepartmentId`, found `Option<_>`
+   |
+   = note: expected struct `domain::entities::department::DepartmentId`
+                found enum `std::option::Option<_>`
+
+error[E0308]: mismatched types
+   --> src/adapters/http/pages/department_ui_tests.rs:500:24
+    |
+500 |         department_id: owner.map(|department| department.id),
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `DepartmentId`, found `Option<DepartmentId>`
+    |
+    = note: expected struct `DepartmentId`
+                 found enum `std::option::Option<DepartmentId>`
+help: consider using `Option::expect` to unwrap the `std::option::Option<domain::entities::department::DepartmentId>` value, panicking if the value is an `Option::None`
+    |
+500 |         department_id: owner.map(|department| department.id).expect("REASON"),
+    |                                                             +++++++++++++++++
+
+Some errors have detailed explanations: E0308, E0422, E0560, E0599, E0624.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 56 previous errors

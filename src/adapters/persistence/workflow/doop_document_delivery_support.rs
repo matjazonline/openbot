@@ -107,7 +107,7 @@ pub(super) async fn verified_recipient(f: &Fixture, user: Uuid) {
         .execute(pool)
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2 AND role<>'owner'")
+    sqlx::query("UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2 AND NOT EXISTS (SELECT 1 FROM companies AS owner_company WHERE owner_company.id = department_members.company_id AND owner_company.user_id = department_members.root_user_id)")
         .bind(company)
         .bind(user)
         .execute(pool)

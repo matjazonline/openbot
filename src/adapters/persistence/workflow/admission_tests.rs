@@ -33,6 +33,8 @@ mod run_finished_at_tests;
 mod run_lineage_tests;
 #[path = "storage_tests.rs"]
 mod storage_tests;
+#[path = "unit_budget_tests.rs"]
+mod unit_budget_tests;
 use crate::domain::entities::correlation::CorrelationId;
 use binding_tests::BindingFixture;
 use serde_json::{Value, json};

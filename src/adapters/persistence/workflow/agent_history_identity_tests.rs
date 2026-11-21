@@ -107,6 +107,35 @@ async fn agent_history_identity_model_only_steps_allocate_no_conversation() {
     }
 }
 
+async fn transfer_creator_ownership(setup: &AgentSetup, principal: Uuid) {
+    let p = &setup.fixture.persistence;
+    let company = setup.fixture.target.company.as_uuid();
+    // Company ownership protects the principal independently of retained history.
+    let error = sqlx::query("DELETE FROM principals WHERE company_id=$1 AND id=$2")
+        .bind(company)
+        .bind(principal)
+        .execute(p.pool())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.as_database_error().unwrap().constraint(),
+        Some("companies_owner_member_fk")
+    );
+    let replacement =
+        crate::adapters::persistence::workflow::tests::message_tests::support::member(
+            &setup.fixture,
+            "member",
+        )
+        .await;
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        p.pool(),
+        company,
+        replacement,
+        crate::entities::company_member::CompanyAccessRole::Member,
+    )
+    .await;
+}
+
 #[tokio::test]
 async fn agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use() {
     let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
@@ -146,7 +175,8 @@ async fn agent_history_identity_principal_deletion_preserves_audit_and_refuses_c
             Some("23514")
         );
     }
-    // Native revocation may delete a principal; history must not pin that authority row.
+    transfer_creator_ownership(&setup, saved.snapshot).await;
+    // After ownership transfers, history must not pin the former owner's authority row.
     sqlx::query("DELETE FROM principals WHERE company_id=$1 AND id=$2")
         .bind(original.company.as_uuid())
         .bind(saved.snapshot)

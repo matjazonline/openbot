@@ -31,12 +31,12 @@ async fn department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep() 
         return;
     };
     let mut chain = Vec::new();
-    for level in 1..=MAX_DEPARTMENT_DEPTH {
+    for level in 2..=MAX_DEPARTMENT_DEPTH {
         let parent = chain.last().copied();
         chain.push(
             f.insert_raw(f.company, &format!("level-{level}"), parent)
                 .await
-                .expect("eight levels nest"),
+                .expect("seven child levels nest below the company root"),
         );
     }
     let ninth = f
@@ -44,7 +44,7 @@ async fn department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep() 
         .await;
     assert_eq!(refused_by(ninth), "departments_shape");
 
-    // Moving level 2 (a subtree seven deep) under a second-level node would reach level 9.
+    // Moving level 3 (a subtree six deep) under a level-3 node would reach level 9.
     let other = f.insert_raw(f.company, "other", None).await.unwrap();
     let other_child = f
         .insert_raw(f.company, "other-child", Some(other))
@@ -56,13 +56,13 @@ async fn department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep() 
         .execute(f.pool())
         .await;
     assert_eq!(refused_by(too_deep), "departments_shape");
-    // Under a root it stays at eight.
+    // Under a level-2 department it stays at eight.
     sqlx::query("UPDATE departments SET parent_id = $2 WHERE id = $1")
         .bind(chain[1])
         .bind(other)
         .execute(f.pool())
         .await
-        .expect("a subtree seven deep fits under a root");
+        .expect("a subtree six deep fits below a level-2 department");
 }
 
 #[tokio::test]
@@ -245,8 +245,8 @@ async fn department_schema_grant_provenance_check_accepts_every_variant() {
     };
     let channel = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO channels (id, company_id, name, access_mode, created_by) \
-         VALUES ($1, $2, 'Grants', 'allowlist', $3)",
+        "INSERT INTO channels (id, company_id, name, access_mode, created_by, department_id) \
+         VALUES ($1, $2, 'Grants', 'members', $3, (SELECT id FROM departments WHERE company_id=$2 AND is_root))",
     )
     .bind(channel)
     .bind(f.company)

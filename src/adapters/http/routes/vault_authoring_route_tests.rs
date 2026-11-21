@@ -16,8 +16,14 @@ async fn vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metada
     let f = Fixture::new().await;
     let config = Arc::new(AppConfig::for_test());
     let other = browser_identity(&f.p, &config).await;
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES(gen_random_uuid(),$1,$2,'admin')")
-        .bind(f.company).bind(other.user).execute(f.p.pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        f.p.pool(),
+        crate::domain::workflow::CompanyId::new(f.company),
+        other.user,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     let mut tx = f.p.pool().begin().await.unwrap();
     crate::adapters::persistence::participant::create_person_principal_on(
         &mut tx,
@@ -78,7 +84,7 @@ async fn vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metada
             && configured.contains("Owner consent recorded.")
     );
     assert!(!configured.contains("sentinel-never-in-browser"));
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
         .bind(f.company)
         .bind(other.user)
         .execute(f.p.pool())

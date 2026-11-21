@@ -64,7 +64,7 @@ pub async fn list(
     Query(query): Query<ListQuery>,
 ) -> WorkflowResult<Json<Value>> {
     let (company, actor) = (company(company_id), actor(&user)?);
-    authorize(&engine, company, actor, RelatedAssociation::Company).await?;
+    managed_listing(&engine, company, actor).await?;
     let page = engine.reads().list_bindings(company, query.page()?).await?;
     let next = page
         .more
@@ -150,6 +150,24 @@ impl<'a> Visibility<'a> {
     }
 }
 
+/// Entry to bindings for anyone who manages a unit (Plan06 02A); each binding is then shown only
+/// when its own association is visible to the caller ([`visible_to`]).
+async fn managed_listing(
+    engine: &WorkflowServices,
+    company: CompanyId,
+    actor: WorkflowActor,
+) -> AppResult<()> {
+    engine
+        .authorization()
+        .authorize(
+            company,
+            actor,
+            RelatedAssociation::Company,
+            WorkflowOperation::ListManaged,
+        )
+        .await
+}
+
 pub(super) async fn visible_binding(
     engine: &WorkflowServices,
     company: CompanyId,
@@ -157,7 +175,7 @@ pub(super) async fn visible_binding(
     binding: Uuid,
 ) -> AppResult<BindingSummary> {
     let not_found = || AppError::NotFound("Workflow binding not found".into());
-    authorize(engine, company, actor, RelatedAssociation::Company).await?;
+    managed_listing(engine, company, actor).await?;
     let binding = engine
         .reads()
         .binding_summary(company, WorkflowBindingId::new(binding))

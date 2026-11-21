@@ -115,19 +115,17 @@ fn escalation_of(
     value: &str,
 ) -> Result<Option<crate::application::workflow::binding::EscalationPolicy>, String> {
     use crate::application::workflow::binding::{EscalationHops, EscalationPolicy};
-    use crate::entities::department::DepartmentRole;
+    let refused = || "Choose a role and one or two escalation hops.".to_owned();
     if value.is_empty() {
         return Ok(None);
     }
-    let (role, hops) = value
-        .split_once(':')
-        .ok_or("Choose a role and one or two escalation hops.")?;
-    let notify = role
-        .parse::<DepartmentRole>()
-        .map_err(|_| "Choose a role and one or two escalation hops.")?;
-    let hops = hops
-        .parse::<u8>()
-        .map_err(|_| "Choose a role and one or two escalation hops.")?;
+    let (role, hops) = value.split_once(':').ok_or_else(refused)?;
+    let notify = role.parse().map_err(|_| refused())?;
+    let hops = match hops {
+        "1" => 1,
+        "2" => 2,
+        _ => return Err(refused()),
+    };
     Ok(Some(EscalationPolicy {
         notify,
         hops: EscalationHops::try_from(hops).map_err(str::to_owned)?,
@@ -193,6 +191,7 @@ fn binding_refusal(error: &WorkflowError) -> Option<String> {
         }),
         WorkflowError::App(AppError::BadRequest(message)) => Some(message.clone()),
         WorkflowError::App(AppError::WorkflowRole(refusal)) => Some(refusal.to_string()),
+        WorkflowError::App(AppError::ResourceOutsideUnit(refusal)) => Some(refusal.to_string()),
         WorkflowError::App(AppError::NotFound(_)) => Some(
             "A chosen desk, version, run-as or resource is not available: it may be hidden from \
              you, disabled, revoked or not ready, or a tool the version froze is no longer \
@@ -231,7 +230,7 @@ impl Ui {
         let mut options = self
             .engine
             .authoring_reads()
-            .binding_options(company_id)
+            .binding_options(company_id, self.user)
             .await?;
         let mut visibility = Visibility::new(&self.engine, company_id, self.actor()?);
         let mut channels = Vec::new();
@@ -406,7 +405,7 @@ impl Ui {
         banner: Option<BindingsBanner>,
         form: Option<BindingForm>,
     ) -> AppResult<String> {
-        let managed = self.company(company).await?;
+        let managed = self.unit_company(company).await?;
         let usage = self
             .engine
             .authoring_reads()
@@ -512,7 +511,7 @@ pub(super) async fn binding_form(
     Query(query): Query<BindingFormQuery>,
     uri: axum::http::Uri,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?;
+    let company = ui.unit_company(query.company_id).await?;
     let detail = ui.detail(company.id, workflow).await?;
     let fields = FormFields::parse(uri.query().unwrap_or_default().as_bytes());
     let typed = fields.get("version_id").is_some();
@@ -542,7 +541,7 @@ pub(super) async fn save_binding(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let fields = FormFields::parse(&body);
     let mut form = BindingForm::typed(&fields);
     let refused = |mut form: BindingForm, message: String| {
@@ -689,7 +688,7 @@ async fn set_activity(
     expected: u64,
     active: bool,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(company_id).await?.id;
+    let company = ui.unit_company(company_id).await?.id;
     ui.visible_binding(company, workflow, binding).await?;
     let banner =
         match set_binding_activity(&ui.engine, company, ui.actor()?, binding, expected, active)
@@ -782,7 +781,7 @@ pub(super) async fn channel_bindings(
     Path(channel): Path<Uuid>,
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     let company_id = super::company(company);
     let mut visibility = Visibility::new(&ui.engine, company_id, ui.actor()?);
     if !visibility
@@ -802,7 +801,7 @@ pub(super) async fn binding_destination(
     Path(binding): Path<Uuid>,
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<axum::response::Redirect> {
-    ui.company(query.company_id).await?;
+    ui.unit_company(query.company_id).await?;
     let summary = ui
         .engine
         .authoring_reads()

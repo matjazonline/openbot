@@ -1,0 +1,37 @@
+--- B2/src/application/workflow/authorization.rs
++++ B3/src/application/workflow/authorization.rs
+@@ -97,8 +97,9 @@
+     Cancel,
+     Retry,
+     Reconcile,
+-    CopyTemplate,
+-    ManageDefinition,
++    CopyTemplate(crate::domain::workflow::WorkflowId),
++    CreateDefinition(crate::domain::workflow::WorkflowId),
++    ManageDefinition(crate::domain::workflow::WorkflowId),
+     ManageBinding,
+     ManageSchedule,
+     /// Enter a configuration collection; each returned item still needs its scoped check.
+@@ -121,9 +122,20 @@
+     operation: WorkflowOperation,
+ ) -> AppResult<Option<crate::application::use_cases::administration::ManagementTarget>> {
+     use crate::application::use_cases::administration::ManagementTarget;
+-    if operation == WorkflowOperation::ListManaged {
++    let scoped = match operation {
++        WorkflowOperation::ListManaged => Some(ManagementTarget::AnyUnit),
++        WorkflowOperation::CreateDefinition(workflow)
++        | WorkflowOperation::CopyTemplate(workflow) => {
++            Some(ManagementTarget::DefinitionCreation(workflow))
++        }
++        WorkflowOperation::ManageDefinition(workflow) => {
++            Some(ManagementTarget::Definition(workflow))
++        }
++        _ => None,
++    };
++    if let Some(target) = scoped {
+         return if association == RelatedAssociation::Company {
+-            Ok(Some(ManagementTarget::AnyUnit))
++            Ok(Some(target))
+         } else {
+             Err(not_found())
+         };

@@ -1,0 +1,62 @@
+PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit
+[delete plan] SET
+[delete plan] SET
+[delete plan] Delete on unit_spend
+[delete plan]   ->  Seq Scan on unit_spend
+[delete plan]         Filter: ((company_id = '00000000-0000-0000-0000-000000000001'::uuid) AND (unit_id = '00000000-0000-0000-0000-0000000000d5'::uuid))
+[charge at commit] timing on
+[charge at commit] Timing is on.
+[charge at commit] BEGIN
+[charge at commit] BEGIN
+[charge at commit] Time: 0.138 ms
+[charge at commit] INSERT INTO unit_spend SELECT '00000000-0000-0000-0000-000000000001', unit, period.name, period.start, 7 FROM unnest(ARRAY['00000000-0000-0000-0000-0000000000a0'::uuid,'00000000-0000-0000-0000-0000000000d5'::uuid]) AS unit, (VALUES ('day','2026-11-21+00'::timestamptz),('month','2026-11-01+00'::timestamptz)) AS period(name,start) ORDER BY unit, period.name ON CONFLICT (company_id,unit_id,period,period_start) DO UPDATE SET spent_micros=LEAST(unit_spend.spent_micros::numeric+EXCLUDED.spent_micros,9223372036854775807)::bigint
+[charge at commit] INSERT 0 4
+[charge at commit] Time: 1576.706 ms (00:01.577)
+[charge at commit] COMMIT
+[charge at commit] COMMIT
+[charge at commit] Time: 2.438 ms
+[delete] SET enable_indexscan=off
+[delete] SET
+[delete] SET enable_bitmapscan=off
+[delete] SET
+[delete] timing on
+[delete] Timing is on.
+[delete] DELETE FROM departments WHERE id='00000000-0000-0000-0000-0000000000d5'
+[delete] ERROR:  deadlock detected
+[delete] DETAIL:  Process 59383 waits for ShareLock on transaction 1455403; blocked by process 59387.
+[delete] Process 59387 waits for ShareLock on transaction 1455402; blocked by process 59383.
+[delete] HINT:  See server log for query details.
+[delete] CONTEXT:  while deleting tuple (0,2) in relation "unit_spend"
+[delete] SQL statement "DELETE FROM unit_spend WHERE company_id = OLD.company_id AND unit_id = OLD.id"
+[delete] PL/pgSQL function remove_unit_spend() line 2 at SQL statement
+[delete] Time: 1802.900 ms (00:01.803)
+[other charge] BEGIN
+[other charge] BEGIN
+[other charge] SELECT period FROM unit_spend WHERE unit_id='00000000-0000-0000-0000-0000000000d5' AND period='month' FOR UPDATE
+[other charge]  period 
+[other charge] --------
+[other charge]  month
+[other charge] (1 row)
+[other charge] 
+[other charge] SELECT pg_sleep(1.0)
+[other charge]  pg_sleep 
+[other charge] ----------
+[other charge]  
+[other charge] (1 row)
+[other charge] 
+[other charge] COMMIT
+[other charge] COMMIT
+ unit | period | spent_micros 
+------+--------+--------------
+ a0   | day    |            7
+ a0   | month  |            7
+ d5   | day    |            8
+ d5   | month  |            8
+(4 rows)
+
+ department 
+------------
+ a0
+ d5
+(2 rows)
+

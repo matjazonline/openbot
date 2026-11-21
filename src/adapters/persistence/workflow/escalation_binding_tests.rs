@@ -21,22 +21,29 @@ async fn workflow_escalation_binding_requires_department_without_role_steps() {
                 RelatedAssociation::Channel(RelatedChannelId::new(desk(&f, None).await));
         }
         let configured = f.service().configure(request).await.unwrap();
-        let error = f
+        let result = f
             .service()
             .activate(SetBindingActivity {
                 target: f.target,
                 expected: configured.revision,
             })
-            .await
-            .err()
-            .unwrap();
-        assert!(format!("{error:?}").contains("binding.escalation_needs_department"));
-        assert!(!f.state().await.active);
+            .await;
+        if on_desk {
+            result.unwrap();
+            assert!(
+                f.state().await.active,
+                "the default root is a valid desk context"
+            );
+        } else {
+            let error = result.err().expect("company association has no department");
+            assert!(format!("{error:?}").contains("binding.escalation_needs_department"));
+            assert!(!f.state().await.active);
+        }
     }
 }
 
 #[tokio::test]
-async fn workflow_escalation_binding_roundtrip_update_and_both_detach_writers() {
+async fn workflow_escalation_binding_roundtrip_update_and_required_owner() {
     let f = BindingFixture::new(json!([])).await;
     let department = department(&f).await;
     let channel = desk(&f, Some(department)).await;
@@ -64,28 +71,24 @@ async fn workflow_escalation_binding_roundtrip_update_and_both_detach_writers() 
         .await
         .unwrap();
     let update = ChannelUpdate {
+        actor: f.target.actor,
         company_id: f.target.company.as_uuid(),
         channel_id: channel,
         write: write(None),
     };
-    let error = ChannelPersistence::update(p, update.clone())
+    let kept = ChannelPersistence::update(p, update.clone()).await.unwrap();
+    assert_eq!(kept.department_id, department);
+    let error = sqlx::query("UPDATE channels SET department_id=NULL WHERE company_id=$1 AND id=$2")
+        .bind(f.target.company.as_uuid())
+        .bind(channel)
+        .execute(p.pool())
         .await
         .unwrap_err();
-    assert!(format!("{error:?}").contains("binding.escalation_needs_department"));
-    let mut tx = p.pool().begin().await.unwrap();
-    let error = crate::adapters::persistence::department_desks::set_desk_ownership_on(
-        &mut tx,
-        f.target.company,
-        channel,
-        &ChannelOwnershipWrite {
-            department_id: Some(None),
-            members_only: None,
-        },
-    )
-    .await
-    .unwrap_err();
-    assert!(format!("{error:?}").contains("binding.escalation_needs_department"));
-    tx.rollback().await.unwrap();
+    assert_eq!(
+        error.as_database_error().unwrap().code().as_deref(),
+        Some("23502")
+    );
+    assert_eq!(f.state().await.configuration.escalation(), Some(first));
     let mut request = f.request(Some(active.revision));
     request.association = RelatedAssociation::Channel(RelatedChannelId::new(channel));
     request.escalation = Some(policy(DepartmentRole::Lead, 1));
@@ -116,21 +119,27 @@ async fn workflow_escalation_binding_roundtrip_update_and_both_detach_writers() 
 #[tokio::test]
 async fn workflow_escalation_binding_sql_and_rust_policy_validation_agree() {
     let f = BindingFixture::new(json!([])).await;
-    for source in [
+    let mut sources = vec![
         json!(null),
         json!({}),
         json!({"notify":null,"hops":1}),
         json!({"notify":"lead","hops":null}),
         json!({"notify":"lead","hops":"1"}),
         json!({"notify":"lead","hops":0}),
-        json!({"notify":"lead","hops":1}),
-        json!({"notify":"reviewer","hops":2}),
         json!({"notify":"lead","hops":3}),
         json!({"notify":"lead","hops":1.5}),
         json!({"notify":"lead","hops":1.0}),
         json!({"notify":"lead","hops":1,"extra":true}),
         json!({"notify":"missing","hops":1}),
-    ] {
+        json!({"notify":"owner","hops":3}),
+        json!({"notify":"admin","hops":0}),
+    ];
+    sources.extend(
+        DepartmentRole::ALL
+            .into_iter()
+            .flat_map(|role| [1, 2].map(|hops| json!({"notify":role,"hops":hops}))),
+    );
+    for source in sources {
         let (stored, valid): (serde_json::Value, bool) =
             sqlx::query_as("SELECT $1::jsonb,workflow_escalation_policy_valid($1::jsonb)")
                 .bind(source)

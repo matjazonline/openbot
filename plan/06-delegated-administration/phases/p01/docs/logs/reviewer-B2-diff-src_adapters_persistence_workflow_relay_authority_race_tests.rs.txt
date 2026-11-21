@@ -1,0 +1,14 @@
+--- B1/src/adapters/persistence/workflow/relay_authority_race_tests.rs
++++ B2/src/adapters/persistence/workflow/relay_authority_race_tests.rs
+@@ -41,6 +41,11 @@
+         ChannelPersistence::update(
+             &p,
+             ChannelUpdate {
++                actor: crate::adapters::persistence::test_support::company_owner_actor(
++                    &p,
++                    old.company_id,
++                )
++                .await,
+                 company_id: old.company_id,
+                 channel_id: desk,
+                 write: ChannelWrite {

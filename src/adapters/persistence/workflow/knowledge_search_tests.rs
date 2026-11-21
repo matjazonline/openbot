@@ -14,6 +14,8 @@ use crate::{
 #[path = "knowledge_search_support.rs"]
 mod support;
 use support::*;
+#[path = "knowledge_scope_runtime_tests.rs"]
+mod scopes;
 
 #[path = "knowledge_search_atomic_tests.rs"]
 mod atomic;
@@ -110,10 +112,14 @@ async fn knowledge_search_replay_uses_the_canonical_result_without_embedding_aga
     };
     f.library
         .upload(
-            KnowledgeScope {
-                company: f.claim.fence.scope.company,
-                actor_id: f.fixture.target.actor.user_id(),
-            },
+            crate::adapters::persistence::knowledge::root_target(
+                f.p(),
+                KnowledgeScope {
+                    company: f.claim.fence.scope.company,
+                    actor_id: f.fixture.target.actor.user_id(),
+                },
+            )
+            .await,
             vec![
                 KnowledgeUploadFile::from_upload(
                     "5_sales.md",

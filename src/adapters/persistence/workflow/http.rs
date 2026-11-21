@@ -30,11 +30,28 @@ pub(super) use publication_owner::capture_on as capture_publication_on;
 #[path = "http_runtime.rs"]
 pub(super) mod runtime;
 
+/// Which HTTP connections may own an unslotted operation (Plan07 G1 r2 F2).
+#[derive(Debug, Clone, Copy)]
+pub(super) enum ConnectionReach {
+    /// Existence anywhere in the company: the support check every binding save, admission and
+    /// replay runs before its reach-aware readiness check. Several units may own the operation;
+    /// which one a run uses is decided within its reach (G1 r2 F2), so this mode never routes.
+    Company,
+    /// Connections in reach of this base department (the root when `None`); ambiguity is judged
+    /// among them only, so another unit's identical operation neither stands in nor collides.
+    From(Option<crate::entities::department::DepartmentId>),
+}
+
 pub(super) async fn registered_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     wanted: &publication::ToolSnapshot,
+    reach: ConnectionReach,
 ) -> AppResult<Uuid> {
+    let (anywhere, start) = match reach {
+        ConnectionReach::Company => (true, None),
+        ConnectionReach::From(start) => (false, start.map(|unit| unit.as_uuid())),
+    };
     let mut normalized = wanted.clone();
     normalized.contract.connection = None;
     HttpOperation {
@@ -43,10 +60,11 @@ pub(super) async fn registered_on(
     }
     .validate(company)?;
     let snapshot = serde_json::to_value(normalized).map_err(|_| invalid())?;
-    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) ORDER BY operation.connection_id LIMIT 2")
-        .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).fetch_all(&mut **tx).await?;
-    // A tool without a binding must have exactly one owner; ambiguous routing fails closed.
-    if ids.is_empty() || (wanted.contract.connection.is_none() && ids.len() != 1) {
+    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) AND ($4 OR unit_reaches($1, COALESCE($5, (SELECT id FROM departments WHERE company_id=$1 AND is_root)), connection.unit_id)) ORDER BY operation.connection_id LIMIT 2")
+        .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).bind(anywhere).bind(start).fetch_all(&mut **tx).await?;
+    // A tool without a binding must have exactly one owner in reach; ambiguous routing fails
+    // closed. Company-wide existence does not route, so multiplicity there is not ambiguity.
+    if ids.is_empty() || (!anywhere && wanted.contract.connection.is_none() && ids.len() != 1) {
         return Err(missing());
     }
     Ok(ids[0])
@@ -56,6 +74,7 @@ pub(super) async fn registered_on(
 struct ConnectionRow {
     company_id: Uuid,
     id: Uuid,
+    unit_id: Uuid,
     origin: String,
     enabled: bool,
     bearer: bool,
@@ -69,6 +88,7 @@ impl ConnectionRow {
         Ok(HttpConnection {
             company: CompanyId::new(self.company_id),
             id: self.id,
+            unit_id: self.unit_id,
             origin: HttpOrigin::parse(&self.origin)?,
             enabled: self.enabled,
             credential_source: match self.integration {
@@ -103,7 +123,7 @@ pub(in crate::adapters::persistence) async fn connection_with_locks_on(
     id: Uuid,
     locks: super::row_locks::RowLocks,
 ) -> AppResult<Option<HttpConnection>> {
-    sqlx::query_as::<_, ConnectionRow>(&locks.sql("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection"))
+    sqlx::query_as::<_, ConnectionRow>(&locks.sql("SELECT connection.company_id, connection.id, connection.unit_id, connection.origin, connection.enabled, connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection"))
         .bind(company.as_uuid()).bind(id).fetch_optional(&mut *tx).await?.map(ConnectionRow::decode).transpose()
 }
 async fn edit_on(
@@ -113,15 +133,26 @@ async fn edit_on(
     id: Uuid,
     revision: i64,
 ) -> AppResult<HttpConnection> {
-    authority::authorize_company(tx, company, actor).await?;
-    lock_edit_on(tx, company, id, revision).await
+    lock_edit_on(tx, company, actor, id, revision)
+        .await
+        .map(|(_, connection)| connection)
 }
+/// Person locks, the connection row, then management of its unit (Plan07) before the revision
+/// check, so someone outside the unit learns nothing.
 async fn lock_edit_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
+    actor: WorkflowActor,
     id: Uuid,
     revision: i64,
-) -> AppResult<HttpConnection> {
+) -> AppResult<(crate::entities::access_level::LevelActor, HttpConnection)> {
+    let level = authority::authorize_person_with_locks(
+        tx,
+        company,
+        actor,
+        super::row_locks::RowLocks::Wait,
+    )
+    .await?;
     sqlx::query(
         "SELECT id FROM workflow_http_connections WHERE company_id=$1 AND id=$2 FOR UPDATE",
     )
@@ -131,10 +162,20 @@ async fn lock_edit_on(
     .await?
     .ok_or_else(missing)?;
     let connection = connection_on(tx, company, id).await?.ok_or_else(missing)?;
+    super::super::administration::management_role_on(
+        tx,
+        actor.user_id(),
+        company,
+        crate::application::ports::administration::ManagementTarget::Unit(
+            crate::entities::department::DepartmentId::new(connection.unit_id),
+        ),
+    )
+    .await?
+    .ok_or_else(missing)?;
     if connection.revision != revision {
         return Err(conflict());
     }
-    Ok(connection)
+    Ok((level, connection))
 }
 async fn revised(
     tx: &mut Transaction<'_, Postgres>,
@@ -153,9 +194,24 @@ impl HttpConnections for PostgresPersistence {
         actor: WorkflowActor,
     ) -> AppResult<Vec<HttpConnection>> {
         let mut tx = begin_http(self).await?;
-        authority::authorize_company(&mut tx, company, actor).await?;
-        let rows=sqlx::query_as::<_,ConnectionRow>("SELECT connection.company_id,connection.id,connection.origin,connection.enabled,connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration,connection.revision,connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 ORDER BY connection.id LIMIT 257")
-            .bind(company.as_uuid()).fetch_all(&mut *tx).await?;
+        authority::authorize_person_with_locks(
+            &mut tx,
+            company,
+            actor,
+            super::row_locks::RowLocks::Wait,
+        )
+        .await?;
+        super::super::administration::management_role_on(
+            &mut tx,
+            actor.user_id(),
+            company,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
+        )
+        .await?
+        .ok_or_else(missing)?;
+        // Only connections of units this person manages (Plan07).
+        let rows=sqlx::query_as::<_,ConnectionRow>("SELECT connection.company_id,connection.id,connection.unit_id,connection.origin,connection.enabled,connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration,connection.revision,connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND unit_management_role($2,$1,connection.unit_id) IS NOT NULL ORDER BY connection.id LIMIT 257")
+            .bind(company.as_uuid()).bind(actor.user_id()).fetch_all(&mut *tx).await?;
         if rows.len() > 256 {
             return Err(AppError::BadRequest(
                 "At most 256 HTTP connections are supported".into(),
@@ -172,22 +228,19 @@ impl HttpConnections for PostgresPersistence {
         &self,
         command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<HttpConnection> {
-        use crate::entities::access_level::{LevelTarget, may_assign_level};
+        use crate::entities::access_level::may_assign_connection_level;
         let mut tx = begin_http(self).await?;
-        let actor = authority::authorize_company(&mut tx, command.company, command.actor).await?;
-        let current = lock_edit_on(
+        let (actor, current) = lock_edit_on(
             &mut tx,
             command.company,
+            command.actor,
             command.connection,
             command.expected_revision,
         )
         .await?;
-        may_assign_level(
-            actor,
-            LevelTarget::Assignable(current.access_level),
-            command.access_level,
-        )
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        // The unit's manager sets it within their own level; above it is a 403 (Plan06 F10).
+        may_assign_connection_level(actor, current.access_level, command.access_level)
+            .map_err(|e| AppError::Forbidden(e.to_string()))?;
         sqlx::query("UPDATE workflow_http_connections SET access_level=$3::smallint,revision=revision+1 WHERE company_id=$1 AND id=$2")
             .bind(command.company.as_uuid()).bind(command.connection).bind(command.access_level.as_i16()).execute(&mut *tx).await?;
         let result = connection_on(&mut tx, command.company, command.connection)
@@ -201,10 +254,44 @@ impl HttpConnections for PostgresPersistence {
         &self,
         company: CompanyId,
         actor: WorkflowActor,
+        unit: Option<crate::entities::department::DepartmentId>,
         write: HttpConnectionWrite,
     ) -> AppResult<HttpConnection> {
+        use crate::application::ports::administration::ManagementTarget;
         let mut tx = begin_http(self).await?;
-        authority::authorize_company(&mut tx, company, actor).await?;
+        authority::authorize_person_with_locks(
+            &mut tx,
+            company,
+            actor,
+            super::row_locks::RowLocks::Wait,
+        )
+        .await?;
+        super::super::administration::management_role_on(
+            &mut tx,
+            actor.user_id(),
+            company,
+            ManagementTarget::AnyUnit,
+        )
+        .await?
+        .ok_or_else(missing)?;
+        let unit = match unit {
+            Some(unit) => unit,
+            None => sqlx::query_scalar::<_, Option<Uuid>>("SELECT resource_default_unit($1,$2)")
+                .bind(actor.user_id())
+                .bind(company.as_uuid())
+                .fetch_one(&mut *tx)
+                .await?
+                .map(crate::entities::department::DepartmentId::new)
+                .ok_or_else(|| AppError::BadRequest("Choose a unit for this resource.".into()))?,
+        };
+        super::super::administration::management_role_on(
+            &mut tx,
+            actor.user_id(),
+            company,
+            ManagementTarget::Unit(unit),
+        )
+        .await?
+        .ok_or_else(missing)?;
         let count: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM workflow_http_connections WHERE company_id=$1",
         )
@@ -215,12 +302,32 @@ impl HttpConnections for PostgresPersistence {
             return Err(invalid());
         }
         let id = Uuid::new_v4();
-        sqlx::query("INSERT INTO workflow_http_connections(company_id,id,origin,bearer) VALUES($1,$2,$3,$4)").bind(company.as_uuid()).bind(id).bind(write.origin.as_str()).bind(write.bearer).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO workflow_http_connections(company_id,id,origin,bearer,unit_id) VALUES($1,$2,$3,$4,$5)").bind(company.as_uuid()).bind(id).bind(write.origin.as_str()).bind(write.bearer).bind(unit.as_uuid()).execute(&mut *tx).await?;
         let connection = connection_on(&mut tx, company, id)
             .await?
             .ok_or_else(missing)?;
         tx.commit().await?;
         Ok(connection)
+    }
+    async fn move_http(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+        id: Uuid,
+        target: crate::entities::department::DepartmentId,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        let mut tx = begin_http(self).await?;
+        let moved = super::super::unit_resources::move_resource_on(
+            &mut tx,
+            actor,
+            company,
+            crate::application::ports::unit_resources::UnitResourceKind::HttpConnection,
+            id,
+            target,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(moved)
     }
     async fn set_http_enabled(
         &self,
@@ -417,10 +524,11 @@ impl PostgresPersistence {
         let company = request.scope.company;
         let id = http_target(&request.target)?;
         let mut tx = begin_http(self).await?;
-        authority::authorize_company(
+        super::resources::authorize_use_on(
             &mut tx,
             company,
             WorkflowActor::authenticated(request.context.actor)?,
+            id,
         )
         .await?;
         live_run_on(&mut tx, request).await?;

@@ -5,8 +5,17 @@ gives one of them the `lead` role, carries a charter, and may sit under a parent
 are what the code calls channels: an address where work arrives, with workflow bindings deciding
 who handles it. Departments nest; desks do not.
 
-Owners and admins manage departments on the company's **Departments** tab
-(`/ui/companies?company_id={company}&tab=departments`) or through the JSON API below. A plain member
+Every company has exactly one root department, created in the company's transaction. Company
+membership is membership of that root. Company access levels live on root member rows; admin
+status comes from the root `admin` role. The company owner remains `companies.user_id`, mirrored
+by the root's single `owner` role. The company remains the tenant boundary: the root is inside
+that boundary and cannot be deleted or re-parented.
+
+Departments are managed on the company's **Departments** tab
+(`/ui/companies?company_id={company}&tab=departments`) or through the JSON API below by the
+owner, a root admin, or a department lead, each within the part of the tree they manage: a lead
+looks after what is inside their department, while the department's own name, deletion and roles
+belong to whoever manages its parent (see [Administration](#administration)). A plain member
 sees, read-only, the departments they belong to or lead; a write from them is answered `404`, as
 for someone outside the company.
 
@@ -18,12 +27,12 @@ for someone outside the company.
 | `slug` | Unique in the company; the address its own desk is created at (`slug@{company}.{application-domain}`). Desk address rules apply. Editing it later does not move the desk. |
 | `description` | One line, optional. |
 | `charter` | What the department is for, at most 4096 bytes. Agents answering on its desks read it (see "Leads"). |
-| `parent_id` | The parent department, or none for a top-level one. Departments nest at most 8 levels; a change that would form a cycle is refused. |
+| `parent_id` | The parent department; only the root has none. Omitting it for a new department selects the root. Departments nest at most 8 levels; a change that would form a cycle is refused. |
 
 **Members** are principals: the company's people and agents. A principal may be in several
-departments. Membership grants nothing by itself; it is a fact the desk rules below read.
+departments. Membership materializes access to the owning department's desks according to the one-step rule below; root membership alone does not give membership of every child department.
 
-**Roles** are held by principals. There are three. `lead` has at most one holder: assigning a new
+**Roles** are held by principals. On ordinary departments, `lead` has at most one holder: assigning a new
 lead replaces the old one, and clearing it leaves none. An agent lead must be a company agent that
 can be published. `reviewer` may have several holders. `sponsor` may also have several people or
 agents, with one marked **decides** and the others informed. The first sponsor decides; assigning
@@ -31,7 +40,10 @@ another with `decider: true` moves that flag atomically. Removing a deciding spo
 remain requires an existing sponsor as successor (`department.sponsor_needs_decider`); removing the
 last is allowed. At most 16 sponsors may be assigned. A holder need not be a member. Workflows can
 name a role instead of a fixed person or agent (see [Roles](workflow-language-v1.md#roles)), and a
-desk's workflow binding can escalate to a role's holders (see "Escalation").
+desk's workflow binding can escalate to a role's holders (see "Escalation"). The root also has
+`owner` and `admin`: they cannot be placed on child departments. The owner mirror cannot be
+cleared or edited independently. The root's roles, and its people, are changed by the owner only;
+every other department follows [Administration](#administration).
 
 Deleting an agent, or removing a person from the company, clears every role they hold in the same
 transaction and records each cleared role as a department administration event. Nobody is
@@ -44,30 +56,40 @@ describes.
 
 ## Desks and ownership
 
-A desk can belong to one department (`department_id`). Ownership alone changes nobody's access:
-the desk keeps the access its own settings give it (the company team, its Participant Emails, or
-`@public`), whichever department owns it. Ownership is set
-on the desk's settings (the **Department** select) or with the desk JSON fields `department_id`
-(`null` detaches) and `members_only`; leaving both out of a PUT keeps them.
+Every desk belongs to one department (`department_id`), the root by default. The **Department**
+select is required. The JSON create API may omit the owner to select root; a PUT may omit it to
+preserve the current owner. Explicit `null`, a missing stored owner or an owner from another
+company is refused. Reassign a desk to another department instead of clearing its owner.
 
-### Members-only desks
+### Members and Public
 
-A desk marked **members only** must belong to a department. It is an allowlist desk whose
-grants are derived from the department, in the same transaction as every change that affects
-them:
+Every desk carries department-derived `participate` and `view` grants for:
 
-- the department's members and its role holders;
-- the holder of the parent department's `lead` role;
+- the department's members and all its role holders;
+- the holder of its parent department's `lead` role; and
 - the `lead` of each direct child department.
 
-Nothing further up or down is granted: one step of the hierarchy each way. The addresses in the
-desk's Participant Emails still have access as before, and the company owner keeps access as on
-every desk; a members-only desk cannot be open to `@public`. Everyone else in the company, and
-anyone outside it, is refused.
+Nothing further up or down is granted: one step of the hierarchy each way. Membership, role,
+tree and ownership changes update these grants in the same transaction, including on root and
+Public desks. Unchanged grants and explicit grants retain their identity and provenance.
 
-Messages that other desks in the company hand to a members-only desk are still admitted, bound by
-the usual hop budget and loop refusal (see `inter_channel_agent_communication.md`): the
-restriction is on people and outside senders, not on desk-to-desk relays.
+A **Members** desk admits this audience plus the named addresses under **Also allow these
+addresses**, with the company owner exempted. A root desk therefore admits root members; a
+child desk does not admit every company member. Adding addresses adds access and never narrows
+the department audience. A signed-in member keeps department grants when their email is
+unverified; additional email-based permissions require proof of their current address.
+
+**Open to anyone** selects **Public** intake (`@public` in the JSON email list). Anyone may send
+mail to it, while explicitly granted senders and current company members are trusted. Public
+intake does not grant outsiders UI reads: reading still requires current company membership.
+Members desks additionally require a view grant, with the company owner exempted.
+
+Internal relays obey the receiving Members desk's grants, including on root desks. The actual
+authenticated sending agent must hold a receiving `participate` grant through membership, a
+qualifying role or explicit permission. A desk's address alone is not agent proof. Tenant,
+source-identity, incarnation, hop-budget and loop checks remain enforced (see
+[internal communication](inter_channel_agent_communication.md)). This admission does not itself
+grant access to the desk's history.
 
 ### Agents' direct addresses
 
@@ -86,15 +108,15 @@ and role-derived desk grants apply to an authenticated agent's relay identity.
 
 Creating a department creates its desk at the department's slug, in the same transaction; a taken
 address refuses the creation. With an agent lead the desk is answered by that agent through the
-autonomous workflow; with a person lead, or none, it is a plain team desk.
+autonomous workflow; with a person lead, or none, it is a plain Members desk.
 
 Changing the lead re-points the department-owned binding on the desk to the new agent lead, or
-pauses it for a person lead or none; the binding then runs as the admin who changed the lead. A
+pauses it for a person lead or none; the binding then runs as the person who changed the lead. A
 plain desk that gets an agent lead is given the autonomous workflow, so it starts answering. A desk
 whose responder someone chose on its settings is left as they set it. The change is refused, and
-nothing moves, when the desk asks reviewers to approve replies, when the admin cannot see the desk,
+nothing moves, when the desk asks reviewers to approve replies, when that person cannot see the desk,
 or when its workflow uses resources, has edits the desk does not run, or has no agent reply step to
-hand over. Detach the desk, or fix its workflow, first.
+hand over. Reassign the desk, or fix its workflow, first.
 
 ## Leads
 
@@ -107,7 +129,8 @@ not listed. The context is frozen with the run's prepared request, so a retry se
 attempt saw.
 
 The Agent Builder's `list_company_agents` tool names each agent's departments, roles and direct
-address and can list one department (`department` slug); it stays an owner's or admin's tool. The
+address and can list one department (`department` slug). It answers whoever manages a department,
+for the agents and departments they manage. The
 plan's intake schema for a member's desk arrives with `channel.call`; the directory does not carry
 one yet.
 
@@ -187,37 +210,200 @@ needs to be able to see the run to act on it.
   now. Archived usage keeps no run and counts under "No department".
 - **`_help` replies and undeliverable-address bounces** list writable desks
   under their department headings, followed by **People and agents** with writable principal addresses.
-- **JSON**: desk responses carry `department_id` and `members_only`; agent responses carry
+- **JSON**: desk responses carry required `department_id` and `access_mode` (`members` or `public`); agent responses carry
   `departments` (`id`, `name`, `slug`, `roles`) and `more_departments`.
 
-Owners and admins see every department in these filters and headings. A plain member sees the
-departments they belong to or lead and the department of each desk they can read, so the
-department of a desk in front of them is always named; any other department is not found as a
-filter.
+Owners and admins see every department in these filters and headings. Anyone else sees the
+departments they belong to or lead, every department they manage, and the department of each desk
+they can read, so the department of a desk in front of them is always named; any other department
+is not found as a filter.
+
+## Memory and knowledge
+
+Each department, including the root, owns a memory namespace. Each company person and agent
+owns a principal namespace. These identities follow their owners through renames and department
+moves; deleting an owner retires its namespace through the memory lifecycle worker. Desks and
+roles own no namespace, and an external correspondent gets none. Changing a lead moves no facts.
+Memory must be enabled in company Settings before the service can be used.
+
+A run captures its readable units when admitted, separately for each acting agent. It reads the
+desk's department and its ancestors to the root. An agent holding a department's `lead` role also
+reads that department's direct children; the entitlement follows that agent, even on another desk.
+It grants no grandchildren or sibling units. Memory adds the agent's personal namespace; knowledge
+has no personal namespace. A person’s personal memory requires their actual authenticated own
+session. [Agent authoring](agent-authoring.md#memory-and-knowledge-scopes) describes the selectors
+and deskless runs.
+
+The default memory write goes to the local unit, or to personal memory when no local unit is
+resolved. A personal save selects the acting principal's namespace. A run cannot write an ancestor
+or another readable report unit merely because it can read it. Read levels and consumed-watermark
+rules remain independent: belonging to a department never raises a reader's level.
+
+The captured placement survives retries, children, renames and later tree or lead changes; later
+admissions use the new topology. Current account, tenant, incarnation, audience, credential,
+source and lease checks still apply. A deleted knowledge owner can stop a cached continuation;
+retaining a historical result does not authorize sending it to another model request.
+
+### The knowledge library
+
+Documents belong to a department, with every access-level layer of the same file in that unit.
+The library at `/ui/knowledge?company_id={company}` groups them by department, root first. Its
+filter selects a department; a department's Knowledge card links to that filtered library.
+Only layers within the viewer's current level are shown.
+
+Manual library reads and search use the person's current memberships and roles, their ancestor
+units, and every unit they manage (the departments they lead and everything below them). Owners
+and admins can read every unit, still within their own level. A run's knowledge search uses its captured agent unit set instead.
+Both unit and level filtering happen before search ranking. A resolved knowledge read set is
+bounded to 256 units; exceeding it makes that knowledge scope unavailable rather than searching
+a partial set. The department's separately authorized roster and desks remain available.
+
+Choose a department when uploading. Upload authority requires membership or a role in that unit,
+managing it (the `lead` role there or in any ancestor), or company owner/admin authority, and each
+file's level must fit the uploader's level. Moving and deleting follow the same unit authority. Level-prefixed names such as `3_handbook.md` keep their existing meaning.
+The native form supplies its selected department. A multipart API upload must put the required
+`unit_id` field before the file fields; omitting it does not implicitly select the root.
+
+**Move to** changes ownership of the whole file, with all level layers and chunks together.
+The mover needs current write authority in the source and destination and authority for the
+whole file. The destination picker pages through larger writable-unit lists. A stale revision
+or refused move leaves the file unchanged. Moving a document to a common ancestor makes it
+available to future eligible readers in both branches; there is no separate sideways grant.
+Existing consumption proofs keep the unit recorded when the content was read.
+
+The knowledge JSON routes are under `/api/companies/{company_id}/knowledge`:
+
+| Method and path | Input |
+| --- | --- |
+| `GET /documents` | Optional `unit_id` filter. |
+| `POST /documents` | Multipart: first `unit_id`, then file fields. |
+| `POST /search` | JSON `query`, optional `unit_id` and `exact_terms`. |
+| `POST /documents/{document_id}/move` | JSON `expected_revision` and `target_unit_id`. |
+| `DELETE /documents/{document_id}` | JSON `expected_revision`. |
+
+These routes recheck current company, unit and level authority. A filtered search refuses an
+unreadable unit before embedding and checks authority again when reading the results.
+
+## Administration
+
+A person **manages** a department when they are the company owner, hold `admin` on the root, or
+hold `lead` on that department or any of its ancestors. Managing a department includes everything
+below it. An agent holding `lead` coordinates work but administers nothing: configuration is done
+by people. Managing a department grants no conversation access: a manager reads a members-only
+desk only through its own desk grants.
+
+| What | Who may change it |
+| --- | --- |
+| A department's name, slug, description, charter, deletion | Whoever manages its parent. The root's name, description and charter: the owner, a root admin or a root lead; its slug and parent never change and it cannot be deleted. |
+| Moving a department | Whoever manages both its current and its new parent. |
+| A child department | Whoever manages the department it is created under. |
+| Members of a department | Whoever manages the department. Removing a person from the root removes them from the company and is the owner's; removing an agent from the root takes the owner or a root admin. |
+| Roles (`lead`, `reviewer`) | Whoever manages the department's parent. The root's roles are the owner's. |
+| A desk, its settings, bindings and schedules | Whoever manages the desk's department (both departments when moving it). |
+| An agent: authoring, publication, tools, skills, deletion | Whoever manages any department the agent belongs to; an agent in none is the root's. |
+| A workflow definition | Whoever manages a department of one of its active bindings; an unbound definition, its creating department (chosen at creation, the root by default). |
+| Knowledge documents | See "The knowledge library". |
+| Skills, MCP and HTTP connections, model connections and spend caps of a department | Whoever manages that department; the root's belong to the owner, root admins and root leads. Moving one takes managing both departments. See [Resources](#resources). |
+| The company itself (edit, delete) and onboarding | The owner. |
+| Team access levels, invitations, connections, memory, local agents, runs, deliveries and the dashboard | Company administration: the owner and root admins, as described on those pages. A person who leads the root manages every department but is not a company administrator. |
+
+Root admins may invite people as members; an invitation carrying the admin role, or addressed to
+a current admin, is the owner's. Lists and pickers show what the viewer manages: desks a manager
+can only read appear read-only and link to the conversation. A refusal of anything the viewer does
+not manage is `404`, as for a stranger; a refusal inside their authority (an access level above
+their own, an admin-role invitation) is `403` with a reason.
+
+Each department's **Recent administration** card, shown to its managers, lists its last ten
+events: who created, edited or moved it, added or removed members, and assigned or cleared roles,
+each with the role that allowed it (`owner`, `admin` or the lead of a department), beside the
+system's own removals of role holders who lost their standing. The history is append-only and is
+written in the same transaction as the change it records; a deletion is recorded too, though a
+deleted department has no card to show it. Desk email
+bindings, workflow bindings and workflow definitions record the acting role on their own audit
+rows the same way.
+
+## Resources
+
+Skills, MCP connections, HTTP connections and model connections each belong to one department,
+the root unless chosen otherwise. A new one goes to the department named when it is created; with
+none named it goes to the root for a root manager, or to the one department its creator leads (a
+creator leading several must choose). Library skills and agents have no department.
+
+A resource is usable at its department and everything below it; a sibling never shares it, and
+sharing means moving it up:
+
+- **Agents.** An agent's tools, skills and model must belong to one of its departments or an
+  ancestor (the root when it is in none). This is checked when the agent is published and when a
+  run that uses it is admitted; a native session also checks its tools and skills whenever it
+  selects its bundle. Moving a resource out of reach refuses the next publication or run
+  (`publication.resource_outside_unit`, `admission.resource_outside_unit`) until it moves back up
+  or the agent is placed below it; published revisions are not rewritten. Editing an agent offers
+  only the tools, skills and models it can reach; the new-agent form lists every model connection
+  with its department and refuses one out of reach when submitted.
+- **Workflows.** A connection a workflow selects must be in reach of its managing department when
+  it is published, and a binding's connections in reach of its desk's department when it is saved
+  (`binding.resource_outside_unit`) and when each run is admitted. An unslotted HTTP operation
+  resolves only among the connections the run's desk reaches, so another department's identical
+  operation neither substitutes nor makes it ambiguous. Any run whose desk reaches a connection may
+  use it, provided the person it runs as is still a company member.
+- **Models.** Each provider is configured once per company, by the department that owns it. A
+  department may mark one of its own model connections as its default; an agent created without a
+  model pins the nearest default from its department up to the root (the root's for an agent in
+  no department). Changing a default affects later creations only. The company keeps at least one
+  model connection once it has one, and the root exactly one default while it has any; the company
+  settings page edits the root's model connections and a department's page edits its own.
+
+Moving a resource takes managing both departments and lists the agents and bindings that use it.
+Skills, MCP connections and HTTP connections have a move form on their pages; every kind moves
+with `POST /api/companies/{company_id}/{skills|mcp-connections|http-connections|model-connections}/{id}/move`
+and `{"unit_id": …}`. A moved model connection
+stops being a default, unless the root had none, and the root's default cannot move away while the
+root keeps another connection.
+
+### Spend caps
+
+A department may cap its model spend per UTC day and per UTC month. Each settled model call adds
+its priced cost (the price configured when it settled) to the department its run was admitted
+under and to every department above it, so a cap bounds the department's whole subtree.
+Models with no price count zero and are shown as unpriced tokens. Once counted spend reaches a cap,
+a new run on that department or below is refused with `budget.unit_exhausted`, naming the nearest
+exhausted department; runs already started finish and may go past it. A cap is set by whoever
+manages that department, on its page or with `PUT` / `DELETE
+/api/companies/{company_id}/departments/{department_id}/budgets/{day|month}` (`{"cap_micros": …}`,
+micro-USD). Deleting a department deletes its caps and keeps what it counted in the departments
+above it.
+
+The usage page groups spend by the department each call was attributed to and drills down to its
+desks; a department's manager sees the departments they manage, root managers all of them, and
+only root managers change prices. Its "Spend counted toward caps" section and the dashboard's
+"Spend by department" panel show each cap, the counted spend and what remains.
 
 ## Delete
 
-A department is deleted only when it owns no desks and has no child departments: detach or delete
-its desk (including its own desk) and move or delete its children first. Its members and role
-rows go with it.
+The root cannot be deleted. A child department is deleted only when it owns no desks, knowledge
+documents, skills or connections, and has no child departments. Reassign or delete its desks,
+move or delete its documents and resources, and move or delete its children first. The refusal
+says it still owns desks, or names the skills and connections it still owns; one for knowledge
+documents says only that the department is still referenced. Its members and role rows go with it; its memory namespace
+is retired through the durable lifecycle worker.
 
 ## JSON API
 
-All under `/api/companies/{company_id}`. Writes are for owners and admins; reads are open to a
-plain member for the departments they belong to or lead. Anything else is answered `404`, as for
-someone outside the company.
+All under `/api/companies/{company_id}`. Writes follow [Administration](#administration); reads
+cover the departments the caller belongs to, leads or manages. Anything else is answered `404`, as
+for someone outside the company.
 
 | Method and path | Does |
 | --- | --- |
 | `GET /departments` | Lists the departments the caller can see. |
 | `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id), `escalation` (role/hops or null). |
 | `GET /departments/{department_id}` | One department with its `members` and `roles`. |
-| `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for `parent_id` makes it top level. |
+| `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for a child's `parent_id` selects the root. The root cannot be re-parented. |
 | `DELETE /departments/{department_id}` | Deletes it (see "Delete"). |
 | `PUT` / `DELETE /departments/{department_id}/members/{principal_id}` | Adds or removes a member. |
 | `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role. PUT requires JSON `{ "decider": false }` (`true` selects a sponsor decider); DELETE accepts `?successor={principal_id}` for sponsor handover. Reads include `decider` for every role holder. |
 
-Refusals: `409 Conflict` for a taken slug or a department that still owns desks or has children;
+Refusals: `409 Conflict` for a taken slug or a department that still owns desks, knowledge documents, skills or connections, or has children;
 `400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither
 a person nor an agent; `404 Not Found` for a principal or parent department that is not the
 company's.

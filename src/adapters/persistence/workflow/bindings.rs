@@ -28,7 +28,12 @@ impl BindingLifecycle for PostgresPersistence {
     }
 
     async fn save_binding(&self, command: PreparedBinding) -> AppResult<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = management::begin(
+            self,
+            command.state().configuration.company_id(),
+            command.actor(),
+        )
+        .await?;
         save_binding_on(&mut tx, &command).await?;
         tx.commit().await?;
         Ok(())
@@ -45,8 +50,7 @@ pub(super) async fn save_binding_on(
     let state = command.state();
     let configuration = &state.configuration;
     let company = configuration.company_id();
-    authority::authorize_company(tx, company, command.actor()).await?;
-    association::authorize_association(tx, company, command.actor(), state.association).await?;
+    management::authorize_association_on(tx, company, command.actor(), state.association).await?;
     if let Some(AddressTarget::Principal(principal)) = state.association.target() {
         let agent: bool =
             sqlx::query_scalar("SELECT kind='agent' FROM principals WHERE company_id=$1 AND id=$2")
@@ -68,7 +72,16 @@ pub(super) async fn save_binding_on(
     }
     if !matches!(change, Change::Deactivate) {
         verify_selection(tx, configuration).await?;
-        resources::check_readiness(tx, configuration.as_ref().into()).await?;
+        let reach = resources::association_reach_on(tx, company, state.association).await?;
+        resources::check_readiness(
+            tx,
+            resources::ReadinessSelection::of(
+                configuration.as_ref(),
+                reach,
+                crate::app_error::UnitCheckStage::Binding,
+            ),
+        )
+        .await?;
         check_run_as(tx, command, current.as_ref()).await?;
         if state.active && configuration.message_trigger().is_some() {
             check_message_binding_cap(tx, command).await?;
@@ -81,9 +94,12 @@ pub(super) async fn save_binding_on(
     if matches!(change, Change::Configuration) {
         insert_configuration(tx, command).await?;
     }
-    sqlx::query("INSERT INTO workflow_binding_events (company_id, binding_id, state_revision, configuration_revision, event_kind, actor_id) VALUES ($1, $2, $3, $4, $5, $6)")
+    let acting =
+        management::association_role_on(tx, company, command.actor(), state.association).await?;
+    sqlx::query("INSERT INTO workflow_binding_events (company_id, binding_id, state_revision, configuration_revision, event_kind, actor_id, acting_role) VALUES ($1, $2, $3, $4, $5, $6, $7)")
         .bind(company.as_uuid()).bind(configuration.id().as_uuid()).bind(revision(state.revision.get())?)
         .bind(revision(configuration.revision().get())?).bind(change.event()).bind(command.actor().user_id())
+        .bind(acting.map(|role| role.to_string()))
         .execute(&mut **tx).await.map_err(write_error)?;
     Ok(())
 }
@@ -204,15 +220,12 @@ async fn check_run_as(
     let company = state.configuration.company_id();
     let run_as = state.configuration.run_as();
     let refused = |error: AppError| match error {
-        AppError::NotFound(_) => AppError::BadRequest(
-            "The binding's run-as must be a current owner or admin who can see its channel".into(),
-        ),
+        AppError::NotFound(_) => {
+            AppError::BadRequest("The binding's run-as must currently manage its unit".into())
+        }
         other => other,
     };
-    authority::authorize_company(tx, company, run_as)
-        .await
-        .map_err(refused)?;
-    association::authorize_association(&mut *tx, company, run_as, state.association)
+    management::authorize_association_on(&mut *tx, company, run_as, state.association)
         .await
         .map_err(refused)?;
     let chosen = current.is_none_or(|previous| previous.configuration.run_as() != run_as);

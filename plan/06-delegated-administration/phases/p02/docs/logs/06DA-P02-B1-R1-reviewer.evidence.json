@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "round": "06DA-P02-B1-R1",
+  "artifact": "6248bc8cd74f200a4e11f9ba2d00fd37eee979cfc341cb09f363d7e05814897d",
+  "checks": [
+    {
+      "criteria": ["02A.1", "02A.2", "02A.3", "02A.4", "U3", "U4", "U5", "U6", "U7", "F9", "F10", "decision-b UI"],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_admin_ authorization_tests ui_team company::tests onboarding skill_library::http_bundle local_machines pairing_tests company_invite_level department_ui team_level ui_departments bindings_tests manages_unit_ desk_wording knowledge_tests workflow_conversation binding_association (reviewer independent run)",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05 (fresh schema; tests create own databases); SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [{"path": "logs/06DA-P02-B1-R1-reviewer-focused-r2.txt", "sha256": "5bef0e592002295cc8387ba3774f9747e4608d435a7ca7946386669b84108a33"}]
+    },
+    {
+      "criteria": ["reviewer-void-run"],
+      "command": "same filters passed as one unsplit zsh word; matched 0 tests (retained, not evidence)",
+      "fixture": "same",
+      "status": "NOT EXERCISED",
+      "reason": "filter variable was not word-split by zsh; superseded by -focused-r2"
+    }
+  ]
+}

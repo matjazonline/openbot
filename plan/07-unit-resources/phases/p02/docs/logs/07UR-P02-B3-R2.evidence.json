@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "round": "07UR-P02-B3-R2",
+  "artifact": "b83aca1623541a7b51632b52cfcc6fb192cf438aaf56534a80816897ad4a4bd8",
+  "checks": [
+    {
+      "criteria": [
+        "B3-F1",
+        "B3-F2 (sub-unit visibility)",
+        "02C"
+      ],
+      "command": "cargo test --locked --offline --lib -- unit_budget department model_usage usage ui_departments",
+      "fixture": "PG18 @127.0.0.1:55407, DATABASE_URL openbot_p07_p02b2 (+ _test and per-test own databases), Node 24 first on PATH",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-focused.txt",
+          "sha256": "13b671bdb472fb16d6c899eb4b37bf0977906001597efcb9f04b49240569ae5a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "worktree build",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-clippy.txt",
+          "sha256": "3a0943fd2a7e3c5ff559e2a1adb9f3242977ebe4ef5e5207be24bf75f7651b72"
+        }
+      ]
+    }
+  ]
+}

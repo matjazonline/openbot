@@ -1,0 +1,19 @@
+--- B1/src/adapters/persistence/dashboard_tests.rs
++++ B2/src/adapters/persistence/dashboard_tests.rs
+@@ -14,7 +14,6 @@
+     delivery::enqueue::insert_delivery_on,
+     test_support::{DeliveryFixtureRequest, delivery_fixture, test_pool},
+ };
+-use crate::application::ports::channel::ChannelPersistence;
+ use crate::application::ports::channel::ChannelWrite;
+ use crate::application::ports::thread::ThreadPersistence;
+ use crate::services::dashboard_snapshot::DashboardSnapshotService;
+@@ -56,7 +55,7 @@
+     )
+     .await
+     .expect("the fixture company is created");
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         persistence,
+         company.id,
+         ChannelWrite {

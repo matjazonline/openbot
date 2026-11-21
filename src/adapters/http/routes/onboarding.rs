@@ -384,6 +384,7 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: CompanyMembership::Owner,
+            administers_units: CompanyMembership::Owner.administers_company(),
         };
         let channel = Channel {
             enabled: true,
@@ -395,13 +396,12 @@ mod tests {
             slug: "customer-support".into(),
             alias_slugs: Vec::new(),
             participant_emails: None,
-            access_mode: crate::entities::channel::ChannelAccessMode::Team,
+            access_mode: crate::entities::channel::ChannelAccessMode::Members,
             principal_grants: Vec::new(),
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
-            department_id: None,
-            members_only: false,
+            department_id: crate::entities::department::DepartmentId::random(),
         };
 
         let company_page = pages::onboarding_company_page(&user, "example.com", None);

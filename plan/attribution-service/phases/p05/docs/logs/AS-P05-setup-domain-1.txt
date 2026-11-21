@@ -1,0 +1,11 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 0.97s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 3 tests
+test adapters::setup::tests::attribution_destination_special_ranges_and_public_addresses ... ok
+test adapters::setup::tests::attribution_credentials_tenant_admission_is_bounded_and_releases ... ok
+test adapters::setup::tests::attribution_destination_dns_transport_all_addresses_and_timeout ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 66 filtered out; finished in 4.01s
+

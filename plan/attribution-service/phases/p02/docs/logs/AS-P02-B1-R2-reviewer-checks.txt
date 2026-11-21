@@ -1,0 +1,88 @@
+COMMAND: git branch --show-current
+EXIT: 0
+attribution-service
+
+
+COMMAND: git rev-parse HEAD
+EXIT: 0
+2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+
+
+COMMAND: git diff --check
+EXIT: 0
+
+
+COMMAND: cmp plan/attribution-service/COORDINATION.md plan/attribution-service/phases/p02/docs/logs/AS-P02-B1-R2.coordination.md
+EXIT: 0
+
+
+COMMAND: python3 .agents/skills/implement-astra-reviewed-2-3/scripts/check-evidence.py plan/attribution-service/phases/p02/docs/logs/AS-P02-B1-R2.evidence.json --expect-artifact f4421ac9eb35f50acf92d710948bf4e3ca777104821000a4c0e296d1ac53c10d
+EXIT: 0
+plan/attribution-service/phases/p02/docs/logs/AS-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 8}
+1 evidence manifest(s) validated; declared results are not acceptance
+
+
+COMMAND: bash /Users/mac02/orca/workspaces/openbot/attribution-service/.agents/skills/implement-astra-reviewed-2-3/scripts/snapshot.sh plan/attribution-service/phases/p01/docs plan/attribution-service/phases/p02/docs plan/attribution-service/COORDINATION.md
+EXIT: 0
+base:   2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+digest: f4421ac9eb35f50acf92d710948bf4e3ca777104821000a4c0e296d1ac53c10d
+files:
+  .github/workflows/attribution-service.yml
+  docs/contracts/attribution-identity.openapi.json
+  plan/attribution-service/01-application-boundaries-and-contracts.md
+  plan/attribution-service/03-single-sign-on-and-company-access.md
+  plan/attribution-service/04-merchant-setup-and-api-credentials.md
+  plan/attribution-service/06-website-tracking-and-checkout-handoff.md
+  plan/attribution-service/07-orders-refunds-and-attribution.md
+  plan/attribution-service/09-operations-retention-and-separate-deployment.md
+  plan/attribution-service/10-integration-verification-and-pilot.md
+  services/attribution/.cargo/config.toml
+  services/attribution/.dockerignore
+  services/attribution/.gitignore
+  services/attribution/.sqlx/query-543e26842177f26513bf38fd1ded9443e88a179f5a9904460ec11f2e65f8a475.json
+  services/attribution/AGENTS.md
+  services/attribution/Cargo.lock
+  services/attribution/Cargo.toml
+  services/attribution/Dockerfile
+  services/attribution/README.md
+  services/attribution/assets/app.css
+  services/attribution/config.env.example
+  services/attribution/contract/README.md
+  services/attribution/contract/attribution.openapi.json
+  services/attribution/contract/examples/analytics.json
+  services/attribution/contract/examples/authority-cases.json
+  services/attribution/contract/examples/checkout.json
+  services/attribution/contract/examples/credential-replay.json
+  services/attribution/contract/examples/ledger.json
+  services/attribution/contract/examples/lifecycle.json
+  services/attribution/contract/examples/observation.json
+  services/attribution/contract/examples/paid.json
+  services/attribution/contract/examples/refund.json
+  services/attribution/contract/examples/token-request.json
+  services/attribution/contract/openbot-identity.openapi.json
+  services/attribution/contract/requirements.lock
+  services/attribution/contract/test_contracts.py
+  services/attribution/migrations/202611150001_foundation.sql
+  services/attribution/rust-toolchain.toml
+  services/attribution/scripts/boundary.py
+  services/attribution/scripts/check-contracts.sh
+  services/attribution/scripts/container-smoke.py
+  services/attribution/scripts/extracted-build.py
+  services/attribution/scripts/fixture.py
+  services/attribution/scripts/test_boundary.py
+  services/attribution/scripts/verify.py
+  services/attribution/scripts/verify.sh
+  services/attribution/src/adapters/http.rs
+  services/attribution/src/adapters/http_tests.rs
+  services/attribution/src/adapters/mod.rs
+  services/attribution/src/adapters/postgres.rs
+  services/attribution/src/adapters/postgres_tests.rs
+  services/attribution/src/infra/config.rs
+  services/attribution/src/infra/connection.rs
+  services/attribution/src/infra/connection_tests.rs
+  services/attribution/src/infra/mod.rs
+  services/attribution/src/infra/startup.rs
+  services/attribution/src/lib.rs
+  services/attribution/src/main.rs
+  services/attribution/src/test_support.rs
+

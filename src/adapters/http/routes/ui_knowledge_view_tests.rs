@@ -33,11 +33,16 @@ async fn member(h: &Harness, level: AccessLevel) -> Viewer {
         .execute(h.persistence.pool())
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',$4)")
-        .bind(Uuid::new_v4()).bind(h.company_id).bind(user.id).bind(level.as_i16()).execute(h.persistence.pool()).await.unwrap();
-    let principal = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'Reader')")
-        .bind(principal).bind(h.company_id).bind(user.id).execute(h.persistence.pool()).await.unwrap();
+    let principal = crate::adapters::persistence::test_support::insert_root_member(
+        h.persistence.pool(),
+        crate::domain::workflow::CompanyId::new(h.company_id),
+        user.id,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::try_from(level.as_i16()).unwrap(),
+    )
+    .await
+    .as_uuid();
+
     sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) VALUES($1,$2,$3,'view','configured_allowlist')")
         .bind(h.company_id).bind(h.channel_id).bind(principal).execute(h.persistence.pool()).await.unwrap();
     Viewer {
@@ -144,12 +149,14 @@ async fn knowledge_view_equal_level_and_owner_get_full_message_and_fresh_demotio
         assert_eq!(messages[0].body, BODY);
         assert_eq!(messages[0].attachments[0].filename, FILENAME);
     }
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(h.company_id)
-        .bind(viewer.user_id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(h.company_id)
+    .bind(viewer.user_id)
+    .execute(h.persistence.pool())
+    .await
+    .unwrap();
     assert!(history(&h, &viewer, thread).await[0].restricted);
     let foreign = Harness::new().await.expect("foreign fixture");
     assert!(matches!(
@@ -220,12 +227,14 @@ async fn knowledge_view_live_stream_rechecks_level_after_demotion() {
     .unwrap();
     let mut frames = Frames::of(response.into_response());
     assert!(frames.next_named("message").await.data.contains(BODY));
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(h.company_id)
-        .bind(viewer.user_id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(h.company_id)
+    .bind(viewer.user_id)
+    .execute(h.persistence.pool())
+    .await
+    .unwrap();
     let next = classified(&h, thread).await;
     h.events
         .publish(MailboxEvent::MessageCommitted(ThreadScope {
@@ -279,12 +288,14 @@ impl crate::adapters::storage::FileStorage for RevokeDuringStorageRead {
     ) -> AppResult<crate::adapters::storage::StoredObject> {
         self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         // The initial permission check passed, but authority changes while external I/O runs.
-        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-            .bind(self.company_id)
-            .bind(self.user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|error| AppError::Database(error.to_string()))?;
+        sqlx::query(
+            "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+        )
+        .bind(self.company_id)
+        .bind(self.user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|error| AppError::Database(error.to_string()))?;
         Ok(crate::adapters::storage::StoredObject {
             content_type: "application/pdf".into(),
             bytes: b"private-file-canary".to_vec(),

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B3-R1-reviewer",
+  "artifact": "831c4502e070a2fa76966cc2ccdec073f50f34dea936055963fcfb1ab1566d6a",
+  "checks": [
+    {
+      "criteria": [
+        "B3-DEFINITIONS",
+        "B3-AGENTS",
+        "B3-CONCURRENCY",
+        "B3-BUILDER",
+        "B3-SCHEMA"
+      ],
+      "command": "SQLX_OFFLINE=true TEST_DATABASE_URL=postgres://mac02@127.0.0.1:55406/openbot_p06_b3_v2 scripts/test-network-isolation.sh cargo test --locked --offline --lib -- delegated_admin_definition_ manages_unit_definition_ delegated_admin_competing_ delegated_admin_agent_ delegated_admin_builder_",
+      "fixture": "Owned PostgreSQL18 port55406 / openbot_p06_b3_v2; isolated child databases; reviewer execution",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/06DA-P01-B3-R1-reviewer-focused.txt",
+          "sha256": "d25c29d1ccfcc1553acaf3d264309cd695b6ff436accbed833a48e6cd5499428"
+        }
+      ]
+    }
+  ]
+}

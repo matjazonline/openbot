@@ -1,0 +1,38 @@
+✖ form feedback and another member’s team autocomplete stay text under production CSP (1682.729667ms)
+ℹ desk-classic-create: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-classic-edit: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-modern-create: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+ℹ desk-modern-edit: native controls, Public preservation/off/reset, owner, spam interlock and both-theme computed styles passed
+✔ served team autocomplete renders account strings as text and keeps selection working (450.685708ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1952.089917
+
+✖ failing tests:
+
+test at scripts/tests/html-injection-browser.mjs:104:1
+✖ form feedback and another member’s team autocomplete stay text under production CSP (1682.729667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   '/assets/htmx-ext-sse-2.2.3.js',
+  +   '/assets/htmx-ext-sse-2.2.3.js'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///Users/mac02/orca/workspaces/openbot/plan03-04/scripts/tests/html-injection-browser.mjs:220:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '/assets/htmx-ext-sse-2.2.3.js', '/assets/htmx-ext-sse-2.2.3.js' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

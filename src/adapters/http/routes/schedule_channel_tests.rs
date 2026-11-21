@@ -3,7 +3,6 @@ use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::own_database;
 use crate::adapters::persistence::workflow::schedule_test_support::schedulable_binding;
 use crate::adapters::persistence::workflow::schedule_test_support::schedule_use_cases;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::domain::workflow::CompanyId;
 use crate::use_cases::company::CompanyPersistence;
@@ -133,7 +132,7 @@ async fn nested_schedule_routes_refuse_another_channels_or_companys_schedule() {
     .await
     .unwrap()
     .id;
-    let other_channel = ChannelPersistence::create(
+    let other_channel = crate::adapters::persistence::test_support::create_channel(
         persistence.as_ref(),
         other_company,
         ChannelWrite {
@@ -314,7 +313,7 @@ async fn fixture(persistence: Arc<PostgresPersistence>) -> Fixture {
     let mut channels = Vec::new();
     for slug in ["first", "selected"] {
         channels.push(
-            ChannelPersistence::create(
+            crate::adapters::persistence::test_support::create_channel(
                 persistence.as_ref(),
                 company,
                 ChannelWrite {

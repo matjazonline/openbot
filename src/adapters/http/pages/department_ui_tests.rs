@@ -15,6 +15,7 @@ use crate::use_cases::department::{DepartmentDetail, DepartmentView};
 
 fn department(company_id: Uuid, name: &str, slug: &str, parent: Option<&Department>) -> Department {
     Department {
+        is_root: false,
         escalation: None,
         id: DepartmentId::new(Uuid::new_v4()),
         company_id,
@@ -72,6 +73,20 @@ impl Tree {
     }
 }
 
+/// An owner manages every listed department and their parents; a member manages none.
+fn managed_when(
+    editable: bool,
+    departments: &[Department],
+) -> std::collections::HashSet<DepartmentId> {
+    if !editable {
+        return Default::default();
+    }
+    departments
+        .iter()
+        .flat_map(|department| std::iter::once(department.id).chain(department.parent_id))
+        .collect()
+}
+
 fn section<'a>(
     tree: &'a Tree,
     departments: &'a [Department],
@@ -80,6 +95,7 @@ fn section<'a>(
     editable: bool,
     error: Option<(DepartmentForm, &'a str)>,
 ) -> String {
+    let managed = managed_when(editable, departments);
     company_departments_section(&DepartmentSection {
         company: &tree.company,
         app_domain_name: "example.com",
@@ -87,9 +103,18 @@ fn section<'a>(
         detail,
         choices,
         choices_cut: false,
-        editable,
+        membership: if editable {
+            crate::entities::company_member::CompanyMembership::Owner
+        } else {
+            crate::entities::company_member::CompanyMembership::Member
+        },
+        managed: &managed,
+        history: &[],
         error,
         notice: None,
+        knowledge: DepartmentKnowledge::Documents(&[]),
+        models: None,
+        budgets: None,
     })
 }
 
@@ -131,6 +156,8 @@ fn department_ui_pane_indents_the_tree_and_shows_the_selected_department() {
     };
     let view = DepartmentView {
         detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
             department: Department {
                 escalation: None,
                 charter: Some("Win and <keep> customers.".into()),
@@ -242,6 +269,8 @@ fn department_ui_member_sees_their_departments_without_forms() {
     let mine = vec![tree.inside.clone()];
     let view = DepartmentView {
         detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
             department: tree.inside.clone(),
             members: Vec::new(),
             roles: Vec::new(),
@@ -342,15 +371,22 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
         detail: DepartmentDetailPane::Create(&draft),
         choices: &choices,
         choices_cut: true,
-        editable: true,
+        membership: crate::entities::company_member::CompanyMembership::Owner,
+        managed: &managed_when(true, &all),
+        history: &[],
         error: None,
         notice: None,
+        knowledge: DepartmentKnowledge::Documents(&[]),
+        models: None,
+        budgets: None,
     });
     assert!(cut.contains("Only the first 500 people and agents are listed."));
 
     // A refused lead change shows on the lead card, not on the edit form.
     let view = DepartmentView {
         detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
             department: tree.sales.clone(),
             members: Vec::new(),
             roles: Vec::new(),
@@ -431,10 +467,16 @@ fn department_ui_company_pane_has_a_departments_tab_and_count() {
 }
 
 #[test]
-fn department_ui_desk_form_offers_the_department_and_members_only() {
+fn access_mode_ui_desk_form_requires_owner_defaults_root_and_offers_public() {
     let tree = tree();
-    let all = tree.all();
-    let channel = mailbox_channel(tree.company.id);
+    let mut root = tree.sales.clone();
+    root.id = crate::entities::department::DepartmentId::random();
+    root.parent_id = None;
+    root.is_root = true;
+    root.name = "Company root".into();
+    let mut sales = tree.sales.clone();
+    sales.parent_id = Some(root.id);
+    let all = vec![root.clone(), sales.clone()];
     let plain = channel_create_pane(&ChannelCreatePane {
         company: &tree.company,
         app_domain_name: "example.com",
@@ -443,20 +485,18 @@ fn department_ui_desk_form_offers_the_department_and_members_only() {
         error: None,
         departments: &all,
     });
-    assert!(plain.contains(
-        r#"<select name="department_id" class="select w-full" data-input="desk-members-only">"#
-    ));
-    assert!(plain.contains(r#"<option value="">No department</option>"#));
-    // Without a department the members-only box is hidden and unticked.
-    assert!(plain.contains(r#"class="desk-members-only form-control w-full hidden""#));
-    assert!(!plain.contains(
-        r#"name="members_only" value="true" class="checkbox checkbox-sm mt-0.5" checked"#
-    ));
-
+    assert!(plain.contains(r#"<select name="department_id" required class="select w-full">"#));
+    assert!(plain.contains(&format!(
+        r#"<option value="{}" selected>Company root</option>"#,
+        root.id
+    )));
+    assert!(!plain.contains("No department"));
+    assert!(!plain.contains("members_only"));
+    assert!(plain.contains("Open to anyone"));
+    assert!(plain.contains("Also allow these addresses"));
     let owned = Channel {
-        department_id: Some(tree.sales.id),
-        members_only: true,
-        ..channel
+        department_id: sales.id,
+        ..mailbox_channel(tree.company.id)
     };
     let html = channel_edit_pane(&ChannelEditPane {
         company: &tree.company,
@@ -471,29 +511,11 @@ fn department_ui_desk_form_offers_the_department_and_members_only() {
     });
     assert!(html.contains(&format!(
         r#"<option value="{}" selected>&nbsp;&nbsp;Sales &lt;team&gt;</option>"#,
-        tree.sales.id
+        sales.id
     )));
-    assert!(html.contains(r#"class="desk-members-only form-control w-full""#));
-    assert!(html.contains(
-        r#"name="members_only" value="true" class="checkbox checkbox-sm mt-0.5" checked"#
-    ));
-    // Who gets access, one step up and down (COORDINATION C002), and that relays stay (C001).
-    // Participant Emails still admit their addresses on a members-only desk (F2).
-    assert!(html.contains("Only the department's members, its lead, the lead of its parent department, the leads of its direct child departments and the addresses in Participant Emails can use this desk."));
-    assert!(html.contains("Other desks in the company can still hand work to it."));
-
-    // A company without departments sees no owner fields at all.
-    let none = channel_create_pane(&ChannelCreatePane {
-        company: &tree.company,
-        app_domain_name: "example.com",
-        spam_scan_enabled: true,
-        draft: &ChannelDraft::default(),
-        error: None,
-        departments: &[],
-    });
-    assert!(!none.contains("department_id"));
-    // The script that shows the box is in the shared layout's handler.
-    assert!(CHANNEL_SETTINGS_SCRIPT.contains("function toggleDeskMembersOnly(select)"));
+    assert!(html.contains("its parent Lead and direct child Leads"));
+    assert!(html.contains("Other agents need an explicit grant"));
+    assert!(!CHANNEL_SETTINGS_SCRIPT.contains("toggleDeskMembersOnly"));
 }
 
 #[test]
@@ -504,7 +526,10 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
         id: Uuid::new_v4(),
         name: name.into(),
         slug: slug.into(),
-        department_id: owner.map(|department| department.id),
+        department_id: owner.map_or_else(
+            crate::entities::department::DepartmentId::random,
+            |department| department.id,
+        ),
         ..mailbox_channel(tree.company.id)
     };
     let channels = vec![
@@ -518,6 +543,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
             company: &tree.company,
             app_domain_name: "example.com",
             channels: &channels,
+            read_only: &Default::default(),
             departments: &all,
             selected_channel_id: None,
         },
@@ -533,7 +559,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
         heading("Revenue"),
         heading("Sales &lt;team&gt;"),
         heading("Support"),
-        heading("No department"),
+        heading("Other desks"),
     );
     assert!(
         revenue < sales && sales < support && support < none,
@@ -544,12 +570,13 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
     // Inside sales owns no desk, so it has no heading.
     assert!(!list.contains("Inside sales"));
 
-    // A company whose desks have no department keeps a flat list.
+    // A separately read list without the permitted desk owner keeps that desk visible.
     let flat = channel_settings_list(
         &ChannelSettingsList {
             company: &tree.company,
             app_domain_name: "example.com",
             channels: &channels[..1],
+            read_only: &Default::default(),
             departments: &all,
             selected_channel_id: None,
         },
@@ -559,7 +586,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
 
     // The classic desks page groups the same way and badges each owned desk.
     let page = channel_list_fragment(&tree.company, "example.com", &channels, &all);
-    let none = page.find(">No department</h4>").unwrap();
+    let none = page.find(">Other desks</h4>").unwrap();
     assert!(page.find(">Revenue</h4>").unwrap() < none);
     let row = channel_row_fragment(
         &tree.company,
@@ -733,12 +760,14 @@ fn department_views_usage_page_groups_by_department() {
         grouping: UsageGrouping::Department,
         agent: None,
         workflow: None,
+        unit: None,
     };
     let group = |department: UsageDepartment| UsageGroup {
         provider: None,
         model: None,
         workflow: None,
         department: Some(department),
+        desk: None,
         calls: 2,
         completed_calls: 2,
         unconfirmed_calls: 0,
@@ -768,6 +797,9 @@ fn department_views_usage_page_groups_by_department() {
         truncated: false,
         prices: Vec::new(),
         prices_truncated: false,
+        budgets: Vec::new(),
+        budgets_truncated: false,
+        prices_editable: true,
     };
     let html = model_usage_page(company, &query, &report);
     assert!(
@@ -780,6 +812,282 @@ fn department_views_usage_page_groups_by_department() {
     let none = html.find("No department").expect("the unowned row");
     assert!(sales < none);
     assert!(!html.contains("Sales <team>"));
+}
+
+fn desk_browser_workspace(company: &Company, content: &str) -> String {
+    let email = crate::entities::value_objects::EmailAddress::from("owner@example.com");
+    let user = mailbox_user(&email);
+    ui_shell(&UiShell {
+        title: "Desk",
+        user: &user,
+        company: Some(company),
+        section: UiSection::Channels,
+        content,
+    })
+}
+
+/// Real controls from both live page producers, also used by the shipped-JavaScript browser gate.
+pub(super) fn desk_access_browser_fixtures() -> [(&'static str, String); 4] {
+    let mut company = mailbox_company();
+    company.id = Uuid::parse_str("00000000-0000-4000-8000-000000000001").unwrap();
+    let mut root = department(company.id, "Company root", "company", None);
+    root.is_root = true;
+    let child = department(company.id, "Dispatch", "dispatch", Some(&root));
+    let departments = [root, child.clone()];
+    let mut channel = mailbox_channel(company.id);
+    channel.department_id = child.id;
+    channel.access_mode = crate::entities::channel::ChannelAccessMode::Public;
+    channel.participant_emails = Some(vec!["@public".into(), "listed@example.test".into()]);
+    let classic_create = channels_page(&ChannelsPage {
+        company: &company,
+        app_domain_name: "example.test",
+        channels: &[],
+        departments: &departments,
+        spam_scan_enabled: false,
+        focus: ChannelsPageFocus {
+            create_form_open: true,
+            editing_channel_id: None,
+        },
+    });
+    let classic_edit =
+        channel_edit_fragment(&company, "example.test", &channel, &departments, false);
+    let modern_create = channel_create_pane(&ChannelCreatePane {
+        company: &company,
+        app_domain_name: "example.test",
+        departments: &departments,
+        spam_scan_enabled: false,
+        draft: &ChannelDraft::default(),
+        error: None,
+    });
+    let modern_edit = channel_edit_pane(&ChannelEditPane {
+        company: &company,
+        app_domain_name: "example.test",
+        channel: &channel,
+        departments: &departments,
+        schedules: &[],
+        schedule_bindings: &[],
+        spam_scan_enabled: false,
+        draft: None,
+        error: None,
+    });
+    [
+        ("desk-classic-create.html", classic_create),
+        (
+            "desk-classic-edit.html",
+            base_layout("Edit desk", &classic_edit),
+        ),
+        (
+            "desk-modern-create.html",
+            desk_browser_workspace(&company, &modern_create),
+        ),
+        (
+            "desk-modern-edit.html",
+            desk_browser_workspace(&company, &modern_edit),
+        ),
+    ]
+}
+
+fn plain_view(department: &Department, members: &[DepartmentPrincipal]) -> DepartmentView {
+    DepartmentView {
+        detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
+            department: department.clone(),
+            members: members
+                .iter()
+                .map(|principal| DepartmentMember {
+                    principal_id: principal.principal_id,
+                    created_at: Utc::now(),
+                })
+                .collect(),
+            roles: Vec::new(),
+        },
+        principals: members.to_vec(),
+        desks: vec![DepartmentDesk {
+            id: Uuid::new_v4(),
+            name: "Unit desk".into(),
+            slug: "unit-desk".into(),
+            own: true,
+        }],
+    }
+}
+
+fn led_section(
+    tree: &Tree,
+    departments: &[Department],
+    view: &DepartmentView,
+    choices: &[DepartmentPrincipal],
+    managed: &std::collections::HashSet<DepartmentId>,
+) -> String {
+    company_departments_section(&DepartmentSection {
+        company: &tree.company,
+        app_domain_name: "example.com",
+        departments,
+        detail: DepartmentDetailPane::Department { view, draft: None },
+        choices,
+        choices_cut: false,
+        membership: crate::entities::company_member::CompanyMembership::Member,
+        managed,
+        history: &[],
+        error: None,
+        notice: None,
+        knowledge: DepartmentKnowledge::Documents(&[]),
+        models: None,
+        budgets: None,
+    })
+}
+
+/// Plan06 02A.2/D1 r2-8: each control follows the server rule for its own target. The lead of
+/// Sales manages Sales and Inside sales: it edits and leads Inside (its parent is Sales), manages
+/// Sales' members, but neither edits Sales nor assigns its lead (Revenue is Sales' parent).
+#[test]
+fn delegated_admin_ui_pane_offers_each_control_only_where_its_server_rule_passes() {
+    let tree = tree();
+    let all = tree.all();
+    let worker = principal(PrincipalKind::Person, "dana", "dana@example.com");
+    let choices = vec![worker.clone()];
+    let managed: std::collections::HashSet<DepartmentId> =
+        [tree.sales.id, tree.inside.id].into_iter().collect();
+    let endpoint = |department: &Department, rest: &str| {
+        format!(
+            "/ui/companies/{}/departments/{}{rest}",
+            tree.company.id, department.id
+        )
+    };
+
+    let inside = led_section(
+        &tree,
+        &all,
+        &plain_view(&tree.inside, std::slice::from_ref(&worker)),
+        &choices,
+        &managed,
+    );
+    assert!(inside.contains(r#"id="department-edit""#), "{inside}");
+    assert!(inside.contains(&endpoint(&tree.inside, "/lead")));
+    assert!(inside.contains(&endpoint(&tree.inside, "/members")));
+    assert!(inside.contains("New department"));
+    assert!(
+        inside.contains("/ui/channels?company_id="),
+        "the managed unit's desk links to settings"
+    );
+    // Destinations are managed units only; the company root is not offered to a unit lead.
+    assert!(!inside.contains(r#"<option value="">Company root</option>"#));
+    assert!(!inside.contains(&format!(r#"<option value="{}""#, tree.revenue.id.as_uuid())));
+    assert!(!inside.contains(&format!(r#"<option value="{}""#, tree.support.id.as_uuid())));
+
+    let sales = led_section(
+        &tree,
+        &all,
+        &plain_view(&tree.sales, std::slice::from_ref(&worker)),
+        &choices,
+        &managed,
+    );
+    assert!(!sales.contains(r#"id="department-edit""#), "{sales}");
+    assert!(!sales.contains(&endpoint(&tree.sales, "/lead")));
+    assert!(sales.contains(&endpoint(&tree.sales, "/members")));
+
+    let support = led_section(
+        &tree,
+        &all,
+        &plain_view(&tree.support, std::slice::from_ref(&worker)),
+        &choices,
+        &managed,
+    );
+    for absent in [
+        r#"id="department-edit""#.to_owned(),
+        endpoint(&tree.support, "/lead"),
+        endpoint(&tree.support, "/members"),
+        "/ui/channels?company_id=".to_owned(),
+    ] {
+        assert!(!support.contains(&absent), "{absent}: {support}");
+    }
+
+    // F9: a person who leads the root manages every unit, yet root membership stays the
+    // company's: no root member removal or add control, and root roles need the owner.
+    let mut root = department(tree.company.id, "Acme", "acme", None);
+    root.is_root = true;
+    let agent = principal(PrincipalKind::Agent, "Helper", "helper");
+    let with_root: Vec<Department> = all.iter().cloned().chain([root.clone()]).collect();
+    let everything: std::collections::HashSet<DepartmentId> =
+        with_root.iter().map(|department| department.id).collect();
+    let root_html = led_section(
+        &tree,
+        &with_root,
+        &plain_view(&root, &[worker.clone(), agent.clone()]),
+        &[worker, agent],
+        &everything,
+    );
+    assert!(
+        !root_html.contains(&endpoint(&root, "/members")),
+        "{root_html}"
+    );
+    assert!(!root_html.contains(&endpoint(&root, "/lead")));
+    assert!(
+        !root_html.contains("hx-delete"),
+        "no root member removal for a root lead"
+    );
+}
+
+/// Plan06 02B.2: a department's managers see its last administration events with the role that
+/// admitted each, escaped; anyone else sees no history card.
+#[test]
+fn administration_audit_pane_shows_recent_history_to_managers_only() {
+    use crate::entities::department::{
+        DepartmentAdministrationAction, DepartmentAdministrationEntry,
+    };
+    let tree = tree();
+    let all = tree.all();
+    let history = vec![
+        DepartmentAdministrationEntry {
+            action: DepartmentAdministrationAction::MemberAdded,
+            actor: Some("Dana <lead>".into()),
+            acting_role: Some(format!("lead:{}", tree.sales.id)),
+            subject: Some("Closer <agent>".into()),
+            role: None,
+            created_at: Utc::now(),
+        },
+        DepartmentAdministrationEntry {
+            action: DepartmentAdministrationAction::Demoted,
+            actor: None,
+            acting_role: None,
+            subject: Some("Former".into()),
+            role: Some(DepartmentRole::Lead),
+            created_at: Utc::now(),
+        },
+    ];
+    let view = plain_view(&tree.inside, &[]);
+    let render = |managed: &std::collections::HashSet<DepartmentId>| {
+        company_departments_section(&DepartmentSection {
+            company: &tree.company,
+            app_domain_name: "example.com",
+            departments: &all,
+            detail: DepartmentDetailPane::Department {
+                view: &view,
+                draft: None,
+            },
+            choices: &[],
+            choices_cut: false,
+            membership: crate::entities::company_member::CompanyMembership::Member,
+            managed,
+            history: &history,
+            error: None,
+            notice: None,
+            knowledge: DepartmentKnowledge::Documents(&[]),
+            models: None,
+            budgets: None,
+        })
+    };
+    let managing: std::collections::HashSet<DepartmentId> =
+        [tree.sales.id, tree.inside.id].into_iter().collect();
+    let html = render(&managing);
+    assert!(html.contains(r#"id="department-history""#), "{html}");
+    assert!(html.contains("Dana &lt;lead&gt;") && html.contains("Closer &lt;agent&gt;"));
+    assert!(!html.contains("Dana <lead>"));
+    assert!(html.contains("as lead of Sales &lt;team&gt;"), "{html}");
+    assert!(html.contains("System") && html.contains("(lead)"));
+    assert!(html.contains(&format!(r#"data-acting-role="lead:{}""#, tree.sales.id)));
+    let outsider = render(&Default::default());
+    assert!(!outsider.contains(r#"id="department-history""#));
 }
 
 #[test]
@@ -799,6 +1107,7 @@ fn department_sponsor_ui_lists_decider_controls_and_named_inherited_escalation()
         detail: DepartmentDetail {
             department: tree.inside.clone(),
             members: Vec::new(),
+            members_truncated: false,
             roles: vec![
                 DepartmentRoleHolder {
                     role: DepartmentRole::Sponsor,
@@ -811,6 +1120,7 @@ fn department_sponsor_ui_lists_decider_controls_and_named_inherited_escalation()
                     decider: false,
                 },
             ],
+            roles_truncated: false,
         },
         principals: vec![deciding.clone(), informed.clone()],
         desks: Vec::new(),

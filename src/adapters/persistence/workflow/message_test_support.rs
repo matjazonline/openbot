@@ -3,7 +3,6 @@
 //! its claimed execution.
 use super::*;
 use crate::adapters::{protocols::email::EmailRenderer, workflow_message::MessageRuntime};
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::transport::{DeliveryComposer, TransportRenderers};
 use crate::application::workflow::{
@@ -61,7 +60,7 @@ pub(in crate::adapters::persistence::workflow::tests) async fn new_channel(
     fixture: &Fixture,
     slug: &str,
 ) -> Uuid {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &fixture.persistence,
         fixture.target.company.as_uuid(),
         ChannelWrite {
@@ -91,17 +90,36 @@ pub(in crate::adapters::persistence::workflow::tests) async fn member(
         .execute(pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,$4)")
-        .bind(Uuid::new_v4())
-        .bind(company)
-        .bind(user)
-        .bind(role)
-        .execute(pool)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'member')")
-        .bind(Uuid::new_v4()).bind(company).bind(user).execute(pool).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        pool,
+        crate::domain::workflow::CompanyId::new(company),
+        user,
+        (role).parse().expect("fixture role"),
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
+
     user
+}
+
+pub(in crate::adapters::persistence::workflow::tests) async fn verify_email(
+    fixture: &Fixture,
+    user: Uuid,
+) {
+    let mut tx = fixture.persistence.pool().begin().await.unwrap();
+    let email: String = sqlx::query_scalar(
+        "UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1 RETURNING email::text",
+    )
+    .bind(user)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    crate::adapters::persistence::account_identity::rekey_account_identity_on(
+        &mut tx, user, &email, &email,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
 }
 
 /// Destinations by role, resolved to ids once the fixture exists.

@@ -75,6 +75,9 @@ pub(crate) fn validate_catalog(
     Ok(())
 }
 
+fn not_found() -> AppError {
+    AppError::NotFound("MCP connection not found".into())
+}
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }
@@ -86,9 +89,11 @@ pub fn endpoint_fixed() -> AppError {
 /// Tokens are write-only and use a distinct port from catalog projections.
 #[async_trait]
 pub trait McpCredentialPersistence: Send + Sync {
+    /// Applies only while `unit_id`, the authorized unit, still owns the connection.
     async fn replace_mcp_token(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         connection_id: Uuid,
         expected_revision: i64,
         token: Option<SecretString>,
@@ -107,15 +112,23 @@ pub trait McpPersistence: Send + Sync {
         &self,
         command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<CompanyMcpConnection>;
-    async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>>;
+    /// Live connections owned by one of `units`.
+    async fn list_mcp_connections(
+        &self,
+        company_id: Uuid,
+        units: &[Uuid],
+    ) -> AppResult<Vec<CompanyMcpConnection>>;
     async fn create_mcp_connection(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection>;
+    /// Writes apply only while `unit_id`, the authorized unit, still owns the connection.
     async fn update_mcp_connection(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         connection_id: Uuid,
         expected_revision: i64,
         write: McpConnectionWrite,
@@ -123,9 +136,18 @@ pub trait McpPersistence: Send + Sync {
     async fn delete_mcp_connection(
         &self,
         company_id: Uuid,
+        unit_id: Uuid,
         connection_id: Uuid,
         expected_revision: i64,
     ) -> AppResult<()>;
+    /// Move a connection to another unit; the actor must manage both (Plan07 01B.4).
+    async fn move_mcp_connection(
+        &self,
+        actor: Uuid,
+        company_id: Uuid,
+        connection_id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource>;
 }
 
 /// Authorization belongs to the application boundary; storage adapters never infer an actor.
@@ -187,28 +209,85 @@ impl McpUseCases {
     ) -> AppResult<crate::entities::access_level::LevelActor> {
         let access =
             super::company::readable_company(self.companies.as_ref(), user, company).await?;
-        if !access.membership.manages_company_operations() {
-            return Err(AppError::NotFound("Company connection".into()));
-        }
+        self.managed_units(user, company).await?;
         Ok(crate::entities::access_level::LevelActor {
             membership: access.membership,
             access_level: access.access_level,
         })
     }
+    /// The units whose connections this person configures (Plan07, user decision a); entry
+    /// needs some unit, and each connection is then checked against its own unit.
+    async fn managed_units(&self, user: Uuid, company: Uuid) -> AppResult<Vec<Uuid>> {
+        let company = crate::domain::workflow::CompanyId::new(company);
+        crate::application::ports::administration::require_management(
+            self.companies.as_ref(),
+            user,
+            company,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
+        )
+        .await?;
+        Ok(self
+            .companies
+            .managed_units(user, company)
+            .await?
+            .into_iter()
+            .map(|unit| unit.as_uuid())
+            .collect())
+    }
+    /// The connection's unit, when this person manages it; otherwise the usual not-found.
+    async fn managed_unit(&self, user: Uuid, current: &CompanyMcpConnection) -> AppResult<Uuid> {
+        let unit = current.unit_id.ok_or_else(not_found)?;
+        let managed = crate::application::ports::administration::manages_unit(
+            self.companies.as_ref(),
+            user,
+            crate::domain::workflow::CompanyId::new(current.company_id),
+            crate::entities::department::DepartmentId::new(unit),
+        )
+        .await?;
+        managed.then_some(unit).ok_or_else(not_found)
+    }
+    /// The units this person may put a connection in, and the default for a new one.
+    pub async fn unit_choices(
+        &self,
+        user: Uuid,
+        company: Uuid,
+    ) -> AppResult<(
+        Vec<crate::application::ports::administration::ManagedUnit>,
+        Option<Uuid>,
+    )> {
+        self.managed_units(user, company).await?;
+        let company = crate::domain::workflow::CompanyId::new(company);
+        let units = self.companies.managed_unit_choices(user, company).await?;
+        let default = self
+            .companies
+            .default_resource_unit(user, company)
+            .await?
+            .map(|unit| unit.as_uuid());
+        Ok((units, default))
+    }
     pub async fn list(&self, user: Uuid, company: Uuid) -> AppResult<Vec<CompanyMcpConnection>> {
-        super::company::managed_company(self.companies.as_ref(), user, company).await?;
-        self.catalog.list_mcp_connections(company).await
+        let units = self.managed_units(user, company).await?;
+        self.catalog.list_mcp_connections(company, &units).await
     }
     pub async fn create(
         &self,
         user: Uuid,
         company: Uuid,
+        unit: Option<Uuid>,
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection> {
-        super::company::managed_company(self.companies.as_ref(), user, company).await?;
+        let unit = crate::application::ports::administration::resource_creation_unit(
+            self.companies.as_ref(),
+            user,
+            crate::domain::workflow::CompanyId::new(company),
+            unit.map(crate::entities::department::DepartmentId::new),
+        )
+        .await?;
         write.validate()?;
         self.client.validate_endpoint(&write.endpoint)?;
-        self.catalog.create_mcp_connection(company, write).await
+        self.catalog
+            .create_mcp_connection(company, unit.as_uuid(), write)
+            .await
     }
     pub async fn update(
         &self,
@@ -216,32 +295,33 @@ impl McpUseCases {
         current: &CompanyMcpConnection,
         write: McpConnectionWrite,
     ) -> AppResult<CompanyMcpConnection> {
-        super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
+        let unit = self.managed_unit(user, current).await?;
         write.validate()?;
         if write.endpoint != current.endpoint {
             return Err(endpoint_fixed());
         }
         self.client.validate_endpoint(&write.endpoint)?;
         self.catalog
-            .update_mcp_connection(current.company_id, current.id, current.revision, write)
+            .update_mcp_connection(
+                current.company_id,
+                unit,
+                current.id,
+                current.revision,
+                write,
+            )
             .await
     }
+    /// The level change authorizes the connection's unit in its own transaction.
     pub async fn set_level(
         &self,
         command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<CompanyMcpConnection> {
-        super::company::managed_company(
-            self.companies.as_ref(),
-            command.actor.user_id(),
-            command.company.as_uuid(),
-        )
-        .await?;
         self.catalog.set_mcp_level(command).await
     }
     pub async fn delete(&self, user: Uuid, current: &CompanyMcpConnection) -> AppResult<()> {
-        super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
+        let unit = self.managed_unit(user, current).await?;
         self.catalog
-            .delete_mcp_connection(current.company_id, current.id, current.revision)
+            .delete_mcp_connection(current.company_id, unit, current.id, current.revision)
             .await
     }
     pub async fn replace_token(
@@ -250,9 +330,27 @@ impl McpUseCases {
         current: &CompanyMcpConnection,
         token: Option<SecretString>,
     ) -> AppResult<i64> {
-        super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
+        let unit = self.managed_unit(user, current).await?;
         self.credentials
-            .replace_mcp_token(current.company_id, current.id, current.revision, token)
+            .replace_mcp_token(
+                current.company_id,
+                unit,
+                current.id,
+                current.revision,
+                token,
+            )
+            .await
+    }
+    pub async fn move_to(
+        &self,
+        user: Uuid,
+        company: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        self.managed_units(user, company).await?;
+        self.catalog
+            .move_mcp_connection(user, company, id, target)
             .await
     }
 }
@@ -279,7 +377,7 @@ impl McpUseCases {
         current: &CompanyMcpConnection,
         owner: crate::application::integrations::VerifiedOwner,
     ) -> AppResult<CompanyMcpConnection> {
-        super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;
+        self.managed_unit(user, current).await?;
         if matches!(current.auth, McpAuth::Integration(_)) {
             return self.discovery.refresh(user, owner, current).await;
         }

@@ -1,0 +1,24 @@
+--- B2/src/adapters/persistence/agent_authoring/directory.rs
++++ B3/src/adapters/persistence/agent_authoring/directory.rs
+@@ -65,8 +65,8 @@
+     let entry = sqlx::query_as::<_, DirectoryRow>(
+         "SELECT agent.id,agent.slug::text AS key,agent.name,active.revision_id AS active_revision FROM agents AS agent \
+          LEFT JOIN agent_active_revisions AS active ON active.company_id=agent.company_id AND active.agent_id=agent.id \
+-         WHERE agent.company_id=$1 AND agent.slug=$2",
+-    ).bind(scope.company.as_uuid()).bind(key.as_str()).fetch_optional(&mut *db).await?
++         WHERE agent.company_id=$1 AND agent.slug=$2 AND agent_management_role($3,$1,agent.id) IS NOT NULL",
++    ).bind(scope.company.as_uuid()).bind(key.as_str()).bind(scope.actor.user_id()).fetch_optional(&mut *db).await?
+         .map(DirectoryRow::entry).transpose()?;
+     let mut entries: Vec<AgentDirectoryEntry> = entry.into_iter().collect();
+     placed(db, scope, domain, &mut entries).await?;
+@@ -83,6 +83,10 @@
+         "SELECT agent.id,agent.slug::text AS key,agent.name,active.revision_id AS active_revision FROM agents AS agent LEFT JOIN agent_active_revisions AS active ON active.company_id=agent.company_id AND active.agent_id=agent.id WHERE agent.company_id=",
+     );
+     query.push_bind(scope.company.as_uuid());
++    query
++        .push(" AND agent_management_role(")
++        .push_bind(scope.actor.user_id())
++        .push(",agent.company_id,agent.id) IS NOT NULL");
+     if let Some(after) = after {
+         query
+             .push(" AND agent.slug>")

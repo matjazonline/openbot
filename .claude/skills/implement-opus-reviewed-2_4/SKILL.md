@@ -1,6 +1,6 @@
 ---
 name: implement-opus-reviewed-2_4
-description: "Execute complex implementation in Claude Code with an Opus 5.5/xhigh author and an independent Fable 5.2/medium reviewer subagent, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity with 75% auto-compaction. Use when an implementation request selects this workflow; not for standalone planning or review."
+description: "Execute complex implementation in Claude Code with an Opus 5.5/xhigh author and an independent Fable/medium reviewer subagent, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity with 75% auto-compaction. Use when an implementation request selects this workflow; not for standalone planning or review."
 ---
 
 # Implement Opus Reviewed 2.4
@@ -17,7 +17,7 @@ measured, not assumed. User preferences override these defaults.
 | Role | Model / effort | Ownership |
 | --- | --- | --- |
 | Author (A) | Opus 5.5 / `xhigh` | Investigation, consequential decisions, implementation, fixtures, tests, and every correction. |
-| Reviewer (B) | Fable 5.2 / `medium` | Independent review of requirements, architecture, code, and verification; review notes and findings. Does not edit project files or author the design. |
+| Reviewer (B) | Fable / `medium` | Independent review of requirements, architecture, code, and verification; review notes and findings. Does not edit project files or author the design. |
 | Root | Actual session settings | Scope, assignments, resources, acceptance, and user updates. |
 
 - When authoritative session information or the user confirms root runs Opus 5.5
@@ -49,8 +49,8 @@ measured, not assumed. User preferences override these defaults.
   completion notification before reporting results, never predict or summarize a
   pending result, and keep user updates flowing. Stop a worker that is still
   running but no longer needed with `TaskStop`.
-- Record actual model/effort when reported. If Opus 5.5/xhigh for A, Fable
-  5.2/medium for B, independent context, or delegation is unavailable, disclose
+- Record actual model/effort when reported. If Opus 5.5/xhigh for A, Fable/medium
+  for B, independent context, or delegation is unavailable, disclose
   the limitation and obtain an authorized alternative before substituting another
   workflow. Honor alternatives already authorized in the session.
 

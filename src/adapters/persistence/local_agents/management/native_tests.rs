@@ -20,6 +20,7 @@ impl NativeSetup {
             s.f.persistence
                 .create_company(
                     s.f.company,
+                    s.f.persistence.test_root_unit(s.f.company).await,
                     SkillWrite {
                         slug: "native-skill".into(),
                         name: "Native".into(),
@@ -374,7 +375,7 @@ async fn cloudroom_native_bundle_refuses_a_valid_foreign_machine_and_revoked_ori
         )
         .await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
         .bind(f.company)
         .bind(f.admin)
         .execute(&f.database.pool)
@@ -480,4 +481,55 @@ async fn cloudroom_native_competing_publication_and_admission_capture_a_coherent
     }
     assert_eq!(bundle.permissions, selection.policy.permissions);
     tx.commit().await.unwrap();
+}
+
+/// Plan07 decision d (B2-F2): a queued session whose agent's skill moved out of the agent's
+/// reach after it was queued is cancelled at delivery like any other authority loss; the
+/// machine's command poll does not fail.
+#[tokio::test]
+async fn unit_resource_selection_native_queued_command_after_a_reach_loss_is_cancelled() {
+    use crate::application::local_agents::protocol::JournalHello;
+    let f = NativeSetup::new().await;
+    let p = &f.s.f.persistence;
+    let request = f.s.request();
+    p.start_session(&request).await.unwrap();
+    let billing = p.test_unit(f.s.f.company, "billing").await;
+    SkillManagementPersistence::move_company(
+        p.as_ref(),
+        f.s.f.owner,
+        f.s.f.company,
+        f.skill,
+        billing,
+    )
+    .await
+    .unwrap();
+    let fence = f.connection().await;
+    p.connect_journal(
+        fence,
+        &JournalHello {
+            version: 2,
+            installation_id: fence.machine.installation_id,
+            journal_id: Uuid::new_v4(),
+            journal_sequence: 0,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(p.finish_reconciliation(fence).await.unwrap());
+    let delivered = p.pending_commands(fence).await.unwrap();
+    assert!(
+        delivered
+            .iter()
+            .all(|delivery| delivery.operation.id() != request.request_id),
+        "the refused session is not delivered"
+    );
+    let outcome: Option<String> = sqlx::query_scalar(
+        "SELECT outcome FROM local_agent_operations WHERE company_id=$1 AND id=$2",
+    )
+    .bind(f.s.f.company)
+    .bind(request.request_id.as_uuid())
+    .fetch_one(&f.s.f.database.pool)
+    .await
+    .unwrap();
+    assert_eq!(outcome.as_deref(), Some("cancelled"));
 }

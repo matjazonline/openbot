@@ -413,6 +413,8 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: crate::entities::company_member::CompanyMembership::Owner,
+            administers_units: crate::entities::company_member::CompanyMembership::Owner
+                .administers_company(),
         };
         let html = attention_page(&AttentionPageView {
             user: &user,
@@ -455,6 +457,7 @@ mod tests {
     fn department_views_attention_groups_and_keeps_the_department() {
         use crate::entities::department::{Department, DepartmentId};
         let sales = Department {
+            is_root: false,
             escalation: None,
             id: DepartmentId::new(Uuid::new_v4()),
             company_id: Uuid::nil(),
@@ -520,6 +523,8 @@ mod tests {
             avatar_url: None,
             is_operator: false,
             company_membership: crate::entities::company_member::CompanyMembership::Owner,
+            administers_units: crate::entities::company_member::CompanyMembership::Owner
+                .administers_company(),
         };
         let full = attention_page(&AttentionPageView {
             user: &user,

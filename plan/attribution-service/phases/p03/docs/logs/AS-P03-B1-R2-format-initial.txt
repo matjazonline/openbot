@@ -1,0 +1,18 @@
+Retained diagnostic from exec session56106, command cargo fmt --all.
+The following root test command did not run because formatting could not parse the file.
+
+error: this file contains an unclosed delimiter
+  --> src/adapters/persistence/attribution/outbox.rs:75:3
+   |
+ 3 | impl AttributionOutbox for PostgresPersistence {
+   |                                                - unclosed delimiter
+ 4 |     async fn health(&self) -> IdentityResult<LifecycleHealth> {
+   |                                                               - this delimiter might not be properly closed...
+...
+75 | }
+   | -^
+
+Error writing files: failed to resolve mod outbox: cannot parse src/adapters/persistence/attribution/outbox.rs
+
+Cause: missing closing brace on the newly added health method. Added it before
+rerunning formatting and the root focused suite. No failing source retained.

@@ -1,7 +1,7 @@
 //! Shared classification control; options reflect current authority, the write rechecks it.
 use super::{escape_html_attr, escape_html_text};
 use crate::application::workflow::http::HttpConnection;
-use crate::entities::access_level::{AccessLevel, LevelActor, LevelTarget, may_assign_level};
+use crate::entities::access_level::{AccessLevel, LevelActor, may_assign_connection_level};
 use uuid::Uuid;
 
 pub(crate) fn level_form(
@@ -14,12 +14,13 @@ pub(crate) fn level_form(
     let selected = draft.unwrap_or(current.as_i16());
     let attempted = draft
         .filter(|level| match AccessLevel::try_from(*level) {
-            Ok(level) => may_assign_level(actor, LevelTarget::Assignable(current), level).is_err(),
+            Ok(level) => may_assign_connection_level(actor, current, level).is_err(),
             Err(_) => true,
         })
         .map(|level| format!("<p>Requested access level: {level}. Choose a permitted level.</p>"))
         .unwrap_or_default();
-    if may_assign_level(actor, LevelTarget::Assignable(current), current).is_err() {
+    // Only the connection unit's managers reach this form; the write rechecks the unit.
+    if may_assign_connection_level(actor, current, current).is_err() {
         return format!(
             "<p>Access level: {}. A teammate with a sufficient level can change it.</p>{attempted}",
             current.as_i16()
@@ -27,7 +28,7 @@ pub(crate) fn level_form(
     }
     let options = AccessLevel::ALL
         .into_iter()
-        .filter(|level| may_assign_level(actor, LevelTarget::Assignable(current), *level).is_ok())
+        .filter(|level| may_assign_connection_level(actor, current, *level).is_ok())
         .map(|level| {
             format!(
                 "<option value=\"{}\"{}>{}</option>",

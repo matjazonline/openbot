@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized] target(s) in 0.43s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+
+
+thread 'adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze' (23208938) panicked at src/adapters/identity/../website/http_tests.rs:718:5:
+FAIL: website browser stage privacy and credentials remain on merchant server: Expected values to be strictly equal:
+
+'' !== undefined
+
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 80 filtered out; finished in 10.36s
+
+error: test failed, to rerun pass `--lib`

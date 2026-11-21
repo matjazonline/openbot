@@ -34,13 +34,20 @@ only behavior the code has.
 
 | Evidence | Status |
 | --- | --- |
-| 01 focused checks (root, membership, competing) | Pending |
-| 02 focused checks (modes, grants, measurement) | Pending |
-| Authorization suites after each batch | Pending |
-| Formatting, offline compilation, clippy and reachability | Pending |
-| Fresh migrations and SQLx metadata | Pending |
-| Database-backed full suite and network isolation | Pending |
-| Stack and lease budgets | Pending |
-| Docs, startup plan paths and graph refresh | Pending |
+| 01 focused checks (root, membership, competing) | Accepted: [p01](phases/p01/docs/TASK.md) and [main integration](integration/main-60b9a28b/docs/TASK.md) |
+| 02 focused checks (modes, grants, measurement) | Accepted: [p02](phases/p02/docs/TASK.md), including real 1,000-member/200-desk delta measurement |
+| Authorization suites after each batch | PASS in accepted batches; p03 recheck includes all 21 required HTTP cases |
+| Formatting, offline compilation, clippy and reachability | PASS: p03 final formatting, locked offline all-target check, Clippy with warnings denied, binary 5 and reachability 8 tests |
+| Fresh migrations and SQLx metadata | PASS: disposable core schemas, all-target SQLx regeneration and unchanged metadata |
+| Database-backed full suite and network isolation | Executed: initial 31 fixture failures have passing corrections; current stock run 4,719 PASS/1 Doop timeout/29 ignored; Linux control-plane gate PASS. See p03 for exact dispositions |
+| Stack and lease budgets | Stock 2 MiB: no overflow; Doop timeout retained and isolated stock recheck PASS. Lease budget: 139 PASS at unchanged thresholds |
+| Docs, startup plan paths and graph refresh | Updated current root/grant/namespace mapping; no new plan path; Trail refresh PASS |
+
+The [phase03 record](phases/p03/docs/TASK.md) retains every failed gate, corrected prerequisite,
+successful recheck and final independent disposition. Browser protocols, all three production
+images, memory extraction/backup/standalone/live integration and attribution extraction/contracts/
+browser integration were exercised. The full-run Doop mock timeout remains explicitly visible;
+its isolated pass does not claim a clean full run. Existing private Doop acceptance is deferred
+under Plan03 C008/r1 to [fix-doop](../fix-doop.md). Whole CI is not claimed green.
 
 Do not declare the implementation complete while a required check is unavailable.

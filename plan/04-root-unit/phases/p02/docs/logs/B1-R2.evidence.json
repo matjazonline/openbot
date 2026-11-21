@@ -1,0 +1,617 @@
+{
+  "version": 1,
+  "round": "04RU-P02-B1-R2",
+  "artifact": "6391c0ba46d382417a618bdc9238b32c1b8e1b976a457ee42f60b2382971e660",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC9"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "fresh pa04_p02_schema2 on task PostgreSQL18:51167; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-r2-migration.txt",
+          "sha256": "0dd73fce5b4336624fc5050a9dc0dd1e25ff93a288a335125375b4c3f21fc9c7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (original core/consumer selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-core-consumer-tests.txt",
+          "sha256": "b4fa2aef1dc28eabbc9a4b979ee03ee1cc2c0af11af857b2b29cb1006f3066bf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (r2 core/security selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-r2-core-security-tests3.txt",
+          "sha256": "5bb44eb6261b56d0bdfc83d2568bf269cfe74a3d587afec328eb4673190ae3a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4",
+        "AC5",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (targeted mode/provisioning correction selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-targeted-corrections.txt",
+          "sha256": "248348500b2d8487314dc89d97df5f9de0fcf4f7de2ecff5cf5e3d79db125a7f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib (remaining affected consumer selection)",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-remaining-consumers.txt",
+          "sha256": "e9e59157facfbca2c7fd7d5e2aa1b75ffad948a59b8e94eac7626ceeed62e7f5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- direct_thread_changed_email_rejoin cloudroom_management_private_and_foreign cloudroom_commands_live_actor_withdrawal agent_history_identity_principal_deletion knowledge_view_delivery_subjects knowledge_view_notification_email_and_in_app knowledge_run_level_verified_member_email",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-remaining-failures-corrected2.txt",
+          "sha256": "cd2bbd320dca05018cd85118c4ae522fc6204572f423f189e4f4d23b7df7fa78"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- authorization_cases",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-workflow-authorization.txt",
+          "sha256": "7dfea98ce7206a637654d0e6570eecc43a5f1989664dfb3761e9fb6b18cae5f6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4",
+        "AC5",
+        "AC7",
+        "AC9"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib -- access_mode_ provisioning_ workflow_escalation_binding_roundtrip_update_and_required_owner authorization_cases direct_thread_changed_email_rejoin direct_competing_personal_rejoin_claimants direct_thread_identity_adoption cloudroom_management_ cloudroom_commands_ agent_history_identity_ knowledge_view_ knowledge_run_level_verified_member_email department_desk_ department_lead_ department_schema_ department_roster_ department_agent_ adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-focused-stock-stack.txt",
+          "sha256": "30f3c15fc919451b2dc4a2821e276ad01d15a30e1565b192d24acdfca61e059a"
+        },
+        {
+          "path": "logs/B1-final-focused-command.json",
+          "sha256": "ce709cd5b19d01a49a5761542d4bd7331db166336ed9567866a4b8deac3b015e"
+        },
+        {
+          "path": "logs/B1-http-authorization-final.json",
+          "sha256": "c7e06f08005933c632a1509d0bf3aa0c8dc4b6f06a9e5f2f67964f4851a567c5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4",
+        "AC6",
+        "AC7"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib -- access_mode_provisioned_assistant access_mode_grants_join_and_removal_write_only_the_delta relay_identity_ department_desk_relay",
+      "fixture": "task PostgreSQL18:51167; pa04_p02_core2_test and per-test owned databases; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-relay-and-initial-grants2.txt",
+          "sha256": "eb60130f9358a57cbf0f1b481ada939c9fd05f12cb5e47552eabfa960d9aba47"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib access_mode_grants_scale_1000_members_200_desks -- --ignored --nocapture (unchanged-production baseline)",
+      "fixture": "owned baseline scale database; source54bfc2c6; original full-rewrite policy, not current implementation; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/baseline-scale-run2.txt",
+          "sha256": "33b55aa6951d6dfa69483ebd8020a06ea716645f55902e01bfe3720f70be52d9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib access_mode_grants_scale_1000_members_200_desks -- --ignored --nocapture",
+      "fixture": "own_database automatically dropped; actual production invite/removal,1000members/200desks/400000grants, quiescent run; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-pruned-scale.txt",
+          "sha256": "71e7342abe5c5a08c5ac9fd4aa86dad05f23175c677dbe02138dd49df885bcb6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "rollback-only EXPLAIN(ANALYZE,BUFFERS,SETTINGS) on actual migrated grant table; original versus pruned INSERT_MISSING",
+      "fixture": "46000real grant rows;2000desired;work_mem4MB; forced generic plan; already-complete desk; no new row trigger claim; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-live-reconciliation-plan.sql",
+          "sha256": "bf8bc13ccff4caa0c192fed169202b055eea597bf0a5c9aff2498eb4b8de6259"
+        },
+        {
+          "path": "logs/B1-live-reconciliation-plan.txt",
+          "sha256": "9d8bcda319d286227c67e9707b6c22e12bc2372d6cd9690729a9c767027d6942"
+        },
+        {
+          "path": "logs/B1-scale-active-query.txt",
+          "sha256": "fc35c59832087d76f27c33ec13fde09465490d52295825cb6debc7784aa18bba"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list; compare baseline/extraction/final inventories",
+      "fixture": "actual libtest runner inventory4739baseline/4746extraction/4747final; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-before-test-inventory.txt",
+          "sha256": "0fa5c8c831fcafcd6b9e8c5f65e9a61238e635e5992210711c6faebb254896ff"
+        },
+        {
+          "path": "logs/B1-before-test-extraction-inventory.txt",
+          "sha256": "f8bd7edf942fc2000c5b1e97b9eb530e10273f5c5acd0a8faadbe4a1c9e3d227"
+        },
+        {
+          "path": "logs/B1-after-test-extraction-inventory.txt",
+          "sha256": "12f137ff8721bd7b8c8458b36f95b0bd7827ba47eadb7c90f2009b6c4b120de1"
+        },
+        {
+          "path": "logs/B1-final-test-inventory.txt",
+          "sha256": "702be651a54396c96886dc6cfb9c6809a6411225a2a0549470ff853a51cae65c"
+        },
+        {
+          "path": "logs/B1-test-dispositions.json",
+          "sha256": "d6b14fa1c15fd46ecc664e6183c0e455702c9977c95fe486ebb64bc7bdd5bf7c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets --locked --offline",
+      "fixture": "fresh pa04_p02_schema2; all targets; no .sqlx diff; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-sqlx-prepare3.txt",
+          "sha256": "1cb847467de1835395fdace9d62764eb3ceb788c9ceb33a718f72e55f7766597"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "local Cargo source-module target roots; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-source-modules.txt",
+          "sha256": "3ce6028bc036dccbc9d1022343e9d752a7cf64b91072ce04bedbd6a21f30c05d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC9"
+      ],
+      "command": "npm run build:css; npm run check:css",
+      "fixture": "Node24/Tailwind4.1.12/daisyUI5.0.50; no generated asset diff; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-css-build.txt",
+          "sha256": "657782e26981fb1a51c2e151f71b4d6942f46ae1fd8de55ab76100e281fbda31"
+        },
+        {
+          "path": "logs/B1-final-css-check.txt",
+          "sha256": "c62690567d97e0a6d8f54496856952f6fe54c2982b8b8bf179a4b638d9e5d61a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "current working source tree; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-format2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "git diff --check",
+      "fixture": "current working source tree; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-whitespace2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "trail build",
+      "fixture": "deterministic local graph; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-trail-build.txt",
+          "sha256": "19512dc0a28f19e6084641a984a4aaa0236827b55c4cf1aabbdd31a9dd59c970"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "trail check",
+      "fixture": "lexical false positive l-2cfeeacd vs preserved native FK; explicit TASK/commit disposition;400KB heuristic cap; retained B1-R1 evidence for unchanged covered scope (see TASK/F1 mapping)",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-final-trail-check.txt",
+          "sha256": "e7199e718d36aa72430ab7af205ec67842dea33aeffa5421ffde8cd6ed2f1f64"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC7"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib -- adapters::http::pages::tests:: adapters::http::routes::channel:: adapters::http::routes::ui_channels::tests:: adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+      "fixture": "initial broader UI run168PASS/2obsolete projection/markup assertion failures; corrected by next entry",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-F1-focused-tests.txt",
+          "sha256": "0a5bd62f466551aafd97fa3f493eab47db9c5f5ba493dd7c9c81788f167be9a4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC3",
+        "AC7",
+        "AC9"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib -- adapters::http::pages::tests:: adapters::http::routes::channel:: adapters::http::routes::ui_channels::tests:: adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks adapters::http::routes::channel::authorization_tests::channel_management_and_simulation_hide_foreign_companies_and_refuse_members adapters::http::routes::channel::authorization_tests::simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids adapters::http::routes::company::authorization_tests::company_pages_and_writes_distinguish_foreign_member_and_database_failure adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback adapters::http::routes::ui_team::authorization_tests::team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_hidden adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+      "fixture": "pa04_p02_core2_test; real GET-rendered controls through HTML parser/URL encoding and real handlers;170PASS/0FAIL/2ignored at stock2MiB; exact HTTP21 included",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-F1-focused-tests2.txt",
+          "sha256": "ca753df525b817a3c7bf7d14716144a2c41e0084edf5c3705505e30eba15a988"
+        },
+        {
+          "path": "logs/B1-F1-focused-command.json",
+          "sha256": "e1c128b4da924abf2490c869b6b41c5e71c7560ca32b84020595d0713cffb36c"
+        },
+        {
+          "path": "logs/B1-R2-inventory-and-HTTP-proof.json",
+          "sha256": "b52a3149463eb0b28c8f3ca87918ec08654f029e7786f963808865abe91dca1e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- access_mode_classic_rendered channel_pages_and_fragments_render_correctly",
+      "fixture": "retained early fixture DOM-owner lifetime failure, before real handler assertions; later corrected owner retention",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-F1-rendered-handler-tests3.txt",
+          "sha256": "7922aed095512ad2b4a421fb8404d99f7d008b28c4dabcbb9ee6e3acd1babe5d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC7"
+      ],
+      "command": "node --test scripts/tests/html-injection-browser.mjs scripts/tests/team-autocomplete-browser.mjs",
+      "fixture": "earlier fixture gaps: lazy binding request, incorrect page-shell style expectations, missing workspace SSE asset; all explicitly corrected in final fixture",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-F1-browser-tests.txt",
+          "sha256": "8aeaf5a7647002416716bcdb9ae623f5268b77eb826b6c7156bc38f4aa6379db"
+        },
+        {
+          "path": "logs/B1-F1-browser-tests3.txt",
+          "sha256": "657303551728be53fa895d8551f3feac250e047b30a069d05231697bb42c69a3"
+        },
+        {
+          "path": "logs/B1-F1-browser-tests4.txt",
+          "sha256": "c073f4dcb5bc524caba6277d249fc2c13bd8bfd27b3c526f27b4bec1ab84f2f3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC7"
+      ],
+      "command": "HTML_INJECTION_BROWSER_FIXTURES=plan/04-root-unit/phases/p02/docs/logs/B1-F1-browser-fixtures3 cargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored",
+      "fixture": "real classic base layout and modern UiShell; generated native markup and shipped app.js; explicitly exercised ignored fixture producer",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-F1-browser-fixture-generation3.txt",
+          "sha256": "c9e2283cdbe03cb5e20926d470ef69c1b5298f10d6f1427ddd41e4c07f75b8c8"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/app.js",
+          "sha256": "7c6e383c3dba398e43d0113dd022dc761f56c5ba6cca755b368c4e2ab246a1be"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/desk-classic-create.html",
+          "sha256": "c0f1e6273b47dd1bd362f3b9911b17f4f5e0c6750ea502b712df5caac8bac003"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/desk-classic-edit.html",
+          "sha256": "7e4ba6ae2fb8bc4dc5bd547480283d25f653c7e6292e509e9beea955833f978d"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/desk-modern-create.html",
+          "sha256": "c6f718412869bb4597146e102536daa3ba9a528875ed212c33094f9e85d163ed"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/desk-modern-edit.html",
+          "sha256": "367786e434ac97a6a0461deea17479caeeecf6034a908a3dc2fc8104abbf02cf"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/form-error.html",
+          "sha256": "f821f7a107b6712e3faf7b6fc597b1cfd4f6c0d59786cb2a61cd7a68207c117f"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/login-success.html",
+          "sha256": "1c18d5f0d36ead822852587914ed75e310f1259bfd0ea6f085d24199d95d2a7d"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/login.html",
+          "sha256": "2b3e95ca64fd37d3345f1e3e41051bd2d02f448897efb6f9e95eff7810acbf49"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/register-success.html",
+          "sha256": "5a0f1b66f7381bcf0c6416bded66fb27bde5febed79e39ec1c59a5461a0be153"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/register.html",
+          "sha256": "0e79b70f1ddd85c76528c461168321fef71fc6a97b9b06bcae92540dac98033a"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/restricted.html",
+          "sha256": "1528402614cd90b4f07629ae97feaa63fb9a916e77983e65dd2ff6c7728ef46c"
+        },
+        {
+          "path": "logs/B1-F1-browser-fixtures3/team.html",
+          "sha256": "229e2ea3a1b0ad356dddbe5559b3fcb623ac81b118f744ad2f4147353d900dee"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC7"
+      ],
+      "command": "HTML_INJECTION_BROWSER_FIXTURES=plan/04-root-unit/phases/p02/docs/logs/B1-F1-browser-fixtures3 APP_JS_OUT=plan/04-root-unit/phases/p02/docs/logs/B1-F1-browser-fixtures3/app.js node --test scripts/tests/html-injection-browser.mjs scripts/tests/team-autocomplete-browser.mjs",
+      "fixture": "real Chromium, local fixture HTTP, production CSP/vendor assets; all4form variants, native FormData/public/owner/reset/spam and both-theme computed styles; control/serialization proof, not live-server authentication",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-F1-browser-tests5.txt",
+          "sha256": "5f02ed0dab4a390256e3ad34c33e9db1d89fae3181df9057ff16d626fc5829e6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "current F1 production and target interfaces; subsequent cfg-test-only shell helper exercised by fixture producer",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-F1-all-targets.txt",
+          "sha256": "d578747d0b7329b52ced587132fdc810fc7cc7f67a78a537c9789ad9f2d00dfa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7",
+        "AC9"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "8PASS; new classic route test module connected to Cargo root",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-F1-source-modules.txt",
+          "sha256": "89cfc3476a5801eb252e7ea267bdb49fd8c526e2a378874af9ca2de58231955f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list; compare actual inventories",
+      "fixture": "4747before F1 ->4749after,2added/0removed; all prior removed-name mappings remain valid",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-test-inventory.txt",
+          "sha256": "e8900ee26131db93aadeb439231ac18df9a1aa8639f95d4c0a2416e1c1d86bc4"
+        },
+        {
+          "path": "logs/B1-R2-inventory-and-HTTP-proof.json",
+          "sha256": "b52a3149463eb0b28c8f3ca87918ec08654f029e7786f963808865abe91dca1e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC9"
+      ],
+      "command": "npm run build:css; npm run check:css",
+      "fixture": "generated asset updated from shared renderer; no production theme-token change",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-F1-css-build.txt",
+          "sha256": "db08ab6337b89968089e35cbc0956a706e056a9ae183dc3f924b322df37a318c"
+        },
+        {
+          "path": "logs/B1-R2-css-check.txt",
+          "sha256": "3d42ea5714a84f87d5971386f38b2ddb8bfe9c90e93cf728e962837b7c08f313"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "final source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "all staged/unstaged source and deliverable docs; exact evidence bytes follow existing scoped .gitattributes rule",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-staged-whitespace2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "trail build",
+      "fixture": "current code graph",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-trail-build.txt",
+          "sha256": "210643b0147cf042f42f380dea1132dc73b00bc76ce8b9d8bca510f5de151de3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC9"
+      ],
+      "command": "trail check",
+      "fixture": "same disposed lexical browser-cleanup learning versus unchanged native cascade FK; TASK/commit rationale required",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-staged-trail-check.txt",
+          "sha256": "61fa93b196ee802de77d1da3b4437399b4d40dd6f60fefec7954d6f778030429"
+        }
+      ]
+    }
+  ]
+}

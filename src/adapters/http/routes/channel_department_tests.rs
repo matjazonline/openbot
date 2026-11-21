@@ -1,6 +1,4 @@
-//! The JSON channel payload's ownership fields (01-departments p02, DEP-P02-D2): unlike the rest
-//! of the PUT they are kept when absent, `null` detaches the desk, and either field alone changes
-//! only itself.
+//! Required desk ownership in the JSON create/edit boundary.
 use super::super::authorization_test_support::Fixture;
 use super::*;
 use crate::application::ports::department::DepartmentWrite;
@@ -24,12 +22,13 @@ async fn put(f: &Fixture, body: serde_json::Value) -> Channel {
     let saved: serde_json::Value = serde_json::from_slice(&body).unwrap();
     // 01-departments 04C.4: the desk response carries its ownership fields, always present.
     assert!(saved["channel"].get("department_id").is_some(), "{saved}");
-    assert!(saved["channel"]["members_only"].is_boolean(), "{saved}");
+    assert!(saved["channel"]["department_id"].is_string(), "{saved}");
+    assert!(saved["channel"].get("members_only").is_none(), "{saved}");
     serde_json::from_value(saved["channel"].clone()).unwrap()
 }
 
 #[tokio::test]
-async fn department_desk_ownership_json_fields_are_kept_when_absent() {
+async fn access_mode_json_owner_is_preserved_and_can_be_reassigned_but_not_cleared() {
     let Some(f) = Fixture::new().await else {
         return;
     };
@@ -66,34 +65,51 @@ async fn department_desk_ownership_json_fields_are_kept_when_absent() {
 
     let owned = put(
         &f,
-        with(serde_json::json!({"department_id": department.id, "members_only": true})),
+        with(serde_json::json!({"department_id": department.id})),
     )
     .await;
     assert_eq!(
-        (owned.department_id, owned.members_only, owned.access_mode),
-        (Some(department.id), true, ChannelAccessMode::Allowlist)
+        (owned.department_id, owned.access_mode),
+        (department.id, ChannelAccessMode::Members)
     );
-
     let kept = put(&f, base.clone()).await;
+    assert_eq!(kept.department_id, department.id);
+    let public = put(
+        &f,
+        with(serde_json::json!({"participant_emails": ["@public"], "confirm_spam_disabled": true})),
+    )
+    .await;
     assert_eq!(
-        (kept.department_id, kept.members_only),
-        (Some(department.id), true)
+        (public.department_id, public.access_mode),
+        (department.id, ChannelAccessMode::Public)
     );
+    assert!(
+        serde_json::from_value::<ChannelJsonPayload>(with(
+            serde_json::json!({"department_id": null})
+        ))
+        .is_err()
+    );
+    let root: Uuid =
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(f.company.id)
+            .fetch_one(f.persistence.pool())
+            .await
+            .unwrap();
+    let reassigned = put(&f, with(serde_json::json!({"department_id": root}))).await;
+    assert_eq!(reassigned.department_id.as_uuid(), root);
+}
 
-    let opened = put(&f, with(serde_json::json!({"members_only": false}))).await;
-    assert_eq!(
-        (
-            opened.department_id,
-            opened.members_only,
-            opened.access_mode
-        ),
-        (Some(department.id), false, ChannelAccessMode::Team),
-        "members_only alone leaves the department"
-    );
-
-    let detached = put(&f, with(serde_json::json!({"department_id": null}))).await;
-    assert_eq!(
-        (detached.department_id, detached.members_only),
-        (None, false)
-    );
+#[test]
+fn access_mode_json_department_rejects_explicit_null_and_invalid_ids() {
+    for department in [serde_json::Value::Null, serde_json::json!("invalid")] {
+        assert!(
+            serde_json::from_value::<ChannelJsonPayload>(
+                serde_json::json!({"name":"Inbox", "department_id": department})
+            )
+            .is_err()
+        );
+    }
+    let omitted: ChannelJsonPayload =
+        serde_json::from_value(serde_json::json!({"name":"Inbox"})).unwrap();
+    assert_eq!(omitted.department_id, None);
 }

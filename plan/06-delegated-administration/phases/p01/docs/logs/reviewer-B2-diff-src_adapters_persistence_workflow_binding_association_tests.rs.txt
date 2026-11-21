@@ -1,0 +1,38 @@
+--- B1/src/adapters/persistence/workflow/binding_association_tests.rs
++++ B2/src/adapters/persistence/workflow/binding_association_tests.rs
+@@ -30,7 +30,7 @@
+     .await
+     .as_uuid();
+ 
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         p,
+         company.as_uuid(),
+         ChannelWrite {
+@@ -157,7 +157,7 @@
+     .await
+     .as_uuid();
+ 
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         p,
+         f.target.company.as_uuid(),
+         ChannelWrite {
+@@ -242,7 +242,7 @@
+ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association() {
+     let f = BindingFixture::new(serde_json::json!([])).await;
+     let p = &f.fixture.persistence;
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         p,
+         f.target.company.as_uuid(),
+         ChannelWrite {
+@@ -253,7 +253,7 @@
+     )
+     .await
+     .unwrap();
+-    let second = ChannelPersistence::create(
++    let second = crate::adapters::persistence::test_support::create_channel(
+         p,
+         f.target.company.as_uuid(),
+         ChannelWrite {

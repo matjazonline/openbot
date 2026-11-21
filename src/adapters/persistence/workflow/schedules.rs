@@ -158,8 +158,9 @@ async fn authorize_channel(
     actor: WorkflowActor,
     channel: Uuid,
 ) -> AppResult<()> {
-    authority::authorize_company(tx, company, actor).await?;
-    association::authorize_association(tx, company, actor, channel_association(channel)).await
+    super::management::authorize_association_on(tx, company, actor, channel_association(channel))
+        .await
+        .map(drop)
 }
 
 /// The schedule `id`, locked, for an actor who may manage it.
@@ -169,7 +170,8 @@ async fn managed(
     actor: WorkflowActor,
     id: Uuid,
 ) -> AppResult<ChannelSchedule> {
-    authority::authorize_company(tx, company, actor).await?;
+    authority::authorize_person_with_locks(tx, company, actor, super::row_locks::RowLocks::Wait)
+        .await?;
     // A schedule's channel is immutable, so it is safe to authorize before locking the row.
     let channel: Uuid = sqlx::query_scalar(
         "SELECT channel_id FROM channel_schedules WHERE company_id = $1 AND id = $2",
@@ -179,7 +181,8 @@ async fn managed(
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(missing)?;
-    association::authorize_association(tx, company, actor, channel_association(channel)).await?;
+    super::management::authorize_association_on(tx, company, actor, channel_association(channel))
+        .await?;
     sqlx::query_as::<_, ScheduleRow>(&format!(
         "SELECT {COLUMNS} FROM channel_schedules WHERE company_id = $1 AND id = $2 FOR UPDATE"
     ))
@@ -337,7 +340,7 @@ impl SchedulePersistence for PostgresPersistence {
         channel_id: Uuid,
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = super::management::begin(self, company, actor).await?;
         authorize_channel(&mut tx, company, actor, channel_id).await?;
         let binding_channel = check_binding(&mut tx, company, write.binding_id, channel_id).await?;
         let schedule = sqlx::query_as::<_, ScheduleRow>(&format!(
@@ -371,7 +374,7 @@ impl SchedulePersistence for PostgresPersistence {
         channel_id: Uuid,
         write: ScheduleWrite,
     ) -> AppResult<ChannelSchedule> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = super::management::begin(self, company, actor).await?;
         let existing = managed(&mut tx, company, actor, id).await?;
         if existing.channel_id != channel_id {
             return Err(AppError::BadRequest(
@@ -409,7 +412,7 @@ impl SchedulePersistence for PostgresPersistence {
     }
 
     async fn delete(&self, actor: WorkflowActor, company: CompanyId, id: Uuid) -> AppResult<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = super::management::begin(self, company, actor).await?;
         managed(&mut tx, company, actor, id).await?;
         sqlx::query("DELETE FROM channel_schedules WHERE company_id = $1 AND id = $2")
             .bind(company.as_uuid())
@@ -427,7 +430,7 @@ impl SchedulePersistence for PostgresPersistence {
         id: Uuid,
         enabled: bool,
     ) -> AppResult<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = super::management::begin(self, company, actor).await?;
         managed(&mut tx, company, actor, id).await?;
         sqlx::query(
             "UPDATE channel_schedules SET enabled = $3, updated_at = CURRENT_TIMESTAMP \
@@ -449,8 +452,15 @@ impl SchedulePersistence for PostgresPersistence {
         id: Uuid,
         command_key: &str,
     ) -> AppResult<Uuid> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = super::management::begin(self, company, actor).await?;
         let schedule = managed(&mut tx, company, actor, id).await?;
+        association::authorize_association(
+            &mut tx,
+            company,
+            actor,
+            channel_association(schedule.channel_id),
+        )
+        .await?;
         let captured = sqlx::query(
             "INSERT INTO schedule_runs (id, schedule_id, scheduled_for, \
                company_id, channel_id, binding_id, command_key) \

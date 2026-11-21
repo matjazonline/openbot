@@ -5,7 +5,7 @@ async fn admission_reader_failures_propagate_without_writes() {
     let company_id = company();
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 128));
-    let channel = channel(company_id, ChannelAccessMode::Team);
+    let channel = channel(company_id, ChannelAccessMode::Members);
     let thread = thread(&channel);
     {
         let mut state = store.state.lock().unwrap();

@@ -1,0 +1,30 @@
+--- B1/src/application/use_cases/thread/tests.rs
++++ B2/src/application/use_cases/thread/tests.rs
+@@ -56,7 +56,12 @@
+ 
+ #[async_trait]
+ impl ChannelPersistence for MockChannelPersistence {
+-    async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
++    async fn create(
++        &self,
++        _actor: crate::application::workflow::WorkflowActor,
++        _company_id: Uuid,
++        _write: ChannelWrite,
++    ) -> AppResult<Channel> {
+         unimplemented!()
+     }
+     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
+@@ -130,7 +135,12 @@
+     ) -> AppResult<crate::entities::channel::Channel> {
+         unimplemented!()
+     }
+-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
++    async fn delete(
++        &self,
++        _actor: crate::application::workflow::WorkflowActor,
++        _company_id: Uuid,
++        _id: Uuid,
++    ) -> AppResult<()> {
+         unimplemented!()
+     }
+ }

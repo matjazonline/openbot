@@ -488,7 +488,7 @@ async fn message_intent_refused_run_as_is_visible_and_spares_its_sibling() {
     let admin = member(&s.fixture, "admin").await;
     let removed = s.binding(MessageTrigger::Any, Some(admin)).await;
     let sibling = s.binding(MessageTrigger::Any, None).await;
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id = $1 AND user_id = $2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(admin)
         .execute(s.pool())
@@ -1325,7 +1325,7 @@ async fn attention_groups_a_bindings_refusals_into_one_team_work_row() {
     let admin = member(&s.fixture, "admin").await;
     let removed = s.binding(MessageTrigger::Any, Some(admin)).await;
     let sibling = s.binding(MessageTrigger::Any, None).await;
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id = $1 AND user_id = $2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(admin)
         .execute(s.pool())
@@ -1440,7 +1440,7 @@ async fn message_outcomes_lookup_and_activity_read_every_binding_of_a_message() 
     let refused = s.binding(MessageTrigger::Any, Some(admin)).await;
     let first = s.binding(MessageTrigger::Any, None).await;
     let second = s.binding(MessageTrigger::Any, None).await;
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id = $1 AND user_id = $2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(admin)
         .execute(s.pool())
@@ -1720,11 +1720,11 @@ async fn thread_attribution_links_require_access_to_the_producing_run() {
             .inspectable
             .is_empty()
     );
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(s.channel)
-        .execute(s.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        s.pool(),
+        s.channel,
+    )
+    .await;
     assert!(
         s.p()
             .thread_runs(company, s.thread, admin)
@@ -1791,7 +1791,6 @@ async fn reconnect_batch_links_do_not_depend_on_the_newest_history_window() {
 
 #[tokio::test]
 async fn link_visibility_loads_only_requested_source_channels() {
-    use crate::application::ports::channel::ChannelPersistence;
     use crate::application::ports::channel::ChannelWrite;
     use crate::application::thread_activity::ThreadActivityReader;
     let s = Intents::new().await;
@@ -1801,7 +1800,7 @@ async fn link_visibility_loads_only_requested_source_channels() {
     let run = s.runs(binding).await[0];
     let company = s.fixture.target.company.as_uuid();
     for index in 0..64 {
-        ChannelPersistence::create(
+        crate::adapters::persistence::test_support::create_channel(
             s.p(),
             company,
             ChannelWrite {

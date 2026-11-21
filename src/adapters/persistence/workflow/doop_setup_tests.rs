@@ -73,6 +73,7 @@ async fn register(f: &Fixture, url: &str) -> CompanyMcpConnection {
     let current = p
         .create_mcp_connection(
             company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
             McpConnectionWrite {
                 slug: "doop".into(),
                 endpoint: url.to_owned().try_into().unwrap(),
@@ -90,6 +91,7 @@ async fn register(f: &Fixture, url: &str) -> CompanyMcpConnection {
         .unwrap();
     p.replace_mcp_token(
         company.as_uuid(),
+        p.test_root_unit(company.as_uuid()).await,
         current.id,
         current.revision,
         Some(SecretString::from(TOKEN)),

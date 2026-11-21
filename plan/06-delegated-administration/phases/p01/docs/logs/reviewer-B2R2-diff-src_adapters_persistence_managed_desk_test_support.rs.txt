@@ -1,0 +1,41 @@
+--- B2R1/src/adapters/persistence/managed_desk_test_support.rs
++++ B2R2/src/adapters/persistence/managed_desk_test_support.rs
+@@ -40,6 +40,38 @@
+             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+         }
+     }).await.expect("the actual competing caller waits on this exact writer");
++}
++
++/// A real writer must wait for its actor while leaving the company available.
++pub(crate) async fn assert_actor_before_company<T>(
++    pool: &PgPool,
++    company: Uuid,
++    actor: Uuid,
++    writer: impl std::future::Future<Output = AppResult<T>>,
++) -> AppResult<T> {
++    let mut account = pool.begin().await.unwrap();
++    sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
++        .bind(actor)
++        .execute(&mut *account)
++        .await
++        .unwrap();
++    let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *account)
++        .await
++        .unwrap();
++    let observe = async {
++        wait_until_blocked_by(pool, blocker).await;
++        let mut company_probe = pool.begin().await.unwrap();
++        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE NOWAIT")
++            .bind(company)
++            .execute(&mut *company_probe)
++            .await
++            .expect("a writer blocked on its actor has not locked the company");
++        company_probe.rollback().await.unwrap();
++        account.commit().await.unwrap();
++    };
++    let (result, ()) = tokio::join!(writer, observe);
++    result
+ }
+ 
+ /// A natural manager-without-View case: lead of the grandparent, two levels above the desk.

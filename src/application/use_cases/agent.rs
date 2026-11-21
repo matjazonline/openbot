@@ -6,11 +6,14 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    application::workflow::WorkflowActor,
+    application::{
+        ports::administration::{ManagementRole, ManagementTarget, require_management},
+        workflow::WorkflowActor,
+    },
     domain::workflow::CompanyId,
     entities::{
         agent::{Agent, MAX_AGENT_SKILLS},
-        company::Company,
+        agent_capability::AgentId,
         creation::CreationProvenance,
         department::{DepartmentId, DepartmentRole},
         user::{Caller, Viewer},
@@ -20,12 +23,12 @@ use crate::{
     use_cases::{
         caller::require_operator,
         channel::{SlugKind, validate_slug},
-        company::{CompanyPersistence, managed_company},
+        company::CompanyPersistence,
     },
 };
 
 /// An agent belonging to another company is reported exactly like a missing one, so an id probe
-/// cannot tell a foreign agent from a nonexistent one. See [`managed_company`].
+/// cannot tell a foreign agent from a nonexistent one. See [`crate::use_cases::company::managed_company`].
 pub fn agent_not_found() -> AppError {
     AppError::NotFound("Agent not found in this company.".into())
 }
@@ -122,10 +125,23 @@ pub trait AgentPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
 
+    async fn list_managed_agents(
+        &self,
+        actor: WorkflowActor,
+        company: CompanyId,
+    ) -> AppResult<Vec<Agent>>;
+
     async fn list_library(&self) -> AppResult<Vec<Agent>>;
 
+    async fn update_library_agent(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
+
+    async fn delete_library_agent(&self, id: Uuid) -> AppResult<()>;
+
+    /// Bare fixture mutation. Production company changes use scoped draft commands.
+    #[cfg(test)]
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent>;
 
+    #[cfg(test)]
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
 
@@ -135,6 +151,12 @@ pub trait AgentPersistence: Send + Sync {
 pub struct AgentPlacement {
     pub department: DepartmentId,
     pub role: Option<DepartmentRole>,
+}
+
+pub(crate) fn placement_target(placement: Option<AgentPlacement>) -> ManagementTarget {
+    placement.map_or(ManagementTarget::Root, |placement| {
+        ManagementTarget::Unit(placement.department)
+    })
 }
 
 /// A company agent and its directly addressable principal.
@@ -209,21 +231,6 @@ pub(crate) fn model_allowed(
     connections
         .iter()
         .any(|connection| connection.provider == provider && connection.models.contains(&model))
-}
-
-/// The model an agent pinned to the company default runs on: the default connection's first
-/// model, when the connection has a key. A workflow runs an agent only on an explicit model.
-pub fn pinned_default_model(
-    connections: &[crate::entities::company::CompanyModelConnection],
-) -> Option<(String, String)> {
-    let connection = connections
-        .iter()
-        .find(|connection| connection.is_default && connection.has_api_key)?;
-    let model = connection.models.first()?;
-    Some((
-        connection.provider.as_str().to_owned(),
-        model.as_str().to_owned(),
-    ))
 }
 
 /// One library definition as a company agent write: every stored field, with the provenance left
@@ -306,9 +313,28 @@ impl AgentUseCases {
         })
     }
 
-    async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
-        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
-        Ok(())
+    fn verify_manager(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        target: ManagementTarget,
+    ) -> impl std::future::Future<Output = AppResult<ManagementRole>> + Send + '_ {
+        require_management(
+            self.company_persistence.as_ref(),
+            user_id,
+            CompanyId::new(company_id),
+            target,
+        )
+    }
+
+    /// Authoring aids every unit manager may use (Plan06 U3): the model choices (no credentials)
+    /// and the system-prompt generator. Editing model connections stays company administration.
+    fn verify_authoring(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> impl std::future::Future<Output = AppResult<ManagementRole>> + Send + '_ {
+        self.verify_manager(user_id, company_id, ManagementTarget::AnyUnit)
     }
 
     async fn validate_model_selection(
@@ -326,15 +352,31 @@ impl AgentUseCases {
         model_preparation::validate_model_selection(&connections, write)
     }
 
+    /// The model connections an author may choose: for an existing agent, those in its own reach
+    /// (Plan07 02A with decision d); for a new one, all of them, checked against its department
+    /// when it is created.
     pub async fn list_company_model_connections(
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        agent_id: Option<Uuid>,
     ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-        self.verify_company_manager(user_id, company_id).await?;
-        self.company_persistence
+        self.verify_authoring(user_id, company_id).await?;
+        let connections = self
+            .company_persistence
             .list_model_connections(company_id)
-            .await
+            .await?;
+        let Some(agent_id) = agent_id else {
+            return Ok(connections);
+        };
+        let reached = self
+            .company_persistence
+            .model_connections_in_agent_reach(company_id, agent_id)
+            .await?;
+        Ok(connections
+            .into_iter()
+            .filter(|connection| reached.contains(&connection.id))
+            .collect())
     }
 
     /// Create a company agent with its default desk at its slug, placed in `placement` when one
@@ -347,8 +389,8 @@ impl AgentUseCases {
         write: AgentWrite,
         placement: Option<AgentPlacement>,
     ) -> AppResult<CreatedAgent> {
-        let (_, write) = self
-            .prepared_agent_write(user_id, company_id, write)
+        let write = self
+            .prepared_agent_write(user_id, company_id, write, placement_target(placement))
             .await?;
         info!(%company_id, "Creating agent");
         self.company_agents()?
@@ -371,10 +413,8 @@ impl AgentUseCases {
         company_id: Uuid,
         write: AgentWrite,
     ) -> AppResult<AgentWrite> {
-        let (_, write) = self
-            .prepared_agent_write(user_id, company_id, write)
-            .await?;
-        Ok(write)
+        self.prepared_agent_write(user_id, company_id, write, ManagementTarget::AnyUnit)
+            .await
     }
 
     /// The company a new agent belongs to, and the write itself normalized and checked.
@@ -386,15 +426,15 @@ impl AgentUseCases {
         user_id: Uuid,
         company_id: Uuid,
         mut write: AgentWrite,
-    ) -> AppResult<(Company, AgentWrite)> {
-        let company =
-            managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+        target: ManagementTarget,
+    ) -> AppResult<AgentWrite> {
+        self.verify_manager(user_id, company_id, target).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
         self.spam_scanning
             .check_public_ingress(write.open_to_public, write.confirm_spam_disabled)?;
         self.validate_model_selection(company_id, &write).await?;
-        Ok((company, write))
+        Ok(write)
     }
 
     /// Create one company agent from a global library definition, with its default desk like
@@ -410,7 +450,8 @@ impl AgentUseCases {
         library_agent_id: Uuid,
         placement: Option<AgentPlacement>,
     ) -> AppResult<ProvisionedAgent> {
-        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+        self.verify_manager(user_id, company_id, placement_target(placement))
+            .await?;
         let definition = self
             .get_library_agent(library_agent_id)
             .await?
@@ -437,7 +478,7 @@ impl AgentUseCases {
             warnings.push(ProvisioningWarning {
                 code: "library_model_pinned".into(),
                 message: format!(
-                    "'{}' answers its desk, which needs an explicit model, so it was created on the company's default: {provider} {model}.",
+                    "'{}' answers its desk, which needs an explicit model, so it was created on its department's default: {provider} {model}.",
                     definition.name
                 ),
             });
@@ -451,8 +492,14 @@ impl AgentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Agent>> {
-        self.verify_company_manager(user_id, company_id).await?;
-        self.agent_persistence.list_by_company_id(company_id).await
+        self.verify_manager(user_id, company_id, ManagementTarget::AnyUnit)
+            .await?;
+        self.agent_persistence
+            .list_managed_agents(
+                WorkflowActor::authenticated(user_id)?,
+                CompanyId::new(company_id),
+            )
+            .await
     }
 
     pub async fn list_library_agents(&self) -> AppResult<Vec<Agent>> {
@@ -515,7 +562,9 @@ impl AgentUseCases {
             .await?
             .ok_or_else(agent_not_found)?;
         write.normalize()?;
-        self.agent_persistence.update(agent_id, write).await
+        self.agent_persistence
+            .update_library_agent(agent_id, write)
+            .await
     }
 
     /// Operator only.
@@ -524,7 +573,7 @@ impl AgentUseCases {
         self.get_library_agent(agent_id)
             .await?
             .ok_or_else(agent_not_found)?;
-        self.agent_persistence.delete(agent_id).await
+        self.agent_persistence.delete_library_agent(agent_id).await
     }
 
     #[instrument(skip_all)]
@@ -534,13 +583,21 @@ impl AgentUseCases {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<Option<Agent>> {
-        self.verify_company_manager(user_id, company_id).await?;
         let agent = self.agent_persistence.get_by_id(agent_id).await?;
         if let Some(ref ag) = agent
             && ag.company_id != Some(company_id)
         {
             return Ok(None);
         }
+        if agent.is_none() {
+            return Ok(None);
+        }
+        self.verify_manager(
+            user_id,
+            company_id,
+            ManagementTarget::Agent(AgentId::new(agent_id)),
+        )
+        .await?;
         Ok(agent)
     }
 
@@ -587,7 +644,8 @@ impl AgentUseCases {
             tools,
         } = request;
         let agent_id = agent.as_uuid();
-        self.verify_company_manager(user_id, company_id).await?;
+        self.verify_manager(user_id, company_id, ManagementTarget::Agent(agent))
+            .await?;
 
         let stored = self
             .agent_persistence
@@ -627,7 +685,12 @@ impl AgentUseCases {
         company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<()> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.verify_manager(
+            user_id,
+            company_id,
+            ManagementTarget::Agent(AgentId::new(agent_id)),
+        )
+        .await?;
 
         let agent = self
             .agent_persistence
@@ -640,7 +703,13 @@ impl AgentUseCases {
         }
 
         info!("Deleting agent {} for company {}", agent_id, company_id);
-        self.agent_persistence.delete(agent_id).await
+        self.draft_persistence
+            .delete_company_agent(crate::application::agent::AgentPublicationScope {
+                company: CompanyId::new(company_id),
+                actor: WorkflowActor::authenticated(user_id)?,
+                agent: AgentId::new(agent_id),
+            })
+            .await
     }
 
     #[instrument(skip_all)]
@@ -654,7 +723,7 @@ impl AgentUseCases {
         provider_override: Option<&str>,
         model_override: Option<&str>,
     ) -> AppResult<String> {
-        self.verify_company_manager(user_id, company_id).await?;
+        self.verify_authoring(user_id, company_id).await?;
 
         let connections = self
             .company_persistence

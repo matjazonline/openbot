@@ -29,18 +29,8 @@ pub struct ChannelWrite {
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
     pub created_by: Option<CreationProvenance>,
-    /// Which department owns the desk and whether it is members-only. `None` leaves both as they
-    /// are on an edit and creates an unowned desk: every form that predates departments builds
-    /// this write wholesale, and must not detach a desk by saving it.
-    pub ownership: Option<ChannelOwnershipWrite>,
-}
-
-/// A change to a desk's ownership; an absent field keeps its current value.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ChannelOwnershipWrite {
-    /// `Some(None)` detaches the desk from its department.
-    pub department_id: Option<Option<DepartmentId>>,
-    pub members_only: Option<bool>,
+    /// The required owner: absent creates under the root or preserves the owner on edit.
+    pub department_id: Option<DepartmentId>,
 }
 
 /// One authorized channel edit, as persistence receives it.
@@ -49,6 +39,7 @@ pub struct ChannelOwnershipWrite {
 /// against `company_id` under its row lock.
 #[derive(Debug, Clone)]
 pub struct ChannelUpdate {
+    pub actor: crate::application::workflow::WorkflowActor,
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub write: ChannelWrite,
@@ -56,7 +47,12 @@ pub struct ChannelUpdate {
 
 #[async_trait]
 pub trait ChannelPersistence: Send + Sync {
-    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
+    async fn create(
+        &self,
+        actor: crate::application::workflow::WorkflowActor,
+        company_id: Uuid,
+        write: ChannelWrite,
+    ) -> AppResult<Channel>;
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>;
 
@@ -93,5 +89,10 @@ pub trait ChannelPersistence: Send + Sync {
     /// Save one channel edit under the channel's gate; any failure leaves it unchanged.
     async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>;
 
-    async fn delete(&self, id: Uuid) -> AppResult<()>;
+    async fn delete(
+        &self,
+        actor: crate::application::workflow::WorkflowActor,
+        company_id: Uuid,
+        id: Uuid,
+    ) -> AppResult<()>;
 }

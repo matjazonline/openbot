@@ -31,6 +31,19 @@ fn unverified_email_error() -> AppError {
     AppError::BadRequest("Verify your current email address before using invitations.".into())
 }
 
+/// Root admins manage member invitations; an invitation carrying the admin role stays the owner's.
+fn require_inviter(
+    membership: crate::entities::company_member::CompanyMembership,
+    roles: impl IntoIterator<Item = CompanyAccessRole>,
+) -> AppResult<()> {
+    if roles.into_iter().all(|role| membership.may_invite_as(role)) {
+        return Ok(());
+    }
+    Err(AppError::Forbidden(
+        "Only the company owner can invite an administrator.".into(),
+    ))
+}
+
 fn not_pending_error() -> AppError {
     AppError::BadRequest("Only a pending invitation can be changed.".into())
 }
@@ -75,7 +88,7 @@ pub trait CompanyInvitePersistence: Send + Sync {
         &self,
         change: InviteLevelChange,
     ) -> AppResult<Option<CompanyInvite>>;
-    async fn delete_invite(&self, id: Uuid) -> AppResult<()>;
+    async fn delete_invite(&self, command: DeleteCompanyInvite) -> AppResult<()>;
     async fn list_invites_for_user(
         &self,
         user_id: Uuid,
@@ -96,11 +109,9 @@ pub trait CompanyInvitePersistence: Send + Sync {
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>>;
     async fn update_member_role(
         &self,
-        company_id: Uuid,
-        user_id: Uuid,
-        role: CompanyAccessRole,
+        change: MemberRoleChange,
     ) -> AppResult<Option<CompanyMember>>;
-    async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()>;
+    async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
 }
 
 #[derive(Clone)]
@@ -148,11 +159,7 @@ impl CompanyInviteUseCases {
         let access = self
             .level_manager(command.actor_id, command.company_id)
             .await?;
-        if !access.membership.is_owner() {
-            return Err(AppError::Forbidden(
-                "Only the company owner can do this.".into(),
-            ));
-        }
+        require_inviter(access.membership, [command.role])?;
         crate::entities::access_level::may_assign_level(
             level_actor(&access),
             crate::entities::access_level::LevelTarget::Assignable(
@@ -207,16 +214,15 @@ impl CompanyInviteUseCases {
         let access = self
             .level_manager(command.actor_id, command.company_id)
             .await?;
-        if !access.membership.is_owner() {
-            return Err(AppError::Forbidden(
-                "Only the company owner can do this.".into(),
-            ));
-        }
         let invite = self
             .invite_persistence
             .get_invite_by_id(command.company_id, command.invite_id)
             .await?
             .ok_or_else(invite_not_found)?;
+        require_inviter(
+            access.membership,
+            [invite.role, command.role.unwrap_or(invite.role)],
+        )?;
         if invite.status != "pending" {
             return Err(not_pending_error());
         }
@@ -243,7 +249,7 @@ impl CompanyInviteUseCases {
         company_id: Uuid,
         invite_id: Uuid,
     ) -> AppResult<()> {
-        self.verify_company_owner(user_id, company_id).await?;
+        let access = self.level_manager(user_id, company_id).await?;
 
         let invite = self
             .invite_persistence
@@ -254,9 +260,16 @@ impl CompanyInviteUseCases {
         if invite.company_id != company_id {
             return Err(invite_not_found());
         }
+        require_inviter(access.membership, [invite.role])?;
 
         info!("Deleting invite {} for company {}", invite_id, company_id);
-        self.invite_persistence.delete_invite(invite_id).await
+        self.invite_persistence
+            .delete_invite(DeleteCompanyInvite {
+                actor_id: user_id,
+                company_id,
+                invite_id,
+            })
+            .await
     }
 
     #[instrument(skip_all)]
@@ -334,7 +347,11 @@ impl CompanyInviteUseCases {
             member_user_id, company_id
         );
         self.invite_persistence
-            .remove_member(company_id, member_user_id)
+            .remove_member(RemoveCompanyMember {
+                actor_id: user_id,
+                company_id,
+                member_user_id,
+            })
             .await
     }
 
@@ -359,7 +376,12 @@ impl CompanyInviteUseCases {
             member_user_id, role, company_id
         );
         self.invite_persistence
-            .update_member_role(company_id, member_user_id, role)
+            .update_member_role(MemberRoleChange {
+                actor_id: user_id,
+                company_id,
+                member_user_id,
+                role,
+            })
             .await?
             .ok_or_else(|| AppError::NotFound("Team member not found".into()))
     }

@@ -1,0 +1,42 @@
+Collecting openapi-spec-validator==0.7.2
+  Downloading openapi_spec_validator-0.7.2-py3-none-any.whl (39 kB)
+Collecting jsonschema==4.23.0
+  Downloading jsonschema-4.23.0-py3-none-any.whl (88 kB)
+Collecting lazy-object-proxy<2.0.0,>=1.7.1
+  Downloading lazy_object_proxy-1.12.0-cp39-cp39-macosx_11_0_arm64.whl (26 kB)
+Collecting jsonschema-path<0.4.0,>=0.3.1
+  Downloading jsonschema_path-0.3.4-py3-none-any.whl (14 kB)
+Collecting openapi-schema-validator<0.7.0,>=0.6.0
+  Downloading openapi_schema_validator-0.6.3-py3-none-any.whl (8.8 kB)
+Collecting jsonschema-specifications>=2023.03.6
+  Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+Collecting rpds-py>=0.7.1
+  Downloading rpds_py-0.27.1-cp39-cp39-macosx_11_0_arm64.whl (354 kB)
+Collecting referencing>=0.28.4
+  Downloading referencing-0.36.2-py3-none-any.whl (26 kB)
+Collecting attrs>=22.2.0
+  Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+Collecting requests<3.0.0,>=2.31.0
+  Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+Collecting pathable<0.5.0,>=0.4.1
+  Downloading pathable-0.4.4-py3-none-any.whl (9.6 kB)
+Collecting PyYAML>=5.1
+  Using cached pyyaml-6.0.3-cp39-cp39-macosx_11_0_arm64.whl (174 kB)
+Collecting rfc3339-validator
+  Downloading rfc3339_validator-0.1.4-py2.py3-none-any.whl (3.5 kB)
+Collecting typing-extensions>=4.4.0
+  Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Collecting urllib3<3,>=1.21.1
+  Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
+Collecting certifi>=2017.4.17
+  Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+Collecting idna<4,>=2.5
+  Downloading idna-3.20-py3-none-any.whl (69 kB)
+Collecting charset_normalizer<4,>=2
+  Downloading charset_normalizer-3.5.2-cp39-cp39-macosx_10_9_universal2.whl (374 kB)
+Collecting six
+  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Installing collected packages: typing-extensions, rpds-py, attrs, referencing, urllib3, six, jsonschema-specifications, idna, charset-normalizer, certifi, rfc3339-validator, requests, PyYAML, pathable, jsonschema, openapi-schema-validator, lazy-object-proxy, jsonschema-path, openapi-spec-validator
+Successfully installed PyYAML-6.0.3 attrs-26.1.0 certifi-2026.10.23 charset-normalizer-3.5.2 idna-3.20 jsonschema-4.23.0 jsonschema-path-0.3.4 jsonschema-specifications-2025.9.1 lazy-object-proxy-1.12.0 openapi-schema-validator-0.6.3 openapi-spec-validator-0.7.2 pathable-0.4.4 referencing-0.36.2 requests-2.32.5 rfc3339-validator-0.1.4 rpds-py-0.27.1 six-1.17.0 typing-extensions-4.16.0 urllib3-2.6.3
+WARNING: You are using pip version 21.2.4; however, version 26.0.1 is available.
+You should consider upgrading via the '/private/tmp/attribution-service-contract-env/bin/python -m pip install --upgrade pip' command.

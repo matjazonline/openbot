@@ -73,9 +73,13 @@ async fn workflow_reviewer_follow_former_run_actor_removal_preserves_owner_histo
             .read_decision(f.command.company, f.command.actor, f.command.decision)
             .await
             .unwrap();
-        p.remove_member(f.command.company.as_uuid(), f.former)
-            .await
-            .unwrap();
+        p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.fixture.s.owner().user_id(),
+            company_id: f.command.company.as_uuid(),
+            member_user_id: f.former,
+        })
+        .await
+        .unwrap();
         assert_eq!(
             p.read_decision(f.command.company, f.command.actor, f.command.decision)
                 .await
@@ -152,7 +156,11 @@ async fn workflow_reviewer_follow_owner_cancel_and_replay_do_not_lock_former_run
     let f = Box::pin(former_actor_decision()).await;
     f.fixture
         .p
-        .remove_member(f.fixture.scope.company.as_uuid(), f.former)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.fixture.s.owner().user_id(),
+            company_id: f.fixture.scope.company.as_uuid(),
+            member_user_id: f.former,
+        })
         .await
         .unwrap();
     // Reply contexts currently retain an actor FK. Exercise actual membership removal and

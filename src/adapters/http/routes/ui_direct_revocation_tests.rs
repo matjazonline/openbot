@@ -218,7 +218,11 @@ async fn rows(s: &Scenario) -> i64 {
 
 async fn revoke(s: &Scenario) {
     s.h.persistence
-        .remove_member(s.h.company_id, s.actor.user_id)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: s.h.owner.user_id,
+            company_id: s.h.company_id,
+            member_user_id: s.actor.user_id,
+        })
         .await
         .unwrap();
     assert!(

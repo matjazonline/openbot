@@ -1,0 +1,11 @@
+openbot-plan04-p03-memory-pg
+Untagged: openbot-plan04-p03-memory:20261117
+Deleted: sha256:c97559baa22c0a1062f63cc7b154a8e87f017dc94be571fd6fde7691a961f6ac
+Untagged: openbot-plan04-p03-knowledge:20261117
+Deleted: sha256:c2a11498946dca5953f02771b6bff3849248809c5505c8616227644e2b3fb77a
+Untagged: openbot-plan04-p03-attribution:20261117
+Deleted: sha256:d67140f1f5795ef47bac240f2b9208bc36cef64845c7050cb70a09b46fd13eab
+Untagged: openbot-plan04-network-scope:20261117
+Deleted: sha256:68f1a39cb2b18253fecd1ca95facce55d5fac62d6fc07228e34fbb4f3a068615
+DROP DATABASE
+PASS: only owned p03 container/images/diag DB removed; prior phase PG/DBs and Colima profile preserved. Build/model/dependency caches retained.

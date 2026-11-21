@@ -74,8 +74,7 @@ async fn direct_thread_notification_real_self_ingress_worker_list_open_and_read_
     let (thread, association) = received(&f, principal, f.owner).await;
     let source: (Uuid, Uuid, Uuid, Uuid) = sqlx::query_as(
         "SELECT event.source_id,event.actor_principal_id,event.direct_membership_id,membership.id \
-         FROM notification_events AS event JOIN company_members AS membership \
-         ON membership.company_id=event.company_id AND membership.user_id=$2 \
+         FROM notification_events AS event JOIN LATERAL membership_of($2, event.company_id) AS membership ON true \
          WHERE event.company_id=$1 AND event.source_kind='direct_message'",
     )
     .bind(f.company.id)
@@ -147,25 +146,31 @@ async fn direct_thread_notification_unprocessed_retirement_and_rejoin_never_revi
     let (user, name) = account(&f.persistence, "receipt_member").await;
     let principal = f.join(user, &name).await;
     let (_, association) = received(&f, principal, f.owner).await;
-    let old_member: Uuid =
-        sqlx::query_scalar("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2")
-            .bind(f.company.id)
-            .bind(user)
-            .fetch_one(f.pool())
-            .await
-            .unwrap();
+    let old_member: Uuid = sqlx::query_scalar(
+        "SELECT id FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(user)
+    .fetch_one(f.pool())
+    .await
+    .unwrap();
     f.persistence
-        .remove_member(f.company.id, user)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.company.user_id,
+            company_id: f.company.id,
+            member_user_id: user,
+        })
         .await
         .unwrap();
     assert_eq!(f.join(user, &name).await, principal);
-    let new_member: Uuid =
-        sqlx::query_scalar("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2")
-            .bind(f.company.id)
-            .bind(user)
-            .fetch_one(f.pool())
-            .await
-            .unwrap();
+    let new_member: Uuid = sqlx::query_scalar(
+        "SELECT id FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(user)
+    .fetch_one(f.pool())
+    .await
+    .unwrap();
     assert_ne!(old_member, new_member);
     assert_eq!(projected(&f).await, 1);
     assert!(list(&f, user, principal).await.items.is_empty());
@@ -212,7 +217,11 @@ async fn direct_thread_notification_projected_retirement_withdraws_before_open_a
             .unwrap();
 
     f.persistence
-        .remove_member(f.company.id, user)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.company.user_id,
+            company_id: f.company.id,
+            member_user_id: user,
+        })
         .await
         .unwrap();
     let (state, read_after): (String, Option<chrono::DateTime<chrono::Utc>>) =
@@ -317,6 +326,7 @@ async fn direct_thread_notification_competing_mixed_redelivery_emits_only_each_p
     ChannelPersistence::update(
         &f.persistence,
         ChannelUpdate {
+            actor: crate::application::workflow::WorkflowActor::authenticated(f.owner).unwrap(),
             company_id: f.company.id,
             channel_id: desk,
             write: ChannelWrite {
@@ -389,6 +399,14 @@ async fn direct_thread_notification_source_deletion_resolves_without_an_actionab
         .execute(f.pool())
         .await
         .unwrap();
+    let (replacement, _) = account(&f.persistence, "replacement_owner").await;
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        f.pool(),
+        f.company.id,
+        replacement,
+        crate::entities::company_member::CompanyAccessRole::Member,
+    )
+    .await;
     sqlx::query("DELETE FROM principals WHERE company_id=$1 AND id=$2")
         .bind(f.company.id)
         .bind(owner)

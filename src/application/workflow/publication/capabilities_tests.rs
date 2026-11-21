@@ -3,6 +3,7 @@ use crate::application::agent::{AgentKey, SkillSnapshot};
 
 fn skill(name_: &str, id: u128, required: Vec<TypeName>) -> SkillSnapshot {
     SkillSnapshot {
+        unit_id: uuid::Uuid::nil(),
         description: "Skill instructions".into(),
         files: Vec::new(),
         company_id: company(),
@@ -26,6 +27,7 @@ fn capable_definition() -> crate::application::agent::ResolvedAgentDefinition {
         .map(|(index, alias)| {
             let snapshot = tool_snapshot("tool.call");
             ResolvedAgentTool {
+                unit_id: Some(uuid::Uuid::nil()),
                 binding: AgentToolBinding {
                     id: AgentBindingId::new(Uuid::from_u128(20 + index as u128)),
                     alias: AgentToolAlias::parse(*alias).unwrap(),

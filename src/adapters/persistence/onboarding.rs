@@ -64,16 +64,17 @@ impl OnboardingPersistence for PostgresOnboarding {
                 .await?
                 .ok_or_else(company_not_found)?;
         let role: String = sqlx::query_scalar(
-            "SELECT role FROM company_members WHERE company_id = $1 AND user_id = $2 FOR SHARE",
+            "SELECT facts.role FROM department_members AS member JOIN LATERAL membership_of(member.root_user_id, member.company_id) AS facts ON facts.id = member.id WHERE member.company_id = $1 AND member.root_user_id = $2 FOR SHARE OF member",
         )
         .bind(company_id)
         .bind(user_id)
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(company_not_found)?;
+        // Onboarding is the owner's; anyone else is told nothing (Plan06 02A.4).
         if owner != user_id || role != "owner" {
-            return Err(AppError::Forbidden(
-                "Only the company owner can onboard agents.".into(),
+            return Err(AppError::NotFound(
+                "Company not found, or you do not have permission.".into(),
             ));
         }
         Ok(Box::new(Session {
@@ -201,6 +202,8 @@ impl Session {
                 &self.templates,
                 company,
                 WorkflowActor::authenticated(self.user_id)?,
+                // Onboarding is the owner's; `begin` verified ownership under the company lock.
+                crate::application::ports::administration::ManagementRole::Owner,
                 department.id,
                 &department.write,
                 None,
@@ -213,9 +216,13 @@ impl Session {
     /// One agent through company-agent creation, with its default desk (01DEP-P03-D4).
     async fn insert(&mut self, mut prepared: PreparedAgent) -> AppResult<()> {
         if let Some(library_id) = prepared.library_id {
+            // Onboarding agents are unplaced, so their copied skills are the root's.
+            let root =
+                super::company::root_on(&mut self.tx, CompanyId::new(self.company_id)).await?;
             prepare_library_agent_on(
                 &mut self.tx,
                 self.company_id,
+                root.as_uuid(),
                 library_id,
                 &mut prepared.write,
             )
@@ -229,7 +236,7 @@ impl Session {
             CompanyAgentCreation {
                 id: prepared.id,
                 write: prepared.write,
-                placement: None,
+                placement: super::company_agent::AgentCreationPlacement::Unplaced,
             },
         ))
         .await?;

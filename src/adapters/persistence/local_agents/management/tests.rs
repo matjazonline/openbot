@@ -105,8 +105,18 @@ async fn cloudroom_management_private_and_foreign_session_reads_and_every_contro
     let s = Setup::new().await;
     let id = s.start().await;
     s.map_thread(id).await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=(SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2)")
-        .bind(s.f.company).bind(s.conversation).execute(&s.f.database.pool).await.unwrap();
+    let restricted_channel: Uuid =
+        sqlx::query_scalar("SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2")
+            .bind(s.f.company)
+            .bind(s.conversation)
+            .fetch_one(&s.f.database.pool)
+            .await
+            .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        &s.f.database.pool,
+        restricted_channel,
+    )
+    .await;
     let p = &s.f.persistence;
     assert!(p.read_session(s.f.owner, s.f.company, id).await.is_ok());
     for (company, actor) in [

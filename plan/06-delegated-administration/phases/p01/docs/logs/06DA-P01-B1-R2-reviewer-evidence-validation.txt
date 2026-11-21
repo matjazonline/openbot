@@ -1,0 +1,3 @@
+plan/06-delegated-administration/phases/p01/docs/logs/06DA-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 9}
+1 evidence manifest(s) validated; declared results are not acceptance
+Exit: 0

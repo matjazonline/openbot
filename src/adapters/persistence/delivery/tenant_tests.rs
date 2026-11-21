@@ -21,7 +21,6 @@ struct Member {
 
 async fn member(persistence: &PostgresPersistence, company_id: Uuid, role: &str) -> Member {
     let user_id = Uuid::new_v4();
-    let principal_id = Uuid::new_v4();
     sqlx::query("INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')")
         .bind(user_id)
         .bind(format!("member_{}", user_id.simple()))
@@ -29,21 +28,16 @@ async fn member(persistence: &PostgresPersistence, company_id: Uuid, role: &str)
         .execute(&persistence.pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,$4)")
-        .bind(Uuid::new_v4())
-        .bind(company_id)
-        .bind(user_id)
-        .bind(role)
-        .execute(&persistence.pool)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'member')")
-        .bind(principal_id)
-        .bind(company_id)
-        .bind(user_id)
-        .execute(&persistence.pool)
-        .await
-        .unwrap();
+    let principal_id = crate::adapters::persistence::test_support::insert_root_member(
+        &persistence.pool,
+        crate::domain::workflow::CompanyId::new(company_id),
+        user_id,
+        (role).parse().expect("fixture role"),
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await
+    .as_uuid();
+
     Member {
         user_id,
         principal_id,
@@ -230,7 +224,11 @@ async fn notification_delivery_tenant_member_removal_cancels_pending_notices() {
     .unwrap();
 
     persistence
-        .remove_member(scope.company.id, leaving.user_id)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: scope.company.user_id,
+            company_id: scope.company.id,
+            member_user_id: leaving.user_id,
+        })
         .await
         .unwrap();
 
@@ -282,10 +280,16 @@ async fn notification_delivery_tenant_member_removal_cancels_pending_notices() {
         .unwrap(),
     };
     let owed = notice(&persistence, &scope, &owner).await;
-    persistence
-        .remove_member(scope.company.id, owner.user_id)
-        .await
-        .unwrap();
+    assert!(matches!(
+        persistence
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: scope.company.user_id,
+                company_id: scope.company.id,
+                member_user_id: owner.user_id,
+            })
+            .await,
+        Err(crate::app_error::AppError::BadRequest(_))
+    ));
     assert_eq!(cancellation_of(&persistence, owed).await, None);
 
     CompanyPersistence::delete(&persistence, scope.company.id)
@@ -306,7 +310,7 @@ async fn notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_i
     let leaving = member(&persistence, scope.company.id, "member").await;
 
     let mut producer = persistence.pool.begin().await.unwrap();
-    sqlx::query("SELECT 1 FROM principals AS principal JOIN company_members AS member ON member.company_id = principal.company_id AND member.user_id = principal.user_id WHERE principal.company_id = $1 AND principal.id = $2 FOR SHARE OF principal, member")
+    sqlx::query("SELECT 1 FROM principals AS principal JOIN department_members AS member ON member.company_id = principal.company_id AND member.root_user_id = principal.user_id WHERE principal.company_id = $1 AND principal.id = $2 FOR SHARE OF principal, member")
         .bind(scope.company.id)
         .bind(leaving.principal_id)
         .fetch_one(&mut *producer)
@@ -317,7 +321,16 @@ async fn notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_i
     let remover = persistence.clone();
     let company = scope.company.id;
     let user = leaving.user_id;
-    let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+    let removing_owner = scope.company.user_id;
+    let removal = tokio::spawn(async move {
+        remover
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: removing_owner,
+                company_id: company,
+                member_user_id: user,
+            })
+            .await
+    });
     wait_until_a_backend_is_blocked(&persistence.pool).await;
     producer.commit().await.unwrap();
     removal.await.unwrap().unwrap();
@@ -357,7 +370,16 @@ async fn notification_delivery_tenant_removal_first_producer_finds_no_member() {
 
     let remover = persistence.clone();
     let (company, user) = (scope.company.id, leaving.user_id);
-    let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+    let removing_owner = scope.company.user_id;
+    let removal = tokio::spawn(async move {
+        remover
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: removing_owner,
+                company_id: company,
+                member_user_id: user,
+            })
+            .await
+    });
     wait_until_backends_are_blocked(&persistence.pool, 1).await;
 
     let producer_pool = persistence.pool.clone();
@@ -366,8 +388,8 @@ async fn notification_delivery_tenant_removal_first_producer_finds_no_member() {
         let mut tx = producer_pool.begin().await.unwrap();
         let recipient: Option<Uuid> = sqlx::query_scalar(
             "SELECT principal.id FROM principals AS principal \
-               JOIN company_members AS member \
-                 ON member.company_id = principal.company_id AND member.user_id = principal.user_id \
+               JOIN department_members AS member \
+                 ON member.company_id = principal.company_id AND member.root_user_id = principal.user_id \
               WHERE principal.company_id = $1 AND principal.id = $2 \
                 FOR SHARE OF principal, member",
         )
@@ -518,7 +540,7 @@ async fn channel_path_fk_delivery_cannot_cross_channels() {
     )
     .await;
     park(&persistence, fixture.delivery.id).await;
-    let other = ChannelPersistence::create(
+    let other = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         scope.company.id,
         ChannelWrite {

@@ -1,0 +1,94 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 24s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 81 tests
+test adapters::http::routes::ui_channels::tests::access_mode_ui_public_checkbox_preserves_named_addresses_and_can_close_intake ... ok
+test adapters::http::routes::ui_channels::tests::access_mode_ui_owner_is_optional_in_a_write_but_cannot_be_cleared ... ok
+test adapters::http::routes::channel::department_tests::access_mode_json_department_rejects_explicit_null_and_invalid_ids ... ok
+test adapters::http::pages::tests::department_ui::access_mode_ui_desk_form_requires_owner_defaults_root_and_offers_public ... ok
+test adapters::http::routes::channel::department_tests::access_mode_json_owner_is_preserved_and_can_be_reassigned_but_not_cleared ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_set_desk_ownership_on_takes_the_desk_edit_path ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_removal_revokes_access_and_notifications_in_one_commit ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_admits_members_and_the_owner_only ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_sql_and_domain_keep_membership_but_withhold_unverified_email_grants ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_default_root_desk_admits_root_members_but_child_requires_its_grant ... ok
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_scale_1000_members_200_desks ... ignored, explicit 1000-member/200-desk scale measurement; run focused with --ignored
+test adapters::persistence::department::tests::desks::access_mode_ownership_company_teardown_takes_owned_desks_with_it ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_provisioning_save_recall_capture_and_disable ... ignored, needs the live memory service: scripts/memory-integration.sh
+test adapters::persistence::department::tests::desks::access_mode_ownership_blocks_deletion_until_reassigned ... ok
+test adapters::persistence::department::tests::desks::access_mode_ownership_refuses_another_companys_department ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_keeps_an_allowlist_entry_and_a_membership_apart ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_reassignment_and_public_keep_the_current_department_audience ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_removing_a_teammate_drops_only_derived_grants ... ok
+test adapters::persistence::department::tests::desks::access_mode_grants_reaches_one_step_up_and_down ... ok
+test adapters::persistence::department::tests::desks::access_mode_raw_null_owner_and_removed_modes_are_refused ... ok
+test adapters::persistence::department::tests::desks::access_mode_public_selection_preserves_owner_and_materialized_grants ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_both_orders ... ok
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_competing_root_join_and_default_desk_creation_keep_every_grant ... ok
+test adapters::persistence::department::tests::desks::access_mode_scale::access_mode_grants_join_and_removal_write_only_the_delta ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_failed_provisioning_is_redriven_not_permanent ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_disable_enable_and_provisioning_serialize ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_member_removal_and_provisioning_serialize_in_both_orders ... ok
+test adapters::persistence::memory::tests::memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identities ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_command_replays_by_key_and_refuses_a_changed_request ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_commands_race_to_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::autonomous_provisioning::autonomous_agent_provisioning_failed_final_command_rolls_back_initial_revision_then_competing_retries_publish_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_can_staff_a_separate_reviewed_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_places_the_agent_in_a_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refuses_implicit_desk_configuration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_returns_direct_binding_without_a_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_competing_builder_claimants_make_one_direct_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::root_membership_builder_infers_no_working_department_but_accepts_an_explicit_root ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_bootstrap_selects_once_and_replay_preserves_clear ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_competing_commands_share_one_selection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::knowledge_provisioning_tests::knowledge_run_level_provisioning_rechecks_pending_intent_before_any_local_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_agent_reference_keeps_its_own_published_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_agents_and_models ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_an_oversized_directory_within_its_bound ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_losing_an_address_race_is_a_conflict_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_refusals_commit_a_receipt_and_no_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_transient_fault_leaves_no_marker_receipt_or_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_install_failure_rolls_back_portable_skills_and_principal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_missing_local_tool_refuses_the_copy ... ok
+test application::use_cases::builtin_agent_library::tests::agent_builder_is_granted_the_provisioning_tools_and_told_their_rules ... ok
+test application::use_cases::channel::public_settings_tests::access_mode_members_normalization_preserves_explicit_owner ... ok
+test application::use_cases::channel::public_settings_tests::access_mode_public_normalization_keeps_an_omitted_owner_omitted ... ok
+test application::use_cases::channel::public_settings_tests::access_mode_public_normalization_preserves_explicit_owner ... ok
+test application::workflow::registry::message_tests::provisioning_names_are_not_step_tools ... ok
+test domain::entities::channel::tests::access_mode_child_members_requires_a_view_grant_even_for_admins ... ok
+test domain::entities::channel::tests::access_mode_members_preserves_owner_and_named_participant_access ... ok
+test domain::entities::channel::tests::access_mode_parses_only_members_and_public ... ok
+test domain::entities::channel::tests::access_mode_public_accepts_outsiders_without_trusting_them ... ok
+test domain::entities::channel::tests::access_mode_public_opens_mail_but_never_outsider_reads ... ok
+test domain::entities::channel::tests::access_mode_root_members_read_through_their_materialized_grants ... ok
+test domain::entities::channel::tests::access_mode_root_members_send_through_their_materialized_grants ... ok
+test domain::entities::channel::tests::access_mode_unresolved_actor_holds_no_grant ... ok
+test domain::entities::channel::tests::access_mode_unverified_account_can_use_only_its_department_grants ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_requires_explicit_company_local_binding_before_publish ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::requester_locks::delegated_provisioning_locks_requester_before_company ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_sees_the_conversation_so_far ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_context_reaches_the_lead_on_its_department_desk ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_lead_desk_answers_through_its_current_lead ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::channel_reply_native_runtime_tests::channel_reply_authoring_native_real_review_closes_reject_and_publishes_only_edited_approval ... ok
+
+test result: ok. 79 passed; 0 failed; 2 ignored; 0 measured; 4665 filtered out; finished in 48.59s
+

@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::department::DepartmentWrite;
 use crate::entities::department::DepartmentRole;
 use crate::entities::transport::PrincipalId;
@@ -153,17 +153,14 @@ async fn role_department(fixture: &Fixture) -> RoleDepartment {
             .await
             .unwrap();
     }
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &fixture.persistence,
         fixture.target.company.as_uuid(),
         ChannelWrite {
             name: "Protected action".into(),
             slug: "protected-action".into(),
             enabled: true,
-            ownership: Some(ChannelOwnershipWrite {
-                department_id: Some(Some(department)),
-                ..Default::default()
-            }),
+            department_id: Some(department),
             ..Default::default()
         },
     )
@@ -212,7 +209,7 @@ async fn workflow_role_reviewer_protected_action_uses_frozen_people_and_current_
     );
     assert!(!decision.reviewers.contains(&owner));
     assert!(!decision.reviewers.contains(&f.admin));
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
         .bind(company.as_uuid())
         .bind(f.admin)
         .execute(p.pool())

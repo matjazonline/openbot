@@ -5,7 +5,7 @@ async fn replay_reauthorizes_and_association_is_part_of_dedup() {
     let company_id = company();
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 128));
-    let channel = channel(company_id, ChannelAccessMode::Team);
+    let channel = channel(company_id, ChannelAccessMode::Members);
     store
         .state
         .lock()

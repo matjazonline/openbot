@@ -1,0 +1,36 @@
+--- B1/src/application/ports/channel.rs
++++ B2/src/application/ports/channel.rs
+@@ -39,6 +39,7 @@
+ /// against `company_id` under its row lock.
+ #[derive(Debug, Clone)]
+ pub struct ChannelUpdate {
++    pub actor: crate::application::workflow::WorkflowActor,
+     pub company_id: Uuid,
+     pub channel_id: Uuid,
+     pub write: ChannelWrite,
+@@ -46,7 +47,12 @@
+ 
+ #[async_trait]
+ pub trait ChannelPersistence: Send + Sync {
+-    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
++    async fn create(
++        &self,
++        actor: crate::application::workflow::WorkflowActor,
++        company_id: Uuid,
++        write: ChannelWrite,
++    ) -> AppResult<Channel>;
+ 
+     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>;
+ 
+@@ -83,5 +89,10 @@
+     /// Save one channel edit under the channel's gate; any failure leaves it unchanged.
+     async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>;
+ 
+-    async fn delete(&self, id: Uuid) -> AppResult<()>;
++    async fn delete(
++        &self,
++        actor: crate::application::workflow::WorkflowActor,
++        company_id: Uuid,
++        id: Uuid,
++    ) -> AppResult<()>;
+ }

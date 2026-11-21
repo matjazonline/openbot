@@ -93,9 +93,10 @@ async fn panel_response(
 
 fn editable_failure(error: AppError) -> AppResult<String> {
     match error {
-        AppError::BadRequest(_) | AppError::Conflict(_) | AppError::ServiceUnavailable(_) => {
-            Ok(error.to_string())
-        }
+        AppError::BadRequest(_)
+        | AppError::Conflict(_)
+        | AppError::ServiceUnavailable(_)
+        | AppError::ResourceOutsideUnit(_) => Ok(error.to_string()),
         error => Err(error),
     }
 }

@@ -49,34 +49,24 @@ async fn user(pool: &PgPool, label: &str) -> Uuid {
 }
 
 async fn person(pool: &PgPool, company: Uuid, user: Uuid, label: &str) -> PrincipalId {
-    let id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO principals (id, company_id, kind, user_id, display_label) \
-         VALUES ($1, $2, 'person', $3, $4)",
+    // Root bootstrap/join already owns this lifetime principal; fixtures only choose its label.
+    let id = sqlx::query_scalar(
+        "UPDATE principals SET display_label = $3 WHERE company_id = $1 AND user_id = $2 RETURNING id",
     )
-    .bind(id)
-    .bind(company)
-    .bind(user)
-    .bind(label)
-    .execute(pool)
-    .await
-    .expect("a person principal");
+    .bind(company).bind(user).bind(label).fetch_one(pool).await.expect("root person's principal");
     PrincipalId::new(id)
 }
 
 async fn teammate(pool: &PgPool, company: Uuid, role: &str) -> (Uuid, PrincipalId) {
     let id = user(pool, role).await;
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role, access_level) \
-         VALUES ($1, $2, $3, $4, 0)",
+    crate::adapters::persistence::test_support::insert_root_member(
+        pool,
+        crate::domain::workflow::CompanyId::new(company),
+        id,
+        (role).parse().expect("fixture role"),
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(company)
-    .bind(id)
-    .bind(role)
-    .execute(pool)
-    .await
-    .expect("a company member");
+    .await;
     (id, person(pool, company, id, role).await)
 }
 
@@ -218,6 +208,15 @@ impl Departments {
         self.persistence.pool()
     }
 
+    async fn root_id(&self) -> DepartmentId {
+        let id = sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(self.company)
+            .fetch_one(self.pool())
+            .await
+            .unwrap();
+        DepartmentId::new(id)
+    }
+
     fn write(&self, name: &str, parent: Option<DepartmentId>) -> DepartmentWrite {
         DepartmentWrite {
             name: name.into(),
@@ -268,9 +267,14 @@ impl Departments {
     /// Delete the department's own plain desk, which a department delete waits for (decision 9).
     async fn drop_desk(&self, department: DepartmentId) {
         use crate::application::ports::channel::ChannelPersistence;
-        ChannelPersistence::delete(&self.persistence, self.desk_of(department).await)
-            .await
-            .expect("a plain department desk deletes");
+        ChannelPersistence::delete(
+            &self.persistence,
+            WorkflowActor::authenticated(self.owner).unwrap(),
+            self.company,
+            self.desk_of(department).await,
+        )
+        .await
+        .expect("a plain department desk deletes");
     }
 
     async fn roles(&self, department: DepartmentId) -> Vec<DepartmentRoleHolder> {
@@ -300,7 +304,7 @@ impl Departments {
         let id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO departments (id, company_id, name, slug, parent_id, created_by) \
-             VALUES ($1, $2, $3, $3, $4, $5)",
+             VALUES ($1, $2, $3, $3, COALESCE($4, (SELECT id FROM departments WHERE company_id = $2 AND is_root)), $5)",
         )
         .bind(id)
         .bind(company)
@@ -416,7 +420,7 @@ async fn department_write_round_trips_create_rename_reparent_and_delete() {
         .expect("the edit is stored");
     assert_eq!(read, moved);
     let rooted = f.reparent(care.id, None).await.unwrap();
-    assert_eq!(rooted.parent_id, None);
+    assert_eq!(rooted.parent_id, Some(f.root_id().await));
 
     // Its own desk goes first: a department owning a desk is not deleted (decision 9).
     f.drop_desk(care.id).await;
@@ -483,7 +487,7 @@ async fn department_write_a_name_only_edit_keeps_every_other_field() {
         Department {
             escalation: None,
             name: "Greenhouse".into(),
-            parent_id: None,
+            parent_id: Some(f.root_id().await),
             ..department
         }
     );
@@ -699,7 +703,7 @@ async fn department_write_preflight_names_the_departments_in_a_cycle_or_too_deep
     assert!(matches!(own, Err(AppError::BadRequest(_))), "{own:?}");
 
     let mut parent = middle.id;
-    for level in 3..=MAX_DEPARTMENT_DEPTH {
+    for level in 4..=MAX_DEPARTMENT_DEPTH {
         parent = f.create(&format!("Level {level}"), Some(parent)).await.id;
     }
     let too_deep = f
@@ -710,15 +714,15 @@ async fn department_write_preflight_names_the_departments_in_a_cycle_or_too_deep
         panic!("a ninth level is a bad request, not {too_deep:?}");
     };
     assert!(message.contains("under 'Level 8'"), "{message}");
-    // `middle` heads a subtree seven deep (levels 2..8): under a second root it stays at eight,
-    // under that root's child it would reach nine.
+    // The company root is level 1. `middle` heads levels 3..8: under another
+    // level-2 department it stays at eight; under its child it would reach nine.
     let other = f.create("Other Root", None).await;
     let other_child = f.create("Other Child", Some(other.id)).await;
     let deeper = f.reparent(middle.id, Some(other_child.id)).await;
     assert!(matches!(deeper, Err(AppError::BadRequest(_))), "{deeper:?}");
     f.reparent(middle.id, Some(other.id))
         .await
-        .expect("a seven-deep subtree fits under a root");
+        .expect("a six-deep subtree fits below a level-2 department");
     let missing = f
         .use_cases
         .create_department(
@@ -874,7 +878,8 @@ async fn department_write_shows_a_member_only_their_departments() {
         ids.sort();
         ids
     };
-    let mut theirs = vec![joined.id, led.id];
+    let root = f.root_id().await;
+    let mut theirs = vec![root, joined.id, led.id];
     theirs.sort();
     assert_eq!(
         ids(f
@@ -884,7 +889,7 @@ async fn department_write_shows_a_member_only_their_departments() {
             .unwrap()),
         theirs
     );
-    let mut every = vec![joined.id, led.id, other.id];
+    let mut every = vec![root, joined.id, led.id, other.id];
     every.sort();
     for manager in [f.owner, f.admin] {
         assert_eq!(
@@ -1034,9 +1039,16 @@ async fn department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_
             .await
             .unwrap();
     }
-    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
-        .await
-        .expect("the member is removed from the company");
+    CompanyInvitePersistence::remove_member(
+        &f.persistence,
+        crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.owner,
+            company_id: f.company,
+            member_user_id: f.member,
+        },
+    )
+    .await
+    .expect("the member is removed from the company");
     assert_eq!(f.members(department.id).await, vec![unpublished]);
     assert!(
         f.roles(department.id).await.is_empty(),
@@ -1075,5 +1087,7 @@ mod roster;
 #[path = "department_ui_reads_tests.rs"]
 mod ui_reads;
 
+#[path = "delegated_administration_tests.rs"]
+mod delegated_administration;
 #[path = "department_sponsor_tests.rs"]
 mod sponsors;

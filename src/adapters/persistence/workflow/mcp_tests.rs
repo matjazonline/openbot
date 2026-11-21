@@ -409,14 +409,26 @@ async fn workflow_mcp_refusals_and_protection_are_terminal_without_network() {
                 } else {
                     write.tool_grants.clear();
                 }
-                p.update_mcp_connection(company.as_uuid(), current.id, current.revision, write)
-                    .await
-                    .unwrap();
+                p.update_mcp_connection(
+                    company.as_uuid(),
+                    p.test_root_unit(company.as_uuid()).await,
+                    current.id,
+                    current.revision,
+                    write,
+                )
+                .await
+                .unwrap();
             }
             "token" => {
-                p.replace_mcp_token(company.as_uuid(), current.id, current.revision, None)
-                    .await
-                    .unwrap();
+                p.replace_mcp_token(
+                    company.as_uuid(),
+                    p.test_root_unit(company.as_uuid()).await,
+                    current.id,
+                    current.revision,
+                    None,
+                )
+                .await
+                .unwrap();
             }
             "operation" => {
                 p.revoke_mcp_operation(
@@ -510,3 +522,62 @@ mod knowledge_mcp_tests;
 
 #[path = "vault_tests/mcp.rs"]
 mod vault_authority_tests;
+
+/// Plan07 01B.2: publishing a workflow refuses an MCP selection outside its managing department's
+/// reach, naming the connection, tool and the step using it, and writes no version; moved up, it
+/// publishes.
+#[tokio::test]
+async fn unit_resource_selection_publication_workflow_refuses_an_mcp_selection_out_of_reach() {
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let (connection, _) = Box::pin(configured(&fixture, "http://127.0.0.1:9")).await;
+    let p = &fixture.persistence;
+    let company = fixture.target.company.as_uuid();
+    let owner = fixture.target.actor.user_id();
+    let definitions = DefinitionService::new(
+        Preflight,
+        p.clone(),
+        WorkflowSourceDecoder,
+        mcp::McpPublicationDirectory {
+            persistence: p.clone(),
+            selections: vec![mcp::McpPublicationSelection {
+                connection: connection.id,
+                slot: ResourceName::parse("service").unwrap(),
+                tool: TypeName::parse(TOOL).unwrap(),
+            }],
+        },
+    );
+    let mut draft = fixture.save(None);
+    draft.content.source = source().to_string();
+    definitions.save(draft).await.unwrap();
+    let billing = p.test_unit(company, "billing").await;
+    p.move_mcp_connection(owner, company, connection.id, billing)
+        .await
+        .unwrap();
+    let refused = definitions.publish(fixture.publish()).await;
+    assert!(
+        refused.as_ref().err().is_some_and(|error| matches!(error,
+            crate::application::workflow::lifecycle::LifecycleError::Application(
+                AppError::ResourceOutsideUnit(refusal))
+            if refusal.code() == "publication.resource_outside_unit"
+                && refusal.resource == connection.id && refusal.name.contains(TOOL)
+                && refusal.name.ends_with("used by step lookup"))),
+        "{:?}",
+        refused.err()
+    );
+    let versions: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM workflow_versions WHERE company_id=$1")
+            .bind(company)
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    assert_eq!(versions, 0, "a refused publication writes no version");
+    let root = p.test_root_unit(company).await;
+    p.move_mcp_connection(owner, company, connection.id, root)
+        .await
+        .unwrap();
+    definitions.publish(fixture.publish()).await.unwrap();
+}

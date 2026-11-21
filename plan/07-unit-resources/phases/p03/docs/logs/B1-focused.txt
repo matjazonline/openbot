@@ -1,0 +1,44 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan06)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 04s
+     Running unittests src/main.rs (target/debug/deps/open_bots-605f25833b075cb7)
+
+running 6 tests
+test tests::operational_subject_commands_validate_ids_before_startup ... ok
+test tests::operational_commands_are_parsed_before_server_startup ... ok
+test tests::operational_command_rejects_zero_and_unknown_arguments ... ok
+test tests::second_interrupt_ends_the_drain_immediately ... ok
+test tests::drain_deadline_expires_when_no_second_interrupt_arrives ... ok
+test tests::a_background_owner_that_ignores_shutdown_is_aborted_inside_the_drain_grace ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.62s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 18 tests
+test adapters::http::pages::dashboard::tests::unit_budget_usage_page_dashboard_panel_lists_department_spend ... ok
+test adapters::http::app_error_impl::role_tests::unit_budget_http_refusal_is_a_bounded_named_bad_request ... ok
+test adapters::http::pages::tests::agent_edit_pane_keeps_a_rejected_save_in_the_form ... ok
+test adapters::http::pages::tests::agent_edit_pane_prefills_the_stored_agent_and_offers_delete ... ok
+test adapters::http::routes::ui_departments::tests::unit_budget_usage_page_department_caps_card_for_managers_only ... ok
+test adapters::persistence::workflow::tests::jev_runtime_tests::unit_budget_charge_production_jev_settlement ... ok
+test application::use_cases::agent::model_preparation::tests::prompt_model_uses_only_the_roots_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_authority_follows_the_units_manager ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_delete_and_department_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_usage_page_scopes_numbers_drill_down_and_prices ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_admission_waits_and_sees_the_crossing_charge ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_delete_takes_totals_in_the_charges_order ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_charge_attributes_and_totals_settled_calls ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::unit_budget_charge_production_agent_settlement_on_a_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_competing_concurrent_settlements_and_lock_order ... ok
+test adapters::persistence::workflow::tests::schedule_tests::unit_budget_refusal_of_a_scheduled_run_settles_its_occurrence ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_admission_refuses_at_the_nearest_exhausted_unit ... ok
+test adapters::persistence::workflow::tests::admission_tests::unit_budget_tests::unit_budget_charge_follows_a_reparented_unit_and_a_childs_inherited_scope ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 4961 filtered out; finished in 8.42s
+

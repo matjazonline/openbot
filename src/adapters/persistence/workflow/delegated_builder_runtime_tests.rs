@@ -1,0 +1,162 @@
+//! The real Builder acts for the signed-in requester, including a unit lead.
+use super::*;
+use crate::adapters::persistence::department::PostgresDepartments;
+use crate::application::ports::department::{
+    DepartmentPersistence, DepartmentScope, DepartmentWrite,
+};
+use crate::entities::department::{DepartmentId, DepartmentRole};
+use crate::entities::transport::PrincipalId;
+
+async fn unit(d: &Deployment, slug: &str, lead: Option<Uuid>) -> DepartmentId {
+    let departments = PostgresDepartments::new(
+        d.p().clone(),
+        crate::adapters::persistence::test_support::provisioning_templates(),
+    );
+    let scope = DepartmentScope {
+        actor: d.fixture.target.actor,
+        company: d.fixture.target.company,
+    };
+    let department = departments
+        .create(
+            scope,
+            DepartmentWrite {
+                name: slug.into(),
+                slug: slug.into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    if let Some(user) = lead {
+        let principal: Uuid = sqlx::query_scalar(
+            "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(user)
+        .fetch_one(d.p().pool())
+        .await
+        .unwrap();
+        departments
+            .assign_role(
+                scope,
+                department.id,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Lead,
+                    principal: PrincipalId::new(principal),
+                    decider: false,
+                },
+            )
+            .await
+            .unwrap();
+    }
+    department.id
+}
+
+#[tokio::test]
+async fn delegated_admin_builder_uses_actual_lead_requester_for_creation_listing_and_root_desk_refusal()
+ {
+    let mut managed = spec("unit-helper");
+    managed["department"] = json!("sales");
+    let mut sibling = spec("sibling-helper");
+    sibling["department"] = json!("sibling-unit");
+    let d = Deployment::new(vec![
+        LlmTurn::tool_call(CREATE_AGENT, managed),
+        LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
+        LlmTurn::tool_call(CREATE_AGENT, sibling),
+        LlmTurn::tool_call(
+            CREATE_DESK_FOR_AGENT,
+            desk_spec("unit-helper", "root-desk", ReplyMode::Autonomous),
+        ),
+        LlmTurn::text(r#"{"body":"Created the unit helper; other requests refused."}"#),
+        LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
+        LlmTurn::text(r#"{"body":"Sign in to manage agents."}"#),
+    ])
+    .await;
+    let builder = builder(&d).await;
+    let (lead, email) = person(&d, "member").await;
+    let sales = unit(&d, "sales", Some(lead)).await;
+    unit(&d, "sibling-unit", None).await;
+    write(
+        &d,
+        &email,
+        "builder",
+        "Create and list my helper.",
+        IngressOrigin::TrustedApplication,
+    )
+    .await;
+    d.run_until("the unit lead's Builder request replied", async || {
+        replied(&d, builder).await == 1
+    })
+    .await;
+    assert_managed_results(&d, builder, lead, sales).await;
+    // The same verified person's email is not authenticated administration provenance.
+    write(
+        &d,
+        &email,
+        "builder",
+        "List my agents by email.",
+        IngressOrigin::ExternalTransport,
+    )
+    .await;
+    d.run_until("the email refusal replied", async || {
+        replied(&d, builder).await == 2
+    })
+    .await;
+    let results = receipts(&d, builder).await;
+    assert_eq!(results.len(), 5);
+    assert_eq!(
+        results[4]["error"]["code"], PROVISIONING_FORBIDDEN,
+        "{results:?}"
+    );
+    assert!(results[4].get("agents").is_none());
+    assert_eq!(d.llm.finish().await.unwrap(), 7);
+}
+
+async fn assert_managed_results(d: &Deployment, builder: Uuid, lead: Uuid, sales: DepartmentId) {
+    let results = receipts(d, builder).await;
+    assert_eq!(results.len(), 4, "{results:?}");
+    assert_eq!(results[0]["agent"]["slug"], "unit-helper", "{results:?}");
+    let listed: Vec<&str> = results[1]["agents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|agent| agent["slug"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        listed,
+        ["unit-helper"],
+        "root and sibling agents are outside the requester's authority"
+    );
+    assert_eq!(
+        results[2]["error"]["code"], PROVISIONING_INVALID,
+        "{results:?}"
+    );
+    assert_eq!(
+        results[3]["error"]["code"], PROVISIONING_FORBIDDEN,
+        "{results:?}"
+    );
+    let binding = Uuid::parse_str(results[0]["binding_id"].as_str().unwrap()).unwrap();
+    let configured: (Uuid, Uuid) = sqlx::query_as(
+        "SELECT actor_id, run_as_user_id FROM workflow_binding_revisions WHERE company_id=$1 AND binding_id=$2",
+    ).bind(d.fixture.target.company.as_uuid()).bind(binding).fetch_one(d.p().pool()).await.unwrap();
+    assert_eq!(configured, (lead, lead));
+    let placed: Uuid = sqlx::query_scalar(
+        "SELECT member.department_id FROM department_members AS member JOIN principals AS principal \
+         ON principal.company_id=member.company_id AND principal.id=member.principal_id \
+         WHERE principal.company_id=$1 AND principal.agent_id=$2 AND member.department_id=$3",
+    ).bind(d.fixture.target.company.as_uuid())
+        .bind(Uuid::parse_str(results[0]["agent"]["id"].as_str().unwrap()).unwrap())
+        .bind(sales.as_uuid()).fetch_one(d.p().pool()).await.unwrap();
+    assert_eq!(placed, sales.as_uuid());
+    assert_eq!(
+        d.count("SELECT count(*) FROM agents WHERE company_id=$1 AND slug='sibling-helper'")
+            .await,
+        0
+    );
+    assert_eq!(
+        d.count("SELECT count(*) FROM addresses WHERE company_id=$1 AND target_kind='desk' AND slug='root-desk'")
+            .await,
+        0
+    );
+}

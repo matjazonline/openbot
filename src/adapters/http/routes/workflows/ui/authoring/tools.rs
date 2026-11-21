@@ -275,13 +275,24 @@ pub(super) async fn agent_usage(
     Path(agent): Path<Uuid>,
     Query(query): Query<CompanyQuery>,
 ) -> AppResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    // The agent's grants are its managers' (Plan06 decision 2); each binding listed is then
+    // filtered by desk visibility below.
+    let company = ui.unit_company(query.company_id).await?.id;
     let company_id = super::company(company);
     // Company-scoped: another company's agent is not found, never an empty list.
     crate::adapters::http::routes::workflows::bindings::company_agent(
         &ui.engine, company_id, agent,
     )
     .await?;
+    ui.companies
+        .require_management(
+            ui.user,
+            company,
+            crate::application::ports::administration::ManagementTarget::Agent(
+                crate::entities::agent_capability::AgentId::new(agent),
+            ),
+        )
+        .await?;
     let usage = ui
         .engine
         .authoring_reads()

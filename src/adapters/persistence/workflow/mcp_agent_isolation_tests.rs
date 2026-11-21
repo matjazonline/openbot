@@ -178,11 +178,16 @@ async fn registered(fixture: &Fixture, server: &McpServer, slug: &str) -> McpBin
     let mut write = connection_write(&server.url);
     write.slug = slug.into();
     let connection = p
-        .create_mcp_connection(company.as_uuid(), write)
+        .create_mcp_connection(
+            company.as_uuid(),
+            p.test_root_unit(company.as_uuid()).await,
+            write,
+        )
         .await
         .unwrap();
     p.replace_mcp_token(
         company.as_uuid(),
+        p.test_root_unit(company.as_uuid()).await,
         connection.id,
         connection.revision,
         Some(SecretString::from(TOKEN)),

@@ -1,0 +1,23 @@
+[
+  {
+    "scope": "integrations/cloudroom-plugin",
+    "unchanged_from": "origin/main",
+    "diff_exit": 0,
+    "accepted_execution_log": "plan/04-root-unit/phases/p03/docs/logs/B1-full-check.txt",
+    "execution_log_sha256": "fc186977675b496066d266784e2f8abb3082e2816ae5bcc140fe8cd323ae479b"
+  },
+  {
+    "scope": "services/attribution",
+    "unchanged_from": "origin/main",
+    "diff_exit": 0,
+    "accepted_execution_log": "plan/04-root-unit/phases/p03/docs/logs/B1-full-check.txt",
+    "execution_log_sha256": "fc186977675b496066d266784e2f8abb3082e2816ae5bcc140fe8cd323ae479b"
+  },
+  {
+    "scope": "services/memory",
+    "unchanged_from": "2edd0a73cbe76bac2d559c52f8c4c5025402c88b",
+    "diff_exit": 0,
+    "accepted_execution_log": "plan/05-scopes/phases/p02/docs/logs/B1-service-suite-r1.txt",
+    "execution_log_sha256": "5f6c66f16aa065e872e1017a89a5719392ab1996a2162322b4963cbf588b0def"
+  }
+]

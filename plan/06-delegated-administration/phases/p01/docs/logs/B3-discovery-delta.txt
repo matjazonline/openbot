@@ -1,0 +1,34 @@
+Comparable library target: B2=4782, B3=4810
+Added library tests: 28
+Removed library tests: 0
+All-target discovery additionally lists 13 unchanged bin/source-module tests absent from the old lib-only inventory.
+
+ADDED adapters::http::routes::agent::api_tests::delegated::delegated_admin_agent_json_routes_allow_unit_managers_and_hide_sibling_and_foreign_targets: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_capture_uses_existing_authority_before_creation_permission: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::boundaries::delegated_admin_definition_prepared_writers_recheck_current_binding_authority: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_old_binding_revisions_confer_no_authority: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_sibling_foreign_missing_and_agent_writes_hide_revision_conflicts: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::delegated_admin_definition_unbound_crud_uses_the_recorded_creating_unit: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_multiple_creator_units_default_to_root_and_company_teardown_succeeds: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::integrity::delegated_admin_definition_ownership_is_immutable_tenant_scoped_and_root_defaulted: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::manages_unit_definition_uses_any_active_binding_and_recorded_unit_only_when_unbound: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_binding_deactivation_precedes_definition_publication: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_binding_deactivation: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_definition_publication_precedes_role_removal: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::races::delegated_admin_competing_role_removal_precedes_definition_publication: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_follows_active_bindings_without_adopting_ownership: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_copy_replay_requires_current_target_authority: test
+ADDED adapters::http::routes::workflows::tests::delegated_definitions::replays::delegated_admin_definition_existing_create_collisions_require_current_management: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::construction::delegated_admin_agent_creation_rolls_back_early_membership_and_publications_on_final_grant_failure: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_create_edit_skills_tools_publish_and_delete_need_no_desk_view: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_library_copy_uses_managed_placement_and_root_when_unplaced: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_managed_lists_and_any_placement_share_the_same_predicate: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::delegated_admin_agent_persistence_refuses_sibling_foreign_agent_and_library_bypasses: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_construction_finishes_before_role_removal: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_deletion_precedes_role_removal: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_agent_draft_write_precedes_role_removal: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_construction: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_deletion: test
+ADDED adapters::persistence::department::tests::delegated_administration::agents::races::delegated_admin_competing_role_removal_precedes_agent_draft_write: test
+ADDED adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::delegated_builder::delegated_admin_builder_uses_actual_lead_requester_for_creation_listing_and_root_desk_refusal: test
+

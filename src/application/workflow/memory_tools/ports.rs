@@ -4,6 +4,7 @@ use crate::{
     application::{
         memory::{
             ClientCredential, ExternalSourceRef, MemoryDetail, MemoryHit, NamespaceExternalId,
+            NamespaceOwner,
         },
         workflow::{
             actions::ModelToolCallId,
@@ -40,29 +41,87 @@ impl MemoryToolCall {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum MemoryToolScope {
-    Company,
-    Agent,
-    User,
+    Personal,
+    Unit,
+    Ancestors,
+    Reports,
 }
 
 impl MemoryToolScope {
-    pub const ALL: [Self; 3] = [Self::Company, Self::Agent, Self::User];
+    pub const ALL: [Self; 4] = [Self::Personal, Self::Unit, Self::Ancestors, Self::Reports];
 
     pub fn parse(name: &str) -> Option<Self> {
         match name {
-            "company" => Some(Self::Company),
-            "agent" => Some(Self::Agent),
-            "user" => Some(Self::User),
+            "personal" => Some(Self::Personal),
+            "unit" => Some(Self::Unit),
+            "ancestors" => Some(Self::Ancestors),
+            "reports" => Some(Self::Reports),
             _ => None,
         }
     }
 
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Company => "company",
-            Self::Agent => "agent",
-            Self::User => "user",
+            Self::Personal => "personal",
+            Self::Unit => "unit",
+            Self::Ancestors => "ancestors",
+            Self::Reports => "reports",
         }
+    }
+}
+
+/// One exact admitted owner. A unit can match several selectors while it is
+/// queried once. The frozen label describes this run, never the current live tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemoryScope {
+    pub owner: NamespaceOwner,
+    pub label: String,
+    pub selectors: Vec<MemoryToolScope>,
+    pub writable: bool,
+    pub private_person: bool,
+}
+
+impl MemoryScope {
+    pub fn matches(&self, requested: Option<&[MemoryToolScope]>) -> bool {
+        requested.is_none_or(|requested| {
+            requested
+                .iter()
+                .any(|selector| self.selectors.contains(selector))
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemorySaveTarget {
+    Default,
+    Unit,
+    Personal,
+}
+
+pub struct MemoryToolSave {
+    pub target: MemorySaveTarget,
+    pub facts: Vec<String>,
+    pub subject: Option<crate::entities::transport::PrincipalId>,
+}
+
+pub fn memory_write_scope(
+    scopes: &[MemoryScope],
+    target: MemorySaveTarget,
+) -> Option<&MemoryScope> {
+    let unit = || {
+        scopes
+            .iter()
+            .find(|scope| scope.writable && matches!(scope.owner, NamespaceOwner::Unit(_)))
+    };
+    let personal = || {
+        scopes
+            .iter()
+            .find(|scope| scope.writable && matches!(scope.owner, NamespaceOwner::Principal(_)))
+    };
+    match target {
+        MemorySaveTarget::Default => unit().or_else(personal),
+        MemorySaveTarget::Unit => unit(),
+        MemorySaveTarget::Personal => personal(),
     }
 }
 
@@ -94,7 +153,7 @@ pub fn user_scope_owner(run_actor: Uuid, root: Option<&UserScopeRoot>) -> Option
 
 /// One namespace the run may read or write, with its own client credential.
 pub struct ScopeAccess {
-    pub scope: MemoryToolScope,
+    pub scope: MemoryScope,
     pub namespace: NamespaceExternalId,
     pub credential: ClientCredential,
 }
@@ -108,7 +167,7 @@ pub struct MemoryToolAccess {
     pub scopes: Vec<ScopeAccess>,
     /// Eligible scopes whose namespace is not provisioned yet; the caller provisions them in
     /// their own transaction (P7b obligation).
-    pub not_ready: Vec<MemoryToolScope>,
+    pub not_ready: Vec<MemoryScope>,
 }
 
 pub enum MemoryToolContext {
@@ -122,6 +181,8 @@ pub enum MemoryToolContext {
 /// A read's answer, checked against the ceiling it was authorized at before it is recorded.
 pub struct MemoryReadObservation {
     pub result: Value,
+    /// Exact namespaces queried, including queries returning no observations.
+    pub namespaces: Vec<NamespaceExternalId>,
     /// The highest level of everything in `result`, provenance included (`carried_level`).
     pub exposed: AccessLevel,
     pub read_ceiling: AccessLevel,
@@ -129,12 +190,54 @@ pub struct MemoryReadObservation {
     pub items: Vec<MemoryRecallRef>,
 }
 
+impl MemoryReadObservation {
+    /// Consumption names exactly the observations shown to the model, including
+    /// the namespace when several readable units share one selector category.
+    pub fn validate_items(&self) -> AppResult<()> {
+        let distinct: std::collections::BTreeSet<_> = self.namespaces.iter().copied().collect();
+        if distinct.is_empty()
+            || distinct.len() > super::super::scopes::MAX_RUN_READ_NAMESPACES
+            || distinct.len() != self.namespaces.len()
+            || self
+                .items
+                .iter()
+                .any(|item| !distinct.contains(&item.namespace))
+        {
+            return Err(AppError::Internal(
+                "Memory read has invalid queried namespaces".into(),
+            ));
+        }
+
+        let shown = self.result["items"]
+            .as_array()
+            .ok_or_else(|| AppError::Internal("Memory read has no items".into()))?;
+        if self.items.len() > 64 || self.items.len() != shown.len() {
+            return Err(AppError::Internal(
+                "Memory read references differ from its result".into(),
+            ));
+        }
+        for (shown, recorded) in shown.iter().zip(&self.items) {
+            if shown["namespace"] != serde_json::json!(recorded.namespace)
+                || shown["id"] != serde_json::json!(recorded.id)
+                || shown["revision"].as_i64() != Some(recorded.revision)
+                || shown["access_level"].as_i64() != Some(i64::from(recorded.access_level.as_i16()))
+                || recorded.access_level > self.exposed
+            {
+                return Err(AppError::Internal(
+                    "Memory read references differ from its result".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// What a consumption row records about one exposed observation. A later tool save in the
 /// same execution cites these as its `external_sources` (E5).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MemoryRecallRef {
-    pub scope: MemoryToolScope,
+    pub namespace: NamespaceExternalId,
     pub id: Uuid,
     pub revision: i64,
     pub access_level: AccessLevel,
@@ -145,9 +248,9 @@ pub struct MemoryRecallRef {
 }
 
 impl MemoryRecallRef {
-    pub fn hit(scope: MemoryToolScope, hit: &MemoryHit) -> AppResult<Self> {
+    pub fn hit(namespace: NamespaceExternalId, hit: &MemoryHit) -> AppResult<Self> {
         Ok(Self {
-            scope,
+            namespace,
             id: hit.observation_id,
             revision: hit.revision,
             access_level: service_level(hit.access_level)?,
@@ -156,9 +259,9 @@ impl MemoryRecallRef {
         })
     }
 
-    pub fn detail(scope: MemoryToolScope, detail: &MemoryDetail) -> AppResult<Self> {
+    pub fn detail(namespace: NamespaceExternalId, detail: &MemoryDetail) -> AppResult<Self> {
         Ok(Self {
-            scope,
+            namespace,
             id: detail.observation_id,
             revision: detail.revision,
             access_level: service_level(detail.access_level)?,
@@ -171,7 +274,7 @@ impl MemoryRecallRef {
 impl From<&crate::application::workflow::agent::RecalledMemory> for MemoryRecallRef {
     fn from(item: &crate::application::workflow::agent::RecalledMemory) -> Self {
         Self {
-            scope: item.scope,
+            namespace: item.namespace,
             id: item.observation_id,
             revision: item.revision,
             access_level: item.access_level,
@@ -191,11 +294,11 @@ pub fn service_level(level: u8) -> AppResult<AccessLevel> {
 /// highest level first then by id, at most `MAX_SAVE_SOURCES`. Provenance only: the run's
 /// watermark already covers every level.
 pub fn save_sources(recalled: impl IntoIterator<Item = MemoryRecallRef>) -> Vec<ExternalSourceRef> {
-    let mut distinct: std::collections::BTreeMap<(MemoryToolScope, Uuid), AccessLevel> =
+    let mut distinct: std::collections::BTreeMap<(NamespaceExternalId, Uuid), AccessLevel> =
         std::collections::BTreeMap::new();
     for item in recalled {
         let level = distinct
-            .entry((item.scope, item.id))
+            .entry((item.namespace, item.id))
             .or_insert(item.access_level);
         *level = (*level).max(item.access_level);
     }
@@ -206,8 +309,8 @@ pub fn save_sources(recalled: impl IntoIterator<Item = MemoryRecallRef>) -> Vec<
     sources
         .into_iter()
         .take(MAX_SAVE_SOURCES)
-        .map(|((scope, id), level)| ExternalSourceRef {
-            reference: format!("memory:{}:{}", scope.label(), id.hyphenated()),
+        .map(|((namespace, id), level)| ExternalSourceRef {
+            reference: format!("memory:{}:{}", namespace.0, id.hyphenated()),
             access_level: level.as_i16() as u8,
         })
         .collect()
@@ -219,8 +322,9 @@ pub const MAX_SAVE_SOURCES: usize = 64;
 pub enum MemorySaveOutcome {
     Accepted(Value),
     NotEnabled,
-    NotReady(MemoryToolScope),
+    NotReady(MemoryScope),
     ScopeNotAllowed,
+    SubjectNotAllowed,
 }
 
 #[async_trait]
@@ -246,8 +350,7 @@ pub trait MemoryToolPersistence: Send + Sync {
         &self,
         fence: WorkflowFence,
         call: &MemoryToolCall,
-        scope: MemoryToolScope,
-        facts: Vec<String>,
+        save: MemoryToolSave,
     ) -> AppResult<MemorySaveOutcome>;
 
     /// Records a controlled refusal (invalid input, not ready, service refusal) as the
@@ -263,7 +366,7 @@ pub trait MemoryToolPersistence: Send + Sync {
     async fn provision_memory_scope(
         &self,
         fence: WorkflowFence,
-        scope: MemoryToolScope,
+        owner: NamespaceOwner,
     ) -> AppResult<()>;
 }
 

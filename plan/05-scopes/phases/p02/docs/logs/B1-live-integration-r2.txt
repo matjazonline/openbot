@@ -1,0 +1,31 @@
+building the memory service in /Users/mac02/orca/workspaces/openbot/plan03-04/services/memory
+    Blocking waiting for file lock on artifact directory
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 02s
+provisioned database memory_live_8d0af49efdf9 owned by memory_live_8d0af49efdf9
+isolation: neither role can read the other's database
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (bin "open_bots") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.70s
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 7 tests
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_tampered_labels_and_missing_authority_save_nothing ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_competing_delivery_workers_deliver_each_intent_once ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_provisioning_save_recall_capture_and_disable ... ok
+test adapters::persistence::memory::live_tests::subjects::memory_e2e_subject_delivery_and_operator_purge_page_units_and_preserve_personal_records ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4769 filtered out; finished in 12.62s
+
+memory integration: live tests passed against the real service

@@ -1,0 +1,27 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 17s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 1 test
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes' (30517951) panicked at src/adapters/persistence/workflow/message_test_support.rs:319:10:
+called `Result::unwrap()` on an `Err` value: BadRequest("Hosted agent execution requires an explicit provider and model; native profiles choose their own model")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4778 filtered out; finished in 1.98s
+
+error: test failed, to rerun pass `--lib`

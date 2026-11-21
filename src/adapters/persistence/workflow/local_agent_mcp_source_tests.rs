@@ -61,7 +61,7 @@ async fn source() -> Source {
 async fn start_source(mut local: Setup) -> Source {
     let p = &local.fixture.persistence;
     let requester: Uuid = sqlx::query_scalar(
-        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin' LIMIT 1",
+        "SELECT member.user_id FROM principals AS member_principal JOIN LATERAL membership_of(member_principal.user_id, member_principal.company_id) AS member ON true WHERE member_principal.company_id=$1 AND role='admin' LIMIT 1",
     )
     .bind(local.scope.company.as_uuid())
     .fetch_one(p.pool())

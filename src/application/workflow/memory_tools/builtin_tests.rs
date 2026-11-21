@@ -2,7 +2,7 @@ use super::*;
 use crate::application::agent::ActionEffect;
 use crate::application::workflow::{
     compiler::{Schema, SourceSpan},
-    memory_tools::{MemoryRecallRef, MemoryToolScope, save_sources},
+    memory_tools::{MemoryRecallRef, save_sources},
     provisioning::is_reserved_tool_name,
 };
 use crate::domain::workflow::ResourceName;
@@ -25,7 +25,8 @@ fn valid(schema: &Value, value: &Value) -> bool {
         .is_ok()
 }
 
-/// No namespace, tenant, user or level is ever a model input (E5), and every bound holds.
+/// Namespace references identify prior hits without granting access; tenant, actor and level
+/// authority stay host-owned, and every bound holds.
 #[test]
 fn memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds() {
     for tool in MemoryTool::ALL {
@@ -49,15 +50,18 @@ fn memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds() {
     let search = memory_tool_schemas(MemoryTool::Search).input;
     assert!(valid(
         &search,
-        &json!({"query":"x","scopes":["company","user"],"limit":10})
+        &json!({"query":"x","scopes":["ancestors","personal"],"limit":10})
     ));
     for bad in [
         json!({"query":""}),
         json!({"query":"x".repeat(1025)}),
         json!({"query":"x","limit":11}),
         json!({"query":"x","scopes":[]}),
-        json!({"query":"x","scopes":["agent","agent"]}),
+        json!({"query":"x","scopes":["personal","personal"]}),
         json!({"query":"x","scopes":["tenant"]}),
+        json!({"query":"x","scopes":["company"]}),
+        json!({"query":"x","scopes":["user"]}),
+        json!({"query":"x","scopes":["agent"]}),
         json!({"query":"x","level":9}),
     ] {
         assert!(!valid(&search, &bad), "{bad}");
@@ -66,23 +70,28 @@ fn memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds() {
     let id = Uuid::new_v4();
     assert!(valid(
         &timeline,
-        &json!({"scope":"agent","id":id,"before":5,"after":0})
+        &json!({"scopes":["personal"],"id":id,"before":5,"after":0})
     ));
     assert!(!valid(
         &timeline,
-        &json!({"scope":"agent","id":id,"after":6})
+        &json!({"scopes":["personal"],"id":id,"after":6})
     ));
     let details = memory_tool_schemas(MemoryTool::Details).input;
-    let item = json!({"scope":"company","id":id});
+    let item = json!({"namespace":Uuid::new_v4(),"id":id});
     assert!(valid(&details, &json!({"items":vec![item.clone();4]})));
     assert!(!valid(&details, &json!({"items":vec![item;5]})));
     assert!(!valid(&details, &json!({"items":[]})));
     let save = memory_tool_schemas(MemoryTool::Save).input;
-    assert!(valid(&save, &json!({"facts":vec!["x";8],"scope":"user"})));
+    assert!(valid(
+        &save,
+        &json!({"facts":vec!["x";8],"scope":"personal"})
+    ));
     for bad in [
         json!({"facts":vec!["x";9]}),
         json!({"facts":["x".repeat(4097)]}),
         json!({"facts":["x"],"scope":"company"}),
+        json!({"facts":["x"],"scope":"user"}),
+        json!({"facts":["x"],"scope":"agent"}),
         json!({"facts":[]}),
     ] {
         assert!(!valid(&save, &bad), "{bad}");
@@ -128,8 +137,8 @@ fn memory_scope_builtin_snapshots_are_reserved_and_exactly_trusted() {
 #[test]
 fn memory_access_level_save_sources_are_distinct_level_ordered_and_bounded() {
     let level = |value: i16| AccessLevel::try_from(value).unwrap();
-    let recall = |scope, id: u128, value: i16| MemoryRecallRef {
-        scope,
+    let recall = |namespace: u128, id: u128, value: i16| MemoryRecallRef {
+        namespace: crate::application::memory::NamespaceExternalId(Uuid::from_u128(namespace)),
         id: Uuid::from_u128(id),
         revision: 1,
         access_level: level(value),
@@ -137,11 +146,11 @@ fn memory_access_level_save_sources_are_distinct_level_ordered_and_bounded() {
         sources_sha256: None,
     };
     let sources = save_sources([
-        recall(MemoryToolScope::Company, 2, 1),
-        recall(MemoryToolScope::Agent, 3, 4),
-        recall(MemoryToolScope::Company, 2, 6),
-        recall(MemoryToolScope::User, 1, 4),
-        recall(MemoryToolScope::Agent, 3, 2),
+        recall(10, 2, 1),
+        recall(20, 3, 4),
+        recall(10, 2, 6),
+        recall(30, 1, 4),
+        recall(20, 3, 2),
     ]);
     let listed: Vec<_> = sources
         .iter()
@@ -150,13 +159,21 @@ fn memory_access_level_save_sources_are_distinct_level_ordered_and_bounded() {
     assert_eq!(
         listed,
         vec![
-            ("memory:company:00000000-0000-0000-0000-000000000002", 6),
-            ("memory:user:00000000-0000-0000-0000-000000000001", 4),
-            ("memory:agent:00000000-0000-0000-0000-000000000003", 4),
+            (
+                "memory:00000000-0000-0000-0000-00000000000a:00000000-0000-0000-0000-000000000002",
+                6
+            ),
+            (
+                "memory:00000000-0000-0000-0000-00000000001e:00000000-0000-0000-0000-000000000001",
+                4
+            ),
+            (
+                "memory:00000000-0000-0000-0000-000000000014:00000000-0000-0000-0000-000000000003",
+                4
+            ),
         ]
     );
-    let many =
-        save_sources((0..100).map(|id| recall(MemoryToolScope::Agent, id, (id % 10) as i16)));
+    let many = save_sources((0..100).map(|id| recall(20, id, (id % 10) as i16)));
     assert_eq!(many.len(), 64);
     assert!(
         many.windows(2)

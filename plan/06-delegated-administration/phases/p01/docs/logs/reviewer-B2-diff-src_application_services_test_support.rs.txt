@@ -1,0 +1,30 @@
+--- B1/src/application/services/test_support.rs
++++ B2/src/application/services/test_support.rs
+@@ -234,7 +234,12 @@
+ 
+ #[async_trait::async_trait]
+ impl ChannelPersistence for ChannelDirectoryStub {
+-    async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel> {
++    async fn create(
++        &self,
++        _actor: crate::application::workflow::WorkflowActor,
++        _company_id: Uuid,
++        _write: ChannelWrite,
++    ) -> AppResult<Channel> {
+         unimplemented!()
+     }
+ 
+@@ -304,7 +309,12 @@
+         unimplemented!()
+     }
+ 
+-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
++    async fn delete(
++        &self,
++        _actor: crate::application::workflow::WorkflowActor,
++        _company_id: Uuid,
++        _id: Uuid,
++    ) -> AppResult<()> {
+         unimplemented!()
+     }
+ }

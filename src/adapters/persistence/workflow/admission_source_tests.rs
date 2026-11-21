@@ -5,6 +5,9 @@ use crate::domain::entities::message::CanonicalMessageId;
 use crate::domain::workflow::{ScheduleId, ScheduleOccurrenceId};
 use admission_history_tests::Conversation;
 
+#[path = "delegated_schedule_admission_tests.rs"]
+mod delegated_schedule;
+
 fn source_request(f: &AdmissionFixture, key: &str, source: TriggerSource) -> AdmitWorkflowRequest {
     f.request(
         key,
@@ -46,7 +49,7 @@ impl ForeignSource {
         )
         .await
         .unwrap();
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             p,
             company.id,
             ChannelWrite {

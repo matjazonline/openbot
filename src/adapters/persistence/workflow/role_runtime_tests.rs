@@ -1,5 +1,4 @@
 use super::*;
-use crate::application::ports::channel::ChannelOwnershipWrite;
 use crate::application::ports::department::DepartmentWrite;
 use crate::application::workflow::DeliveryPolicy;
 use crate::domain::workflow::{TriggerRef, TriggerSource};
@@ -102,7 +101,7 @@ async fn desk(d: &Deployment, slug: &str, agent: &RoleAgent) -> RoleDesk {
         )
         .await
         .unwrap();
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         d.p(),
         d.fixture.target.company.as_uuid(),
         ChannelWrite {
@@ -110,10 +109,7 @@ async fn desk(d: &Deployment, slug: &str, agent: &RoleAgent) -> RoleDesk {
             slug: format!("{slug}-intake"),
             enabled: true,
             participant_emails: Some(vec![CUSTOMER.into()]),
-            ownership: Some(ChannelOwnershipWrite {
-                department_id: Some(Some(department.id)),
-                members_only: Some(false),
-            }),
+            department_id: Some(department.id),
             ..Default::default()
         },
     )

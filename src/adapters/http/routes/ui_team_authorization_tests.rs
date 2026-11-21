@@ -13,7 +13,7 @@ fn workspace(f: &Fixture, user: Uuid) -> Workspace {
 }
 
 #[tokio::test]
-async fn team_roles_come_from_membership_and_nonowners_get_forbidden() {
+async fn team_roles_come_from_membership_and_noninviters_are_told_nothing() {
     let Some(f) = Fixture::new().await else {
         return;
     };
@@ -25,7 +25,8 @@ async fn team_roles_come_from_membership_and_nonowners_get_forbidden() {
     .await;
     denied(
         invite_form_pane(workspace(&f, f.member.id), Path(f.company.id)).await,
-        StatusCode::FORBIDDEN,
+        // Inviting is company administration; a plain member is told nothing (Plan06 02A.4).
+        StatusCode::NOT_FOUND,
         &f.company.name,
     )
     .await;
@@ -52,6 +53,7 @@ async fn denied_mutations(
     f: &Fixture,
     company_id: Uuid,
     expected: StatusCode,
+    invite_role: CompanyAccessRole,
     make_workspace: impl Fn() -> Workspace,
 ) {
     let responses = [
@@ -61,7 +63,7 @@ async fn denied_mutations(
             Form(InviteForm {
                 access_level: None,
                 email: format!("new-{}@example.test", Uuid::new_v4().simple()),
-                role: Some(CompanyAccessRole::Member),
+                role: Some(invite_role),
             }),
         )
         .await,
@@ -91,23 +93,91 @@ async fn team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes
     let Some(f) = Fixture::new().await else {
         return;
     };
-    for role in ["member", "admin"] {
-        sqlx::query("UPDATE company_members SET role=$3 WHERE company_id=$1 AND user_id=$2")
+    // Root admins invite members (Plan06 decision 01B.7); every root role change stays the
+    // owner's. Refusals of people who may not do these at all are a stranger's 404 (02A.4).
+    for (role, invite_role) in [
+        ("member", CompanyAccessRole::Member),
+        ("admin", CompanyAccessRole::Admin),
+    ] {
+        sqlx::query("WITH cleared AS (DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2 AND $3::text='member') INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.company_id=$1 AND member.root_user_id=$2 AND $3::text='admin' ON CONFLICT DO NOTHING")
             .bind(f.company.id)
             .bind(f.member.id)
             .bind(role)
             .execute(f.persistence.pool())
             .await
             .expect("fixture member role changed");
-        denied_mutations(&f, f.company.id, StatusCode::FORBIDDEN, || {
-            workspace(&f, f.member.id)
-        })
-        .await;
+        if role == "member" {
+            denied_mutations(&f, f.company.id, StatusCode::NOT_FOUND, invite_role, || {
+                workspace(&f, f.member.id)
+            })
+            .await;
+            continue;
+        }
+        // An admin naming the admin role is refused inside its authority: inline, nothing stored.
+        let refused = create_invite(
+            workspace(&f, f.member.id),
+            Path(f.company.id),
+            Form(InviteForm {
+                access_level: None,
+                email: format!("new-admin-{}@example.test", Uuid::new_v4().simple()),
+                role: Some(CompanyAccessRole::Admin),
+            }),
+        )
+        .await
+        .expect("a business refusal renders on the form");
+        assert_eq!(refused.status(), StatusCode::OK);
+        let refused = String::from_utf8(
+            axum::body::to_bytes(refused.into_body(), 1 << 20)
+                .await
+                .unwrap()
+                .to_vec(),
+        )
+        .unwrap();
+        assert!(refused.contains("Failed to send invite"), "{refused}");
+        for response in [
+            update_member_role(
+                workspace(&f, f.member.id),
+                Path((f.company.id, f.owner.id)),
+                Form(MemberRoleForm {
+                    role: CompanyAccessRole::Member,
+                }),
+            )
+            .await,
+            remove_member(workspace(&f, f.member.id), Path((f.company.id, f.owner.id))).await,
+        ] {
+            denied(response, StatusCode::NOT_FOUND, &f.company.name).await;
+        }
     }
+    let email = format!("by-admin-{}@example.test", Uuid::new_v4().simple());
+    let invited = create_invite(
+        workspace(&f, f.member.id),
+        Path(f.company.id),
+        Form(InviteForm {
+            access_level: None,
+            email: email.clone(),
+            role: Some(CompanyAccessRole::Member),
+        }),
+    )
+    .await
+    .expect("a root admin invites a member");
+    assert!(invited.status().is_success(), "{}", invited.status());
+    let stored: String = sqlx::query_scalar(
+        "SELECT role FROM company_invites WHERE company_id=$1 AND email=$2::citext",
+    )
+    .bind(f.company.id)
+    .bind(&email)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(stored, "member");
     for company_id in [f.foreign.id, Uuid::new_v4()] {
-        denied_mutations(&f, company_id, StatusCode::NOT_FOUND, || {
-            workspace(&f, f.owner.id)
-        })
+        denied_mutations(
+            &f,
+            company_id,
+            StatusCode::NOT_FOUND,
+            CompanyAccessRole::Member,
+            || workspace(&f, f.owner.id),
+        )
         .await;
     }
 }
@@ -122,11 +192,17 @@ async fn team_mutations_propagate_database_errors_after_successful_readable_comp
         Arc::new(MockCompanyPersistence::failing()),
         f.persistence.clone(),
     ));
-    denied_mutations(&f, f.company.id, StatusCode::INTERNAL_SERVER_ERROR, || {
-        let mut ws = workspace(&f, f.owner.id);
-        ws.invite_use_cases = invites.clone();
-        ws
-    })
+    denied_mutations(
+        &f,
+        f.company.id,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        CompanyAccessRole::Member,
+        || {
+            let mut ws = workspace(&f, f.owner.id);
+            ws.invite_use_cases = invites.clone();
+            ws
+        },
+    )
     .await;
 }
 
@@ -234,7 +310,7 @@ async fn access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_a
         return;
     };
     sqlx::query(
-        "UPDATE company_members SET role='admin',access_level=4 WHERE company_id=$1 AND user_id=$2",
+        "WITH updated AS (UPDATE department_members AS member SET access_level=4 WHERE member.company_id=$1 AND member.root_user_id=$2 RETURNING member.company_id, member.department_id, member.principal_id) INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT company_id, department_id, principal_id, 'admin' FROM updated ON CONFLICT DO NOTHING",
     )
     .bind(f.company.id)
     .bind(f.member.id)

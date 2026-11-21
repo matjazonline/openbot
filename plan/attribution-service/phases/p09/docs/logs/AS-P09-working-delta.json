@@ -1,0 +1,200 @@
+{
+  "baseline": "99d5627b7bc25cb34d828005e9539a07cf5e40eb76c35fb7b1276feeddaa225e",
+  "files": [
+    {
+      "path": ".github/workflows/attribution-service.yml",
+      "before": "c6ff6364f7da67d37e1c6d10bb79c333f1c7d145a5df52cf7c283416fe55e4de",
+      "after": "312e55cf0d9badc3d337fd5dea65177f3d2fe019997149bd9c08a83f7a8354a3"
+    },
+    {
+      "path": ".trail/learnings/2026-11-16-tls-integration-fixtures-need-a-separate-mac02.md",
+      "before": null,
+      "after": "cb058b7ec029e78f8063c31c4d784d5258c27cabea2e49f88ee8380ea88025a9"
+    },
+    {
+      "path": "scripts/attribution/Openbot.fixture.Dockerfile",
+      "before": null,
+      "after": "c205be821db5e29f4d29ccf718ba67b368fe480f7bbe0cdf5a37ddc2b15b3d30"
+    },
+    {
+      "path": "scripts/attribution/__pycache__/topology.cpython-313.pyc",
+      "before": null,
+      "after": "21ca893b77cb3d8410b083163428a8bf835b3a018c25406692ed3ee5b02ea721"
+    },
+    {
+      "path": "scripts/attribution/topology.py",
+      "before": null,
+      "after": "8c3faa6dc108fd6c955e38699e941714330bea87517cc6eef2535de563397542"
+    },
+    {
+      "path": "services/attribution/Dockerfile",
+      "before": "7c34ca5ab6b77668472243ba80b1e989dbb59700815719dc523a38c84f5bf40a",
+      "after": "3f56bc0a5fa5d0d7f235785c73964e73c3c41bb35bd5c409508e1bd88a1cf8a8"
+    },
+    {
+      "path": "services/attribution/README.md",
+      "before": "aaa45f7117f0ef9a90dabb63dbff3ec5f81f10734620ba3c5e411e1b33203ad5",
+      "after": "1025e4445a060bc64910119dacde47979b6a137026d5566e904fc0fe13b97f33"
+    },
+    {
+      "path": "services/attribution/browser/topology.mjs",
+      "before": null,
+      "after": "0de02250c4fb9f0831cc46991aa3dbe17ad442760b48d36b35e5f37c9fe068fa"
+    },
+    {
+      "path": "services/attribution/config.env.example",
+      "before": "d2efc7e7969d6614488a8d5badeda64a9915902d093c28bca87ce56571c38bc1",
+      "after": "728845d0cd81562e49bbf49d70cd4672bae1e4c9b818bba409921c2b6ef5f178"
+    },
+    {
+      "path": "services/attribution/deploy/.gitignore",
+      "before": null,
+      "after": "2fda8b30bb96762fd5eba45681911bf510ff2c3d8acb488bc62256d2770f7e37"
+    },
+    {
+      "path": "services/attribution/deploy/compose.yaml",
+      "before": null,
+      "after": "96e187c8f7e51cadaba98ddc246092abbb61fdb044586cc5673a2e7e76cea269"
+    },
+    {
+      "path": "services/attribution/deploy/init-database.sh",
+      "before": null,
+      "after": "d83ff239662fb775093ba0e0374b19b4f6127560ba6d7975d28f25ae76710b96"
+    },
+    {
+      "path": "services/attribution/deploy/nginx.conf",
+      "before": null,
+      "after": "43dd331a314670525593e391f5cf52346967fcbf2ac1ad4fd80f721701315a7e"
+    },
+    {
+      "path": "services/attribution/migrations/202611150001_foundation.sql",
+      "before": "9bcae314e044f52c1e14994ae7c90029efde50ab51cf6d21df55084fae9f1e9a",
+      "after": "58da8a3d947a998814f4d12e74822ab86c92d60758649970aad3fc66278cd067"
+    },
+    {
+      "path": "services/attribution/operations.md",
+      "before": null,
+      "after": "9c10296f64a07fd203a8751236a28c6819ca2ae7c22b0afc8d11e7a57bcab87d"
+    },
+    {
+      "path": "services/attribution/scripts/browser-sso.py",
+      "before": "77deb517dffa5b203d52e98fdbff48d3e1c57f9c0045c728d6a5cc390236ac55",
+      "after": "dca1e89e2528442ff04bbb7c09e5cd244d740991777e64e82721bd71b238c2dc"
+    },
+    {
+      "path": "services/attribution/scripts/container-smoke.py",
+      "before": "990224c4b67f13fee20d8e2b32ba5db5fa683189c817384023c9021db8087f66",
+      "after": "77d3dc50928f7be05fe9381049fd93cfbaad50193b0f3db9a2131f3bc7a81fb1"
+    },
+    {
+      "path": "services/attribution/src/adapters/analytics/http_tests.rs",
+      "before": "26c12d2bb407e4f5203d675b5341533715ab2575b9b06635aa3ef363d03c9a97",
+      "after": "290e72d26904fc68a8fe0d8967f3372e54e22f745502375fbdf252fd758dbd98"
+    },
+    {
+      "path": "services/attribution/src/adapters/analytics/query.rs",
+      "before": "02883a950007a6859878f26b2bb29393416e719ae825396c6bff2c86bb282297",
+      "after": "beaa0718852896ec388431dca25395c4a59de934eeea236ee1effb9b57cb287a"
+    },
+    {
+      "path": "services/attribution/src/adapters/catalog/postgres.rs",
+      "before": "fb3fbeac2099dded6213b4bca972324ca97907db48b7cb3e3b6924e198a011aa",
+      "after": "b701536fb112426ffc3422a47b4b57e8238e0316278b7518a3c55dc29306efad"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/http_tests.rs",
+      "before": "8c42471dd7c50dbee42b62e0e0a0e6574057e76aff78b83afe1cb601f7566667",
+      "after": "c042848c0e5fcf9e891991c5130b1ff2181be5a200e51a15dd3c1ed6a4debd22"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/postgres.rs",
+      "before": "b156398c374933502d57eb209de02f2b4c2e6bc7ab3bd79bde899b13b78bebb7",
+      "after": "a9914fd7026ce17dfd8032aff1a77a7021d958cf8c4609c9bb4e3091613d5812"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/reads.rs",
+      "before": "a7f5c58041f24f39f0e8ab089bd61517919cbc499a33e507ef546139d083061e",
+      "after": "44ad89fd724172429c46c1874cabd86a3882eef34cb19a701c4d252500a2d627"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/recovery_tests.rs",
+      "before": "ebfefba43bb4ef7249361e4a984bfe8f2761c87531042e614144d6595c169371",
+      "after": "f8903ba7fc54e3b05e8e715b9dcb83e3e4bc244776e07ea10e19b51c6203c7fb"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/worker.rs",
+      "before": "38d834b4c620a902d26aa04566372070e9412f4bbc72c282af69b07a92843856",
+      "after": "9f41021d12b71ed6f672cd2cafa9d842d58d1319e25fd3c33272cd15ea70e275"
+    },
+    {
+      "path": "services/attribution/src/adapters/http.rs",
+      "before": "6ed31ec739376af91f7ed768b43b448b5d5e0daa808eb3b447173c00f722dcaa",
+      "after": "51871e29f5e591c78c9535c3e7cc376044ee3775e9f1532940f29550388810f5"
+    },
+    {
+      "path": "services/attribution/src/adapters/identity/http_boundary_tests.rs",
+      "before": "491a366014a59cd0e29f1c769531adfa163f108e9ea67874c74994496c04c611",
+      "after": "9c8a1e0df28a3c2dc224832a8330ca28172924cbd9371699156f013d969e2b39"
+    },
+    {
+      "path": "services/attribution/src/adapters/identity/tenants.rs",
+      "before": "9a9b1f7b84bcfaa1258be7a8bbe91bf5a4c3c6461c8d0a5b6a2175031d1a9c0d",
+      "after": "797dd5cb89985904dd4ebd745fda7af3a37044d7ee0975ec93253d3417750e97"
+    },
+    {
+      "path": "services/attribution/src/adapters/mod.rs",
+      "before": "4844ebef9acde313d7f4dae98d64ec695b7bba83f01fe99cf0abb3d1481f059b",
+      "after": "1841ce20981669a021244e318bafc3ac7bf1dd623f800874a505153b72e3612d"
+    },
+    {
+      "path": "services/attribution/src/adapters/retention/cutoff_tests.rs",
+      "before": null,
+      "after": "1e97810d5f2412ae130290d02d0d8fc34c1a211683d28c90e2fc42719f7b480a"
+    },
+    {
+      "path": "services/attribution/src/adapters/retention/http_tests.rs",
+      "before": null,
+      "after": "c006eb01251add12eb2658a11691838b28822c192a796139f80eb223f5526e33"
+    },
+    {
+      "path": "services/attribution/src/adapters/retention/mod.rs",
+      "before": null,
+      "after": "399854474684756980d4c9dd61c7808cb04388baee07a6a66d0e9e9090319d45"
+    },
+    {
+      "path": "services/attribution/src/adapters/retention/prune.rs",
+      "before": null,
+      "after": "afd756518d82cfca48213d58e950e8332f19e89586894aa3327f2a9c0d171423"
+    },
+    {
+      "path": "services/attribution/src/adapters/retention/restore_tests.rs",
+      "before": null,
+      "after": "91df6616c31a2d4522d4a61dbe95bde89c62dccea6ff71ad35c1b8b79dd3a4b0"
+    },
+    {
+      "path": "services/attribution/src/application/mod.rs",
+      "before": "ff09327d8028c533dc1e42ff42c11c511ead23cfa68c412bfd4b39fdbe9ff681",
+      "after": "32b8d63a762ab507b2a1844695e35c924e3636e90f0e75ff085489149e30c50e"
+    },
+    {
+      "path": "services/attribution/src/application/retention.rs",
+      "before": null,
+      "after": "d98a37702c97af107e5e621b639446e46bdc28595b75d213521afd9de2bb1e04"
+    },
+    {
+      "path": "services/attribution/src/infra/config.rs",
+      "before": "578de61a1336518087b03a736c4a482321f1bab5ef69bb67bff74f1f7b0307f8",
+      "after": "1b66a6ca72d92f50e00fb202f6b85782ca11b3c36dc8f7664c05fc4c2b83c826"
+    },
+    {
+      "path": "services/attribution/src/infra/startup.rs",
+      "before": "b768aca54458ae929f22300065931067c620a92eef12024903cd0b925a60dca2",
+      "after": "212d5ab4a2e01bb12584d64762e38c026f88d8e8a2e7c2a3ace9bf4b36e744cd"
+    },
+    {
+      "path": "services/attribution/src/test_support.rs",
+      "before": "4657e74d3e9d9f4c1b64e8bbef707a0190303f47418252138f5301cdf73d4160",
+      "after": "5ed4032221cd02634f16ff65ada3e8271f85059da60e579ab696268d83abe509"
+    }
+  ]
+}

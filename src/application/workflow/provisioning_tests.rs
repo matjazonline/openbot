@@ -110,7 +110,7 @@ fn refusals_and_results_are_both_valid_receipts() {
             {"slug": "b", "name": "B", "description": null, "provider": null, "model": null,
                 "departments": [], "address": null}
         ],
-        "models": [{"provider": "anthropic", "model": "claude"}],
+        "models": [{"provider": "anthropic", "model": "claude", "department": "Company"}],
         "truncated": false
     });
     assert!(valid(&list, &listed));
@@ -120,8 +120,13 @@ fn refusals_and_results_are_both_valid_receipts() {
         missing["agents"][1].as_object_mut().unwrap().remove(field);
         assert!(!valid(&list, &missing), "{field} is required");
     }
+    for role in ["owner", "admin", "lead"] {
+        let mut known = listed.clone();
+        known["agents"][0]["departments"][0]["roles"] = json!([role]);
+        assert!(valid(&list, &known), "{role} is a known department role");
+    }
     let mut unknown = listed.clone();
-    unknown["agents"][0]["departments"][0]["roles"] = json!(["owner"]);
+    unknown["agents"][0]["departments"][0]["roles"] = json!(["unknown_role"]);
     assert!(!valid(&list, &unknown));
     let mut long = listed.clone();
     long["agents"][0]["name"] = json!("n".repeat(MAX_LISTED_NAME_CHARS + 1));

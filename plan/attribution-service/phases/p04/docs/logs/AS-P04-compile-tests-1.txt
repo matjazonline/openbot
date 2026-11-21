@@ -1,0 +1,91 @@
+   Compiling critical-section v1.2.0
+   Compiling portable-atomic v1.15.0
+   Compiling getrandom v0.4.3
+   Compiling num-traits v0.2.19
+   Compiling crossbeam-utils v0.8.23
+   Compiling ipnet v2.12.2
+   Compiling data-encoding v2.11.1
+   Compiling siphasher v1.0.4
+   Compiling tagptr v0.2.0
+   Compiling phf_shared v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling uuid v1.29.2
+   Compiling once_cell v1.21.4
+   Compiling phf v0.12.1
+   Compiling crossbeam-queue v0.3.14
+   Compiling crossbeam-epoch v0.9.21
+   Compiling crossbeam-channel v0.5.17
+   Compiling tracing-core v0.1.36
+   Compiling rustls v0.23.46
+   Compiling chrono v0.4.45
+   Compiling prefix-trie v0.8.4
+   Compiling atoi v2.0.0
+   Compiling tracing v0.1.44
+   Compiling tracing-serde v0.2.0
+   Compiling moka v0.12.16
+   Compiling cipher v0.5.2
+   Compiling universal-hash v0.6.1
+   Compiling aead v0.6.1
+   Compiling hyper-util v0.1.21
+   Compiling tracing-subscriber v0.3.23
+   Compiling poly1305 v0.9.1
+   Compiling chacha20 v0.10.2
+   Compiling rand v0.10.4
+   Compiling chacha20poly1305 v0.11.0
+   Compiling chrono-tz v0.10.4
+   Compiling oauth2 v5.0.0
+   Compiling hickory-proto v0.26.3
+   Compiling axum v0.8.9
+   Compiling hickory-net v0.26.3
+   Compiling tokio-rustls v0.26.6
+   Compiling sqlx-core v0.8.6
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.4
+   Compiling hickory-resolver v0.26.3
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+error[E0603]: module `tests` is private
+ --> src/adapters/identity/../setup/http_tests.rs:3:31
+  |
+3 | use crate::{adapters::setup::{tests::DnsFixture,postgres::approved_destination},application::setup::*};
+  |                               ^^^^^ private module
+  |
+note: the module `tests` is defined here
+ --> src/adapters/setup/mod.rs:8:1
+  |
+8 | mod tests;
+  | ^^^^^^^^^^
+
+warning: unused import: `json`
+ --> src/adapters/identity/../setup/http_tests.rs:4:18
+  |
+4 | use serde_json::{json,Value};
+  |                  ^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0505]: cannot move out of `f` because it is borrowed
+   --> src/adapters/identity/../setup/http_tests.rs:160:5
+    |
+149 |     let f=Fixture::new().await;let p=principal(&f).await;let store=create_store(&f,&p,"Shop").await;let issued=issue(&f,&p,store).a...
+    |         - binding `f` declared here
+...
+152 |     let revoke=f.setup.store.mutate(&p,Mutation::RevokeCredential(credential),retry(),&f.setup.dns);tokio::pin!(revoke);
+    |                ------------- borrow of `f.setup.store` occurs here
+...
+160 |     f.close().await;
+    |     ^ move out of `f` occurs here
+161 | }
+    | - borrow might be used here, when `revoke` is dropped and runs the destructor for type `impl std::future::Future<Output = std::result::Result<MutationResult, application::identity::Failure>>`
+    |
+help: consider cloning the value if the performance cost is acceptable
+    |
+152 |     let revoke=f.setup.store.clone().mutate(&p,Mutation::RevokeCredential(credential),retry(),&f.setup.dns);tokio::pin!(revoke);
+    |                             ++++++++
+
+Some errors have detailed explanations: E0505, E0603.
+For more information about an error, try `rustc --explain E0505`.
+warning: `attribution_service` (lib test) generated 1 warning
+error: could not compile `attribution_service` (lib test) due to 2 previous errors; 1 warning emitted

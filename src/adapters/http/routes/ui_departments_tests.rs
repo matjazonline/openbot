@@ -5,11 +5,19 @@
 use super::super::authorization_test_support::{Fixture, denied};
 use super::*;
 use axum::http::StatusCode;
+#[path = "ui_department_knowledge_tests.rs"]
+mod knowledge;
 
 fn workspace(f: &Fixture, user: &crate::entities::user::User) -> Workspace {
     Workspace {
         company_use_cases: f.companies.clone(),
         department_use_cases: f.departments(),
+        knowledge: Arc::new(crate::application::knowledge::KnowledgeLibrary::new(
+            f.persistence.clone(),
+            Arc::new(
+                crate::application::knowledge::test_support::DeterministicTextEmbedder::default(),
+            ),
+        )),
         config: f.config.clone(),
         user_id: user.id,
     }
@@ -150,7 +158,7 @@ async fn department_ui_writes_answer_404_to_members_strangers_and_foreign_compan
             .await
             .unwrap()
             .len(),
-        1
+        2
     );
 }
 
@@ -301,7 +309,15 @@ async fn department_ui_owner_writes_render_and_refusals_land_on_their_form() {
         .visible_department(f.owner.id, company, sales.id)
         .await
         .unwrap();
-    assert_eq!(stored.department.parent_id, None);
+    let root = f
+        .departments()
+        .list_departments(f.owner.id, company)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|department| department.is_root)
+        .unwrap();
+    assert_eq!(stored.department.parent_id, Some(root.id));
 
     // A slug edit does not move the department's desk: the header keeps the desk's address (F1).
     let (_, _, html) = body(
@@ -404,7 +420,7 @@ async fn department_ui_owner_writes_render_and_refusals_land_on_their_form() {
             .fetch_one(f.persistence.pool())
             .await
             .unwrap();
-    sqlx::query("UPDATE channels SET department_id = NULL, members_only = false WHERE id = $1")
+    sqlx::query("UPDATE channels SET department_id=(SELECT id FROM departments WHERE company_id=channels.company_id AND is_root) WHERE id=$1")
         .bind(leaf_desk)
         .execute(f.persistence.pool())
         .await
@@ -622,6 +638,292 @@ async fn department_ui_foreign_ids_under_the_owners_path_change_nothing() {
     assert_eq!(untouched.members[0].principal_id.as_uuid(), their_person);
 }
 
+/// Plan06 02A: a unit lead reaches the Departments routes and writes inside its unit; a sibling
+/// lead's write there changes nothing, and a plain member is still told nothing.
+#[tokio::test]
+async fn delegated_admin_routes_department_writes_follow_the_lead_unit() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let d = f.delegation().await;
+    let unit = d.unit.as_uuid();
+    let child = |name: &str| DepartmentFormData {
+        parent_id: Some(unit.to_string()),
+        ..form(name, &name.to_lowercase())
+    };
+    let new_pane = new_department(workspace(&f, &d.lead), Path(f.company.id))
+        .await
+        .expect("a lead opens the create form")
+        .0;
+    assert!(
+        new_pane.contains(&format!(r#"<option value="{unit}""#)),
+        "{new_pane}"
+    );
+    assert!(!new_pane.contains(r#"<option value="">Company root</option>"#));
+    let (status, _, html) = body(
+        create_department(
+            workspace(&f, &d.lead),
+            Path(f.company.id),
+            Form(child("Team")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{html}");
+    assert!(html.contains("Department created."), "{html}");
+    let (_, _, refused) = body(
+        create_department(
+            workspace(&f, &d.sibling),
+            Path(f.company.id),
+            Form(child("Other")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(!refused.contains("Department created."), "{refused}");
+    let names: Vec<String> = f
+        .departments()
+        .list_departments(f.owner.id, f.company.id)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|department| department.name)
+        .collect();
+    assert!(names.contains(&"Team".to_owned()) && !names.contains(&"Other".to_owned()));
+    let principal = person(&f, &f.member).await;
+    let (status, _, html) = body(
+        add_member(
+            workspace(&f, &d.lead),
+            Path((f.company.id, unit)),
+            Form(PrincipalFormData {
+                principal_id: Some(principal.to_string()),
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{html}");
+    denied(
+        new_department(workspace(&f, &f.member), Path(f.company.id)).await,
+        StatusCode::NOT_FOUND,
+        &f.company.name,
+    )
+    .await;
+}
+
+fn models_form(provider: &str, models: &str, key: &str) -> DepartmentModelsForm {
+    DepartmentModelsForm {
+        default_model_provider: Some(0),
+        connection_fields: [
+            ("connection_0_provider", provider),
+            ("connection_0_models", models),
+            ("connection_0_api_key", key),
+        ]
+        .into_iter()
+        .map(|(name, value)| (name.to_owned(), value.to_owned()))
+        .collect(),
+    }
+}
+
+/// Plan07 02A (B1-F1): a department's managers get its "Model connections" card and save it; a
+/// refusal comes back inline on the card's section; a plain member gets no card and a not-found
+/// for the write.
+#[tokio::test]
+async fn unit_model_default_department_card_saves_for_managers_only() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    crate::use_cases::company::CompanyPersistence::replace_model_connections_for_user(
+        f.persistence.as_ref(),
+        f.owner.id,
+        f.company.id,
+        vec![crate::use_cases::company::CompanyModelConnectionWrite {
+            provider: "openai".into(),
+            api_key: Some("root-key".into()),
+            models: vec!["gpt-4o-mini".into()],
+            is_default: true,
+        }],
+    )
+    .await
+    .unwrap();
+    let sales = create(&f, "Sales", "sales").await;
+    let member = person(&f, &f.member).await;
+    f.departments()
+        .add_member(f.owner.id, f.company.id, sales, PrincipalId::new(member))
+        .await
+        .unwrap();
+    let shown = show_department(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(shown.contains("id=\"department-models\""), "{shown}");
+    let saved = save_models(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+        Form(models_form("anthropic", "claude-sales", "sales-key")),
+    )
+    .await
+    .unwrap();
+    let (status, _, html) = body(saved).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Saved model connections."), "{html}");
+    assert!(html.contains("claude-sales"), "{html}");
+    // The root's provider is not Sales's: the refusal lands on the section, nothing changes.
+    let refused = save_models(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+        Form(models_form("openai", "gpt-x", "other-key")),
+    )
+    .await
+    .unwrap();
+    let (status, _, html) = body(refused).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        html.contains("Model connections not saved:") && html.contains("openai"),
+        "{html}"
+    );
+    // A plain member sees the department without the card and cannot save it.
+    let shown = show_department(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!shown.contains("department-models"), "{shown}");
+    let denied = save_models(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+        Form(models_form("groq", "llama", "member-key")),
+    )
+    .await;
+    assert!(
+        matches!(&denied, Err(AppError::NotFound(_))),
+        "{:?}",
+        denied.as_ref().map(|_| ())
+    );
+}
+
+/// Plan07 02B.1/02C (B3): a department's managers get its "Spend caps" card, save USD caps and
+/// clear them; a bad amount is refused inline; a plain member gets no card and a not-found.
+#[tokio::test]
+async fn unit_budget_usage_page_department_caps_card_for_managers_only() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let sales = create(&f, "Sales", "sales").await;
+    let member = person(&f, &f.member).await;
+    f.departments()
+        .add_member(f.owner.id, f.company.id, sales, PrincipalId::new(member))
+        .await
+        .unwrap();
+    let shown = show_department(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(shown.contains("id=\"department-budgets\""), "{shown}");
+    let caps = |day: &str, month: &str| DepartmentBudgetsForm {
+        day_cap: day.into(),
+        month_cap: month.into(),
+    };
+    let (status, _, html) = body(
+        save_budgets(
+            workspace(&f, &f.owner),
+            Path((f.company.id, sales.as_uuid())),
+            Form(caps("12.5", "")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Saved spend caps."), "{html}");
+    assert!(html.contains("12.500000"), "{html}");
+    let stored: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT period, cap_micros FROM unit_budgets WHERE company_id=$1 AND unit_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(sales.as_uuid())
+    .fetch_all(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(stored, vec![("day".to_owned(), 12_500_000)]);
+    let (_, _, html) = body(
+        save_budgets(
+            workspace(&f, &f.owner),
+            Path((f.company.id, sales.as_uuid())),
+            Form(caps("0", "")),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(html.contains("Spend caps not saved:"), "{html}");
+    // A valid daily cap beside an invalid monthly one changes nothing (B3-F1).
+    for month in ["abc", "0"] {
+        let (_, _, html) = body(
+            save_budgets(
+                workspace(&f, &f.owner),
+                Path((f.company.id, sales.as_uuid())),
+                Form(caps("99", month)),
+            )
+            .await
+            .unwrap(),
+        )
+        .await;
+        assert!(html.contains("Spend caps not saved:"), "{html}");
+        let kept: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT period, cap_micros FROM unit_budgets WHERE company_id=$1 AND unit_id=$2",
+        )
+        .bind(f.company.id)
+        .bind(sales.as_uuid())
+        .fetch_all(f.persistence.pool())
+        .await
+        .unwrap();
+        assert_eq!(kept, vec![("day".to_owned(), 12_500_000)], "{month}");
+    }
+    save_budgets(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+        Form(caps("", "")),
+    )
+    .await
+    .unwrap();
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM unit_budgets WHERE company_id=$1")
+        .bind(f.company.id)
+        .fetch_one(f.persistence.pool())
+        .await
+        .unwrap();
+    assert_eq!(left, 0, "blank clears");
+    let shown = show_department(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!shown.contains("department-budgets"));
+    let denied = save_budgets(
+        workspace(&f, &f.member),
+        Path((f.company.id, sales.as_uuid())),
+        Form(caps("1", "")),
+    )
+    .await;
+    assert!(
+        matches!(&denied, Err(AppError::NotFound(_))),
+        "{:?}",
+        denied.as_ref().map(|_| ())
+    );
+}
 #[tokio::test]
 async fn department_sponsor_ui_mutations_hide_unauthorized_and_foreign_units() {
     let Some(f) = Fixture::new().await else {

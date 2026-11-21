@@ -40,6 +40,7 @@ impl SkillHistory {
         value.skills.push(ResolvedAgentSkill {
             assignment_id: AgentSkillAssignmentId::new(assignment),
             skill: SkillSnapshot {
+                unit_id: uuid::Uuid::nil(),
                 description: "Skill instructions".into(),
                 files: Vec::new(),
                 company_id: f.binding.target.company,
@@ -152,9 +153,14 @@ impl SkillHistory {
 async fn autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment() {
     let saved = SkillHistory::new().await;
     let p = saved.f.persistence();
-    p.delete_company(saved.f.binding.target.company.as_uuid(), saved.skill.id)
-        .await
-        .unwrap();
+    p.delete_company(
+        saved.f.binding.target.company.as_uuid(),
+        p.test_root_unit(saved.f.binding.target.company.as_uuid())
+            .await,
+        saved.skill.id,
+    )
+    .await
+    .unwrap();
     saved.assert_retired().await;
     let replacement = add_skill(&saved.f).await;
     // Reusing a deleted resource UUID cannot reconnect the old immutable assignment.
@@ -229,9 +235,14 @@ async fn autonomous_agent_storage_skill_authority_reader_serializes_before_sourc
     );
     deleting.rollback().await.unwrap();
     reader.commit().await.unwrap();
-    p.delete_company(saved.f.binding.target.company.as_uuid(), saved.skill.id)
-        .await
-        .unwrap();
+    p.delete_company(
+        saved.f.binding.target.company.as_uuid(),
+        p.test_root_unit(saved.f.binding.target.company.as_uuid())
+            .await,
+        saved.skill.id,
+    )
+    .await
+    .unwrap();
     saved.assert_retired().await;
 }
 

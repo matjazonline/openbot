@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "round": "06DA-P02-B2-R2",
+  "artifact": "802700ab809070e6ef89a5b33288e0b60579cbb53012ead62e5404211634f32f",
+  "checks": [
+    {
+      "criteria": ["06DA-P02-B2-F1", "06DA-P02-B2-F2", "06DA-P02-B2-F3", "02B.1", "02B.2", "r1-14"],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- administration_audit delegated_admin retirement onboarding company_invite department root_unit company_agent (reviewer independent run)",
+      "fixture": "owned Plan06 PostgreSQL18 127.0.0.1:55406 / openbot_p06_merge05 (tests create own databases); SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [{"path": "logs/06DA-P02-B2-R2-reviewer-focused.txt", "sha256": "7c989bad8a51e5659258e3a38dfd003a0e5ea81c6a99ac7fd04006f562a927a6"}]
+    }
+  ]
+}

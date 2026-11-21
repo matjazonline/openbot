@@ -105,7 +105,12 @@ async fn workflow_escalation_decision_assigned_member_acknowledges_once_and_conf
     let (f, decision) = Box::pin(pending(1)).await;
     let actor = f.people.users[0];
     f.p()
-        .update_member_role(f.scope.company.as_uuid(), actor, CompanyAccessRole::Member)
+        .update_member_role(crate::use_cases::company_invite::MemberRoleChange {
+            actor_id: f.people.role.admission.binding.target.actor.user_id(),
+            company_id: f.scope.company.as_uuid(),
+            member_user_id: actor,
+            role: CompanyAccessRole::Member,
+        })
         .await
         .unwrap();
     let before = view(&f, decision, actor).await;
@@ -159,7 +164,11 @@ async fn workflow_escalation_decision_assigned_member_acknowledges_once_and_conf
     );
     assert_eq!(f.worker().drain_once().await.unwrap(), 0);
     f.p()
-        .remove_member(f.scope.company.as_uuid(), actor)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.people.role.admission.binding.target.actor.user_id(),
+            company_id: f.scope.company.as_uuid(),
+            member_user_id: actor,
+        })
         .await
         .unwrap();
     let history = view(
@@ -206,7 +215,11 @@ async fn workflow_escalation_decision_reassignment_creates_one_manual_notice_and
     assert_eq!(current.recipients[0].principal, target);
     let label = current.recipients[0].label.clone();
     f.p()
-        .remove_member(f.scope.company.as_uuid(), target_user)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.people.role.admission.binding.target.actor.user_id(),
+            company_id: f.scope.company.as_uuid(),
+            member_user_id: target_user,
+        })
         .await
         .unwrap();
     assert_eq!(

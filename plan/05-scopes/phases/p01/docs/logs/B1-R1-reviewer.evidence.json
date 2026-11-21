@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "round": "05SC-P01-B1-R1-B",
+  "artifact": "0713361f3809b86cfbde192b30267041ea50f862c3183afcb4fe38896890dabf",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2"
+      ],
+      "command": "cargo test --locked --offline --lib -- memory_scope_shape_ memory_scope_lifecycle_ agent_retire_races_agent_principal_upsert memory_scope_returning_member_gets_a_new_namespace_id --skip doop --skip Doop",
+      "fixture": "Reviewer execution: pa05_p01_core_test plus test-owned databases on PostgreSQL18:51167;9passed,0failed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-reviewer-focused.txt",
+          "sha256": "653391bc5f8ee3b269342cb4d8d2c18b6790aef82c811ac40140c14d902ec794"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list; compare discovered : test names to B1-before-tests.txt",
+      "fixture": "Reviewer collection only; no tests executed by list; six added, none removed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-reviewer-test-list.txt",
+          "sha256": "888eb71d09fe61a7e6a5c9868c0bc55f362e5af4b62589230b5ca8e61d3ddd0f"
+        },
+        {
+          "path": "logs/B1-R1-reviewer-collection.json",
+          "sha256": "163c4f374d1d4b536c0a7ec587d7d7d7bae8623ef39f7667998860fef2dfd7f5"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 use super::super::reviewer_picker::{ReviewerForm, apply, picker};
 use super::*;
-use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::department::DepartmentWrite;
 use crate::application::workflow::registry;
 use crate::domain::workflow::CompanyId;
@@ -64,17 +64,14 @@ async fn preview_desk(f: &Fixture) -> Uuid {
             .await
             .unwrap();
     }
-    let desk = ChannelPersistence::create(
+    let desk = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.company,
         ChannelWrite {
             name: "Preview".into(),
             slug: "preview".into(),
             enabled: true,
-            ownership: Some(ChannelOwnershipWrite {
-                department_id: Some(Some(department.id)),
-                members_only: Some(false),
-            }),
+            department_id: Some(department.id),
             ..Default::default()
         },
     )
@@ -175,7 +172,7 @@ async fn workflow_role_reviewer_picker_refuses_foreign_people_desks_and_actors()
         .await,
         Err(AppError::NotFound(_))
     ));
-    let foreign_desk = ChannelPersistence::create(
+    let foreign_desk = crate::adapters::persistence::test_support::create_channel(
         &f.persistence,
         f.other,
         ChannelWrite {

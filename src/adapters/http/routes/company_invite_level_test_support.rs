@@ -170,7 +170,7 @@ impl RouteFixture {
         );
     }
     pub async fn make_admin(&self) {
-        sqlx::query("UPDATE company_members SET role='admin',access_level=4 WHERE company_id=$1 AND user_id=$2")
+        sqlx::query("WITH updated AS (UPDATE department_members AS member SET access_level=4 WHERE member.company_id=$1 AND member.root_user_id=$2 RETURNING member.company_id, member.department_id, member.principal_id) INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT company_id, department_id, principal_id, 'admin' FROM updated ON CONFLICT DO NOTHING")
             .bind(self.base.company.id).bind(self.base.member.id).execute(self.base.persistence.pool()).await.unwrap();
     }
 }

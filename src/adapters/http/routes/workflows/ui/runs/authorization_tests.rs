@@ -40,7 +40,34 @@ async fn reconciliation_and_step_refuse_foreign_and_hidden_channel_identities() 
             .collect();
         submitted.push(("note", "No confirmation from vendor yet."));
         let (stranger, other) = owner_and_company(&action.persistence, "Foreign annotation").await;
-        let mut denied = vec![(stranger, other), (stranger, action.company)];
+        // A unit lead manages configuration, not the company-wide run views (Plan06 U4).
+        let lead = teammate(&action.persistence, action.company, "member").await;
+        let principal: Uuid = sqlx::query_scalar(
+            "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+        )
+        .bind(action.company)
+        .bind(lead)
+        .fetch_one(action.persistence.pool())
+        .await
+        .unwrap();
+        crate::adapters::persistence::test_support::department_use_cases(&action.persistence)
+            .create_department(
+                action.owner,
+                action.company,
+                crate::application::ports::department::DepartmentWrite {
+                    name: "Led".into(),
+                    slug: "led".into(),
+                    ..Default::default()
+                },
+                Some(crate::entities::transport::PrincipalId::new(principal)),
+            )
+            .await
+            .unwrap();
+        let mut denied = vec![
+            (stranger, other),
+            (stranger, action.company),
+            (lead, action.company),
+        ];
         if matches!(kind, HttpForm::PrivateChannelSlot) {
             denied.push((
                 teammate(&action.persistence, action.company, "admin").await,

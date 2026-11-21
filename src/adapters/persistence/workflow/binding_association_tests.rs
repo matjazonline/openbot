@@ -20,20 +20,17 @@ async fn security_email_identity_workflow_channel_and_thread_need_current_addres
         )
         .await
         .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    let principal_id = crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(company.as_uuid()),
+        admin.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(company.as_uuid())
-    .bind(admin.id)
-    .execute(p.pool())
     .await
-    .unwrap();
-    let principal_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Admin')")
-        .bind(principal_id).bind(company.as_uuid()).bind(admin.id)
-        .execute(p.pool()).await.unwrap();
-    let channel = ChannelPersistence::create(
+    .as_uuid();
+
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         company.as_uuid(),
         ChannelWrite {
@@ -44,11 +41,11 @@ async fn security_email_identity_workflow_channel_and_thread_need_current_addres
     )
     .await
     .unwrap();
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(channel.id)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        channel.id,
+    )
+    .await;
     sqlx::query("INSERT INTO channel_principal_grants (company_id, channel_id, principal_id, capability, provenance) VALUES ($1, $2, $3, 'view', 'configured_allowlist')")
         .bind(company.as_uuid()).bind(channel.id).bind(principal_id)
         .execute(p.pool()).await.unwrap();
@@ -150,19 +147,17 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
         .execute(p.pool())
         .await
         .unwrap();
-    let principal = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    let principal = crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(f.target.company.as_uuid()),
+        user.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(f.target.company.as_uuid())
-    .bind(user.id)
-    .execute(p.pool())
     .await
-    .unwrap();
-    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Admin')")
-        .bind(principal).bind(f.target.company.as_uuid()).bind(user.id).execute(p.pool()).await.unwrap();
-    let channel = ChannelPersistence::create(
+    .as_uuid();
+
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         f.target.company.as_uuid(),
         ChannelWrite {
@@ -173,16 +168,21 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
     )
     .await
     .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        channel.id,
+    )
+    .await;
     let association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
     for role in ["admin", "member"] {
-        sqlx::query("UPDATE company_members SET role = $3 WHERE company_id = $1 AND user_id = $2")
+        sqlx::query("WITH cleared AS (DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id = $1 AND member.root_user_id = $2 AND $3::text='member') INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.company_id = $1 AND member.root_user_id = $2 AND $3::text='admin' ON CONFLICT DO NOTHING")
             .bind(f.target.company.as_uuid())
             .bind(user.id)
             .bind(role)
             .execute(p.pool())
             .await
             .unwrap();
-        for mode in ["team", "public", "allowlist"] {
+        for mode in ["members", "public"] {
             sqlx::query("UPDATE channels SET access_mode = $2 WHERE id = $1")
                 .bind(channel.id)
                 .bind(mode)
@@ -212,8 +212,8 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
                         .await
                         .unwrap()
                         .unwrap();
-                    let expected = context.membership.manages_company_operations()
-                        && channel.viewer_access(context);
+                    let expected =
+                        context.membership.administers_company() && channel.viewer_access(context);
                     let mut tx = p.pool().begin().await.unwrap();
                     let result = async {
                         authority::authorize_company(&mut tx, f.target.company, actor).await?;
@@ -242,7 +242,7 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
 async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association() {
     let f = BindingFixture::new(serde_json::json!([])).await;
     let p = &f.fixture.persistence;
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         p,
         f.target.company.as_uuid(),
         ChannelWrite {
@@ -253,7 +253,7 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
     )
     .await
     .unwrap();
-    let second = ChannelPersistence::create(
+    let second = crate::adapters::persistence::test_support::create_channel(
         p,
         f.target.company.as_uuid(),
         ChannelWrite {
@@ -315,11 +315,11 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
         .execute(p.pool())
         .await
         .unwrap();
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-        .bind(channel.id)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        channel.id,
+    )
+    .await;
     let principal: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND user_id = $2")
             .bind(f.target.company.as_uuid())
@@ -330,19 +330,33 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
     sqlx::query("INSERT INTO channel_principal_grants (company_id, channel_id, principal_id, capability, provenance) VALUES ($1, $2, $3, 'view', 'configured_allowlist')")
         .bind(f.target.company.as_uuid()).bind(channel.id).bind(principal).execute(p.pool()).await.unwrap();
     let activation = f.activity(configured.revision).await;
-    // Direct grant writers need not take the company lock; the exact grant row is locked.
     let mut revocation = p.pool().begin().await.unwrap();
-    sqlx::query("DELETE FROM channel_principal_grants WHERE channel_id = $1 AND principal_id = $2")
+    sqlx::query("DELETE FROM channel_principal_grants WHERE channel_id=$1 AND principal_id=$2")
         .bind(channel.id)
         .bind(principal)
         .execute(&mut *revocation)
         .await
         .unwrap();
+    // The grant writer still holds the desk row; configuration serializes with it,
+    // then succeeds without borrowing the revoked human View permission.
     let (result, ()) = tokio::join!(p.save_binding(activation), async {
         crate::adapters::persistence::test_support::wait_until_backends_are_blocked(p.pool(), 1)
             .await;
         revocation.commit().await.unwrap();
     });
-    assert!(matches!(result, Err(AppError::NotFound(_))));
-    assert_eq!(f.state().await.revision, configured.revision);
+    result.unwrap();
+    assert_eq!(
+        f.state().await.revision.get(),
+        configured.revision.get() + 1
+    );
+    assert!(
+        super::super::association::authorize_association(
+            &mut p.pool().acquire().await.unwrap(),
+            f.target.company,
+            f.target.actor,
+            configured.association,
+        )
+        .await
+        .is_err()
+    );
 }

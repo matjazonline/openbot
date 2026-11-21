@@ -1,4 +1,6 @@
 use super::{authority::*, rows::*, *};
+use crate::application::ports::administration::ManagementTarget;
+use crate::entities::department::DepartmentId;
 
 pub(super) async fn read_draft(
     db: &mut PgConnection,
@@ -40,10 +42,20 @@ async fn event(
     kind: &str,
     version: Option<VersionId>,
 ) -> AppResult<()> {
+    // The role the definition is managed with as it now stands (Plan06 02B).
+    let acting = super::super::administration::management_role_on(
+        tx,
+        actor.user_id(),
+        draft.company(),
+        crate::application::ports::administration::ManagementTarget::DefinitionCreation(
+            draft.workflow(),
+        ),
+    )
+    .await?;
     sqlx::query(
         "INSERT INTO workflow_definition_events \
-        (company_id, workflow_id, id, revision, event_kind, actor_id, version_id) \
-        VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        (company_id, workflow_id, id, revision, event_kind, actor_id, version_id, acting_role) \
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(draft.company().as_uuid())
     .bind(draft.workflow().as_uuid())
@@ -52,6 +64,7 @@ async fn event(
     .bind(kind)
     .bind(actor.user_id())
     .bind(version.map(VersionId::as_uuid))
+    .bind(acting.map(|role| role.to_string()))
     .execute(&mut **tx)
     .await?;
     Ok(())
@@ -60,11 +73,12 @@ async fn insert_draft(
     tx: &mut Transaction<'_, Postgres>,
     draft: &CompanyWorkflowDraft,
     owner_agent: Option<Uuid>,
+    managing_department: Option<DepartmentId>,
 ) -> AppResult<()> {
     sqlx::query(
         "INSERT INTO workflow_definitions \
-        (company_id, id, revision, title, description, source, template_origin, owner_agent_id) \
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        (company_id, id, revision, title, description, source, template_origin, owner_agent_id, managing_department_id) \
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(draft.company().as_uuid())
     .bind(draft.workflow().as_uuid())
@@ -74,6 +88,7 @@ async fn insert_draft(
     .bind(draft.source())
     .bind(origin_json(draft)?)
     .bind(owner_agent)
+    .bind(managing_department.map(DepartmentId::as_uuid))
     .execute(&mut **tx)
     .await
     .map_err(write_error)?;
@@ -83,10 +98,22 @@ async fn insert_draft(
 #[async_trait]
 impl WorkflowDraftCopies for PostgresPersistence {
     async fn insert_copy(&self, copy: PreparedTemplateCopy) -> AppResult<()> {
-        let mut tx = self.pool.begin().await?;
         let draft = copy.draft();
-        authorize_company(&mut tx, draft.company(), copy.actor()).await?;
-        insert_draft(&mut tx, draft, None).await?;
+        let mut tx = management::begin(self, draft.company(), copy.actor()).await?;
+        management::authorize_target_on(
+            &mut tx,
+            draft.company(),
+            copy.actor(),
+            ManagementTarget::DefinitionCreation(draft.workflow()),
+        )
+        .await?;
+        let department = super::super::administration::creating_department_on(
+            &mut tx,
+            copy.actor().user_id(),
+            draft.company(),
+        )
+        .await?;
+        insert_draft(&mut tx, draft, None, Some(department)).await?;
         event(&mut tx, draft, copy.actor(), "copied", None).await?;
         tx.commit().await?;
         Ok(())
@@ -130,15 +157,34 @@ impl WorkflowDefinitions for PostgresPersistence {
             .transpose()
     }
     async fn save_draft(&self, command: PreparedDraft) -> AppResult<()> {
-        let mut tx = self.pool.begin().await?;
         let state = command.state();
-        authorize_company(&mut tx, state.draft.company(), command.actor()).await?;
+        let company = state.draft.company();
+        let mut tx = management::begin(self, company, command.actor()).await?;
+        let target = if command.expected().is_none() {
+            ManagementTarget::DefinitionCreation(state.draft.workflow())
+        } else {
+            ManagementTarget::Definition(state.draft.workflow())
+        };
+        management::authorize_target_on(&mut tx, company, command.actor(), target).await?;
+        let creating_department = if command.expected().is_none() {
+            Some(
+                super::super::administration::creating_department_on(
+                    &mut tx,
+                    command.actor().user_id(),
+                    company,
+                )
+                .await?,
+            )
+        } else {
+            None
+        };
         save_draft_on(
             &mut tx,
             &state.draft,
             command.actor(),
             command.expected(),
             state.archived,
+            creating_department,
         )
         .await?;
         tx.commit().await?;
@@ -146,8 +192,14 @@ impl WorkflowDefinitions for PostgresPersistence {
     }
     async fn publish(&self, prepared: PreparedPublication) -> AppResult<Arc<PublishedBundle>> {
         let request = &prepared.command().request;
-        let mut tx = self.pool.begin().await?;
-        authorize_company(&mut tx, request.target.company, request.target.actor).await?;
+        let mut tx = management::begin(self, request.target.company, request.target.actor).await?;
+        management::authorize_target_on(
+            &mut tx,
+            request.target.company,
+            request.target.actor,
+            ManagementTarget::Definition(request.target.workflow),
+        )
+        .await?;
         let bundle = publish_on(&mut tx, &prepared).await?;
         tx.commit().await?;
         Ok(bundle)
@@ -208,9 +260,10 @@ pub(super) async fn save_draft_on(
     actor: WorkflowActor,
     expected: Option<DraftRevision>,
     archived: bool,
+    managing_department: Option<DepartmentId>,
 ) -> AppResult<()> {
     match expected {
-        None => insert_draft(tx, draft, None).await?,
+        None => insert_draft(tx, draft, None, managing_department).await?,
         Some(expected) => {
             let count = sqlx::query(
                 "UPDATE workflow_definitions SET revision = $3, title = $4, \
@@ -254,7 +307,7 @@ pub(super) async fn insert_draft_on(
     kind: &str,
     owner_agent: Option<Uuid>,
 ) -> AppResult<()> {
-    insert_draft(tx, draft, owner_agent).await?;
+    insert_draft(tx, draft, owner_agent, None).await?;
     event(tx, draft, actor, kind, None).await
 }
 

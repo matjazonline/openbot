@@ -1,0 +1,19 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-17137d9956c1beec)
+
+running 7 tests
+test application::workflow::tests::authorization_cases::reader_errors::admission_reader_failures_propagate_without_writes ... ok
+test application::workflow::tests::authorization_cases::association::related_ids_and_thread_channel_must_match_loaded_records ... ok
+test application::workflow::tests::authorization_cases::replay::replay_reauthorizes_and_association_is_part_of_dedup ... ok
+test application::workflow::tests::authorization_cases::visibility::channel_visibility_is_independent_of_management_access ... ok
+test application::workflow::tests::authorization_cases::cancellation::cancel_uses_stored_association_and_reader_errors_propagate ... ok
+test application::workflow::tests::authorization_cases::membership::current_manager_membership_controls_admit_and_cancel_before_reads ... ok
+test application::workflow::tests::authorization_cases::resources::unresolved_resources_cannot_enter_admission_configuration ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4739 filtered out; finished in 0.20s
+

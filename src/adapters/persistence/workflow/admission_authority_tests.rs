@@ -87,11 +87,11 @@ async fn restrict_channel(f: &AdmissionFixture, c: &Conversation) -> Uuid {
         crate::entities::company_member::CompanyAccessRole::Admin,
     )
     .await;
-    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
-        .bind(c.channel)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+        p.pool(),
+        c.channel,
+    )
+    .await;
     let principal: Uuid =
         sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
             .bind(f.binding.target.company.as_uuid())
@@ -189,13 +189,17 @@ async fn workflow_admit_sql_deactivated_replay_uses_saved_resources_not_current_
     );
     let p = f.persistence();
     let old = p
-        .list_mcp_connections(f.binding.target.company.as_uuid())
+        .list_mcp_connections(
+            f.binding.target.company.as_uuid(),
+            &p.test_all_units(f.binding.target.company.as_uuid()).await,
+        )
         .await
         .unwrap()
         .remove(0);
     let replacement = p
         .create_mcp_connection(
             f.binding.target.company.as_uuid(),
+            p.test_root_unit(f.binding.target.company.as_uuid()).await,
             crate::application::use_cases::mcp::McpConnectionWrite {
                 slug: "replacement".into(),
                 endpoint: old.endpoint,

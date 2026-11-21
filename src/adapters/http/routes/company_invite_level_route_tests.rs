@@ -28,7 +28,8 @@ async fn check_member_endpoint(endpoint: Endpoint) {
     f.refuse(
         endpoint,
         f.local(&base.member, base.member.id, AccessLevel::L1),
-        StatusCode::FORBIDDEN,
+        // Not administering the company is an authority refusal: told nothing (Plan06 02A.4).
+        StatusCode::NOT_FOUND,
     )
     .await;
     f.refuse(
@@ -100,7 +101,8 @@ async fn check_invite_endpoint(endpoint: Endpoint) {
     f.refuse(
         endpoint,
         f.local(&base.member, f.local_invite.id, AccessLevel::L1),
-        StatusCode::FORBIDDEN,
+        // Not administering the company is an authority refusal: told nothing (Plan06 02A.4).
+        StatusCode::NOT_FOUND,
     )
     .await;
     f.refuse(

@@ -1,0 +1,19 @@
+Removed names:
+adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card
+adapters::persistence::workflow::tests::schedule_tests::schedule_management_requires_an_owner_or_admin_who_sees_the_channel
+Added names:
+adapters::http::routes::channel::authorization_tests::delegated::delegated_admin_desk_json_routes_allow_the_unit_lead_and_hide_siblings_and_foreign_ids
+adapters::http::routes::channel::authorization_tests::delegated::delegated_admin_schedule_json_routes_scope_configuration_to_the_desk_unit
+adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::binding_configuration_does_not_grant_conversation_view_in_the_tab_form_or_card
+adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_desk_edit_holds_authority_until_commit
+adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_competing_role_removal_precedes_a_desk_edit
+adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_desk_crud_follows_the_managed_subtree_without_conversation_view
+adapters::persistence::department::tests::delegated_administration::desks::delegated_admin_desk_persistence_checks_current_destination_and_foreign_ownership
+adapters::persistence::department::tests::delegated_administration::desks::manages_unit_collection_entry_never_grants_an_individual_target
+adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_competing_role_removal_precedes_schedule_configuration
+adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_configuration_and_lists_follow_managed_units_without_view
+adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_hides_foreign_ids_in_the_local_scope
+adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_refuses_sibling_and_foreign_writers
+adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_run_inspection_and_initiation_require_current_human_view
+adapters::persistence::workflow::tests::binding_tests::delegated::delegated_admin_binding_service_configures_activates_and_pauses_captured_messaging
+adapters::persistence::workflow::tests::schedule_tests::configuration_authority::schedule_management_separates_configuration_from_human_view

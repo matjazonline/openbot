@@ -1,0 +1,156 @@
+--- B2/src/adapters/persistence/company_agent.rs
++++ B3/src/adapters/persistence/company_agent.rs
+@@ -33,14 +33,28 @@
+     use_cases::agent::{AgentPlacement, AgentWrite, CompanyAgents, CreatedAgent, model_allowed},
+ };
+ 
+-/// What [`create_company_agent_on`] creates: the agent under `id` from `write`, placed in
+-/// `placement` when one is named. A caller with writes of its own after the creation passes no
+-/// placement and places the agent last itself (`place_in_department_on`), so the department's
+-/// desk gates stay the last locks it takes.
++/// Membership is established before publication; callers doing more construction finalize
++/// deferred placement last so department desk gates remain the last locks they take.
++#[derive(Clone, Copy)]
++pub(crate) enum AgentCreationPlacement {
++    Unplaced,
++    Complete(AgentPlacement),
++    Deferred(AgentPlacement),
++}
++
++impl AgentCreationPlacement {
++    fn requested(self) -> Option<AgentPlacement> {
++        match self {
++            Self::Unplaced => None,
++            Self::Complete(placement) | Self::Deferred(placement) => Some(placement),
++        }
++    }
++}
++
+ pub(crate) struct CompanyAgentCreation {
+     pub id: Uuid,
+     pub write: AgentWrite,
+-    pub placement: Option<AgentPlacement>,
++    pub placement: AgentCreationPlacement,
+ }
+ 
+ pub(crate) struct CreatedCompanyAgent {
+@@ -59,25 +73,20 @@
+     actor: WorkflowActor,
+     creation: CompanyAgentCreation,
+ ) -> AppResult<CreatedCompanyAgent> {
++    let mut creation = creation;
++    // Publication capture dominates this phase; keep it off the constructor's future frame.
++    let principal = Box::pin(insert_company_agent_identity_on(
++        tx,
++        company,
++        actor,
++        &mut creation,
++    ))
++    .await?;
+     let CompanyAgentCreation {
+         id,
+-        mut write,
++        write,
+         placement,
+     } = creation;
+-    resolve_model_on(tx, company, &mut write).await?;
+-    insert_agent_on(tx, id, Some(company.as_uuid()), &write).await?;
+-    let principal = create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
+-    super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, &write).await?;
+-    register_agent_address_on(tx, company, principal, &write.slug).await?;
+-    publish_initial_on(
+-        tx,
+-        AgentPublicationScope {
+-            company,
+-            actor,
+-            agent: AgentId::new(id),
+-        },
+-    )
+-    .await?;
+     // Boxed: template compilation and publication otherwise dominate the creator's future.
+     let workflow = Box::pin(provision_agent_workflow_on(
+         tx,
+@@ -92,7 +101,7 @@
+     ))
+     .await?
+     .map_err(refusal_error)?;
+-    if let Some(placement) = placement {
++    if let AgentCreationPlacement::Complete(placement) = placement {
+         place_in_department_on(
+             tx,
+             templates,
+@@ -108,6 +117,48 @@
+         principal,
+         workflow,
+     })
++}
++
++async fn insert_company_agent_identity_on(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    actor: WorkflowActor,
++    creation: &mut CompanyAgentCreation,
++) -> AppResult<crate::entities::transport::PrincipalId> {
++    let id = creation.id;
++    let placement = creation.placement;
++    let write = &mut creation.write;
++    super::workflow::management::authorize_target_on(
++        tx,
++        company,
++        actor,
++        crate::use_cases::agent::placement_target(placement.requested()),
++    )
++    .await?;
++    resolve_model_on(tx, company, write).await?;
++    insert_agent_on(tx, id, Some(company.as_uuid()), write).await?;
++    let principal = create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
++    if let Some(placement) = placement.requested() {
++        super::department::prepare_new_agent_placement_on(
++            tx,
++            crate::application::ports::department::DepartmentScope { company, actor },
++            principal,
++            placement,
++        )
++        .await?;
++    }
++    super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, write).await?;
++    register_agent_address_on(tx, company, principal, &write.slug).await?;
++    publish_initial_on(
++        tx,
++        AgentPublicationScope {
++            company,
++            actor,
++            agent: AgentId::new(id),
++        },
++    )
++    .await?;
++    Ok(principal)
+ }
+ 
+ async fn register_agent_address_on(
+@@ -229,6 +280,13 @@
+     ) -> AppResult<CreatedAgent> {
+         let mut tx = begin_bounded(&self.persistence).await?;
+         lock_company_on(&mut tx, AgentCompanyScope { company, actor }).await?;
++        super::workflow::management::authorize_target_on(
++            &mut tx,
++            company,
++            actor,
++            crate::use_cases::agent::placement_target(placement),
++        )
++        .await?;
+         if let Some(library_agent_id) = library_agent_id {
+             prepare_library_agent_on(&mut tx, company.as_uuid(), library_agent_id, &mut write)
+                 .await?;
+@@ -242,7 +300,10 @@
+             CompanyAgentCreation {
+                 id,
+                 write,
+-                placement,
++                placement: placement.map_or(
++                    AgentCreationPlacement::Unplaced,
++                    AgentCreationPlacement::Complete,
++                ),
+             },
+         ))
+         .await?;

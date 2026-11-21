@@ -22,7 +22,7 @@ async fn knowledge_e2e_competing_application_replicas_replace_one_name_and_level
         .execute(&mut *gate)
         .await
         .unwrap();
-    let actor = scope(&j.d, j.d.fixture.target.actor.user_id());
+    let actor = target(&j.d, j.d.fixture.target.actor.user_id()).await;
     let mut writes = Vec::new();
     for (library, body) in [
         (j.d.knowledge.clone(), "first writer"),

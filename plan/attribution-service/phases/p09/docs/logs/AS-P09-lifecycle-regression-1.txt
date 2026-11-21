@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized] target(s) in 0.17s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 12 tests
+test adapters::identity::tests::attribution_company_lifecycle_waiting_writer_rechecks_expiry_and_suspension ... ok
+test adapters::identity::tests::attribution_company_lifecycle_reconciliation_fences_and_poison_backoff ... ok
+test adapters::identity::tests::attribution_company_lifecycle_competing_delivery_and_provision_never_revive_delete ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_shutdown_cancels_inflight_status_and_joins ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_body_limit_follows_header_authentication ... ok
+test adapters::identity::tests::attribution_company_lifecycle_freshness_rejects_clock_rollback_and_cold_process ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_company_lifecycle_operator_signal_survives_restart_and_repair ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_reconciliation_repairs_missed_delete_and_records_denial ... ok
+test adapters::identity::tests::attribution_company_lifecycle_equal_version_competitors_conflict ... ok
+test adapters::identity::tests::attribution_company_lifecycle_stale_observations_and_deliveries_cannot_refresh ... ok
+test adapters::identity::tests::attribution_company_lifecycle_lost_reconciliation_lease_cannot_store_observation ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_company_lifecycle_cold_expired_evicted_and_concurrent_access ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 110 filtered out; finished in 3.98s
+

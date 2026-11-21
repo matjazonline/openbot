@@ -25,6 +25,67 @@ pub(super) async fn inspect_on(
     }
 }
 
+/// The draft steps that use a selected tool, for naming them in a publication refusal (Plan07
+/// 01B.2): steps whose literal `connection` is the selection's slot (and literal `tool`, when
+/// they name one, its tool), or for an unslotted tool, whose literal `tool` is its name. A step
+/// that picks it through an expression is not named. Empty when none is found.
+pub(super) fn steps_using(source: &str, slot: Option<&str>, tool: &str) -> String {
+    let Ok(source) = serde_json::from_str::<serde_json::Value>(source) else {
+        return String::new();
+    };
+    let steps: Vec<&str> = source["steps"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(_, step)| {
+            let with = &step["with"];
+            match slot {
+                Some(slot) => {
+                    with["connection"]["literal"] == slot
+                        && (with["tool"].is_null() || with["tool"]["literal"] == tool)
+                }
+                None => with["tool"]["literal"] == tool,
+            }
+        })
+        .map(|(id, _)| id.as_str())
+        .collect();
+    match steps.as_slice() {
+        [] => String::new(),
+        [step] => format!(", used by step {step}"),
+        steps => format!(", used by steps {}", steps.join(", ")),
+    }
+}
+
+/// Who may use a runtime resource for a binding or a run's action (Plan07 decision f): an HTTP
+/// or MCP connection may be used by any current company member, since which runs reach it is
+/// judged from their desk (readiness, admission and runtime resolution); the company's messaging
+/// and JEV resources stay with root management.
+pub(super) async fn authorize_use_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    id: Uuid,
+) -> AppResult<()> {
+    let connection: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_http_connections WHERE company_id=$1 AND id=$2) \
+         OR EXISTS(SELECT 1 FROM company_mcp_connections WHERE company_id=$1 AND id=$2 \
+         AND deleted_at IS NULL)",
+    )
+    .bind(company.as_uuid())
+    .bind(id)
+    .fetch_one(&mut *db)
+    .await?;
+    if connection {
+        authority::authorize_person_with_locks(db, company, actor, super::row_locks::RowLocks::Wait)
+            .await
+            .map(|_| ())
+    } else {
+        authority::authorize_company(db, company, actor)
+            .await
+            .map(|_| ())
+    }
+}
+
 #[async_trait]
 impl ResourceDirectory for PostgresPersistence {
     async fn inspect(
@@ -34,7 +95,7 @@ impl ResourceDirectory for PostgresPersistence {
         id: RuntimeResourceId,
     ) -> AppResult<Option<ResourceStatus>> {
         let mut tx = self.pool.begin().await?;
-        authority::authorize_company(&mut tx, company, actor).await?;
+        authorize_use_on(&mut tx, company, actor, id.as_uuid()).await?;
         let status = inspect_on(&mut tx, company, id).await?;
         tx.commit().await?;
         Ok(status)
@@ -46,15 +107,93 @@ pub(super) struct ReadinessSelection<'a> {
     pub bundle: &'a PublishedBundle,
     pub resources:
         &'a std::collections::BTreeMap<crate::domain::workflow::ResourceName, RuntimeResourceId>,
+    /// Where workflow-level connections must be reachable from (Plan07): the association's base
+    /// department, the root when `None`.
+    pub reach: Option<crate::entities::department::DepartmentId>,
+    pub stage: crate::app_error::UnitCheckStage,
 }
 
-impl<'a> From<&'a binding::ConfiguredBinding> for ReadinessSelection<'a> {
-    fn from(binding: &'a binding::ConfiguredBinding) -> Self {
+impl<'a> ReadinessSelection<'a> {
+    pub(super) fn of(
+        binding: &'a binding::ConfiguredBinding,
+        reach: Option<crate::entities::department::DepartmentId>,
+        stage: crate::app_error::UnitCheckStage,
+    ) -> Self {
         Self {
             company: binding.company_id(),
             bundle: binding.bundle(),
             resources: binding.resources(),
+            reach,
+            stage,
         }
+    }
+}
+
+/// The start of a run's reach for workflow-level connections (Plan07 decision d): the
+/// association's base department, which equals the run's base read set; the root when none.
+pub(super) async fn association_reach_on(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    association: crate::application::workflow::RelatedAssociation,
+) -> AppResult<Option<crate::entities::department::DepartmentId>> {
+    Ok(super::role_binding::context_on(tx, company, association)
+        .await?
+        .ok())
+}
+
+/// A run's reach once it exists: its base scope rows' own unit (the root when the chain was
+/// empty), the same start admission used.
+pub(super) async fn run_reach_on(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    run: crate::domain::workflow::RunId,
+) -> AppResult<Option<crate::entities::department::DepartmentId>> {
+    let unit: Option<Uuid> = sqlx::query_scalar(
+        "SELECT unit_id FROM workflow_run_scopes WHERE company_id=$1 AND run_id=$2 \
+         AND acting_principal_id IS NULL AND access='read' AND own LIMIT 1",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_optional(tx)
+    .await?;
+    Ok(unit.map(crate::entities::department::DepartmentId::new))
+}
+
+/// A slot's HTTP or MCP connection must belong to a unit in reach (Plan07 01B.3, D8).
+async fn check_connection_unit_on(
+    tx: &mut PgConnection,
+    configuration: &ReadinessSelection<'_>,
+    slot: &crate::domain::workflow::ResourceName,
+    id: Uuid,
+) -> AppResult<()> {
+    use crate::application::ports::unit_resources::UnitResourceKind;
+    let owner: Option<(String, bool)> = sqlx::query_as(
+        "SELECT kind, unit_reaches($1, COALESCE($3, (SELECT id FROM departments \
+            WHERE company_id=$1 AND is_root)), unit_id) FROM ( \
+            SELECT 'http' AS kind, unit_id FROM workflow_http_connections \
+                WHERE company_id=$1 AND id=$2 \
+            UNION ALL SELECT 'mcp', unit_id FROM company_mcp_connections \
+                WHERE company_id=$1 AND id=$2 AND unit_id IS NOT NULL) AS owner",
+    )
+    .bind(configuration.company.as_uuid())
+    .bind(id)
+    .bind(configuration.reach.map(|unit| unit.as_uuid()))
+    .fetch_optional(&mut *tx)
+    .await?;
+    match owner {
+        Some((kind, false)) => Err(AppError::ResourceOutsideUnit(
+            crate::app_error::ResourceOutsideUnit {
+                stage: configuration.stage,
+                kind: if kind == "http" {
+                    UnitResourceKind::HttpConnection
+                } else {
+                    UnitResourceKind::McpConnection
+                },
+                resource: id,
+                name: slot.as_str().to_owned(),
+            },
+        )),
+        _ => Ok(()),
     }
 }
 
@@ -94,7 +233,13 @@ pub(super) async fn check_readiness(
                 continue;
             }
             ToolKind::Http => {
-                http::registered_on(tx, company, tool).await?;
+                http::registered_on(
+                    tx,
+                    company,
+                    tool,
+                    http::ConnectionReach::From(configuration.reach),
+                )
+                .await?;
                 continue;
             }
             // A frozen pin runs while its name is registered for the same workflow (P07-Q2).
@@ -142,6 +287,7 @@ pub(super) async fn check_readiness(
             .resources
             .get(&requirement.slot)
             .ok_or_else(missing)?;
+        check_connection_unit_on(tx, &configuration, &requirement.slot, id.as_uuid()).await?;
         let status = inspect_on(tx, configuration.company, id)
             .await?
             .ok_or_else(missing)?;

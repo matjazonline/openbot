@@ -1,0 +1,8 @@
+base:   334e79c74b383dffd8e0d565c33a77c6ac24c94d
+digest: 54bfc2c64c4b501ee0539b514f0e0e26432a2ac823b0de55d9ef6a14fd588cdc
+files:
+  plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md
+  plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md
+  plan/04-root-unit/phases/p01/docs/HANDOFF.md
+  src/adapters/persistence/access_mode_scale_tests.rs
+  src/adapters/persistence/department_desks_tests.rs

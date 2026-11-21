@@ -135,8 +135,8 @@ const PUBLIC_NAV: &str = r##"
                 <a href="/register" class="px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-content rounded-lg transition">Sign Up</a>
         "##;
 
-/// Client-side behaviour shared by every page: remembering the selected company, the spam-warning
-/// interlock, and the participant/team autocomplete.
+/// Client-side behaviour shared by every page: remembering the selected company and
+/// participant/team autocomplete.
 ///
 /// Kept out of the `format!` above so its braces need no escaping and it reads as plain JavaScript.
 pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
@@ -197,27 +197,6 @@ pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
         document.addEventListener('DOMContentLoaded', autoDetectAndSyncCompany);
         document.addEventListener('htmx:afterSettle', autoDetectAndSyncCompany);
         autoDetectAndSyncCompany();
-
-        function toggleSpamWarning(input) {
-            var form = input.closest('form');
-            if (!form) return;
-            var box = form.querySelector('.spam-disabled-box');
-            if (!box) return;
-            var checkbox = box.querySelector('input[type="checkbox"]');
-            var isPublic = input.value.toLowerCase().includes('@public');
-            if (isPublic) {
-                box.classList.remove('opacity-40', 'pointer-events-none', 'grayscale');
-                if (checkbox) {
-                    checkbox.disabled = false;
-                }
-            } else {
-                box.classList.add('opacity-40', 'pointer-events-none', 'grayscale');
-                if (checkbox) {
-                    checkbox.disabled = true;
-                    checkbox.checked = false;
-                }
-            }
-        }
 
         window.companyTeamCache = window.companyTeamCache || {};
 

@@ -1,0 +1,25 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.72s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 13 tests
+test adapters::persistence::workflow::tests::http_tests::vault_tests::bindings::unit_resource_authority_vault_binding_needs_the_connection_unit ... ok
+test adapters::persistence::workflow::tests::http_tests::unit_resource_authority_http_operation_register_needs_the_connection_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_schema_delete_names_what_to_move_and_teardown_keeps_working ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_skills_tab_and_agent_authoring_reads ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_move_lists_the_agents_whose_active_revision_uses_a_skill ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_move_needs_both_units_and_changes_only_the_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_schema_keys_checks_and_default_unit ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_authority_root_lead_level_ceiling_refresh_and_placed_defaults ... ok
+test adapters::persistence::department::tests::delegated_administration::unit_resources::unit_resource_authority_each_write_follows_the_resource_unit ... ok
+test adapters::persistence::workflow::tests::binding_tests::unit_resource_move_lists_active_bindings_of_the_current_configuration ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_move_counts_but_does_not_name_unmanaged_uses ... ok
+test adapters::persistence::department::tests::delegated_administration::agents::unit_resource_library_agent_copies_skills_into_its_placement_or_the_root ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::unit_resource_authority_mcp_operation_register_needs_the_connection_unit ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 4914 filtered out; finished in 8.12s
+

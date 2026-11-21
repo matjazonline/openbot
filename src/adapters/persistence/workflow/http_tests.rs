@@ -372,6 +372,7 @@ async fn workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed(
         .create_http(
             foreign.target.company,
             foreign.target.actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://example.test").unwrap(),
                 bearer: true,
@@ -390,6 +391,7 @@ async fn workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed(
         p.create_http(
             setup.fixture.target.company,
             foreign.target.actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://example.test").unwrap(),
                 bearer: false
@@ -516,3 +518,772 @@ mod knowledge_http_tests;
 
 #[path = "vault_tests/mod.rs"]
 mod vault_tests;
+
+/// Plan07 decision a: registering and revoking an operation is the connection unit's manager's.
+#[tokio::test]
+async fn unit_resource_authority_http_operation_register_needs_the_connection_unit() {
+    let setup = Box::pin(setup("http://127.0.0.1:1", Entrance::Http)).await;
+    let p = &setup.fixture.persistence;
+    let company = setup.fixture.target.company;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    p.move_http(
+        company,
+        setup.fixture.target.actor,
+        setup.connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    let sibling =
+        WorkflowActor::authenticated(p.test_unit_lead(company.as_uuid(), support).await).unwrap();
+    let lead =
+        WorkflowActor::authenticated(p.test_unit_lead(company.as_uuid(), billing).await).unwrap();
+    let refused = p
+        .register_http_operation(
+            company,
+            sibling,
+            setup.connection.id,
+            setup.connection.revision,
+            operation(company, "billing.lookup"),
+        )
+        .await;
+    assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
+    // The move left the revision alone, so the unit's lead registers against it.
+    let registered = p
+        .register_http_operation(
+            company,
+            lead,
+            setup.connection.id,
+            setup.connection.revision,
+            operation(company, "billing.lookup"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(registered.unit_id, billing);
+}
+
+/// Plan07 G1 r2 F2: an unslotted HTTP operation resolves among connections in reach only, so two
+/// sibling units can each own it, and neither substitutes for the other.
+#[tokio::test]
+async fn unit_resource_selection_unslotted_http_resolution_is_judged_within_reach() {
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let billing_connection = Box::pin(configured(
+        &fixture,
+        "https://billing.example.test",
+        Entrance::Http,
+    ))
+    .await;
+    let support_connection = Box::pin(configured(
+        &fixture,
+        "https://support.example.test",
+        Entrance::Http,
+    ))
+    .await;
+    let p = &fixture.persistence;
+    let company = fixture.target.company;
+    let unit = crate::entities::department::DepartmentId::new;
+    let billing = unit(p.test_unit(company.as_uuid(), "billing").await);
+    let support = unit(p.test_unit(company.as_uuid(), "support").await);
+    for (connection, target) in [
+        (&billing_connection, billing),
+        (&support_connection, support),
+    ] {
+        p.move_http(company, fixture.target.actor, connection.id, target)
+            .await
+            .unwrap();
+    }
+    let wanted = operation(company, "http.request").tool;
+    let mut tx = p.pool().begin().await.unwrap();
+    use super::super::http::{ConnectionReach, registered_on};
+    assert_eq!(
+        registered_on(
+            &mut tx,
+            company,
+            &wanted,
+            ConnectionReach::From(Some(billing))
+        )
+        .await
+        .unwrap(),
+        billing_connection.id
+    );
+    assert_eq!(
+        registered_on(
+            &mut tx,
+            company,
+            &wanted,
+            ConnectionReach::From(Some(support))
+        )
+        .await
+        .unwrap(),
+        support_connection.id
+    );
+    // The root reaches neither and fails closed; company-wide the operation merely exists, so
+    // the support check every binding and admission runs first does not fail (B2-F1).
+    assert!(matches!(
+        registered_on(&mut tx, company, &wanted, ConnectionReach::From(None)).await,
+        Err(AppError::NotFound(_))
+    ));
+    registered_on(&mut tx, company, &wanted, ConnectionReach::Company)
+        .await
+        .unwrap();
+    // With Billing's connection disabled, Billing's runs do not fall back to Support's.
+    tx.rollback().await.unwrap();
+    let current = p
+        .list_http(company, fixture.target.actor)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|connection| connection.id == billing_connection.id)
+        .unwrap();
+    p.set_http_enabled(
+        company,
+        fixture.target.actor,
+        current.id,
+        current.revision,
+        false,
+    )
+    .await
+    .unwrap();
+    let mut tx = p.pool().begin().await.unwrap();
+    assert!(matches!(
+        registered_on(
+            &mut tx,
+            company,
+            &wanted,
+            ConnectionReach::From(Some(billing))
+        )
+        .await,
+        Err(AppError::NotFound(_))
+    ));
+}
+
+/// Plan07 01B.1: the workflow editor offers a definition only connections in reach of its
+/// managing department; the binding form offers a lead only those in reach of a unit they manage.
+#[tokio::test]
+async fn unit_resource_selection_offers_follow_definition_and_author_reach() {
+    use crate::application::workflow::reads::{AuthoringReads, PublicationReach};
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let p = &fixture.persistence;
+    let company = fixture.target.company;
+    let root_connection = Box::pin(configured(
+        &fixture,
+        "https://root.example.test",
+        Entrance::Http,
+    ))
+    .await;
+    let billing_connection = Box::pin(configured(
+        &fixture,
+        "https://billing.example.test",
+        Entrance::Http,
+    ))
+    .await;
+    let support_connection = Box::pin(configured(
+        &fixture,
+        "https://support.example.test",
+        Entrance::Http,
+    ))
+    .await;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    for (connection, target) in [
+        (&billing_connection, billing),
+        (&support_connection, support),
+    ] {
+        p.move_http(
+            company,
+            fixture.target.actor,
+            connection.id,
+            crate::entities::department::DepartmentId::new(target),
+        )
+        .await
+        .unwrap();
+    }
+    // The fixture's definition is managed by the root, which reaches only root connections.
+    let options = p
+        .publication_options(
+            company,
+            PublicationReach {
+                workflow: fixture.target.workflow,
+                author: fixture.target.actor.user_id(),
+            },
+            &[],
+            &["http.request".to_owned()],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        options
+            .http
+            .iter()
+            .map(|option| option.connection)
+            .collect::<Vec<_>>(),
+        vec![root_connection.id]
+    );
+    let lead = p.test_unit_lead(company.as_uuid(), billing).await;
+    let offered = |options: crate::application::workflow::reads::BindingOptions| {
+        let mut ids: Vec<Uuid> = options.http.into_iter().map(|choice| choice.id).collect();
+        ids.sort();
+        ids
+    };
+    let mut expected = vec![root_connection.id, billing_connection.id];
+    expected.sort();
+    assert_eq!(
+        offered(p.binding_options(company, lead).await.unwrap()),
+        expected
+    );
+    assert_eq!(
+        offered(
+            p.binding_options(company, fixture.target.actor.user_id())
+                .await
+                .unwrap()
+        )
+        .len(),
+        3,
+        "a root manager is offered every unit's connections"
+    );
+}
+
+/// Plan07 01B.2: publishing a workflow refuses an HTTP selection outside its managing
+/// department's reach, naming the connection, operation and the step using it, and writes no
+/// version.
+#[tokio::test]
+async fn unit_resource_selection_publication_workflow_refuses_an_http_selection_out_of_reach() {
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let connection = Box::pin(configured(
+        &fixture,
+        "https://billing.example.test",
+        Entrance::Http,
+    ))
+    .await;
+    let p = &fixture.persistence;
+    let company = fixture.target.company;
+    let definitions = DefinitionService::new(
+        Preflight,
+        p.clone(),
+        WorkflowSourceDecoder,
+        http::HttpPublicationDirectory {
+            persistence: p.clone(),
+            selections: vec![http::HttpPublicationSelection {
+                connection: connection.id,
+                slot: Some(ResourceName::parse("service").unwrap()),
+                operation: TypeName::parse("http.request").unwrap(),
+            }],
+        },
+    );
+    let mut draft = fixture.save(None);
+    draft.content.source = registry::example("http.request").unwrap().source.clone();
+    definitions.save(draft).await.unwrap();
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    p.move_http(
+        company,
+        fixture.target.actor,
+        connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    let refused = definitions.publish(fixture.publish()).await;
+    assert!(
+        refused.as_ref().err().is_some_and(|error| matches!(error,
+            crate::application::workflow::lifecycle::LifecycleError::Application(
+                AppError::ResourceOutsideUnit(refusal))
+            if refusal.code() == "publication.resource_outside_unit"
+                && refusal.resource == connection.id
+                && refusal.name.contains("http.request")
+                && refusal.name.ends_with("used by step start"))),
+        "{:?}",
+        refused.err()
+    );
+    let versions: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM workflow_versions WHERE company_id=$1")
+            .bind(company.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    assert_eq!(versions, 0, "a refused publication writes no version");
+}
+
+/// Plan07 decision d: Agent Builder tool names resolve among connections in reach of the agent's
+/// placement only (the root's when none).
+#[tokio::test]
+async fn unit_resource_selection_agent_builder_tool_names_follow_the_placement_reach() {
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let connection = Box::pin(configured(
+        &fixture,
+        "https://billing.example.test",
+        Entrance::Tool,
+    ))
+    .await;
+    let p = &fixture.persistence;
+    let company = fixture.target.company;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    p.move_http(
+        company,
+        fixture.target.actor,
+        connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    let names = [TypeName::parse("registered.request").unwrap()];
+    let mut db = p.pool().acquire().await.unwrap();
+    use crate::adapters::persistence::agent_binding_selection::resolve_bindings_in_reach_on;
+    for placement in [None, Some(support)] {
+        assert!(
+            resolve_bindings_in_reach_on(&mut db, company.as_uuid(), None, &names, placement)
+                .await
+                .is_err(),
+            "{placement:?}"
+        );
+    }
+    let resolved =
+        resolve_bindings_in_reach_on(&mut db, company.as_uuid(), None, &names, Some(billing))
+            .await
+            .unwrap();
+    assert_eq!(resolved.len(), 1);
+}
+
+fn desk_association(desk: Uuid) -> RelatedAssociation {
+    RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(desk))
+}
+
+async fn unit_desk(fixture: &Fixture, unit: Uuid) -> Uuid {
+    crate::adapters::persistence::test_support::create_channel(
+        &fixture.persistence,
+        fixture.target.company.as_uuid(),
+        crate::application::ports::channel::ChannelWrite {
+            name: "Unit desk".into(),
+            slug: format!("desk-{}", Uuid::new_v4().simple()),
+            department_id: Some(crate::entities::department::DepartmentId::new(unit)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id
+}
+
+fn configure(
+    target: BindingTarget,
+    association: RelatedAssociation,
+    version: VersionId,
+    slot: Option<Uuid>,
+) -> ConfigureBinding {
+    ConfigureBinding {
+        escalation: None,
+        target,
+        expected: None,
+        association,
+        version,
+        params: json!({}),
+        resources: slot
+            .map(|id| {
+                BTreeMap::from([(
+                    ResourceName::parse("service").unwrap(),
+                    RuntimeResourceId::new(id),
+                )])
+            })
+            .unwrap_or_default(),
+        run_as: None,
+        message_trigger: None,
+    }
+}
+
+/// Plan07 G1 r2 F2 (B2-F1, F4): on a Billing desk an unslotted operation that Support also owns
+/// routes to Billing's connection: the binding saves, the run is admitted and an identical
+/// request replays it, and the action calls Billing's origin. A company-wide binding (the
+/// root's reach) reaches neither, and with Billing's connection disabled after admission the
+/// action does not fall back to Support's.
+#[tokio::test]
+async fn unit_resource_selection_desk_routes_an_unslotted_operation_within_its_reach() {
+    let (origin, server) =
+        server("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\n{\"ok\":true}").await;
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let billing_connection = Box::pin(configured(&fixture, &origin, Entrance::Tool)).await;
+    let version = Box::pin(published(
+        &fixture,
+        &billing_connection,
+        Entrance::Tool,
+        None,
+    ))
+    .await;
+    let support_connection =
+        Box::pin(configured(&fixture, "http://127.0.0.1:9", Entrance::Tool)).await;
+    let p = fixture.persistence.clone();
+    let company = fixture.target.company;
+    let actor = fixture.target.actor;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    for (connection, unit) in [
+        (&billing_connection, billing),
+        (&support_connection, support),
+    ] {
+        p.move_http(
+            company,
+            actor,
+            connection.id,
+            crate::entities::department::DepartmentId::new(unit),
+        )
+        .await
+        .unwrap();
+    }
+    let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
+    let company_wide = BindingTarget {
+        company,
+        actor,
+        binding: WorkflowBindingId::new(Uuid::new_v4()),
+    };
+    assert!(
+        bindings
+            .configure(configure(
+                company_wide,
+                RelatedAssociation::Company,
+                version,
+                None
+            ))
+            .await
+            .is_err(),
+        "the root reaches neither connection"
+    );
+    let association = desk_association(unit_desk(&fixture, billing).await);
+    let target = Box::pin(bound(
+        &fixture,
+        &billing_connection,
+        version,
+        Entrance::Tool,
+        association,
+    ))
+    .await;
+    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
+    let trigger = TriggerId::new(Uuid::new_v4());
+    let correlation = CorrelationId::new();
+    let request = || AdmitWorkflowRequest {
+        history_session: None,
+        company_id: company,
+        actor,
+        association,
+        trigger: TriggerRef::new(company, trigger, TriggerSource::Manual).unwrap(),
+        correlation_id: correlation,
+        binding_id: target.binding,
+        idempotency_key: IdempotencyKey::parse("desk-replay").unwrap(),
+        input: json!({}),
+        rerun_of: None,
+        delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+        expected_binding_revision: None,
+        admission_claim: None,
+    };
+    let AdmissionResult::Created(first) = service.admit(request()).await.unwrap() else {
+        panic!("admitted on the Billing desk");
+    };
+    assert_eq!(
+        service.admit(request()).await.unwrap(),
+        AdmissionResult::Replayed(first)
+    );
+    let claim = Box::pin(claimed_with_key(&fixture, target, association, "desk-run")).await;
+    let second = Box::pin(claimed_with_key(
+        &fixture,
+        target,
+        association,
+        "desk-run-2",
+    ))
+    .await;
+    let setup = Setup {
+        version,
+        fixture,
+        connection: billing_connection,
+        claim,
+        kind: WorkflowStepKind("tool.call".into()),
+    };
+    runtime(&setup)
+        .run(&setup.kind, &setup.claim)
+        .await
+        .completed_result()
+        .unwrap();
+    assert!(server.await.unwrap().contains("fixture-http-secret"));
+    let current = p
+        .list_http(company, actor)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|connection| connection.id == setup.connection.id)
+        .unwrap();
+    p.set_http_enabled(company, actor, current.id, current.revision, false)
+        .await
+        .unwrap();
+    assert!(
+        runtime(&setup)
+            .run(&setup.kind, &second)
+            .await
+            .completed_result()
+            .is_err(),
+        "no fallback to Support's identical operation"
+    );
+}
+
+/// Plan07 01B.3/D8 and decision f (B2-F4, F5, F9): a slot connection owned by Billing is usable
+/// on a Billing desk by a Billing lead, who does not manage the root, through binding save,
+/// admission and the action; a root-owned connection is shared with that desk too; the Billing
+/// connection is refused on a Support desk with `binding.resource_outside_unit`, and once moved
+/// up to the root it is selectable there.
+#[tokio::test]
+async fn unit_resource_selection_desk_slot_connection_follows_desk_reach_and_is_shared_below() {
+    let (origin, server) =
+        server("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\n{\"ok\":true}").await;
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let connection = Box::pin(configured(&fixture, &origin, Entrance::Http)).await;
+    let rooted = Box::pin(configured(&fixture, "http://127.0.0.1:9", Entrance::Http)).await;
+    let version = Box::pin(published(&fixture, &connection, Entrance::Http, None)).await;
+    let p = fixture.persistence.clone();
+    let company = fixture.target.company;
+    let owner = fixture.target.actor;
+    let billing = p.test_unit(company.as_uuid(), "billing").await;
+    let support = p.test_unit(company.as_uuid(), "support").await;
+    p.move_http(
+        company,
+        owner,
+        connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    let billing_channel = unit_desk(&fixture, billing).await;
+    let billing_desk = desk_association(billing_channel);
+    let support_desk = desk_association(unit_desk(&fixture, support).await);
+    let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
+    let lead =
+        WorkflowActor::authenticated(p.test_unit_lead(company.as_uuid(), billing).await).unwrap();
+    // The lead sees the desk, as any run actor must (unchanged by Plan07).
+    sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) SELECT $1,$2,id,'view','department_membership' FROM principals WHERE company_id=$1 AND user_id=$3")
+        .bind(company.as_uuid()).bind(billing_channel).bind(lead.user_id()).execute(p.pool()).await.unwrap();
+    let target = |actor| BindingTarget {
+        company,
+        actor,
+        binding: WorkflowBindingId::new(Uuid::new_v4()),
+    };
+    // Moved up is shared: the lead may bind the root's connection on a Billing desk.
+    bindings
+        .configure(configure(
+            target(lead),
+            billing_desk,
+            version,
+            Some(rooted.id),
+        ))
+        .await
+        .unwrap();
+    let led = target(lead);
+    let state = bindings
+        .configure(configure(led, billing_desk, version, Some(connection.id)))
+        .await
+        .unwrap();
+    bindings
+        .activate(SetBindingActivity {
+            target: led,
+            expected: state.revision,
+        })
+        .await
+        .unwrap();
+    // The lead admits the run, as its actor.
+    fixture.target.actor = lead;
+    let claim = Box::pin(claimed_with_key(&fixture, led, billing_desk, "lead-run")).await;
+    fixture.target.actor = owner;
+    let refused = bindings
+        .configure(configure(
+            target(owner),
+            support_desk,
+            version,
+            Some(connection.id),
+        ))
+        .await;
+    assert!(
+        refused.as_ref().err().is_some_and(|error| matches!(error,
+            crate::application::workflow::lifecycle::LifecycleError::Application(
+                AppError::ResourceOutsideUnit(refusal))
+            if refusal.code() == "binding.resource_outside_unit"
+                && refusal.resource == connection.id)),
+        "{:?}",
+        refused.err()
+    );
+    p.move_http(
+        company,
+        owner,
+        connection.id,
+        crate::entities::department::DepartmentId::new(p.test_root_unit(company.as_uuid()).await),
+    )
+    .await
+    .unwrap();
+    bindings
+        .configure(configure(
+            target(owner),
+            support_desk,
+            version,
+            Some(connection.id),
+        ))
+        .await
+        .unwrap();
+    // Moved back to Billing, the lead's admitted run uses it at action time.
+    p.move_http(
+        company,
+        owner,
+        connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    let setup = Setup {
+        version,
+        fixture,
+        connection,
+        claim,
+        kind: WorkflowStepKind("http.request".into()),
+    };
+    runtime(&setup)
+        .run(&setup.kind, &setup.claim)
+        .await
+        .completed_result()
+        .unwrap();
+    assert!(server.await.unwrap().contains("fixture-http-secret"));
+}
+
+/// Plan07 D9a (B2-F4): admission checks every reachable bundle against the run's reach, so a
+/// parent whose `workflow.call` child uses an unslotted operation is refused, with no run
+/// written, once that operation's only connection moves out of the root's reach.
+#[tokio::test]
+async fn unit_resource_selection_admission_workflow_child_bundle_out_of_reach_is_refused() {
+    let mut fixture = Fixture::new().await;
+    fixture.persistence = PostgresPersistence::with_credential_cipher(
+        fixture.persistence.pool().clone(),
+        CredentialCipher::for_test(),
+    );
+    let connection = Box::pin(configured(&fixture, "http://127.0.0.1:9", Entrance::Tool)).await;
+    let p = fixture.persistence.clone();
+    let child = Fixture {
+        _db: fixture._db.clone(),
+        persistence: p.clone(),
+        target: DefinitionTarget {
+            workflow: WorkflowId::new(Uuid::new_v4()),
+            ..fixture.target
+        },
+    };
+    let child_workflow = child.target.workflow.to_string();
+    let child_version = Box::pin(published_customized(
+        &child,
+        &connection,
+        Entrance::Tool,
+        None,
+        move |source| source["workflow_id"] = json!(child_workflow),
+    ))
+    .await;
+    let mut source: Value =
+        serde_json::from_str(&registry::example("workflow.call").unwrap().source).unwrap();
+    source["steps"]["start"]["child_workflow_id"] = json!(child.target.workflow.to_string());
+    source["steps"]["start"]["child_version_id"] = json!(child_version.as_uuid().to_string());
+    source["steps"]["start"]["with"]["input"] = json!({"literal":{}});
+    source["steps"]["start"]["with"]["params"] = json!({"literal":{}});
+    let definitions = DefinitionService::new(
+        Preflight,
+        p.clone(),
+        WorkflowSourceDecoder,
+        crate::adapters::persistence::workflow::child_publication::ChildPublicationDirectory {
+            persistence: p.clone(),
+            inner: Preflight,
+        },
+    );
+    let mut draft = fixture.save(None);
+    draft.content.source = source.to_string();
+    definitions.save(draft).await.unwrap();
+    let mut publication = fixture.publish();
+    publication.key = IdempotencyKey::parse("publish-parent").unwrap();
+    definitions.publish(publication.clone()).await.unwrap();
+    let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
+    let target = BindingTarget {
+        company: fixture.target.company,
+        actor: fixture.target.actor,
+        binding: WorkflowBindingId::new(Uuid::new_v4()),
+    };
+    let state = bindings
+        .configure(configure(
+            target,
+            RelatedAssociation::Company,
+            publication.version,
+            None,
+        ))
+        .await
+        .unwrap();
+    bindings
+        .activate(SetBindingActivity {
+            target,
+            expected: state.revision,
+        })
+        .await
+        .unwrap();
+    let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
+    let admit = |key: &'static str| AdmitWorkflowRequest {
+        history_session: None,
+        company_id: target.company,
+        actor: target.actor,
+        association: RelatedAssociation::Company,
+        trigger: TriggerRef::new(
+            target.company,
+            TriggerId::new(Uuid::new_v4()),
+            TriggerSource::Manual,
+        )
+        .unwrap(),
+        correlation_id: CorrelationId::new(),
+        binding_id: target.binding,
+        idempotency_key: IdempotencyKey::parse(key).unwrap(),
+        input: json!({}),
+        rerun_of: None,
+        delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+        expected_binding_revision: None,
+        admission_claim: None,
+    };
+    assert!(matches!(
+        service.admit(admit("child-in-reach")).await.unwrap(),
+        AdmissionResult::Created(_)
+    ));
+    let runs = || async {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM workflow_runs WHERE company_id=$1")
+            .bind(target.company.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap()
+    };
+    let before = runs().await;
+    let billing = p.test_unit(target.company.as_uuid(), "billing").await;
+    p.move_http(
+        target.company,
+        target.actor,
+        connection.id,
+        crate::entities::department::DepartmentId::new(billing),
+    )
+    .await
+    .unwrap();
+    assert!(service.admit(admit("child-out-of-reach")).await.is_err());
+    assert_eq!(runs().await, before, "refused before any run row");
+}

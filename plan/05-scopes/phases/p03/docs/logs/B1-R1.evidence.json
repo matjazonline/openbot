@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "round": "05SC-P03-B1-R1",
+  "artifact": "bd0bc89e1a9374f2c259145d6f9859a8af92f93e4bf49070da17d794f7b2828a",
+  "checks": [
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "Fresh owned pa05_p03_schema on PG18:51167",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-fresh-migrate-r3.txt",
+          "sha256": "d95f0e02c9afcfe27916fd58b86650330da73a87068f51d37a31ef46a4b0b274"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_search_cached_model_continuation_refuses_deleted_report_owner -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test / migrated per-case databases; no Doop execution",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-deleted-owner-continuation-red-r1.txt",
+          "sha256": "6adf1f852fdc77d59fc9ea06b830278d5a309596a64eeceb981dfe3f6605acdd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_ -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test / migrated per-case databases; no Doop execution",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-knowledge-scopes-r5.txt",
+          "sha256": "2b1e7d0b2c35f06cf82071d962b10c35bce06492ac212612a47f7ed5f0a1e674"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_ -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test / migrated per-case databases; no Doop execution",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-knowledge-all-r7.txt",
+          "sha256": "6a21814661cb54813c0915c383e550a812ef10edcb2ef7eb0f6152075a77247a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_ -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test / migrated per-case databases; no Doop execution",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-knowledge-scopes-r10.txt",
+          "sha256": "74ecb45ab0854a0fc172c3a4d9423a8ec5ba9cd6e36bb9ab458108c1a93b6750"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_upload_http_requires_first_unit_and_rejects_before_collecting_file_body -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test / migrated per-case databases; no Doop execution",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-upload-body-r6.txt",
+          "sha256": "8cc98f989a955861949a0fce964b353677f97a6b0e2bf652fa7dcf547dec0ef9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_search_deployment_two_desks -- --skip doop --skip Doop",
+      "fixture": "Owned pa05_p03_core_test / migrated per-case databases; no Doop execution",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-deployment-r14.txt",
+          "sha256": "7b80897ab7e44f72a8706465d2072777b2a66f5895ad3b9bf5be96e8ca7f6bfc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test --test-timeout=90000 scripts/tests/knowledge-browser.mjs",
+      "fixture": "Owned phase browser fixtures / pinned installed Node24 and Chromium; actual native markup",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-knowledge-browser-r1.txt",
+          "sha256": "777f30208e42bd3f379c9fd782ea6f197d4a8bae52dd70b3d1577a1a0d553860"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889 dump_knowledge_browser_fixtures --ignored --skip doop --skip Doop",
+      "fixture": "Same production page source as frozen artifact; only later test assertions/model hook differ",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-knowledge-browser-fixtures-r1.txt",
+          "sha256": "889702b5ea8f5af212bd1134cae854b7923ea2c2b375da9f9a2bd616659a2151"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "docker run --rm --name openbot-plan05-p03-network-scope --label phase=05SC-P03 --cap-add=NET_ADMIN -v \"$PWD:/repo:ro\" -w /repo openbot-plan05-network-scope:20261117 python3 -I scripts/tests/network-isolation-scope.py",
+      "fixture": "Owned pinned Ubuntu24 Docker image and private network namespace; all eight real categories",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-linux-scope-test.txt",
+          "sha256": "e82603ee38534631b6639d2c7803c3af3cb93c93f8a5219ddf4fe984c627d4b2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets --locked --offline",
+      "fixture": "Owned migrated pa05_p03_schema; .sqlx metadata unchanged; later test-only delta awaits final compilation",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare-r1.txt",
+          "sha256": "0e4cb62c5723fd6b88b69232472ae257216a65b71abdbbcfee9e8b04e868ab9d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_scope_search_manual_rechecks_revoked_grant_after_embedding -- --skip doop --skip Doop",
+      "fixture": "Actual HTTP/library/SQL path, bounded test-model pause, genuine department role revocation",
+      "status": "NOT EXERCISED",
+      "reason": "Added during coverage audit; current full runner will compile and run it in the scheduled stock-stack suite. Final source PASS must await that assertion."
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "bash plan/05-scopes/phases/p03/docs/logs/final-check.sh",
+      "fixture": "Owned openbot_check_72463015231446a4b4d5f6bc2e045d59 plus isolated memory and browser fixtures",
+      "status": "NOT EXERCISED",
+      "reason": "Full gate is executing; active output is deliberately not hashed. Static/offline/Clippy/migrations passed; final immutable results and current inventory/final Clippy follow before source acceptance."
+    }
+  ]
+}

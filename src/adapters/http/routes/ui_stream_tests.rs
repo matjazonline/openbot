@@ -20,7 +20,6 @@ use std::sync::Mutex;
 use super::*;
 use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::thread::ThreadPersistence;
 use crate::entities::thread_activity::ThreadWorkSummary;
@@ -289,7 +288,7 @@ impl Harness {
         )
         .await
         .unwrap();
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             persistence.as_ref(),
             company.id,
             ChannelWrite {

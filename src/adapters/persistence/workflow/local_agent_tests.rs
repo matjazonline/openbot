@@ -87,8 +87,17 @@ impl Setup {
             TestAssociation::Company => RelatedAssociation::Company,
             TestAssociation::PrivateConversation => {
                 let thread = local.conversation(local.company).await;
-                let channel:Uuid=sqlx::query_scalar("UPDATE channels SET access_mode='allowlist' WHERE id=(SELECT channel_id FROM threads WHERE id=$1) RETURNING id")
-                    .bind(thread).fetch_one(&local.database.pool).await.unwrap();
+                let channel: Uuid =
+                    sqlx::query_scalar("SELECT channel_id FROM threads WHERE id=$1")
+                        .bind(thread)
+                        .fetch_one(&local.database.pool)
+                        .await
+                        .unwrap();
+                crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+                    &local.database.pool,
+                    channel,
+                )
+                .await;
                 RelatedAssociation::Thread {
                     target: crate::entities::address::AddressTarget::Desk(channel),
                     thread_id: crate::application::workflow::RelatedThreadId::new(thread),
@@ -495,3 +504,113 @@ mod e2e;
 mod graph_support;
 #[path = "local_agent_retention_tests.rs"]
 mod retention;
+
+/// Plan07 decision d (B2-F2): a workflow local-agent step whose agent's skill is outside the
+/// agent's reach is a terminal `local_agent.refused`, not a retryable storage failure; with the
+/// skill in reach the same step parks.
+#[tokio::test]
+async fn unit_resource_selection_native_workflow_step_refuses_a_moved_skill_terminally() {
+    use crate::application::agent::{
+        AgentPublicationKey, AgentPublicationScope, AgentPublications, PublishAgent,
+    };
+    use crate::use_cases::agent::{AgentPersistence, AgentWrite};
+    use crate::use_cases::skill::{SkillManagementPersistence, SkillWrite};
+    for moved in [false, true] {
+        let s = Setup::new().await;
+        let p = &s.fixture.persistence;
+        let company = s.fixture.target.company;
+        let owner = s.fixture.target.actor;
+        let root = p.test_root_unit(company.as_uuid()).await;
+        let skill = SkillManagementPersistence::create_company(
+            p,
+            company.as_uuid(),
+            root,
+            SkillWrite {
+                slug: "native-unit".into(),
+                name: "Native unit".into(),
+                description: "Unit guidance".into(),
+                instructions: "Follow the unit's guidance.".into(),
+                files: None,
+                required_tools: None,
+                created_by: None,
+            },
+        )
+        .await
+        .unwrap();
+        let agent = AgentPersistence::create(
+            p,
+            company.as_uuid(),
+            AgentWrite {
+                name: "Native unit".into(),
+                slug: "native-unit".into(),
+                native_permissions: s.profile.selection.policy.permissions,
+                skill_ids: vec![skill.id],
+                system_prompt: Some("Use the unit's guidance.".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        Box::pin(
+            crate::adapters::persistence::test_support::register_native_agent_address(p, &agent),
+        )
+        .await;
+        AgentPublications::publish_agent(
+            p,
+            PublishAgent {
+                scope: AgentPublicationScope {
+                    company,
+                    actor: owner,
+                    agent: crate::entities::agent_capability::AgentId::new(agent.id),
+                },
+                expected_draft_revision: agent.draft_revision,
+                expected_active_revision: None,
+                key: AgentPublicationKey::parse("native-unit").unwrap(),
+            },
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE local_agent_profiles SET agent_id=$3 WHERE company_id=$1 AND id=$2")
+            .bind(company.as_uuid())
+            .bind(s.profile.id.as_uuid())
+            .bind(agent.id)
+            .execute(p.pool())
+            .await
+            .unwrap();
+        if moved {
+            let billing = p.test_unit(company.as_uuid(), "billing").await;
+            SkillManagementPersistence::move_company(
+                p,
+                owner.user_id(),
+                company.as_uuid(),
+                skill.id,
+                billing,
+            )
+            .await
+            .unwrap();
+        }
+        let claim = s.claim().await;
+        if !moved {
+            s.park(&claim).await;
+            continue;
+        }
+        let refused = s
+            .handler()
+            .execute(&WorkflowStepKind(KIND.into()), &claim)
+            .await
+            .completed_result()
+            .unwrap_err();
+        assert_eq!(refused.failure.code().as_str(), "local_agent.refused");
+        assert_eq!(
+            refused.failure.class(),
+            crate::domain::workflow::FailureClass::Terminal
+        );
+        let operations: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM local_agent_operations WHERE command->>'kind' IN ('create','send')",
+        )
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+        assert_eq!(operations, 0, "nothing parked or queued");
+    }
+}

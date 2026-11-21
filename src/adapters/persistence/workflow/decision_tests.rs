@@ -468,7 +468,7 @@ async fn workflow_decision_revoked_reviewer_and_foreign_company_are_hidden() {
         f.persistence().submit_decision(foreign).await,
         Err(AppError::NotFound(_))
     ));
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
         .bind(f.scope.company.as_uuid())
         .bind(f.users[0])
         .execute(f.persistence().pool())

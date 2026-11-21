@@ -42,10 +42,19 @@ pub async fn list(
     Query(query): Query<ListQuery>,
 ) -> WorkflowResult<Json<Value>> {
     let company = company(company_id);
-    authorize(&engine, company, actor(&user)?, RelatedAssociation::Company).await?;
+    let actor = actor(&user)?;
+    engine
+        .authorization()
+        .authorize(
+            company,
+            actor,
+            RelatedAssociation::Company,
+            WorkflowOperation::ListManaged,
+        )
+        .await?;
     let page = engine
         .reads()
-        .list_definitions(company, query.page()?)
+        .list_definitions(company, Some(actor), query.page()?)
         .await?;
     let next = page
         .more
@@ -63,7 +72,15 @@ pub async fn read(
     Path((company_id, workflow)): Path<(Uuid, Uuid)>,
 ) -> WorkflowResult<Json<Value>> {
     let company = company(company_id);
-    authorize(&engine, company, actor(&user)?, RelatedAssociation::Company).await?;
+    engine
+        .authorization()
+        .authorize(
+            company,
+            actor(&user)?,
+            RelatedAssociation::Company,
+            WorkflowOperation::ManageDefinition(WorkflowId::new(workflow)),
+        )
+        .await?;
     let detail = engine
         .reads()
         .definition(company, WorkflowId::new(workflow))
@@ -371,13 +388,15 @@ pub async fn templates(
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> WorkflowResult<Json<Value>> {
-    authorize(
-        &engine,
-        company(company_id),
-        actor(&user)?,
-        RelatedAssociation::Company,
-    )
-    .await?;
+    engine
+        .authorization()
+        .authorize(
+            company(company_id),
+            actor(&user)?,
+            RelatedAssociation::Company,
+            WorkflowOperation::ListManaged,
+        )
+        .await?;
     Ok(ok(json!(
         engine
             .template_catalogue()
@@ -445,6 +464,15 @@ pub(in crate::adapters::http::routes) async fn copy_template_draft(
         Err(crate::application::workflow::templates::TemplateError::Application(
             AppError::Conflict(message),
         )) => {
+            engine
+                .authorization()
+                .authorize(
+                    company,
+                    actor,
+                    RelatedAssociation::Company,
+                    WorkflowOperation::ManageDefinition(workflow),
+                )
+                .await?;
             let existing = engine.reads().definition(company, workflow).await?;
             match existing {
                 Some(detail)

@@ -124,7 +124,9 @@ impl CompanyWrite {
 }
 
 #[async_trait]
-pub trait CompanyPersistence: Send + Sync {
+pub trait CompanyPersistence:
+    crate::application::ports::administration::AdministrationPersistence + Send + Sync
+{
     async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company>;
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>>;
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>>;
@@ -174,12 +176,76 @@ pub trait CompanyPersistence: Send + Sync {
         provider: &ModelProvider,
     ) -> AppResult<Option<String>>;
 
+    /// Replace the root's own model connections (the company settings form).
     async fn replace_model_connections_for_user(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         connections: Vec<CompanyModelConnectionWrite>,
     ) -> AppResult<()>;
+
+    /// Replace one unit's own model connections (Plan07 02A): the caller must manage the unit.
+    async fn replace_unit_model_connections_for_user(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()>;
+
+    /// Set one period's spend cap of a unit, in micro-USD (Plan07 02B.1, decision c): whoever
+    /// manages the unit; anyone else gets not-found.
+    async fn set_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+        cap_micros: i64,
+    ) -> AppResult<()>;
+
+    /// Replace both of a unit's caps at once (the department form): `None` clears that period.
+    async fn replace_unit_budgets(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        day_micros: Option<i64>,
+        month_micros: Option<i64>,
+    ) -> AppResult<()>;
+
+    /// A unit's caps and counted spend for the current UTC day and month, for its managers.
+    async fn unit_budget_states(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+    ) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>>;
+
+    /// Remove one period's spend cap of a unit, under the same authority.
+    async fn clear_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+    ) -> AppResult<()>;
+
+    /// The ids of the model connections in `agent`'s own reach (Plan07 02A with decision d).
+    async fn model_connections_in_agent_reach(
+        &self,
+        company_id: Uuid,
+        agent_id: Uuid,
+    ) -> AppResult<Vec<Uuid>>;
+
+    /// Move a model connection to another unit; the caller must manage both (Plan07 01B.4, 02A).
+    async fn move_model_connection(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource>;
 }
 
 /// The caller's access to a company they can see at all.
@@ -200,10 +266,9 @@ pub async fn readable_company(
 
 /// Resolve a company the caller owns.
 ///
-/// Someone with no membership gets the same not-found as for a missing company. An admin or member
-/// can see the company, so for them this is a refusal (`Forbidden`, 403) rather than a pretence
-/// that it does not exist. Ownership is the `Owner` membership, which the schema keeps in step with
-/// `companies.user_id`.
+/// Anyone else, member or stranger, gets the same not-found as for a missing company (Plan06
+/// 02A.4: a management refusal tells nothing). Ownership is the `Owner` membership, which the
+/// schema keeps in step with `companies.user_id`.
 pub async fn owned_company(
     persistence: &dyn CompanyPersistence,
     user_id: Uuid,
@@ -214,12 +279,12 @@ pub async fn owned_company(
         return Ok(access.company);
     }
     warn!("User {user_id} is not the owner of company {company_id}");
-    Err(company_forbidden("Only the company owner can do this."))
+    Err(company_not_found())
 }
 
-/// Resolve a company whose operational workspaces and automation the caller may manage: its owner
-/// or one of its admins. A member can see the company and is refused (`Forbidden`); a stranger gets
-/// the same not-found as for a missing company.
+/// Resolve a company the caller administers at company level: its owner or a root admin
+/// ([`CompanyMembership::administers_company`]). Everyone else gets the same not-found as for a
+/// missing company.
 pub async fn managed_company(
     persistence: &dyn CompanyPersistence,
     user_id: Uuid,
@@ -236,18 +301,35 @@ async fn managed_company_access(
     company_id: Uuid,
 ) -> AppResult<CompanyAccess> {
     let access = readable_company(persistence, user_id, company_id).await?;
-    if access.membership.manages_company_operations() {
+    if access.membership.administers_company() {
         return Ok(access);
     }
     warn!("User {user_id} may not manage operations for company {company_id}");
-    Err(company_forbidden(
-        "Only the company owner or an admin can do this.",
-    ))
+    Err(company_not_found())
 }
 
-/// A refusal for someone who can see the company but may not do this to it.
-pub fn company_forbidden(message: &str) -> AppError {
-    AppError::Forbidden(message.into())
+/// Resolve a company in which the caller manages at least one unit: the entry to unit-owned
+/// configuration workspaces. It authorizes nothing by itself; every object is checked against
+/// its own unit. Everyone else gets the same not-found as for a missing company.
+pub async fn administered_company(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<CompanyAccess> {
+    use crate::application::ports::administration::ManagementTarget;
+    let access = readable_company(persistence, user_id, company_id).await?;
+    if persistence
+        .management_role(
+            user_id,
+            crate::domain::workflow::CompanyId::new(company_id),
+            ManagementTarget::AnyUnit,
+        )
+        .await?
+        .is_some()
+    {
+        return Ok(access);
+    }
+    Err(company_not_found())
 }
 
 pub fn company_not_found() -> AppError {
@@ -260,14 +342,12 @@ pub struct CompanyUseCases {
 }
 
 impl CompanyUseCases {
+    /// The root's own connections: the company default lives there, so the set is never empty
+    /// and holds exactly one default.
     pub fn validate_model_connections(
         connections: &[CompanyModelConnectionWrite],
     ) -> AppResult<()> {
-        if connections.len() > MAX_COMPANY_MODEL_CONNECTIONS {
-            return Err(AppError::BadRequest(format!(
-                "A company may configure at most {MAX_COMPANY_MODEL_CONNECTIONS} model providers."
-            )));
-        }
+        Self::validate_model_connection_bounds(connections)?;
         // A replace is wholesale, so an empty set is a request to delete every stored credential
         // -- which reads to the caller as an ordinary save and leaves every agent unable to run.
         // Clearing the last provider is not something a save is allowed to mean.
@@ -280,6 +360,18 @@ impl CompanyUseCases {
             return Err(AppError::BadRequest(
                 "Exactly one configured model provider must be the company default.".into(),
             ));
+        }
+        Ok(())
+    }
+
+    /// Bounds every unit's replace shares: the count limit and one row per provider.
+    fn validate_model_connection_bounds(
+        connections: &[CompanyModelConnectionWrite],
+    ) -> AppResult<()> {
+        if connections.len() > MAX_COMPANY_MODEL_CONNECTIONS {
+            return Err(AppError::BadRequest(format!(
+                "A company may configure at most {MAX_COMPANY_MODEL_CONNECTIONS} model providers."
+            )));
         }
         let mut providers = std::collections::HashSet::new();
         if connections
@@ -358,7 +450,48 @@ impl CompanyUseCases {
         self.persistence.list_accessible_by_user_id(user_id).await
     }
 
-    /// Companies whose operational workspaces and automation the caller may manage.
+    /// The caller's role over one management target, or not found: for pages that show a fragment
+    /// of one object to whoever manages it.
+    pub async fn require_management(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        target: crate::application::ports::administration::ManagementTarget,
+    ) -> AppResult<crate::application::ports::administration::ManagementRole> {
+        crate::application::ports::administration::require_management(
+            self.persistence.as_ref(),
+            user_id,
+            crate::domain::workflow::CompanyId::new(company_id),
+            target,
+        )
+        .await
+    }
+
+    /// The caller's access when they manage at least one of its units. See [`administered_company`].
+    pub async fn administered_company(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<CompanyAccess> {
+        administered_company(self.persistence.as_ref(), user_id, company_id).await
+    }
+
+    /// Companies in which the caller manages at least one unit, for unit workspace switchers.
+    #[instrument(skip_all)]
+    pub async fn list_administered_companies(
+        &self,
+        user_id: Uuid,
+    ) -> AppResult<Vec<CompanyAccess>> {
+        Ok(self
+            .persistence
+            .list_accessible_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .filter(|access| access.administers_units)
+            .collect())
+    }
+
+    /// Companies the caller administers at company level.
     #[instrument(skip_all)]
     pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
         Ok(self
@@ -366,7 +499,7 @@ impl CompanyUseCases {
             .list_accessible_by_user_id(user_id)
             .await?
             .into_iter()
-            .filter(|access| access.membership.manages_company_operations())
+            .filter(|access| access.membership.administers_company())
             .collect())
     }
 
@@ -388,25 +521,178 @@ impl CompanyUseCases {
         self.persistence.delete_for_user(user_id, id).await
     }
 
+    /// The model connections of the units this person manages (Plan07 decision a): root
+    /// managers see all; anyone managing no unit gets the usual not-found.
     pub async fn list_model_connections(
         &self,
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyModelConnection>> {
-        owned_company(self.persistence.as_ref(), user_id, company_id).await?;
-        self.persistence.list_model_connections(company_id).await
+        let company = crate::domain::workflow::CompanyId::new(company_id);
+        crate::application::ports::administration::require_management(
+            self.persistence.as_ref(),
+            user_id,
+            company,
+            crate::application::ports::administration::ManagementTarget::AnyUnit,
+        )
+        .await?;
+        let units: std::collections::HashSet<Uuid> = self
+            .persistence
+            .managed_units(user_id, company)
+            .await?
+            .into_iter()
+            .map(|unit| unit.as_uuid())
+            .collect();
+        Ok(self
+            .persistence
+            .list_model_connections(company_id)
+            .await?
+            .into_iter()
+            .filter(|connection| units.contains(&connection.unit_id))
+            .collect())
     }
 
+    /// One unit's own model connections, the root's when `unit` is `None`, for that unit's form:
+    /// whoever manages the unit (Plan07 decision a); anyone else gets the usual not-found.
+    pub async fn list_unit_model_connections(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit: Option<Uuid>,
+    ) -> AppResult<Vec<CompanyModelConnection>> {
+        let choices = self
+            .persistence
+            .managed_unit_choices(user_id, crate::domain::workflow::CompanyId::new(company_id))
+            .await?;
+        let unit = choices
+            .iter()
+            .find(|choice| match unit {
+                Some(unit) => choice.id.as_uuid() == unit,
+                None => choice.is_root,
+            })
+            .ok_or_else(company_not_found)?
+            .id
+            .as_uuid();
+        Ok(self
+            .persistence
+            .list_model_connections(company_id)
+            .await?
+            .into_iter()
+            .filter(|connection| connection.unit_id == unit)
+            .collect())
+    }
+
+    /// Set a unit's spend cap for `period` (`day` or `month`, UTC), in micro-USD (Plan07 02B.1).
+    pub async fn set_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+        cap_micros: i64,
+    ) -> AppResult<()> {
+        self.persistence
+            .set_unit_budget(user_id, company_id, unit_id, period, cap_micros)
+            .await
+    }
+
+    /// Replace a unit's day and month caps together, in one transaction (`None` clears one).
+    pub async fn replace_unit_budgets(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        day_micros: Option<i64>,
+        month_micros: Option<i64>,
+    ) -> AppResult<()> {
+        self.persistence
+            .replace_unit_budgets(user_id, company_id, unit_id, day_micros, month_micros)
+            .await
+    }
+
+    /// A unit's caps and counted spend for the current UTC day and month (Plan07 02C).
+    pub async fn unit_budget_states(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+    ) -> AppResult<Vec<crate::application::ports::unit_resources::UnitBudgetState>> {
+        self.persistence
+            .unit_budget_states(user_id, company_id, unit_id)
+            .await
+    }
+
+    /// Remove a unit's spend cap for `period`.
+    pub async fn clear_unit_budget(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        period: &str,
+    ) -> AppResult<()> {
+        self.persistence
+            .clear_unit_budget(user_id, company_id, unit_id, period)
+            .await
+    }
+
+    /// Move a model connection between units the caller manages (Plan07 02A).
+    pub async fn move_model_connection(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        id: Uuid,
+        target: Uuid,
+    ) -> AppResult<crate::application::ports::unit_resources::MovedResource> {
+        self.persistence
+            .move_model_connection(user_id, company_id, id, target)
+            .await
+    }
+
+    /// Replace the root's own connections: whoever manages the root (Plan07 decision a), which
+    /// persistence checks under its locks.
     pub async fn replace_model_connections(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         connections: Vec<CompanyModelConnectionWrite>,
     ) -> AppResult<()> {
-        owned_company(self.persistence.as_ref(), user_id, company_id).await?;
         Self::validate_model_connections(&connections)?;
         self.persistence
             .replace_model_connections_for_user(user_id, company_id, connections)
+            .await
+    }
+
+    /// Replace one unit's own connections: whoever manages that unit. A unit may hold none and
+    /// marks at most one of its own as its default (Plan07 02A, decision g).
+    pub async fn replace_unit_model_connections(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit_id: Uuid,
+        connections: Vec<CompanyModelConnectionWrite>,
+    ) -> AppResult<()> {
+        // The root's own connections hold the company default whichever form saves them, so the
+        // root's department form is held to the settings form's rules (never empty, exactly one
+        // default); the company therefore always keeps a connection (G1 r2 D1).
+        let root = self
+            .persistence
+            .managed_unit_choices(user_id, crate::domain::workflow::CompanyId::new(company_id))
+            .await?
+            .iter()
+            .any(|choice| choice.is_root && choice.id.as_uuid() == unit_id);
+        if root {
+            Self::validate_model_connections(&connections)?;
+        } else {
+            Self::validate_model_connection_bounds(&connections)?;
+            if connections.iter().filter(|item| item.is_default).count() > 1 {
+                return Err(AppError::BadRequest(
+                    "A department may mark at most one of its model providers as its default."
+                        .into(),
+                ));
+            }
+        }
+        self.persistence
+            .replace_unit_model_connections_for_user(user_id, company_id, unit_id, connections)
             .await
     }
 }
@@ -625,10 +911,10 @@ mod tests {
                 .company,
             company
         );
-        // A member sees the company, so being refused is a 403, not a pretence it is not there.
+        // A member is told nothing, the same as a stranger (Plan06 02A.4).
         assert!(matches!(
             use_cases.managed_company(member, company.id).await,
-            Err(AppError::Forbidden(_))
+            Err(AppError::NotFound(_))
         ));
     }
 
@@ -644,10 +930,10 @@ mod tests {
         }
     }
 
-    /// Owner-only actions: an admin or member is refused with 403, a stranger and a missing id get
-    /// the same 404, and the write never runs for any of them.
+    /// Owner-only actions: an admin, a member, a stranger and a missing id all get the same 404
+    /// (Plan06 02A.4), and the write never runs for any of them.
     #[tokio::test]
-    async fn only_the_owner_may_update_or_delete_and_members_are_refused_not_hidden() {
+    async fn only_the_owner_may_update_or_delete_and_everyone_else_is_told_nothing() {
         let owner = Uuid::new_v4();
         let admin = Uuid::new_v4();
         let member = Uuid::new_v4();
@@ -671,11 +957,11 @@ mod tests {
                 use_cases
                     .update_company_for_user(refused, company.id, rename())
                     .await,
-                Err(AppError::Forbidden(_))
+                Err(AppError::NotFound(_))
             ));
             assert!(matches!(
                 use_cases.delete_company_for_user(refused, company.id).await,
-                Err(AppError::Forbidden(_))
+                Err(AppError::NotFound(_))
             ));
         }
         let foreign = use_cases

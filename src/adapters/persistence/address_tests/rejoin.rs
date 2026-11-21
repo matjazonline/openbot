@@ -38,7 +38,11 @@ impl RejoinCase {
         let original = PrincipalId::new(fixture.principal_of(user).await);
         fixture
             .persistence
-            .remove_member(fixture.company.id, user)
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: fixture.owner,
+                company_id: fixture.company.id,
+                member_user_id: user,
+            })
             .await
             .unwrap();
         let email = EmailAddress::from(format!("changed-{}@example.test", Uuid::new_v4().simple()));
@@ -68,7 +72,7 @@ impl RejoinCase {
     }
 
     async fn outsider_places(&self) -> OutsiderPlaces {
-        let desk = ChannelPersistence::create(
+        let desk = crate::adapters::persistence::test_support::create_channel(
             &self.fixture.persistence,
             self.fixture.company.id,
             ChannelWrite {
@@ -80,6 +84,11 @@ impl RejoinCase {
         )
         .await
         .unwrap();
+        crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+            self.fixture.pool(),
+            desk.id,
+        )
+        .await;
         let thread = ThreadPersistence::create_thread(
             &self.fixture.persistence,
             self.fixture.company.id,

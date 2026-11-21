@@ -33,6 +33,7 @@ async fn source_at(f: &Fixture, bearer: bool, origin: &str) -> HttpConnection {
         f.p.create_http(
             f.scope.company,
             f.scope.actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse(origin).unwrap(),
                 bearer,

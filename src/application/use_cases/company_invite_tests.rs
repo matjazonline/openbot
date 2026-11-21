@@ -121,8 +121,11 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
         ))
     }
 
-    async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
-        self.invites.lock().unwrap().retain(|i| i.id != id);
+    async fn delete_invite(&self, command: DeleteCompanyInvite) -> AppResult<()> {
+        self.invites
+            .lock()
+            .unwrap()
+            .retain(|i| i.id != command.invite_id);
         Ok(())
     }
 
@@ -221,10 +224,14 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
 
     async fn update_member_role(
         &self,
-        company_id: Uuid,
-        user_id: Uuid,
-        role: CompanyAccessRole,
+        change: MemberRoleChange,
     ) -> AppResult<Option<CompanyMember>> {
+        let MemberRoleChange {
+            company_id,
+            member_user_id: user_id,
+            role,
+            ..
+        } = change;
         let mut members = self.members.lock().unwrap();
         let Some(member) = members
             .iter_mut()
@@ -236,7 +243,12 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
         Ok(Some(member.clone()))
     }
 
-    async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
+    async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()> {
+        let RemoveCompanyMember {
+            company_id,
+            member_user_id: user_id,
+            ..
+        } = command;
         self.members
             .lock()
             .unwrap()
@@ -521,7 +533,7 @@ async fn company_invites_crud_and_accept_flow() {
         .unwrap();
     assert_eq!(changed_member.role, CompanyAccessRole::Member);
 
-    // The two doubles stand for one `company_members` table: acceptance wrote the row the
+    // The two doubles stand for one root-membership source: acceptance wrote the row the
     // company double answers `company_access` from.
     company_persistence.memberships.lock().unwrap().push((
         user.id,

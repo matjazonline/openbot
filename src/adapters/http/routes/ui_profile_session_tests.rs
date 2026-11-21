@@ -314,7 +314,7 @@ async fn security_session_profile_failed_change_keeps_session_and_document_redir
 #[tokio::test]
 async fn address_profile_renames_only_the_callers_own_address() {
     use crate::{
-        application::ports::channel::{ChannelPersistence, ChannelWrite},
+        application::ports::channel::ChannelWrite,
         use_cases::company::{CompanyPersistence, CompanyWrite},
     };
     let Some(f) = Fixture::new(AccountKind::Password, Confirmation::Immediate).await else {
@@ -332,7 +332,7 @@ async fn address_profile_renames_only_the_callers_own_address() {
     )
     .await
     .unwrap();
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company.id,
         ChannelWrite {

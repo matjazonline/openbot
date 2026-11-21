@@ -226,15 +226,14 @@ async fn work_page(
         .get_user_by_id(viewer.user_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Account not found.".into()))?;
-    let user = workspace_user(&account, &viewer.email, &state.config)
-        .with_company_membership(access.membership);
+    let user = workspace_user(&account, &viewer.email, &state.config).with_company_access(&access);
     Ok(Html(pages::attention_page(&pages::AttentionPageView {
         user: &user,
         companies: &company_list,
         company: &access.company,
         view: list_query.view()?,
         page: &page,
-        manager: access.membership.manages_company_operations(),
+        manager: access.membership.administers_company(),
         departments: &departments,
         department,
     })))

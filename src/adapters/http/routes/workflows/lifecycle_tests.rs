@@ -325,6 +325,7 @@ async fn http_operation(f: &Fixture) -> Uuid {
         .create_http(
             company,
             actor,
+            None,
             HttpConnectionWrite {
                 origin: HttpOrigin::parse("https://tools.example.test").unwrap(),
                 bearer: false,

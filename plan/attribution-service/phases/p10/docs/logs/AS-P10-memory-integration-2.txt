@@ -1,0 +1,34 @@
+Applied 20260817000000/migrate init schema (830.606625ms)
+building the memory service in /private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/memory
+    Finished `dev` profile [unoptimized] target(s) in 0.69s
+provisioned database memory_live_a81a0949c4dd owned by memory_live_a81a0949c4dd
+isolation: neither role can read the other's database
+warning: unused import: `super::support::*`
+ --> src/adapters/persistence/workflow/reconciliation_fixture.rs:7:5
+  |
+7 | use super::support::*;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 2 warnings (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 1.35s
+     Running unittests src/lib.rs (/tmp/as-openbot-target/debug/deps/open_bots-fda01552d3c282dd)
+
+running 6 tests
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_a_revoked_credential_is_replaced_and_the_save_delivered_once ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_labels_follow_consumption_and_no_lower_reader_sees_them ... ok
+test adapters::persistence::memory::live_tests::e2e::memory_e2e_tampered_labels_and_missing_authority_save_nothing ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_competing_delivery_workers_deliver_each_intent_once ... ok
+test adapters::persistence::memory::live_tests::memory_integration_live_provisioning_save_recall_capture_and_disable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4251 filtered out; finished in 17.87s
+
+memory integration: live tests passed against the real service
+
+Exit: 0

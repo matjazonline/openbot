@@ -80,7 +80,7 @@ async fn the_event_stream_ticks_while_access_holds_and_ends_when_it_is_lost() {
     assert!(next(&mut stream).await.unwrap().contains("resync"));
     let tick = next(&mut stream).await.unwrap();
     assert!(tick.contains("tick") && !tick.contains("resync"), "{tick}");
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id = $1 AND user_id = $2")
         .bind(f.company)
         .bind(f.admin)
         .execute(f.persistence.pool())

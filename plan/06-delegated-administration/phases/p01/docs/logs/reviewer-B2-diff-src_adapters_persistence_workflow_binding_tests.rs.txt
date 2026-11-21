@@ -1,0 +1,12 @@
+--- B1/src/adapters/persistence/workflow/binding_tests.rs
++++ B2/src/adapters/persistence/workflow/binding_tests.rs
+@@ -4,6 +4,9 @@
+ use crate::entities::mcp::{McpAuth, McpDiscoveredTool};
+ use serde_json::json;
+ use std::sync::Mutex;
++
++#[path = "delegated_binding_management_tests.rs"]
++mod delegated;
+ 
+ #[derive(Clone)]
+ struct Capture {

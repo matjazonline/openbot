@@ -163,7 +163,7 @@ async fn workflow_harness_token_reviewer_revocation_wins_before_approval_commit(
     let approve = command(p, f.model.write.fence.scope, f.reviewer, "approve").await;
     let before = snapshot(&f).await;
     let mut revoke = p.pool().begin().await.unwrap();
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
         .bind(f.model.write.fence.scope.company.as_uuid())
         .bind(f.reviewer.user_id())
         .execute(&mut *revoke)

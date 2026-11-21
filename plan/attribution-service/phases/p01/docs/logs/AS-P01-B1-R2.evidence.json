@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "round": "AS-P01-B1-R2",
+  "artifact": "f61d9149b78e8f3cbf8876ac1362089561e0d76f2d2e67b5373a7ec801dd6a02",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4",
+        "AC5-contract",
+        "AC7-fixture",
+        "AC8-contract",
+        "AC9-contract"
+      ],
+      "command": "ATTRIBUTION_CONTRACT_PYTHON=/tmp/attribution-service-contract-env/bin/python services/attribution/scripts/check-contracts.sh --list; same command without --list",
+      "fixture": "local OpenAPI and examples, pinned Python venv; no runtime authorization/ledger claim",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P01-B1-R2-tests-list.txt",
+          "sha256": "9b631c067c0b6cb3176c1cf08d9404d8da814ff54d04e0b7f74c2cff3d3e216b"
+        },
+        {
+          "path": "logs/AS-P01-B1-R2-tests.txt",
+          "sha256": "ea32ddc7b70e7aee3e1bbc2183cf0625dcbc94552b82fe394f89759453f7cd9b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1-portable",
+        "AC1-owner-copy",
+        "plan-integrity",
+        "test-discovery"
+      ],
+      "command": "inline Python audit: plan notes/links/registration, byte-equal identity copy, old/new discovered names, standalone-copy contract suite, git diff --check",
+      "fixture": "local OpenAPI and examples, pinned Python venv; no runtime authorization/ledger claim",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P01-B1-R2-audit.txt",
+          "sha256": "3ee38d75a77b7ab0d65e99be90ac7d2248361ce64fa97bcc4ac3b85375c5a26a"
+        }
+      ]
+    }
+  ]
+}

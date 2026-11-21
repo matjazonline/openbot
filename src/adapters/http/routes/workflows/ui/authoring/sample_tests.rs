@@ -363,7 +363,7 @@ async fn autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes(
 async fn wait_for_member_lock(pool: &sqlx::PgPool, minimum: i64) {
     tokio::time::timeout(std::time::Duration::from_secs(2),async {
         loop {
-            let waiting:i64=sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE '%company_members%'").fetch_one(pool).await.unwrap();
+            let waiting:i64=sqlx::query_scalar("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE '%department_members%'").fetch_one(pool).await.unwrap();
             if waiting>=minimum {break;}
             tokio::task::yield_now().await;
         }
@@ -413,21 +413,25 @@ async fn autonomous_agent_samples_release_rechecks_admin_after_competing_role_re
         .unwrap();
     capture.authorize_release(target).await.unwrap();
     let mut locker = f.persistence.pool().begin().await.unwrap();
-    sqlx::query("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2 FOR UPDATE")
-        .bind(f.company)
-        .bind(f.admin)
-        .execute(&mut *locker)
-        .await
-        .unwrap();
+    sqlx::query(
+        "SELECT id FROM department_members WHERE company_id=$1 AND root_user_id=$2 FOR UPDATE",
+    )
+    .bind(f.company)
+    .bind(f.admin)
+    .execute(&mut *locker)
+    .await
+    .unwrap();
     let p = f.persistence.clone();
     let company = f.company;
     let admin = f.admin;
+    let changing_owner = f.owner;
     let demote = tokio::spawn(async move {
-        p.update_member_role(
-            company,
-            admin,
-            crate::entities::company_member::CompanyAccessRole::Member,
-        )
+        p.update_member_role(crate::use_cases::company_invite::MemberRoleChange {
+            actor_id: changing_owner,
+            company_id: company,
+            member_user_id: admin,
+            role: crate::entities::company_member::CompanyAccessRole::Member,
+        })
         .await
         .unwrap()
         .unwrap()

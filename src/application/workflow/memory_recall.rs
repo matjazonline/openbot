@@ -6,15 +6,15 @@ use crate::{
     app_error::{AppError, AppResult},
     application::{
         memory::{
-            MemoryClient, MemoryPack, MemoryPackRequest, MemoryServiceError, PackItemStatus,
-            PackedRevision, ScopedPack,
+            MemoryClient, MemoryPack, MemoryPackRequest, MemoryServiceError, NamespaceExternalId,
+            NamespaceOwner, PackItemStatus, PackedRevision, ScopedPack,
         },
         workflow::{
             agent::{
                 FrozenMemory, MAX_RECALL_BYTES, MIN_RECALL_TOKENS, PreparedAgent, RecallState,
             },
             lease::{ClaimedWorkflow, LeasePolicy, WorkflowFence},
-            memory_tools::{MemoryRecallRef, MemoryToolScope, ScopeAccess},
+            memory_tools::{MemoryRecallRef, MemoryScope, ScopeAccess},
         },
     },
     entities::access_level::AccessLevel,
@@ -39,18 +39,24 @@ pub struct RecallRequest {
     /// The ready namespaces of every eligible scope (E2/U4), in scope order.
     pub scopes: Vec<ScopeAccess>,
     /// Eligible scopes not provisioned yet; requested in their own transaction.
-    pub not_ready: Vec<MemoryToolScope>,
+    pub not_ready: Vec<MemoryScope>,
     /// `RecalledMemory` budget for the whole recall (E7).
     pub max_tokens: u32,
     /// The trigger message, else the current input, cut to 1,024 characters; none = recency.
     pub query: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct RecallNamespace {
+    pub namespace: NamespaceExternalId,
+    pub label: String,
+}
+
 /// What a fresh attempt fetched, frozen by the preparation unless it already has a freeze.
 pub enum FetchedRecall {
     Packs {
         read_ceiling: AccessLevel,
-        packs: Vec<(MemoryToolScope, MemoryPack)>,
+        packs: Vec<(RecallNamespace, MemoryPack)>,
     },
     Skipped {
         read_ceiling: AccessLevel,
@@ -98,7 +104,7 @@ pub trait MemoryRecallPersistence: Send + Sync {
     async fn provision_recall_scope(
         &self,
         fence: WorkflowFence,
-        scope: MemoryToolScope,
+        owner: NamespaceOwner,
     ) -> AppResult<()>;
 
     /// Capture targets (E8) whose namespace is not ready yet: the agent scope while its
@@ -109,7 +115,7 @@ pub trait MemoryRecallPersistence: Send + Sync {
         &self,
         claim: &ClaimedWorkflow,
         policy: LeasePolicy,
-    ) -> AppResult<Vec<MemoryToolScope>>;
+    ) -> AppResult<Vec<NamespaceOwner>>;
 
     /// What a resumed attempt revalidates against: the run's current read ceiling, the ready
     /// namespaces of its eligible scopes (a scope missing now is absent), and every memory item
@@ -125,6 +131,7 @@ pub struct Revalidation {
     pub read_ceiling: AccessLevel,
     pub scopes: Vec<ScopeAccess>,
     pub tool_items: Vec<MemoryRecallRef>,
+    pub tool_namespaces: Vec<NamespaceExternalId>,
 }
 
 /// What the agent runtime's memory composition contributes to a fresh preparation.
@@ -234,14 +241,17 @@ impl MemoryRecall {
             RecallPlan::Frozen => return Ok(RecallStep::Resumed),
             RecallPlan::Needed(request) => request,
         };
-        self.provision(claim, &request.not_ready).await;
+        let owners: Vec<_> = request.not_ready.iter().map(|scope| scope.owner).collect();
+        self.provision(claim, &owners).await;
         let skipped = |state| {
             Ok(RecallStep::Fresh(FetchedRecall::Skipped {
                 read_ceiling: request.read_ceiling,
                 state,
             }))
         };
-        if request.max_tokens < MIN_RECALL_TOKENS {
+        if request.max_tokens < MIN_RECALL_TOKENS
+            || request.max_tokens < request.scopes.len() as u32
+        {
             return skipped(RecallState::SkippedBudget);
         }
         if request.scopes.is_empty() {
@@ -259,7 +269,7 @@ impl MemoryRecall {
                     namespace: entry.namespace,
                     read_ceiling: ceiling,
                     query: request.query.clone(),
-                    max_tokens: share(entry.scope, request.max_tokens),
+                    max_tokens: share(request.scopes.len(), request.max_tokens),
                     max_bytes: MAX_RECALL_BYTES,
                 },
             })
@@ -271,7 +281,10 @@ impl MemoryRecall {
                     packs: request
                         .scopes
                         .iter()
-                        .map(|entry| entry.scope)
+                        .map(|entry| RecallNamespace {
+                            namespace: entry.namespace,
+                            label: entry.scope.label.clone(),
+                        })
                         .zip(answers)
                         .collect(),
                 }))
@@ -290,7 +303,7 @@ impl MemoryRecall {
 
     /// Requests each scope's namespace in its own transaction; a failed request is logged and
     /// never fails the run.
-    async fn provision(&self, claim: &ClaimedWorkflow, scopes: &[MemoryToolScope]) {
+    async fn provision(&self, claim: &ClaimedWorkflow, scopes: &[NamespaceOwner]) {
         for scope in scopes {
             if let Err(error) = self
                 .persistence
@@ -333,7 +346,7 @@ impl MemoryRecall {
     ) -> AppResult<RecallValidation> {
         let pack = prepared
             .frozen_memory()
-            .filter(|memory| !memory.items.is_empty())
+            .filter(|memory| !memory.namespaces.is_empty())
             // Without a client nothing was frozen this attempt, so a pack is an earlier one's.
             .filter(|_| resumed || self.client.is_none());
         if pack.is_none() && !prepared.uses_memory_tools() {
@@ -341,7 +354,7 @@ impl MemoryRecall {
             return Ok(RecallValidation::Valid);
         }
         let facts = self.persistence.revalidation(claim, policy).await?;
-        if pack.is_none() && facts.tool_items.is_empty() {
+        if pack.is_none() && facts.tool_items.is_empty() && facts.tool_namespaces.is_empty() {
             return Ok(RecallValidation::Valid);
         }
         let Some(client) = &self.client else {
@@ -354,6 +367,14 @@ impl MemoryRecall {
             .max()
             .unwrap_or(AccessLevel::PUBLIC);
         if facts.read_ceiling < exposed {
+            return Ok(RecallValidation::Revoked);
+        }
+        if facts.tool_namespaces.iter().any(|namespace| {
+            !facts
+                .scopes
+                .iter()
+                .any(|entry| entry.namespace == *namespace)
+        }) {
             return Ok(RecallValidation::Revoked);
         }
         if let Some(memory) = pack {
@@ -383,10 +404,12 @@ async fn validate_tool_items(
     ceiling: AccessLevel,
     scopes: &[ScopeAccess],
 ) -> RecallValidation {
-    for scope in MemoryToolScope::ALL {
+    let namespaces: std::collections::BTreeSet<_> =
+        items.iter().map(|item| item.namespace).collect();
+    for namespace in namespaces {
         let mut wanted: Vec<(uuid::Uuid, i64)> = items
             .iter()
-            .filter(|item| item.scope == scope)
+            .filter(|item| item.namespace == namespace)
             .map(|item| (item.id, item.revision))
             .collect();
         wanted.sort_unstable();
@@ -394,7 +417,7 @@ async fn validate_tool_items(
         if wanted.is_empty() {
             continue;
         }
-        let Some(entry) = scopes.iter().find(|entry| entry.scope == scope) else {
+        let Some(entry) = scopes.iter().find(|entry| entry.namespace == namespace) else {
             return RecallValidation::Revoked;
         };
         for chunk in wanted.chunks(64) {
@@ -435,11 +458,20 @@ async fn validate_scopes(
     ceiling: AccessLevel,
     scopes: &[ScopeAccess],
 ) -> RecallValidation {
-    for scope in MemoryToolScope::ALL {
+    if memory
+        .namespaces
+        .iter()
+        .any(|namespace| !scopes.iter().any(|entry| entry.namespace == *namespace))
+    {
+        return RecallValidation::Revoked;
+    }
+    let namespaces: std::collections::BTreeSet<_> =
+        memory.items.iter().map(|item| item.namespace).collect();
+    for namespace in namespaces {
         let items: Vec<PackedRevision> = memory
             .items
             .iter()
-            .filter(|item| item.scope == scope)
+            .filter(|item| item.namespace == namespace)
             .map(|item| PackedRevision {
                 observation_id: item.observation_id,
                 revision: item.revision,
@@ -449,7 +481,7 @@ async fn validate_scopes(
         if items.is_empty() {
             continue;
         }
-        let Some(entry) = scopes.iter().find(|entry| entry.scope == scope) else {
+        let Some(entry) = scopes.iter().find(|entry| entry.namespace == namespace) else {
             return RecallValidation::Revoked;
         };
         match client
@@ -477,13 +509,10 @@ async fn validate_scopes(
     RecallValidation::Valid
 }
 
-/// A scope's share of the recall budget (E7): company 1/2, agent 1/4, user 1/4.
-fn share(scope: MemoryToolScope, max_tokens: u32) -> u32 {
-    match scope {
-        MemoryToolScope::Company => max_tokens / 2,
-        MemoryToolScope::Agent | MemoryToolScope::User => max_tokens / 4,
-    }
-    .max(1)
+/// Divide the fixed total budget across exact namespaces. The caller skips a
+/// recall too small to allocate at least one token per namespace.
+fn share(namespaces: usize, max_tokens: u32) -> u32 {
+    max_tokens / (namespaces.max(1) as u32)
 }
 
 /// The failures that leave recall optional (the run continues without memory); every other

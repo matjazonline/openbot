@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "round": "AS-P10-PUSH-R1",
+  "artifact": "3688ab5d0c47cb02398dd3504190f7dfb7a25a8f2781a84d3c9a7d218823b26d",
+  "checks": [
+    {
+      "criteria": [
+        "preservation"
+      ],
+      "command": "Compare accepted service/owner bytes and source snapshots",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-source-preservation.txt",
+          "sha256": "bf39063462298d8ba0728394c1d9ba54d54914c8734ee6f88474f77b1b7586a1"
+        },
+        {
+          "path": "logs/AS-P10-PUSH-R1-service-identity.json",
+          "sha256": "813f61c11a6d9551aca91aafd8ab70374d039078fb5fc3aabbf0175d51959132"
+        },
+        {
+          "path": "logs/AS-P10-PUSH-R1-snapshot.txt",
+          "sha256": "0ab0629324df021632a5129b867b5adb8142bf15f45daaf3a97e009ed665ddad"
+        },
+        {
+          "path": "logs/AS-P10-PUSH-R1-end-snapshot.txt",
+          "sha256": "0ab0629324df021632a5129b867b5adb8142bf15f45daaf3a97e009ed665ddad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "format"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-fmt.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "compile"
+      ],
+      "command": "SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-offline.txt",
+          "sha256": "856945db3d6f190d33b5871d4ca6cecb225cbf24395278ad57e3748484848917"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "migration"
+      ],
+      "command": "psql --single-transaction -v ON_ERROR_STOP=1 -f migrations/20260817000000_init_schema.sql",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-migration.txt",
+          "sha256": "bac400e32e0e70320d8030122dadf72cb1207963f1a705c9d41b3fe2b846774f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "compile"
+      ],
+      "command": "SQLX_OFFLINE=true cargo build --locked --offline --bin attribution-service (accepted identical isolated service tree)",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-service-build.txt",
+          "sha256": "5536578301ceabc4d9404c4f4715abd4219e2ce26c903eb4e39461a0bb8d7bd7"
+        },
+        {
+          "path": "logs/AS-P10-PUSH-R1-service-binary.json",
+          "sha256": "c46264d9eb2dffe51f71117cac266641cb1e76b6dbd540d043b89f8f142c7ba4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "harness-initial"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --lib attribution_ -- --test-threads=4 (default debug symbols)",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits; linker write errno28, tests not reached; corrected with smaller disposable debug artifacts",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-root-attribution.txt",
+          "sha256": "1bf618a5be1227bfaa3020b3438859e21314883ce48187a0f52a7c3b5e0c668d"
+        },
+        {
+          "path": "logs/AS-P10-PUSH-R1-owned-build-cleanup.txt",
+          "sha256": "9097a662f93d1f316467ba48af92b92e2d5239dd2a2145b39a33d123a21c3f92"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "identity-lifecycle"
+      ],
+      "command": "CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib attribution_ -- --test-threads=4",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-root-attribution-retry.txt",
+          "sha256": "39b5be92c027ed1d5f898838234471ff92ff21d1614748d030697bd6ed3a33ac"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "actual-sso"
+      ],
+      "command": "CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 SQLX_OFFLINE=true cargo test --locked --offline --lib attribution_sso_browser_ -- --ignored --nocapture --test-threads=1",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-sso-browser.txt",
+          "sha256": "77972bf6791beb22432b072f2eb4bab71a12d248f68350ecbc788f1fa1376c80"
+        },
+        {
+          "path": "logs/AS-P10-PUSH-R1-browser-deps.txt",
+          "sha256": "1371e03551a375dae488aef30cb1967e87023c6abf36fbcefbf11bc2b4931c62"
+        },
+        {
+          "path": "logs/AS-P10-PUSH-R1-service-binary.json",
+          "sha256": "c46264d9eb2dffe51f71117cac266641cb1e76b6dbd540d043b89f8f142c7ba4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "learning-check"
+      ],
+      "command": "trail check --json (merged state, capped scan)",
+      "fixture": "Owned native PostgreSQL18, metadata AS-P10-PUSH-R1-postgres.json; merged source e61d384e + 8fdb892b; no source edits",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-PUSH-R1-trail-merged.json",
+          "sha256": "46b58207f8a216d20f1e84e7e37afed74f671aba31173d2325f6a37872ac9cab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "whole-repository-status"
+      ],
+      "command": "Whole-repository suite on publication merge",
+      "fixture": "Publication uses focused integration checks; previous full-gate failures and AS-P10-VG1 remain retained without reclassification",
+      "status": "NOT EXERCISED",
+      "reason": "No full-suite rerun for already reviewed incoming source; scope is publication integration, not whole-repository green status"
+    }
+  ]
+}

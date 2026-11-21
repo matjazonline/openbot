@@ -17,6 +17,7 @@ async fn vault_workflow_mcp_native_valid_oversized_projection_is_terminal_before
     let current = p
         .update_mcp_connection(
             f.setup.company().as_uuid(),
+            p.test_root_unit(f.setup.company().as_uuid()).await,
             current.id,
             current.revision,
             write,

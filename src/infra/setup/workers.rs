@@ -1,6 +1,7 @@
 //! Fully constructed workers; main retains and joins every spawned loop.
 use super::*;
 pub struct ApplicationWorkers {
+    pub attribution: Option<Arc<crate::adapters::http::attribution::Bridge>>,
     pub workflow: Arc<crate::infra::workflow::WorkflowEngine>,
     pub inbound_events: Arc<InboundEventWorker>,
     pub notifications: Arc<NotificationWorker>,
@@ -34,6 +35,7 @@ pub(super) fn build(
             .with_monitoring(f.monitoring.clone()),
     );
     Ok(ApplicationWorkers {
+        attribution: f.attribution.clone(),
         workflow: c.workflow,
         inbound_events: c.inbound,
         notifications,

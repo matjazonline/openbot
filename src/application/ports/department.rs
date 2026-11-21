@@ -17,6 +17,10 @@ use crate::{
     },
 };
 
+/// Maximum members or held roles in a department detail response. Readers fetch one extra
+/// row so the application can report truncation; this never bounds an authorization lookup.
+pub const MAX_DEPARTMENT_ROSTER_ENTRIES: usize = 500;
+
 /// Everything one department create or edit sets. Values reach persistence already normalized —
 /// see `DepartmentWrite::normalize`.
 #[derive(Debug, Clone, Default)]
@@ -71,7 +75,9 @@ pub struct DepartmentScope {
 }
 
 #[async_trait]
-pub trait DepartmentPersistence: Send + Sync {
+pub trait DepartmentPersistence:
+    crate::application::ports::administration::AdministrationPersistence
+{
     async fn create(
         &self,
         scope: DepartmentScope,
@@ -118,11 +124,13 @@ pub trait DepartmentPersistence: Send + Sync {
     async fn list_by_company(&self, company: CompanyId) -> AppResult<Vec<Department>>;
     /// The departments where `user`'s person principal is a member or holds a role.
     async fn list_for_user(&self, company: CompanyId, user: Uuid) -> AppResult<Vec<Department>>;
+    /// At most MAX_DEPARTMENT_ROSTER_ENTRIES + 1 rows, ordered for the roster.
     async fn members(
         &self,
         company: CompanyId,
         department: DepartmentId,
     ) -> AppResult<Vec<DepartmentMember>>;
+    /// At most MAX_DEPARTMENT_ROSTER_ENTRIES + 1 rows; owner and lead precede other roles.
     async fn roles(
         &self,
         company: CompanyId,
@@ -161,6 +169,13 @@ pub trait DepartmentPersistence: Send + Sync {
     >;
     /// Every department-owned desk of the company with its owner.
     async fn desk_owners(&self, company: CompanyId) -> AppResult<Vec<(Uuid, DepartmentId)>>;
+    /// The department's administration history, newest first, at most
+    /// [`DEPARTMENT_HISTORY_ENTRIES`](crate::entities::department::DEPARTMENT_HISTORY_ENTRIES).
+    async fn administration_history(
+        &self,
+        company: CompanyId,
+        department: DepartmentId,
+    ) -> AppResult<Vec<crate::entities::department::DepartmentAdministrationEntry>>;
     /// The desks this department owns, by address.
     async fn desks(
         &self,

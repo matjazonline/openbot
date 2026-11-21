@@ -479,7 +479,7 @@ async fn account_email_change_adopts_an_allowlisted_outsider_address() {
     let company_id = company_of(&persistence, &owner, "allow").await;
     join(&persistence, company_id, &member).await;
     let home = format!("{}@home.test", unique("home"));
-    let channel = ChannelPersistence::create(
+    let channel = crate::adapters::persistence::test_support::create_channel(
         &persistence,
         company_id,
         ChannelWrite {
@@ -532,14 +532,7 @@ async fn account_email_change_adopts_an_allowlisted_outsider_address() {
         Some(vec![EmailAddress::from(home.as_str())]),
         "the allowlist still reads back the address it was given"
     );
-    assert!(
-        after
-            .principal_grants
-            .iter()
-            .all(|grant| grant.principal_id.as_uuid() == person),
-        "the grants now hang on the person"
-    );
-    assert_eq!(after.principal_grants.len(), 2);
+    assert_adopted_allowlist_grants(&after, person);
     let home_access = access(&persistence, company_id, &home).await;
     assert_eq!(
         home_access.principal_id.map(|id| id.as_uuid()),
@@ -566,6 +559,25 @@ async fn account_email_change_adopts_an_allowlisted_outsider_address() {
     assert_eq!(leftovers, (0, 0), "the outsider is left unreachable");
 
     let _ = CompanyPersistence::delete(&persistence, company_id).await;
+}
+
+fn assert_adopted_allowlist_grants(channel: &crate::entities::channel::Channel, person: Uuid) {
+    use crate::entities::participant::{GrantProvenance, PrincipalCapability};
+    let grants: Vec<_> = channel
+        .principal_grants
+        .iter()
+        .filter(|grant| grant.provenance == GrantProvenance::ConfiguredAllowlist)
+        .collect();
+    assert_eq!(grants.len(), 2);
+    assert!(
+        grants
+            .iter()
+            .all(|grant| grant.principal_id.as_uuid() == person),
+        "both configured grants now hang on the person"
+    );
+    for capability in [PrincipalCapability::View, PrincipalCapability::Participate] {
+        assert!(grants.iter().any(|grant| grant.capability == capability));
+    }
 }
 
 /// An address held by another account's person principal is not taken over; the change fails and

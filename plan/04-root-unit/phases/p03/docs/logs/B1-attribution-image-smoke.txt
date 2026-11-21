@@ -1,0 +1,1 @@
+container smoke passed: non-root/read-only, assets, migrations, DB loss, graceful exit, redaction

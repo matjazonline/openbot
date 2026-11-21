@@ -9,15 +9,18 @@ async fn team_member(d: &Deployment) -> String {
         .execute(d.p().pool())
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(d.fixture.target.company.as_uuid())
-        .bind(user)
-        .execute(d.p().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(d.fixture.target.company.as_uuid())
+    .bind(user)
+    .execute(d.p().pool())
+    .await
+    .unwrap();
     ChannelPersistence::update(
         d.p(),
         crate::application::ports::channel::ChannelUpdate {
+            actor: d.fixture.target.actor,
             company_id: d.fixture.target.company.as_uuid(),
             channel_id: d.channel,
             write: ChannelWrite {

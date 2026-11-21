@@ -13,8 +13,13 @@ struct NamespaceChannels {
 
 #[async_trait]
 impl ChannelPersistence for NamespaceChannels {
-    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
-        self.desks.create(company_id, write).await
+    async fn create(
+        &self,
+        actor: crate::application::workflow::WorkflowActor,
+        company_id: Uuid,
+        write: ChannelWrite,
+    ) -> AppResult<Channel> {
+        self.desks.create(actor, company_id, write).await
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
@@ -71,8 +76,13 @@ impl ChannelPersistence for NamespaceChannels {
         self.desks.update(request).await
     }
 
-    async fn delete(&self, id: Uuid) -> AppResult<()> {
-        self.desks.delete(id).await
+    async fn delete(
+        &self,
+        actor: crate::application::workflow::WorkflowActor,
+        company_id: Uuid,
+        id: Uuid,
+    ) -> AppResult<()> {
+        self.desks.delete(actor, company_id, id).await
     }
 }
 

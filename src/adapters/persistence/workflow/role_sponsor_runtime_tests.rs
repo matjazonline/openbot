@@ -64,14 +64,17 @@ impl SponsorDeployment {
         }
         let departments = crate::adapters::persistence::test_support::department_use_cases(d.p());
         for (index, unit) in desks.iter().enumerate() {
-            // Sponsors still need ordinary desk visibility; holding the role grants no access.
-            sqlx::query("UPDATE channels SET access_mode='team' WHERE company_id=$1 AND id=$2")
-                .bind(d.fixture.target.company.as_uuid())
-                .bind(unit.id)
-                .execute(d.p().pool())
-                .await
-                .unwrap();
             for principal in [people[index].principal, people[2].principal, lead.principal] {
+                // Sponsors still need ordinary desk visibility; holding the role grants no access.
+                departments
+                    .add_member(
+                        d.fixture.target.actor.user_id(),
+                        d.fixture.target.company.as_uuid(),
+                        unit.department,
+                        principal,
+                    )
+                    .await
+                    .unwrap();
                 departments
                     .assign_role(
                         d.fixture.target.actor.user_id(),

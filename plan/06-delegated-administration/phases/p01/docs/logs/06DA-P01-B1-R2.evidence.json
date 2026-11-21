@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "round": "06DA-P01-B1-R2",
+  "artifact": "c5286ce14e6fb94342627eae937049ce00fe01a3d83b41d587956ef1f2d35442",
+  "checks": [
+    {
+      "criteria": [
+        "B1-F1",
+        "B1-F2",
+        "SCHEDULE-VIEW",
+        "NATIVE-RUNTIME",
+        "GRANT-RACE"
+      ],
+      "command": "TEST_DATABASE_URL=<owned-v2> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- schedule_ delegated_admin_",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-schedule-affected.txt",
+          "sha256": "5a5189e7e2132bdfae71a2c382216f3b1b256fb17f2049b948b90e762aa62c72"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "UNCHANGED-PREDICATE",
+        "UNCHANGED-DEPARTMENT-INTERFACES"
+      ],
+      "command": "TEST_DATABASE_URL=<owned-v2> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- manages_unit_ delegated_admin_ department_ root_ workflow_authorization workflow_binding_ native_mcp_ channel_reply_",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-integrated-corrected.txt",
+          "sha256": "59a3c3b1376f0525b0a53f90cdf5b2b763f469828c763f385c5759423d461d77"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "COMPILATION"
+      ],
+      "command": "SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-offline-check.txt",
+          "sha256": "61ec4b789d50c0600e8f5f24ce2e0e3d70fc09c3dc7788f968288deab15682f8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CLIPPY"
+      ],
+      "command": "SQLX_OFFLINE=true cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-schedule-clippy.txt",
+          "sha256": "68b7c054d0a96fd42c17a07cf9854ba10d2affcf3b99b19f89d6bd4b15bc72c9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REACHABILITY"
+      ],
+      "command": "SQLX_OFFLINE=true cargo test --locked --offline --test source_modules",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-modules-corrected.txt",
+          "sha256": "cb9b300fea07ad6d2e3d7a6f62800935ebc4da1c811d7f6489a364ae9d06f70b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "SQLX"
+      ],
+      "command": "DATABASE_URL=<owned-v2> SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-sqlx-prepare.txt",
+          "sha256": "e5e22c9c11d1392bc61c4abc4b12aace5d6ca6dd52ae18ccb3efaee3c7430b10"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FRESH-SCHEMA"
+      ],
+      "command": "DATABASE_URL=<owned-v2> cargo sqlx migrate run",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migration-v2.txt",
+          "sha256": "148e2fc21619d877214dfe4fa0ada237b100ca104b25eab1d320ee90bb53b450"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FORMAT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "WHITESPACE"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "LEARNING-SCAN-RAW-RESULT"
+      ],
+      "command": "trail check",
+      "fixture": "Plan06-owned v2 PostgreSQL18 port55406 where required; evidence reuse and lexical conflict disposition in TASK",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-trail-check.txt",
+          "sha256": "8b9b3cdc8a7eb161d1410cf14d3cae8f460b201e4998218f3186b7fac9a9f9fe"
+        }
+      ]
+    }
+  ]
+}

@@ -644,43 +644,43 @@ $$;
 -- Name: enforce_company_owner_agreement(); Type: FUNCTION; Schema: public; Owner: -
 --
 
--- Ownership is two columns, companies.user_id and the owner role in company_members, enforced as
 -- one fact at commit: the member row of companies.user_id is that company's owner row. With
--- company_members_one_owner_idx there is then exactly one owner row, and it is the owner's.
+-- A surviving company has one root, its owner member at level 9, and one owner role.
+-- All four tables call this at commit, so bootstrap and ownership transfer are atomic.
 CREATE FUNCTION public.enforce_company_owner_agreement() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    checked_companies UUID[];
+    LANGUAGE plpgsql AS $$
+DECLARE checked_companies uuid[];
 BEGIN
-    -- Separate branches, because an expression naming a column the firing table lacks (NEW.id on
-    -- company_members, OLD.company_id on companies) fails even where it would not be evaluated.
-    -- A member row moved to another company leaves both companies to check.
     IF TG_TABLE_NAME = 'companies' THEN
         checked_companies := ARRAY[NEW.id];
     ELSIF TG_OP = 'DELETE' THEN
         checked_companies := ARRAY[OLD.company_id];
     ELSIF TG_OP = 'UPDATE' THEN
-        checked_companies := ARRAY[NEW.company_id, OLD.company_id];
+        checked_companies := ARRAY[OLD.company_id, NEW.company_id];
     ELSE
         checked_companies := ARRAY[NEW.company_id];
     END IF;
     IF EXISTS (
-        SELECT 1 FROM companies AS company
-        WHERE company.id = ANY (checked_companies)
-          AND NOT EXISTS (
-              SELECT 1 FROM company_members AS member
-              WHERE member.company_id = company.id
-                AND member.user_id = company.user_id
-                AND member.role = 'owner'
-          )
+        SELECT 1 FROM public.companies AS company
+        WHERE company.id = ANY(checked_companies) AND NOT EXISTS (
+            SELECT 1 FROM public.departments AS root
+            JOIN public.department_members AS member
+              ON member.company_id = root.company_id AND member.department_id = root.id
+            JOIN public.principals AS principal
+              ON principal.company_id = member.company_id AND principal.id = member.principal_id
+            JOIN public.department_roles AS holder
+              ON holder.company_id = root.company_id AND holder.department_id = root.id
+             AND holder.principal_id = principal.id AND holder.role = 'owner'
+            WHERE root.company_id = company.id AND root.is_root AND root.slug = company.slug
+              AND principal.kind = 'person' AND principal.user_id = company.user_id
+              AND member.root_user_id = company.user_id AND member.access_level = 9
+        )
     ) THEN
-        RAISE EXCEPTION 'company owner must be the owner member of that company'
-            USING ERRCODE = '23514', CONSTRAINT = 'companies_owner_member_agreement';
+        RAISE EXCEPTION 'company requires its root and level-9 owner membership and role'
+            USING ERRCODE='23514', CONSTRAINT='companies_root_owner_agreement';
     END IF;
     RETURN NULL;
-END;
-$$;
+END $$;
 
 
 --
@@ -876,6 +876,13 @@ $$;
 -- Name: valid_creation_provenance(jsonb); Type: FUNCTION; Schema: public; Owner: -
 --
 
+-- The role with which a person made a management write (Plan06 02B): the company owner, a root
+-- admin, or the lead of the named department (the unit, or an ancestor, whose management admitted it).
+CREATE FUNCTION public.valid_acting_role(role text) RETURNS boolean
+    LANGUAGE sql IMMUTABLE STRICT
+    RETURN role IN ('owner', 'admin')
+        OR role ~ '^lead:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+
 CREATE FUNCTION public.valid_creation_provenance(provenance jsonb) RETURNS boolean
     LANGUAGE sql IMMUTABLE
     RETURN ((jsonb_typeof(provenance) = 'object'::text) AND ((provenance - ARRAY['actor_type'::text, 'actor_id'::text, 'actor_name'::text]) = '{}'::jsonb) AND (jsonb_typeof((provenance -> 'actor_type'::text)) = 'string'::text) AND ((provenance ->> 'actor_type'::text) = ANY (ARRAY['user'::text, 'system'::text])) AND (jsonb_typeof((provenance -> 'actor_name'::text)) = 'string'::text) AND (btrim((provenance ->> 'actor_name'::text)) <> ''::text) AND CASE (provenance ->> 'actor_type'::text) WHEN 'system'::text THEN ((provenance ? 'actor_id'::text) AND ((provenance -> 'actor_id'::text) = 'null'::jsonb)) WHEN 'user'::text THEN ((jsonb_typeof((provenance -> 'actor_id'::text)) = 'string'::text) AND ((provenance ->> 'actor_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text)) ELSE false END);
@@ -909,42 +916,26 @@ CREATE TABLE public.channels (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     name text NOT NULL,
-    access_mode text DEFAULT 'team'::text NOT NULL,
+    access_mode text DEFAULT 'members'::text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     add_3rd_party boolean DEFAULT true NOT NULL,
     created_by jsonb NOT NULL,
     description text,
     settings_revision bigint DEFAULT 0 NOT NULL,
-    department_id uuid,
-    members_only boolean DEFAULT false NOT NULL,
-    CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
+    department_id uuid NOT NULL,
+    CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['members'::text, 'public'::text]))),
     CONSTRAINT channels_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
-    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text)),
-    -- A members-only desk belongs to a department and is an allowlist desk, so channel policy
-    -- needs no rule of its own: its department's grants are its allowlist (01-departments p02).
-    CONSTRAINT channels_members_only_owned CHECK (((NOT members_only) OR (department_id IS NOT NULL))),
-    CONSTRAINT channels_members_only_allowlist CHECK (((NOT members_only) OR (access_mode = 'allowlist'::text)))
+    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text))
 );
 
 
 --
--- Name: company_members; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE DOMAIN public.access_level AS smallint
     CONSTRAINT access_level_range CHECK (VALUE BETWEEN 0 AND 9);
 
-CREATE TABLE public.company_members (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    role text DEFAULT 'member'::text NOT NULL,
-    access_level public.access_level DEFAULT 0 NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT company_members_role_check CHECK ((role = ANY (ARRAY['owner'::text, 'member'::text, 'admin'::text]))),
-    CONSTRAINT company_members_owner_level_check CHECK (role <> 'owner' OR access_level = 9)
-);
 
 
 --
@@ -974,6 +965,31 @@ CREATE TABLE public.principals (
 );
 
 
+-- One derivation for current company authority; root membership is the only source.
+-- `id` is the membership incarnation, deliberately distinct from the lifetime principal.
+CREATE FUNCTION public.membership_of(checked_user uuid, checked_company uuid)
+RETURNS TABLE(id uuid, company_id uuid, user_id uuid, principal_id uuid,
+    department_id uuid, role text, access_level public.access_level, created_at timestamptz)
+LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    RETURN QUERY
+    SELECT member.id, company.id, principal.user_id, principal.id, root.id,
+        CASE WHEN company.user_id = principal.user_id THEN 'owner'
+             WHEN EXISTS (SELECT 1 FROM public.department_roles AS holder
+                 WHERE holder.company_id = company.id AND holder.department_id = root.id
+                   AND holder.principal_id = principal.id AND holder.role = 'admin') THEN 'admin'
+             ELSE 'member' END,
+        member.access_level, member.created_at
+    FROM public.companies AS company
+    JOIN public.departments AS root ON root.company_id = company.id AND root.is_root
+    JOIN public.department_members AS member
+      ON member.company_id = root.company_id AND member.department_id = root.id
+    JOIN public.principals AS principal
+      ON principal.company_id = member.company_id AND principal.id = member.principal_id
+    WHERE company.id = checked_company AND principal.user_id = checked_user
+      AND principal.kind = 'person' AND member.root_user_id = checked_user;
+END $$;
+
 --
 -- Name: notification_principal_can_view(uuid, uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -981,13 +997,15 @@ CREATE TABLE public.principals (
 CREATE FUNCTION public.notification_principal_can_view(checked_company uuid, checked_channel uuid, checked_principal uuid) RETURNS boolean
     LANGUAGE sql STABLE AS $$
     SELECT EXISTS (SELECT 1 FROM public.principals AS principal
-        JOIN public.company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id
+        JOIN public.users AS account ON account.id=principal.user_id
+        JOIN LATERAL public.membership_of(principal.user_id, principal.company_id) AS member ON true
         LEFT JOIN public.channels AS channel ON channel.company_id=principal.company_id AND channel.id=checked_channel
         WHERE principal.company_id=checked_company AND principal.id=checked_principal AND principal.kind='person'
           AND ((checked_channel IS NULL AND member.role IN ('owner','admin')) OR (channel.id IS NOT NULL AND (
-            member.role='owner' OR channel.access_mode IN ('team','public') OR EXISTS (
+            member.role='owner' OR channel.access_mode='public' OR EXISTS (
                 SELECT 1 FROM public.channel_principal_grants AS permission WHERE permission.company_id=checked_company
-                  AND permission.channel_id=checked_channel AND permission.principal_id=checked_principal AND permission.capability='view')))))
+                  AND permission.channel_id=checked_channel AND permission.principal_id=checked_principal AND permission.capability='view'
+                  AND (permission.provenance='department_membership' OR account.email_verified_at IS NOT NULL))))))
 $$;
 
 
@@ -1024,7 +1042,7 @@ CREATE FUNCTION public.notification_recheck_membership() RETURNS trigger
     AS $$
 DECLARE
     changed_company UUID := COALESCE(NEW.company_id, OLD.company_id);
-    changed_user UUID := COALESCE(NEW.user_id, OLD.user_id);
+    changed_user UUID := COALESCE(NEW.root_user_id, OLD.root_user_id);
 BEGIN
     UPDATE notifications AS notification
        SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
@@ -3628,6 +3646,8 @@ CREATE TABLE public.binding_audit_events (
     actor jsonb NOT NULL,
     metadata jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- The person's management role over the binding's target when the write was theirs (02B).
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     CONSTRAINT binding_audit_events_action_check CHECK ((action = ANY (ARRAY['linked'::text, 'endpoint_changed'::text, 'enabled'::text, 'paused'::text, 'disabled'::text, 'drift_detected'::text, 'unlinked'::text]))),
     CONSTRAINT binding_audit_events_actor_check CHECK (public.valid_creation_provenance(actor)),
     CONSTRAINT binding_audit_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND ((metadata -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((metadata -> 'transport'::text)) = 'string'::text) AND (octet_length((metadata)::text) <= 4096))),
@@ -3777,6 +3797,9 @@ CREATE TABLE public.company_mcp_connections (
     credential_revision bigint DEFAULT 1 NOT NULL,
     discovery_json jsonb DEFAULT '[]'::jsonb NOT NULL,
     deleted_at timestamp with time zone,
+    -- The owning unit (Plan07). A deleted connection releases it, so it never pins a department.
+    unit_id uuid,
+    CONSTRAINT company_mcp_connections_unit_check CHECK (((deleted_at IS NULL) = (unit_id IS NOT NULL))),
     CONSTRAINT company_mcp_connections_auth_type_check CHECK ((auth_type = ANY (ARRAY['none'::text, 'bearer'::text]))),
     CONSTRAINT company_mcp_connections_deleted_check CHECK (deleted_at IS NULL OR NOT enabled),
     CONSTRAINT company_mcp_connections_credential_revision_check CHECK ((credential_revision > 0)),
@@ -3818,10 +3841,12 @@ CREATE TABLE public.company_mcp_tool_grants (
 
 CREATE TABLE public.company_model_connections (
     company_id uuid NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    unit_id uuid NOT NULL,
     provider text NOT NULL,
     api_key text NOT NULL,
     models text[] NOT NULL,
-    is_default boolean DEFAULT false NOT NULL,
+    default_for_unit boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT company_model_connections_api_key_check CHECK (((btrim(api_key) <> ''::text) AND (octet_length(api_key) <= 16384))),
@@ -4469,6 +4494,8 @@ $$;
 CREATE TABLE public.skills (
     id uuid NOT NULL,
     company_id uuid,
+    -- The owning unit of a company skill; library skills (no company) have none (Plan07).
+    unit_id uuid,
     slug public.citext NOT NULL,
     name text NOT NULL,
     description text NOT NULL,
@@ -4484,7 +4511,8 @@ CREATE TABLE public.skills (
     CONSTRAINT skills_description_bounded CHECK (((btrim(description) <> ''::text) AND (char_length(description) <= 500))),
     CONSTRAINT skills_instructions_bounded CHECK (((btrim(instructions) <> ''::text) AND (octet_length(instructions) <= 16384))),
     CONSTRAINT skills_name_bounded CHECK (((btrim(name) <> ''::text) AND (char_length(name) <= 120))),
-    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
+    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
+    CONSTRAINT skills_unit_check CHECK (((company_id IS NULL) = (unit_id IS NULL)))
 );
 
 
@@ -5169,6 +5197,9 @@ CREATE TABLE public.workflow_binding_events (
     event_kind text NOT NULL,
     actor_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- The actor's management role over the binding's association (Plan06 02B); NULL for a
+    -- system write.
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     CONSTRAINT workflow_binding_events_configuration_revision_check CHECK ((configuration_revision > 0)),
     CONSTRAINT workflow_binding_events_event_kind_check CHECK ((event_kind = ANY (ARRAY['configured'::text, 'activated'::text, 'deactivated'::text]))),
     CONSTRAINT workflow_binding_events_state_revision_check CHECK ((state_revision > 0))
@@ -5394,6 +5425,8 @@ CREATE TABLE public.workflow_definition_events (
     actor_id uuid NOT NULL,
     version_id uuid,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- The actor's management role over the definition (Plan06 02B); NULL for a system write.
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     CONSTRAINT workflow_definition_events_check CHECK (((event_kind = 'published'::text) = (version_id IS NOT NULL))),
     CONSTRAINT workflow_definition_events_event_kind_check CHECK ((event_kind = ANY (ARRAY['copied'::text, 'saved'::text, 'archived'::text, 'published'::text]))),
     CONSTRAINT workflow_definition_events_revision_check CHECK ((revision > 0))
@@ -5408,6 +5441,7 @@ CREATE TABLE public.workflow_definitions (
     company_id uuid NOT NULL,
     id uuid NOT NULL,
     owner_agent_id uuid,
+    managing_department_id uuid NOT NULL,
     revision bigint NOT NULL,
     title text NOT NULL,
     description text NOT NULL,
@@ -5526,6 +5560,8 @@ CREATE TABLE public.workflow_http_connections (
     bearer boolean NOT NULL,
     revision bigint DEFAULT 1 NOT NULL,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    -- The owning unit (Plan07).
+    unit_id uuid NOT NULL,
     CONSTRAINT workflow_http_connections_origin_check CHECK (((octet_length(origin) >= 8) AND (octet_length(origin) <= 2048))),
     CONSTRAINT workflow_http_connections_revision_check CHECK ((revision > 0))
 );
@@ -6352,19 +6388,13 @@ ALTER TABLE ONLY public.company_mcp_tool_grants
 
 
 --
--- Name: company_members company_members_company_user_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.company_members
-    ADD CONSTRAINT company_members_company_user_key UNIQUE (company_id, user_id);
 
 
 --
--- Name: company_members company_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.company_members
-    ADD CONSTRAINT company_members_pkey PRIMARY KEY (id);
 
 
 --
@@ -8121,31 +8151,26 @@ CREATE INDEX company_invites_email_created_idx ON public.company_invites USING b
 
 
 --
--- Name: company_members_company_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX company_members_company_created_idx ON public.company_members USING btree (company_id, created_at, id);
 
 
 --
--- Name: company_members_one_owner_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX company_members_one_owner_idx ON public.company_members USING btree (company_id) WHERE (role = 'owner'::text);
 
 
 --
--- Name: company_members_user_company_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX company_members_user_company_idx ON public.company_members USING btree (user_id, company_id);
 
 
 --
 -- Name: company_model_connections_one_default_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX company_model_connections_one_default_idx ON public.company_model_connections USING btree (company_id) WHERE is_default;
+CREATE UNIQUE INDEX company_model_connections_one_default_idx ON public.company_model_connections USING btree (company_id, unit_id) WHERE default_for_unit;
+CREATE UNIQUE INDEX company_model_connections_id_idx ON public.company_model_connections USING btree (company_id, id);
 
 
 --
@@ -8618,10 +8643,8 @@ CREATE CONSTRAINT TRIGGER companies_owner_agreement AFTER INSERT OR UPDATE OF us
 
 
 --
--- Name: company_members company_members_owner_agreement; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE CONSTRAINT TRIGGER company_members_owner_agreement AFTER INSERT OR DELETE OR UPDATE OF company_id, user_id, role ON public.company_members DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_company_owner_agreement();
 
 
 --
@@ -8718,10 +8741,8 @@ CREATE TRIGGER notification_channel_policy_recheck AFTER UPDATE OF access_mode O
 
 
 --
--- Name: company_members notification_membership_recheck; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER notification_membership_recheck AFTER DELETE OR UPDATE OF role, access_level ON public.company_members FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_membership();
 
 
 --
@@ -9716,7 +9737,7 @@ ALTER TABLE ONLY public.addresses
 --
 
 ALTER TABLE ONLY public.channels
-    ADD CONSTRAINT channels_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+    ADD CONSTRAINT channels_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -9731,10 +9752,7 @@ ALTER TABLE ONLY public.companies
 -- Name: companies companies_owner_member_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
--- The owner is also a member: companies.user_id always names a company_members row of the same
 -- company. Deferred, because company creation writes the company before its owner row.
-ALTER TABLE ONLY public.companies
-    ADD CONSTRAINT companies_owner_member_fk FOREIGN KEY (id, user_id) REFERENCES public.company_members(company_id, user_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -9770,19 +9788,13 @@ ALTER TABLE ONLY public.company_mcp_tool_grants
 
 
 --
--- Name: company_members company_members_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.company_members
-    ADD CONSTRAINT company_members_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
 
 
 --
--- Name: company_members company_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.company_members
-    ADD CONSTRAINT company_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -10017,7 +10029,7 @@ ALTER TABLE ONLY public.message_delivery_parts
 -- the end of the statement, so a company delete that removes both sides in one statement passes
 -- whatever order its cascades run in.
 ALTER TABLE ONLY public.message_participants
-    ADD CONSTRAINT message_participants_identity_fk FOREIGN KEY (company_id, participant_identity_id) REFERENCES public.participant_identities(company_id, id);
+    ADD CONSTRAINT message_participants_identity_fk FOREIGN KEY (company_id, participant_identity_id) REFERENCES public.participant_identities(company_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -10125,8 +10137,6 @@ ALTER TABLE ONLY public.notifications
 -- Name: notifications notifications_recipient_member_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_recipient_member_fk FOREIGN KEY (company_id, member_recipient_user_id) REFERENCES public.company_members(company_id, user_id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_recipient_account_fk FOREIGN KEY (recipient_user_id) REFERENCES public.users(id) ON DELETE CASCADE;
@@ -10157,7 +10167,7 @@ ALTER TABLE ONLY public.pending_account_changes
 -- the end of the statement, so a company delete that removes both sides in one statement passes
 -- whatever order its cascades run in.
 ALTER TABLE ONLY public.principals
-    ADD CONSTRAINT principals_company_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id);
+    ADD CONSTRAINT principals_company_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -10165,15 +10175,13 @@ ALTER TABLE ONLY public.principals
 --
 
 ALTER TABLE ONLY public.principals
-    ADD CONSTRAINT principals_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+    ADD CONSTRAINT principals_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
 -- Name: principals principals_company_user_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.principals
-    ADD CONSTRAINT principals_company_user_fk FOREIGN KEY (company_id, user_id) REFERENCES public.company_members(company_id, user_id) ON DELETE CASCADE;
 
 
 --
@@ -11462,6 +11470,8 @@ CREATE TABLE public.model_usage_calls (
     run_id uuid NOT NULL,
     execution_id uuid NOT NULL,
     root_run_id uuid NOT NULL,
+    -- The unit the call is attributed to (Plan07 02B.3), set on insert by `attribute_model_usage`.
+    unit_id uuid NOT NULL,
     provider text NOT NULL CHECK (octet_length(provider) BETWEEN 1 AND 128 AND provider = lower(btrim(provider))),
     model text NOT NULL CHECK (octet_length(model) BETWEEN 1 AND 256 AND model = btrim(model)),
     requested_at timestamptz NOT NULL DEFAULT statement_timestamp(),
@@ -11489,6 +11499,7 @@ CREATE TABLE public.model_usage_calls (
         REFERENCES public.workflow_run_budgets(company_id,run_id,root_run_id) ON DELETE CASCADE
 );
 CREATE INDEX model_usage_company_time ON public.model_usage_calls(company_id,requested_at,request_id);
+CREATE INDEX model_usage_calls_unit_time ON public.model_usage_calls(company_id,unit_id,requested_at);
 -- A run's calls, for the simulation's per-run usage (p08 D4.6) and the run delete cascade.
 CREATE INDEX model_usage_calls_run ON public.model_usage_calls(company_id,run_id);
 CREATE FUNCTION public.guard_model_usage_update() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -12074,6 +12085,7 @@ CREATE TABLE public.model_usage_history (
     agent_id uuid,
     workflow_id uuid NOT NULL,
     version_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
     provider text NOT NULL,
     model text NOT NULL,
     requested_at timestamptz NOT NULL,
@@ -12089,6 +12101,7 @@ CREATE TABLE public.model_usage_history (
         DEFERRABLE INITIALLY DEFERRED
 );
 CREATE INDEX model_usage_history_company_time ON public.model_usage_history(company_id,requested_at,request_id);
+CREATE INDEX model_usage_history_unit_time ON public.model_usage_history(company_id,unit_id,requested_at);
 CREATE FUNCTION public.guard_model_usage_history() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE original jsonb;
 BEGIN
@@ -12213,6 +12226,7 @@ CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDA
 CREATE TABLE public.knowledge_documents (
     id uuid PRIMARY KEY,
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    unit_id uuid NOT NULL,
     name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 253),
     name_key text COLLATE "C" GENERATED ALWAYS AS (casefold(name COLLATE pg_unicode_fast)) STORED,
     access_level public.access_level NOT NULL,
@@ -12222,8 +12236,9 @@ CREATE TABLE public.knowledge_documents (
     revision bigint NOT NULL DEFAULT 1 CHECK (revision>0),
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (company_id,name_key,access_level),
-    UNIQUE (company_id,id,access_level)
+    UNIQUE (company_id,unit_id,name_key,access_level),
+    UNIQUE (company_id,id,access_level),
+    UNIQUE (company_id,id,unit_id,access_level)
 );
 
 CREATE FUNCTION public.knowledge_embedding_is_valid(vector real[]) RETURNS boolean
@@ -12241,6 +12256,7 @@ CREATE TABLE public.knowledge_chunks (
     id uuid PRIMARY KEY,
     company_id uuid NOT NULL,
     document_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
     access_level public.access_level NOT NULL,
     ordinal integer NOT NULL CHECK (ordinal>=0 AND ordinal<4096),
     heading text CHECK (octet_length(heading)<=2048),
@@ -12249,8 +12265,8 @@ CREATE TABLE public.knowledge_chunks (
     embedding real[] NOT NULL CHECK (public.knowledge_embedding_is_valid(embedding)),
     search_text tsvector GENERATED ALWAYS AS
         (to_tsvector('simple',coalesce(heading,'') || ' ' || body)) STORED,
-    FOREIGN KEY (company_id,document_id,access_level)
-        REFERENCES public.knowledge_documents(company_id,id,access_level)
+    FOREIGN KEY (company_id,document_id,unit_id,access_level)
+        REFERENCES public.knowledge_documents(company_id,id,unit_id,access_level)
         ON UPDATE CASCADE ON DELETE CASCADE,
     UNIQUE (document_id,ordinal)
 );
@@ -12258,6 +12274,41 @@ CREATE INDEX knowledge_chunks_search_idx ON public.knowledge_chunks(company_id,e
 
 -- Search saves the canonical harness result and its classification in the same transaction.
 -- Each new/replayed consumption also proves its actual attempt is still live at COMMIT.
+CREATE FUNCTION public.knowledge_source_items_valid(result jsonb, items jsonb, units uuid[], level smallint)
+RETURNS boolean LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE item jsonb; highest smallint := 0;
+BEGIN
+    IF result IS NULL OR items IS NULL OR units IS NULL OR level IS NULL
+        OR jsonb_typeof(items) IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+    IF octet_length(items::text)>4096 THEN RETURN false; END IF;
+    IF cardinality(units)>256
+        OR (cardinality(units)>0 AND (array_ndims(units)<>1 OR array_lower(units,1)<>1)) THEN RETURN false; END IF;
+    IF array_position(units,NULL) IS NOT NULL
+        OR units IS DISTINCT FROM ARRAY(SELECT DISTINCT unit FROM unnest(units) AS selected(unit) ORDER BY unit)
+        OR jsonb_array_length(items)>8 THEN RETURN false; END IF;
+    IF result ? 'passages' THEN
+        IF jsonb_typeof(result->'passages') IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+        IF jsonb_array_length(result->'passages')<>jsonb_array_length(items) THEN RETURN false; END IF;
+    ELSIF jsonb_typeof(result->'error') IS DISTINCT FROM 'object' OR jsonb_array_length(items)<>0 THEN
+        RETURN false;
+    END IF;
+    FOR item IN SELECT value FROM jsonb_array_elements(items) AS source(value) LOOP
+        IF jsonb_typeof(item) IS DISTINCT FROM 'object' THEN RETURN false; END IF;
+        IF (SELECT count(*) FROM jsonb_object_keys(item))<>4
+            OR jsonb_typeof(item->'document_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'chunk_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'unit_id') IS DISTINCT FROM 'string'
+            OR jsonb_typeof(item->'access_level') IS DISTINCT FROM 'number' THEN RETURN false; END IF;
+        IF (item->>'document_id')::uuid='00000000-0000-0000-0000-000000000000'::uuid
+            OR (item->>'chunk_id')::uuid='00000000-0000-0000-0000-000000000000'::uuid
+            OR NOT ((item->>'unit_id')::uuid=ANY(units))
+            OR (item->>'access_level')::smallint NOT BETWEEN 0 AND 9 THEN RETURN false; END IF;
+        highest := greatest(highest,(item->>'access_level')::smallint);
+    END LOOP;
+    RETURN highest=level;
+EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN RETURN false;
+END $$;
+
 CREATE TABLE public.workflow_knowledge_consumptions (
     company_id uuid NOT NULL,
     run_id uuid NOT NULL,
@@ -12271,6 +12322,9 @@ CREATE TABLE public.workflow_knowledge_consumptions (
     content_level public.access_level NOT NULL,
     -- jsonb's spacing differs from the compact 65536-byte application result representation.
     result jsonb NOT NULL CHECK (jsonb_typeof(result)='object' AND octet_length(result::text)<=131072),
+    queried_unit_ids uuid[] NOT NULL,
+    source_items jsonb NOT NULL,
+    CHECK (public.knowledge_source_items_valid(result,source_items,queried_unit_ids,content_level::smallint)),
     PRIMARY KEY (company_id,run_id,execution_id,job_id,attempt_number,invocation_id),
     FOREIGN KEY (company_id,run_id,execution_id)
         REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
@@ -12310,12 +12364,30 @@ BEGIN
         JOIN public.task_harness_runs AS harness ON harness.company_id=job.company_id AND harness.task_id=job.id
             AND harness.id=NEW.checkpoint_id AND harness.workflow_run_id=run.id
             AND harness.workflow_execution_id=execution.id
+        JOIN public.principals AS actor ON actor.company_id=run.company_id AND actor.kind='agent'
+            AND actor.agent_id::text=harness.workflow_prepared->'selection'->>'agent'
+        LEFT JOIN LATERAL (
+            SELECT array_agg(scope.unit_id ORDER BY scope.unit_id) AS units,bool_and(unit.id IS NOT NULL) AS live
+            FROM public.workflow_run_scopes AS scope
+            JOIN public.workflow_run_scope_snapshots AS snapshot ON snapshot.company_id=scope.company_id
+                AND snapshot.run_id=scope.run_id AND snapshot.state='available'
+            LEFT JOIN public.departments AS unit ON unit.company_id=scope.company_id AND unit.id=scope.unit_id
+            WHERE scope.company_id=run.company_id AND scope.run_id=run.id
+                AND scope.acting_principal_id=actor.id AND scope.access='read'
+        ) AS knowledge ON true
         WHERE job.company_id=NEW.company_id AND job.id=NEW.job_id AND execution.id=NEW.execution_id AND run.id=NEW.run_id
             AND job.status='processing' AND job.worker_id=NEW.worker_id
             AND job.execution_generation=NEW.execution_generation AND job.attempt_ordinal=NEW.attempt_number
             AND job.lock_expires_at>clock_timestamp() AND execution.completed_at IS NULL
             AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
             AND run.content_level>=NEW.content_level
+            AND (
+                (knowledge.live AND cardinality(knowledge.units)>0 AND NEW.queried_unit_ids=knowledge.units)
+                OR ((knowledge.units IS NULL OR NOT knowledge.live)
+                    AND NEW.queried_unit_ids='{}'::uuid[] AND NEW.source_items='[]'::jsonb AND NEW.content_level=0
+                    AND NEW.result=jsonb_build_object('error',jsonb_build_object('code','knowledge.scope_unavailable',
+                        'message','Knowledge scopes are unavailable for this run')))
+            )
             AND EXISTS (
                 SELECT 1 FROM jsonb_array_elements(harness.checkpoint->'invocations') AS saved(invocation)
                 WHERE invocation->'call'->>'invocation_id'=NEW.invocation_id::text
@@ -13972,11 +14044,11 @@ CREATE TABLE public.local_agent_sessions (
     UNIQUE (company_id,profile_id,id),
     UNIQUE (company_id,machine_id,installation_id,id),
     FOREIGN KEY (company_id,machine_id,installation_id) REFERENCES public.local_machines(company_id,id,installation_id) ON DELETE CASCADE,
-    FOREIGN KEY (company_id,profile_id) REFERENCES public.local_agent_profiles(company_id,id),
+    FOREIGN KEY (company_id,profile_id) REFERENCES public.local_agent_profiles(company_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,agent_id,agent_revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
     CHECK (num_nonnulls(agent_id,agent_revision_id,bundle_digest) IN (0,3)),
-    FOREIGN KEY (company_id,conversation_id) REFERENCES public.threads(company_id,id),
-    FOREIGN KEY (company_id,workflow_run_id) REFERENCES public.workflow_runs(company_id,id),
+    FOREIGN KEY (company_id,conversation_id) REFERENCES public.threads(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,workflow_run_id) REFERENCES public.workflow_runs(company_id,id) DEFERRABLE INITIALLY DEFERRED,
     CHECK (num_nonnulls(conversation_id,workflow_run_id) = 1)
 );
 
@@ -14016,7 +14088,7 @@ CREATE TABLE public.local_agent_operations (
     UNIQUE (company_id,machine_id,installation_id,id),
     UNIQUE (company_id,machine_id,installation_id,id,origin),
     FOREIGN KEY (company_id,machine_id,installation_id) REFERENCES public.local_machines(company_id,id,installation_id) ON DELETE CASCADE,
-    FOREIGN KEY (company_id,machine_id,installation_id,session_id) REFERENCES public.local_agent_sessions(company_id,machine_id,installation_id,id),
+    FOREIGN KEY (company_id,machine_id,installation_id,session_id) REFERENCES public.local_agent_sessions(company_id,machine_id,installation_id,id) DEFERRABLE INITIALLY DEFERRED,
     CHECK (origin<>'workflow' OR command->>'kind' IN ('create','send')),
     CHECK ((command->>'kind' IN ('create','send','inspect','stop_thread','archive_thread','refresh_catalog')) IS TRUE),
     CHECK (((command->>'kind' = 'refresh_catalog') = (session_id IS NULL)) IS TRUE),
@@ -14102,18 +14174,20 @@ CREATE TABLE public.workflow_local_agent_calls (
     UNIQUE (company_id,wait_id),
     FOREIGN KEY (company_id,run_id,execution_id,invocation_id,argument_digest)
         REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest) ON DELETE CASCADE,
-    FOREIGN KEY (company_id,profile_id) REFERENCES public.local_agent_profiles(company_id,id),
+    -- Native resources and workflow intents have separate tenant cascade owners.
+    -- Retain these peer identities until both owning trees finish their teardown.
+    FOREIGN KEY (company_id,profile_id) REFERENCES public.local_agent_profiles(company_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,machine_id,installation_id,operation_id,operation_origin)
-        REFERENCES public.local_agent_operations(company_id,machine_id,installation_id,id,origin),
+        REFERENCES public.local_agent_operations(company_id,machine_id,installation_id,id,origin) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,machine_id,installation_id,session_id)
-        REFERENCES public.local_agent_sessions(company_id,machine_id,installation_id,id),
-    FOREIGN KEY (company_id,profile_id,session_id) REFERENCES public.local_agent_sessions(company_id,profile_id,id),
+        REFERENCES public.local_agent_sessions(company_id,machine_id,installation_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,profile_id,session_id) REFERENCES public.local_agent_sessions(company_id,profile_id,id) DEFERRABLE INITIALLY DEFERRED,
     -- Link the scoped call before the wait's immediate owner guard runs. The cycle
     -- must be complete at COMMIT; the dispatch commit guard proves the atomic park.
     FOREIGN KEY (company_id,run_id,execution_id,wait_id)
         REFERENCES public.workflow_waits(company_id,run_id,execution_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind)
-        REFERENCES public.workflow_action_dispatches(company_id,run_id,execution_id,invocation_id,argument_digest,id,effect_kind),
+        REFERENCES public.workflow_action_dispatches(company_id,run_id,execution_id,invocation_id,argument_digest,id,effect_kind) DEFERRABLE INITIALLY DEFERRED,
     CHECK (num_nonnulls(machine_id,installation_id,session_id,operation_id,wait_id,dispatch_id,fence_expires_at) IN (0,7)),
     CHECK (operation_id IS NULL OR operation_id=invocation_id),
     CHECK (ready_at IS NULL OR operation_id IS NOT NULL),
@@ -14804,7 +14878,7 @@ RETURNS boolean LANGUAGE sql VOLATILE AS $$
         WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
             AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
             AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
-            AND checkpoint.workflow_prepared->>'version'='7'
+            AND checkpoint.workflow_prepared->>'version'='8'
             AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
                 OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
             AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
@@ -14876,7 +14950,7 @@ BEGIN
           AND execution.completed_at IS NULL FOR SHARE OF run NOWAIT;
     PERFORM 1 FROM public.agent_history_conversations WHERE company_id=owner.company_id
         AND id=owner.conversation_id AND active_exchange_id=owner.id FOR UPDATE;
-    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '7'
+    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '8'
         OR document->>'mcp_error_policy' NOT IN ('observe','fail_step')
         OR document->>'mcp_error_policy' IS DISTINCT FROM
             (CASE WHEN source.frozen_inputs ? 'mcp_error_policy'
@@ -15639,6 +15713,7 @@ CREATE TABLE public.departments (
     slug public.citext NOT NULL,
     description text,
     parent_id uuid,
+    is_root boolean NOT NULL DEFAULT false,
     charter text,
     created_by jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -15646,10 +15721,11 @@ CREATE TABLE public.departments (
     CONSTRAINT departments_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT departments_company_slug_key UNIQUE (company_id, slug),
     CONSTRAINT departments_company_id_fkey FOREIGN KEY (company_id)
-        REFERENCES public.companies(id) ON DELETE CASCADE,
+        REFERENCES public.companies(id) DEFERRABLE INITIALLY DEFERRED,
     -- Deleting a parent that still has children is refused; a company teardown removes the tree.
     CONSTRAINT departments_parent_fk FOREIGN KEY (company_id, parent_id)
         REFERENCES public.departments(company_id, id),
+    CONSTRAINT departments_root_shape CHECK (is_root = (parent_id IS NULL)),
     CONSTRAINT departments_not_own_parent CHECK ((parent_id IS NULL) OR (parent_id <> id)),
     CONSTRAINT departments_name_not_blank CHECK ((btrim(name) <> ''::text)),
     -- A department slug is a legal channel slug, so it can be the department desk's address.
@@ -15657,21 +15733,30 @@ CREATE TABLE public.departments (
     CONSTRAINT departments_charter_size CHECK ((charter IS NULL) OR (octet_length(charter) <= 4096)),
     CONSTRAINT departments_created_by_shape_check CHECK (public.valid_creation_provenance(created_by))
 );
+CREATE UNIQUE INDEX departments_one_root ON public.departments(company_id) WHERE is_root;
 CREATE INDEX departments_parent_idx ON public.departments USING btree (company_id, parent_id)
     WHERE (parent_id IS NOT NULL);
 COMMENT ON TABLE public.departments IS 'A named group inside one company that owns desks, has member principals and role holders, and may sit under a parent department (01-departments).';
 
 CREATE TABLE public.department_members (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
     company_id uuid NOT NULL,
     department_id uuid NOT NULL,
     principal_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    access_level public.access_level,
+    root_user_id uuid REFERENCES public.users(id) ON DELETE CASCADE,
+    CONSTRAINT department_members_company_id_key UNIQUE (company_id, id),
+    CONSTRAINT department_members_company_user_key UNIQUE (company_id, root_user_id),
     CONSTRAINT department_members_pkey PRIMARY KEY (department_id, principal_id),
     CONSTRAINT department_members_department_fk FOREIGN KEY (company_id, department_id)
         REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
     CONSTRAINT department_members_principal_fk FOREIGN KEY (company_id, principal_id)
         REFERENCES public.principals(company_id, id) ON DELETE CASCADE
 );
+-- The former company membership user/company access path now belongs to the root witness.
+CREATE INDEX department_members_user_company_idx ON public.department_members(root_user_id, company_id)
+    WHERE root_user_id IS NOT NULL;
 CREATE INDEX department_members_principal_idx ON public.department_members USING btree (company_id, principal_id);
 
 CREATE TABLE public.department_roles (
@@ -15683,7 +15768,7 @@ CREATE TABLE public.department_roles (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT department_roles_pkey PRIMARY KEY (department_id, role, principal_id),
     -- Widened by later plans; the string is always `DepartmentRole::as_str`.
-    CONSTRAINT department_roles_role_check CHECK ((role IN ('lead', 'reviewer', 'sponsor'))),
+    CONSTRAINT department_roles_role_check CHECK ((role IN ('lead', 'reviewer', 'sponsor', 'owner', 'admin'))),
     CONSTRAINT department_roles_department_fk FOREIGN KEY (company_id, department_id)
         REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
     CONSTRAINT department_roles_principal_fk FOREIGN KEY (company_id, principal_id)
@@ -15697,13 +15782,285 @@ CREATE INDEX department_roles_principal_idx ON public.department_roles USING btr
 CREATE UNIQUE INDEX department_roles_one_sponsor_decider ON public.department_roles(department_id)
     WHERE role='sponsor' AND decider;
 
--- A desk may belong to a department (p02). Deleting a department that still owns a desk is
--- refused; detach or delete the desk first. Deleting the desk is never blocked by its owner.
+-- Management is a person authority over configuration, never a conversation grant.
+-- NULL selects the company's root; a missing/foreign explicit unit never falls back.
+-- Root counts as level one, matching department_shape_problem's eight-level bound.
+CREATE FUNCTION public.unit_management_role(checked_user uuid, checked_company uuid, checked_unit uuid)
+RETURNS text LANGUAGE sql STABLE AS $$
+    WITH RECURSIVE ancestors(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1
+        FROM public.departments AS department
+        WHERE department.company_id = checked_company
+          AND (department.id = checked_unit OR (checked_unit IS NULL AND department.is_root))
+        UNION ALL
+        SELECT department.id, department.parent_id, ancestor.depth + 1
+        FROM ancestors AS ancestor
+        JOIN public.departments AS department
+          ON department.company_id = checked_company AND department.id = ancestor.parent_id
+        WHERE ancestor.depth < 8
+    )
+    SELECT CASE
+        WHEN NOT EXISTS (SELECT 1 FROM ancestors) THEN NULL
+        WHEN actor.role = 'owner' THEN 'owner'
+        WHEN actor.role = 'admin' THEN 'admin'
+        ELSE (
+            SELECT 'lead:' || ancestor.id::text
+            FROM ancestors AS ancestor
+            JOIN public.department_roles AS holder
+              ON holder.company_id = checked_company AND holder.department_id = ancestor.id
+             AND holder.principal_id = actor.principal_id AND holder.role = 'lead'
+            ORDER BY ancestor.depth LIMIT 1
+        )
+    END
+    FROM public.membership_of(checked_user, checked_company) AS actor
+$$;
+
+-- The strongest role with which a person manages at least one unit: the root, or a unit they
+-- lead. Collection entry only; every object is still checked against its own unit.
+CREATE FUNCTION public.any_unit_management_role(checked_user uuid, checked_company uuid)
+RETURNS text LANGUAGE sql STABLE AS $$
+    WITH candidate AS (
+        SELECT id FROM public.departments WHERE company_id = checked_company AND is_root
+        UNION
+        SELECT holder.department_id FROM public.department_roles AS holder
+        JOIN public.principals AS principal
+          ON principal.company_id = holder.company_id AND principal.id = holder.principal_id
+        WHERE holder.company_id = checked_company AND holder.role = 'lead'
+          AND principal.user_id = checked_user
+    ), roles AS MATERIALIZED (
+        SELECT public.unit_management_role(checked_user, checked_company, candidate.id) AS role
+        FROM candidate
+    )
+    SELECT role FROM roles WHERE role IS NOT NULL ORDER BY role LIMIT 1
+$$;
+
+-- Every desk belongs to a department. Reassign or delete its desks before deleting a
+-- department. The tenant participates in the FK; ownership cannot cross a company boundary.
 ALTER TABLE ONLY public.channels
     ADD CONSTRAINT channels_department_fk FOREIGN KEY (company_id, department_id)
         REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
-CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id)
-    WHERE (department_id IS NOT NULL);
+ALTER TABLE ONLY public.knowledge_documents
+    ADD CONSTRAINT knowledge_documents_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id);
+
+-- Skills and connections belong to a unit (Plan07): move them before deleting the department.
+-- Library skills and deleted MCP connections have no unit, which the composite key skips.
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.company_mcp_connections
+    ADD CONSTRAINT company_mcp_connections_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.workflow_http_connections
+    ADD CONSTRAINT workflow_http_connections_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX skills_unit_idx ON public.skills USING btree (company_id, unit_id);
+CREATE INDEX company_mcp_connections_unit_idx ON public.company_mcp_connections USING btree (company_id, unit_id);
+CREATE INDEX workflow_http_connections_unit_idx ON public.workflow_http_connections USING btree (company_id, unit_id);
+-- Model connections belong to a unit too (Plan07 02A, decision g): one per provider per company,
+-- each unit marking at most one of its own as its default.
+ALTER TABLE ONLY public.company_model_connections
+    ADD CONSTRAINT company_model_connections_unit_fk FOREIGN KEY (company_id, unit_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX company_model_connections_unit_idx ON public.company_model_connections USING btree (company_id, unit_id);
+
+-- Whether `unit` is `start` or one of its ancestors (Plan07): a skill or connection is in reach of
+-- the desks, definitions and agents in its unit and below it. Bounded like the tree (8 levels).
+CREATE FUNCTION public.unit_reaches(checked_company uuid, start uuid, unit uuid)
+    RETURNS boolean LANGUAGE sql STABLE AS $$
+    WITH RECURSIVE chain(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1 FROM public.departments AS department
+        WHERE department.company_id = checked_company AND department.id = start
+        UNION ALL
+        SELECT department.id, department.parent_id, chain.depth + 1 FROM chain
+        JOIN public.departments AS department
+            ON department.company_id = checked_company AND department.id = chain.parent_id
+        WHERE chain.depth < 8
+    )
+    SELECT EXISTS (SELECT 1 FROM chain WHERE chain.id = unit)
+$$;
+
+-- An agent's own reach (Plan07 decision d): any unit it is placed in (member or role) and their
+-- ancestors; the root alone when it has no placement.
+CREATE FUNCTION public.agent_reaches(checked_company uuid, checked_agent uuid, unit uuid)
+    RETURNS boolean LANGUAGE sql STABLE AS $$
+    WITH target AS (
+        SELECT id FROM public.principals
+        WHERE company_id = checked_company AND agent_id = checked_agent AND kind = 'agent'
+    ), placements AS (
+        SELECT member.department_id FROM public.department_members AS member
+        JOIN target ON target.id = member.principal_id WHERE member.company_id = checked_company
+        UNION SELECT holder.department_id FROM public.department_roles AS holder
+        JOIN target ON target.id = holder.principal_id WHERE holder.company_id = checked_company
+    ), starts AS (
+        SELECT department_id FROM placements
+        UNION ALL SELECT id FROM public.departments
+        WHERE company_id = checked_company AND is_root AND NOT EXISTS (SELECT 1 FROM placements)
+    )
+    SELECT EXISTS (
+        SELECT 1 FROM starts WHERE public.unit_reaches(checked_company, starts.department_id, unit)
+    )
+$$;
+
+-- A model call is attributed to the unit of its run's write scope (Plan07 02B.3), the root when
+-- the run has none. A recorded id, not a key: a department's deletion never touches usage rows.
+CREATE FUNCTION public.attribute_model_usage() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.unit_id IS NULL THEN
+        NEW.unit_id := COALESCE(
+            (SELECT scope.unit_id FROM public.workflow_run_scopes AS scope
+             WHERE scope.company_id = NEW.company_id AND scope.run_id = NEW.run_id
+               AND scope.acting_principal_id IS NULL AND scope.access = 'write' LIMIT 1),
+            (SELECT id FROM public.departments WHERE company_id = NEW.company_id AND is_root));
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER model_usage_attributed BEFORE INSERT ON public.model_usage_calls
+    FOR EACH ROW EXECUTE FUNCTION public.attribute_model_usage();
+
+-- A unit's spend caps (Plan07 02B.1, decisions c and i): one per UTC day or month, set by whoever
+-- manages the unit; configuration of the unit, so they go with it.
+CREATE TABLE public.unit_budgets (
+    company_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
+    period text NOT NULL CHECK (period IN ('day', 'month')),
+    cap_micros bigint NOT NULL CHECK (cap_micros > 0),
+    created_by jsonb NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, unit_id, period),
+    FOREIGN KEY (company_id, unit_id) REFERENCES public.departments(company_id, id) ON DELETE CASCADE
+);
+
+-- Running spend per unit and period (Plan07 decision j): each settled call adds its priced cost to
+-- its unit and every ancestor at that moment, so caps read a few rows and deleting or moving a
+-- department leaves what was counted above it. No key to departments: charging never locks them.
+CREATE TABLE public.unit_spend (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    unit_id uuid NOT NULL,
+    period text NOT NULL CHECK (period IN ('day', 'month')),
+    period_start timestamptz NOT NULL,
+    spent_micros bigint NOT NULL DEFAULT 0 CHECK (spent_micros >= 0),
+    unpriced_tokens bigint NOT NULL DEFAULT 0 CHECK (unpriced_tokens >= 0),
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, unit_id, period, period_start)
+);
+
+-- Charge a settled call once, at its transaction's commit (Plan07 G1 r3-r5): cost in micro-USD
+-- with the price current now, rounded up and saturated; unpriced tokens counted apart (decision
+-- h); the UTC day and month containing `requested_at`; the call's unit and its ancestors (≤8),
+-- the root alone when the unit is gone. Totals rows are taken in (unit_id, period, period_start)
+-- order, the order the department-delete cleanup uses too.
+CREATE FUNCTION public.charge_unit_spend() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    cost numeric;
+    priced boolean;
+    chain uuid[];
+BEGIN
+    SELECT ceil((NEW.input_tokens::numeric * price.input_micro_usd_per_million
+               + NEW.output_tokens::numeric * price.output_micro_usd_per_million) / 1000000)
+      INTO cost
+      FROM public.model_prices AS price
+     WHERE price.company_id = NEW.company_id AND price.provider = NEW.provider
+       AND price.model = NEW.model;
+    priced := FOUND;
+    WITH RECURSIVE up(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1 FROM public.departments AS department
+        WHERE department.company_id = NEW.company_id AND department.id = NEW.unit_id
+        UNION ALL
+        SELECT department.id, department.parent_id, up.depth + 1 FROM up
+        JOIN public.departments AS department
+            ON department.company_id = NEW.company_id AND department.id = up.parent_id
+        WHERE up.depth < 8
+    )
+    SELECT array_agg(id) INTO chain FROM up;
+    IF chain IS NULL THEN
+        SELECT ARRAY[id] INTO chain FROM public.departments
+         WHERE company_id = NEW.company_id AND is_root;
+    END IF;
+    IF chain IS NULL THEN
+        RETURN NULL;
+    END IF;
+    INSERT INTO public.unit_spend AS spend
+        (company_id, unit_id, period, period_start, spent_micros, unpriced_tokens, updated_at)
+    SELECT NEW.company_id, unit, period.name, period.start,
+           CASE WHEN priced THEN LEAST(cost, 9223372036854775807)::bigint ELSE 0 END,
+           CASE WHEN priced THEN 0 ELSE NEW.input_tokens + NEW.output_tokens END,
+           clock_timestamp()
+      FROM unnest(chain) AS unit,
+           (VALUES ('day', date_trunc('day', NEW.requested_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),
+                   ('month', date_trunc('month', NEW.requested_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'))
+               AS period(name, start)
+     ORDER BY unit, period.name, period.start
+    ON CONFLICT (company_id, unit_id, period, period_start) DO UPDATE
+       SET spent_micros = LEAST(spend.spent_micros::numeric + EXCLUDED.spent_micros,
+                                9223372036854775807)::bigint,
+           unpriced_tokens = LEAST(spend.unpriced_tokens::numeric + EXCLUDED.unpriced_tokens,
+                                   9223372036854775807)::bigint,
+           updated_at = EXCLUDED.updated_at;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER model_usage_charges_unit_spend
+    AFTER UPDATE OF settled_at ON public.model_usage_calls
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+    WHEN (OLD.settled_at IS NULL AND NEW.settled_at IS NOT NULL)
+    EXECUTE FUNCTION public.charge_unit_spend();
+
+-- A deleted department's own totals go with it, taken in the charge's lock order (G1 r5 F16);
+-- its ancestors keep what was counted.
+CREATE FUNCTION public.forget_unit_spend() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM 1 FROM public.unit_spend
+     WHERE company_id = OLD.company_id AND unit_id = OLD.id
+     ORDER BY period, period_start FOR UPDATE;
+    DELETE FROM public.unit_spend WHERE company_id = OLD.company_id AND unit_id = OLD.id;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER departments_forget_unit_spend AFTER DELETE ON public.departments
+    FOR EACH ROW EXECUTE FUNCTION public.forget_unit_spend();
+
+-- The model a new agent pins when it names none (Plan07 02A.2): the default connection of the
+-- nearest unit from `start` upward (the root when `start` is NULL) that has one with a key, and
+-- that connection's first model. No row when no unit up to the root has a default.
+CREATE FUNCTION public.unit_default_model(checked_company uuid, start uuid)
+    RETURNS TABLE (provider text, model text) LANGUAGE sql STABLE AS $$
+    WITH RECURSIVE chain(id, parent_id, depth) AS (
+        SELECT department.id, department.parent_id, 1 FROM public.departments AS department
+        WHERE department.company_id = checked_company
+          AND (department.id = start OR (start IS NULL AND department.is_root))
+        UNION ALL
+        SELECT department.id, department.parent_id, chain.depth + 1 FROM chain
+        JOIN public.departments AS department
+            ON department.company_id = checked_company AND department.id = chain.parent_id
+        WHERE chain.depth < 8
+    )
+    SELECT connection.provider, connection.models[1] FROM chain
+    JOIN public.company_model_connections AS connection
+        ON connection.company_id = checked_company AND connection.unit_id = chain.id
+       AND connection.default_for_unit
+    ORDER BY chain.depth LIMIT 1
+$$;
+
+-- The unit a new skill or connection gets when its creator names none: the root for a root
+-- manager, else the one department they lead, else NULL (the creator must choose).
+CREATE FUNCTION public.resource_default_unit(checked_user uuid, checked_company uuid)
+    RETURNS uuid LANGUAGE sql STABLE AS $$
+    WITH led AS (
+        SELECT DISTINCT holder.department_id FROM public.principals AS principal
+        JOIN public.department_roles AS holder
+            ON holder.company_id=principal.company_id AND holder.principal_id=principal.id
+           AND holder.role='lead'
+        WHERE principal.company_id=checked_company AND principal.user_id=checked_user
+            AND principal.kind='person'
+        LIMIT 2
+    )
+    SELECT CASE
+        WHEN public.unit_management_role(checked_user,checked_company,NULL) IS NOT NULL
+            THEN (SELECT id FROM public.departments WHERE company_id=checked_company AND is_root)
+        WHEN (SELECT count(*) FROM led)=1 THEN (SELECT department_id FROM led)
+    END
+$$;
 
 -- Why `checked_department` may not sit under `proposed_parent`, or NULL when it may: 'cycle' when
 -- the parent is the department itself or one of its descendants; 'depth' when the department's
@@ -15744,6 +16101,12 @@ $$;
 CREATE FUNCTION public.guard_department_shape() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE problem text;
 BEGIN
+    IF TG_OP = 'UPDATE' AND (OLD.is_root IS DISTINCT FROM NEW.is_root
+        OR (OLD.is_root AND (OLD.company_id IS DISTINCT FROM NEW.company_id
+            OR OLD.parent_id IS DISTINCT FROM NEW.parent_id))) THEN
+        RAISE EXCEPTION 'the company root cannot change or be reparented'
+            USING ERRCODE='23514', CONSTRAINT='departments_root_shape';
+    END IF;
     IF NEW.parent_id IS NULL THEN RETURN NEW; END IF;
     problem := public.department_shape_problem(NEW.company_id, NEW.id, NEW.parent_id);
     IF problem IS NOT NULL THEN
@@ -15752,21 +16115,43 @@ BEGIN
     END IF;
     RETURN NEW;
 END $$;
-CREATE TRIGGER guard_department_shape BEFORE INSERT OR UPDATE OF parent_id ON public.departments
+CREATE TRIGGER guard_department_shape BEFORE INSERT OR UPDATE OF company_id, parent_id, is_root ON public.departments
     FOR EACH ROW EXECUTE FUNCTION public.guard_department_shape();
 
 -- Departments hold people and agents. External and system principals have no place in one.
 CREATE FUNCTION public.guard_department_principal_kind() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE principal_kind text;
+DECLARE principal_kind text; principal_user uuid; root boolean; expected_user uuid;
 BEGIN
-    -- FOR KEY SHARE waits for a demotion in flight (a key update of `kind`) and then reads its
-    -- outcome, so a join row is never written against a principal that has just left.
-    SELECT principal.kind INTO principal_kind FROM public.principals AS principal
-     WHERE principal.company_id = NEW.company_id AND principal.id = NEW.principal_id
-       FOR KEY SHARE;
+    SELECT principal.kind, principal.user_id INTO principal_kind, principal_user
+    FROM public.principals AS principal
+    WHERE principal.company_id = NEW.company_id AND principal.id = NEW.principal_id FOR KEY SHARE;
     IF principal_kind IS NOT NULL AND principal_kind NOT IN ('person', 'agent') THEN
         RAISE EXCEPTION 'principal % cannot belong to or hold a role in a department', NEW.principal_id
             USING ERRCODE='23514', CONSTRAINT='department_principal_kind';
+    END IF;
+    IF TG_TABLE_NAME = 'department_members' THEN
+        SELECT department.is_root INTO root FROM public.departments AS department
+        WHERE department.company_id = NEW.company_id AND department.id = NEW.department_id FOR KEY SHARE;
+        IF root IS NOT NULL AND ((NEW.access_level IS NULL) <> (NOT root)) THEN
+            RAISE EXCEPTION 'access level is required on root membership and forbidden elsewhere'
+                USING ERRCODE='23514', CONSTRAINT='department_members_level_on_root';
+        END IF;
+        expected_user := CASE WHEN root AND principal_kind = 'person' THEN principal_user END;
+        IF NEW.root_user_id IS NOT NULL AND NEW.root_user_id IS DISTINCT FROM expected_user THEN
+            RAISE EXCEPTION 'root membership user must match its current person principal'
+                USING ERRCODE='23514', CONSTRAINT='department_members_root_user';
+        END IF;
+        NEW.root_user_id := expected_user;
+        IF root AND EXISTS (SELECT 1 FROM public.companies AS company
+            WHERE company.id = NEW.company_id AND company.user_id = principal_user)
+            AND NEW.access_level <> 9 THEN
+            RAISE EXCEPTION 'the owner root membership must have level 9'
+                USING ERRCODE='23514', CONSTRAINT='department_members_owner_level';
+        END IF;
+        IF TG_OP = 'UPDATE' AND OLD.id IS DISTINCT FROM NEW.id THEN
+            RAISE EXCEPTION 'membership incarnation cannot be rewritten'
+                USING ERRCODE='23514', CONSTRAINT='department_members_incarnation';
+        END IF;
     END IF;
     RETURN NEW;
 END $$;
@@ -15850,31 +16235,76 @@ CREATE TABLE public.memory_tenants (
     changed_by uuid NOT NULL,
     changed_at timestamptz NOT NULL
 );
+-- Shared owner lock protocol for application ensures and direct namespace writes. The
+-- metadata probe chooses the prefix only; the final locked read authenticates it.
+CREATE FUNCTION public.memory_lock_namespace_owner(company uuid, unit uuid, actor uuid)
+RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE owner_kind text; owner_user uuid; owner_agent uuid; found_owner uuid;
+BEGIN
+    IF num_nonnulls(unit,actor) <> 1 THEN RETURN false; END IF;
+    IF actor IS NOT NULL THEN
+        SELECT principal.kind,principal.user_id,principal.agent_id
+          INTO owner_kind,owner_user,owner_agent FROM public.principals AS principal
+         WHERE principal.company_id=company AND principal.id=actor;
+        IF owner_kind IS NULL OR owner_kind NOT IN ('person','agent') THEN RETURN false; END IF;
+        IF owner_user IS NOT NULL THEN
+            PERFORM 1 FROM public.users WHERE id=owner_user FOR SHARE;
+            IF NOT FOUND THEN RETURN false; END IF;
+        END IF;
+    END IF;
+    PERFORM 1 FROM public.companies WHERE id=company FOR SHARE;
+    IF NOT FOUND THEN RETURN false; END IF;
+    IF unit IS NOT NULL THEN
+        SELECT department.id INTO found_owner FROM public.departments AS department
+         WHERE department.company_id=company AND department.id=unit FOR SHARE;
+        RETURN found_owner IS NOT NULL;
+    END IF;
+    IF owner_agent IS NOT NULL THEN
+        PERFORM 1 FROM public.agents WHERE company_id=company AND id=owner_agent FOR SHARE;
+        IF NOT FOUND THEN RETURN false; END IF;
+    END IF;
+    SELECT principal.id INTO found_owner FROM public.principals AS principal
+     WHERE principal.company_id=company AND principal.id=actor AND principal.kind=owner_kind
+       AND principal.user_id IS NOT DISTINCT FROM owner_user
+       AND principal.agent_id IS NOT DISTINCT FROM owner_agent FOR SHARE;
+    RETURN found_owner IS NOT NULL;
+END $$;
 CREATE TABLE public.memory_namespaces (
     company_id uuid NOT NULL REFERENCES public.memory_tenants(company_id) ON DELETE CASCADE,
-    -- The service namespace external id: random, never an encoded scope.
+    -- Random opaque service identity; owner IDs survive their owner's deletion until cleanup.
     id uuid NOT NULL,
-    scope_kind text NOT NULL CHECK (scope_kind IN ('company', 'agent', 'user')),
-    -- Plain ids, not FKs: the owner may be deleted while removal is still reconciling, and the
-    -- owner-row lock protocol (E2) orders provisioning against that deletion instead.
-    agent_id uuid,
-    user_id uuid,
+    scope_kind text NOT NULL CHECK (scope_kind IN ('unit', 'principal')),
+    unit_id uuid,
+    principal_id uuid,
     state text NOT NULL CHECK (state IN ('provisioning', 'ready', 'removing')),
     credential_id uuid,
-    -- `enc:v2` under CredentialContext::memory_client_credential; the envelope records its key version.
     credential_envelope text CHECK (octet_length(credential_envelope) <= 4096),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (company_id, id),
-    CHECK ((scope_kind = 'company' AND agent_id IS NULL AND user_id IS NULL)
-        OR (scope_kind = 'agent' AND agent_id IS NOT NULL AND user_id IS NULL)
-        OR (scope_kind = 'user' AND agent_id IS NULL AND user_id IS NOT NULL)),
+    CHECK ((scope_kind = 'unit' AND unit_id IS NOT NULL AND principal_id IS NULL)
+        OR (scope_kind = 'principal' AND principal_id IS NOT NULL AND unit_id IS NULL)),
     CHECK ((credential_id IS NULL) = (credential_envelope IS NULL)),
     CHECK (state <> 'ready' OR credential_id IS NOT NULL)
 );
--- One live namespace per scope; a returning agent or user gets a new row and id (E9).
 CREATE UNIQUE INDEX memory_namespaces_live_scope ON public.memory_namespaces (company_id, scope_kind,
-    COALESCE(agent_id, '00000000-0000-0000-0000-000000000000'::uuid),
-    COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE state <> 'removing';
+    COALESCE(unit_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(principal_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE state <> 'removing';
+CREATE FUNCTION public.guard_memory_namespace_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='UPDATE' THEN
+        IF (NEW.company_id,NEW.id,NEW.scope_kind,NEW.unit_id,NEW.principal_id)
+           IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.scope_kind,OLD.unit_id,OLD.principal_id) THEN
+            RAISE EXCEPTION 'Memory namespace ownership is immutable'
+                USING ERRCODE='23514',CONSTRAINT='memory_namespace_owner';
+        END IF;
+    ELSIF NOT public.memory_lock_namespace_owner(NEW.company_id,NEW.unit_id,NEW.principal_id) THEN
+        RAISE EXCEPTION 'Memory namespace owner is missing, foreign or ineligible'
+            USING ERRCODE='23514',CONSTRAINT='memory_namespace_owner';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_memory_namespace_owner BEFORE INSERT OR UPDATE ON public.memory_namespaces
+    FOR EACH ROW EXECUTE FUNCTION public.guard_memory_namespace_owner();
 -- Capture policy (E8, U3): per agent and conversation kind, off unless an owner or admin turns it
 -- on. Each change records who, why and when. An agent's final delete removes its rows; capture
 -- locks run → tenant → namespace → this row, so that cascade (after removal's namespace lock)
@@ -15901,7 +16331,7 @@ CREATE TABLE public.memory_lifecycles (
     company_id uuid NOT NULL,
     resource text NOT NULL CHECK (resource IN ('tenant', 'namespace')),
     namespace_id uuid,
-    owner_kind text NOT NULL CHECK (owner_kind IN ('company', 'agent', 'user')),
+    owner_kind text NOT NULL CHECK (owner_kind IN ('company', 'unit', 'principal')),
     owner_id uuid NOT NULL,
     provisioner_credential_id uuid NOT NULL,
     desired text NOT NULL CHECK (desired IN ('present', 'disabled', 'absent')),
@@ -15919,7 +16349,7 @@ CREATE TABLE public.memory_lifecycles (
     outcome_code text CHECK (outcome_code ~ '^[a-z_]{1,64}$'),
     updated_at timestamptz NOT NULL,
     CHECK ((resource = 'namespace') = (namespace_id IS NOT NULL)),
-    CHECK (resource <> 'tenant' OR owner_kind = 'company'),
+    CHECK ((resource = 'tenant') = (owner_kind = 'company')),
     CHECK (owner_kind <> 'company' OR owner_id = company_id),
     -- Only a claimed row carries lease data, and it carries all of it.
     CHECK ((state = 'claimed') = (lease_owner IS NOT NULL)),
@@ -15940,6 +16370,10 @@ CREATE TABLE public.memory_deliveries (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     id uuid NOT NULL,
     namespace_id uuid NOT NULL,
+    -- Retained provenance; owner and subject rows may disappear while delivery reconciles.
+    unit_id uuid,
+    principal_id uuid,
+    subject_principal_id uuid,
     kind text NOT NULL CHECK (kind IN ('save', 'generation')),
     -- Origin: a save comes from a run's execution (and, for a tool, its invocation); a
     -- generation from an agent-history exchange.
@@ -16023,6 +16457,8 @@ CREATE TABLE public.workflow_memory_consumptions (
     invocation_id uuid NOT NULL,
     read_ceiling public.access_level NOT NULL,
     exposed_level public.access_level NOT NULL,
+    namespace_ids uuid[] NOT NULL CHECK (cardinality(namespace_ids) BETWEEN 1 AND 258
+        AND array_position(namespace_ids,NULL) IS NULL),
     items jsonb NOT NULL CHECK (jsonb_typeof(items) = 'array' AND jsonb_array_length(items) <= 64
         AND octet_length(items::text) <= 65536),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -16043,7 +16479,7 @@ CREATE TABLE public.workflow_run_role_bindings (
     manifest_id uuid NOT NULL,
     version_id uuid NOT NULL,
     step text NOT NULL CHECK (octet_length(step) BETWEEN 1 AND 128 AND step ~ '^[A-Za-z_][A-Za-z0-9_-]*$'),
-    role text NOT NULL CHECK (role IN ('lead','reviewer','sponsor')),
+    role text NOT NULL CHECK (role IN ('lead','reviewer','sponsor','owner','admin')),
     resolution_revision bigint NOT NULL DEFAULT 0 CHECK (resolution_revision >= 0),
     human_resolution_revision bigint GENERATED ALWAYS AS (CASE WHEN resolution_revision>0 THEN resolution_revision END) STORED,
     department_id uuid NOT NULL,
@@ -16261,7 +16697,7 @@ CREATE FUNCTION public.valid_workflow_role_refusal(value jsonb) RETURNS boolean 
         AND value->>'format'='workflow-role-refusal-v1'
         AND jsonb_typeof(value->'step')='string' AND octet_length(value->>'step') BETWEEN 1 AND 128
         AND value->>'step' ~ '^[A-Za-z_][A-Za-z0-9_-]*$'
-        AND value->>'role' IN ('lead','reviewer','sponsor')
+        AND value->>'role' IN ('lead','reviewer','sponsor','owner','admin')
         AND public.workflow_role_refusal_code(value) IS NOT NULL
         AND (value-ARRAY['format','step','role','kind'])='{}'::jsonb) IS TRUE
 $$;
@@ -16275,7 +16711,8 @@ ALTER TABLE public.schedule_runs ADD COLUMN role_refusal jsonb,
         AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
 ALTER TABLE public.schedule_runs DROP CONSTRAINT schedule_runs_refusal_check,
     ADD CONSTRAINT schedule_runs_refusal_check CHECK ((refusal IS NULL
-        OR refusal IN ('unavailable','input_rejected','key_conflict')
+        OR refusal IN ('unavailable','input_rejected','key_conflict',
+            'admission.resource_outside_unit','budget.unit_exhausted')
         OR (role_refusal IS NOT NULL AND public.valid_workflow_role_refusal(role_refusal)
             AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
 
@@ -16288,7 +16725,7 @@ CREATE FUNCTION public.workflow_escalation_policy_valid(value jsonb) RETURNS boo
        AND (value - ARRAY['notify','hops'])='{}'::jsonb
        AND jsonb_typeof(value->'notify')='string'
        AND jsonb_typeof(value->'hops')='number'
-       AND value->>'notify' IN ('lead','reviewer','sponsor')
+       AND value->>'notify' IN ('lead','reviewer','sponsor','owner','admin')
        AND value->>'hops' IN ('1','2'), false)
 $$;
 ALTER TABLE public.departments ADD COLUMN escalation jsonb,
@@ -16330,8 +16767,7 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
         WHERE recipient.company_id = tenant AND recipient.id = target
             AND (actor.kind = 'agent' OR (actor.kind = 'person' AND (
                 actor.user_id = company.user_id OR EXISTS (
-                    SELECT 1 FROM public.company_members AS membership
-                    WHERE membership.company_id = tenant AND membership.user_id = actor.user_id))))
+                    SELECT 1 FROM public.membership_of(actor.user_id, tenant) AS membership))))
     ), false)
 $$;
 
@@ -16349,8 +16785,7 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
         CROSS JOIN LATERAL (
             SELECT COALESCE(actor.kind = 'agent' OR (actor.kind = 'person' AND (
                 actor.user_id = company.user_id OR EXISTS (
-                    SELECT 1 FROM public.company_members AS membership
-                    WHERE membership.company_id = tenant AND membership.user_id = actor.user_id))), false) AS allowed
+                    SELECT 1 FROM public.membership_of(actor.user_id, tenant) AS membership))), false) AS allowed
         ) AS team
         WHERE recipient.company_id = tenant AND recipient.id = target
     ), false)
@@ -16428,7 +16863,7 @@ CREATE TABLE public.workflow_people_role_resolutions (
     manifest_id uuid NOT NULL,
     version_id uuid NOT NULL,
     step text NOT NULL CHECK (octet_length(step) BETWEEN 1 AND 128 AND step ~ '^[A-Za-z_][A-Za-z0-9_-]*$'),
-    role text NOT NULL CHECK (role IN ('lead','reviewer','sponsor')),
+    role text NOT NULL CHECK (role IN ('lead','reviewer','sponsor','owner','admin')),
     resolution_revision bigint NOT NULL CHECK (resolution_revision>0),
     context_department_id uuid NOT NULL,
     department_id uuid,
@@ -16556,7 +16991,7 @@ BEGIN
     FOR item IN SELECT member.value FROM jsonb_array_elements(value) AS member(value) LOOP
         IF jsonb_typeof(item)='string' THEN
             role_name:=item #>> '{}';
-            IF role_name NOT IN ('lead','reviewer','sponsor') THEN RETURN NULL; END IF;
+            IF role_name NOT IN ('lead','reviewer','sponsor','owner','admin') THEN RETURN NULL; END IF;
             IF NOT role_name=ANY(roles) THEN roles:=array_append(roles,role_name); END IF;
         ELSIF jsonb_typeof(item)='object' AND item->>'kind'='principal'
             AND item - ARRAY['kind','id']='{}' AND jsonb_typeof(item->'id')='string' THEN
@@ -16665,7 +17100,7 @@ CREATE FUNCTION public.workflow_follow_is_open(company uuid, decision uuid) RETU
 $$;
 CREATE FUNCTION public.workflow_follow_reviewer_eligible(company uuid, run_identity uuid, person uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT EXISTS (SELECT 1 FROM public.principals AS principal
-        JOIN public.company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id
+        JOIN LATERAL public.membership_of(principal.user_id, principal.company_id) AS member ON true
         JOIN public.users AS account ON account.id=principal.user_id
         JOIN public.companies AS tenant ON tenant.id=principal.company_id
         JOIN public.workflow_runs AS run ON run.company_id=principal.company_id AND run.id=run_identity
@@ -16673,10 +17108,10 @@ CREATE FUNCTION public.workflow_follow_reviewer_eligible(company uuid, run_ident
         WHERE principal.company_id=company AND principal.id=person AND principal.kind='person'
           AND ((run.principal_id IS NOT NULL AND public.principal_direct_can_view(company,run.principal_id,principal.id))
             OR (run.principal_id IS NULL AND (tenant.user_id=principal.user_id OR (run.channel_id IS NULL AND run.principal_id IS NULL AND member.role IN ('owner','admin'))
-            OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public')
+            OR (run.channel_id IS NOT NULL AND (channel.access_mode='public'
               OR EXISTS (SELECT 1 FROM public.channel_principal_grants AS access_grant WHERE access_grant.company_id=company
                 AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id
-                AND account.email_verified_at IS NOT NULL AND access_grant.capability='view'))))))
+                AND (access_grant.provenance='department_membership' OR account.email_verified_at IS NOT NULL) AND access_grant.capability='view'))))))
           AND (run.thread_id IS NULL OR EXISTS (SELECT 1 FROM public.threads AS thread WHERE thread.company_id=company
             AND thread.channel_id IS NOT DISTINCT FROM run.channel_id AND thread.principal_id IS NOT DISTINCT FROM run.principal_id AND thread.id=run.thread_id)))
 $$;
@@ -17054,6 +17489,8 @@ CREATE TRIGGER workflow_reviewer_receipt_immutable BEFORE UPDATE OR DELETE ON pu
     FOR EACH ROW EXECUTE FUNCTION public.workflow_follow_fact_immutable();
 
 -- Historical retirement facts do not hold live principals or departments in existence (D2/r2).
+-- Plan06 02B: the same history records each person's administration of a department, with the
+-- role that admitted it, so one table answers "what happened to this department".
 CREATE FUNCTION public.department_audit_label(name text) RETURNS jsonb LANGUAGE sql IMMUTABLE STRICT AS $$
     SELECT jsonb_build_object('prefix',left(name,128),'truncated',char_length(left(name,129))>128)
 $$;
@@ -17061,20 +17498,65 @@ CREATE TABLE public.department_administration_events (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     operation_id uuid NOT NULL,
-    principal_id uuid NOT NULL,
-    principal_kind text NOT NULL CHECK (principal_kind IN ('person','agent')),
-    principal_label text NOT NULL CHECK (octet_length(principal_label)<=255),
+    -- The member or role holder the event is about; none for a department's own lifecycle.
+    principal_id uuid,
+    principal_kind text CHECK (principal_kind IN ('person','agent')),
+    principal_label text CHECK (octet_length(principal_label)<=255),
     department_id uuid NOT NULL,
     department_label jsonb NOT NULL CHECK (octet_length(department_label::text)<=1024),
-    role text NOT NULL CHECK (role IN ('lead','reviewer','sponsor')),
-    transition_kind text NOT NULL CHECK (transition_kind IN ('demoted','deleted')),
-    actor_kind text NOT NULL DEFAULT 'system' CHECK (actor_kind='system'),
+    role text CHECK (role IN ('lead','reviewer','sponsor','owner','admin')),
+    transition_kind text NOT NULL CHECK (transition_kind IN ('demoted','deleted',
+        'department_created','department_updated','department_moved','department_deleted',
+        'member_added','member_removed','role_assigned','role_cleared')),
+    actor_kind text NOT NULL DEFAULT 'system' CHECK (actor_kind IN ('system','person')),
+    -- A person's write: who, as they were labelled then, and the role that admitted it.
+    actor_principal_id uuid,
+    actor_label text CHECK (octet_length(actor_label)<=255),
+    acting_role text CHECK (public.valid_acting_role(acting_role)),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY(company_id,id),
-    UNIQUE(company_id,operation_id,principal_id,department_id,role)
+    UNIQUE(company_id,operation_id,principal_id,department_id,role),
+    CONSTRAINT department_administration_event_shape CHECK (CASE
+        WHEN actor_kind='system' THEN transition_kind IN ('demoted','deleted')
+            AND principal_id IS NOT NULL AND principal_kind IS NOT NULL
+            AND principal_label IS NOT NULL AND role IS NOT NULL
+            AND actor_principal_id IS NULL AND actor_label IS NULL AND acting_role IS NULL
+        WHEN transition_kind IN ('department_created','department_updated','department_moved',
+                'department_deleted') THEN
+            principal_id IS NULL AND principal_kind IS NULL AND principal_label IS NULL
+            AND role IS NULL
+        WHEN transition_kind IN ('member_added','member_removed') THEN
+            principal_id IS NOT NULL AND principal_kind IS NOT NULL
+            AND principal_label IS NOT NULL AND role IS NULL
+        WHEN transition_kind IN ('role_assigned','role_cleared') THEN
+            principal_id IS NOT NULL AND principal_kind IS NOT NULL
+            AND principal_label IS NOT NULL AND role IS NOT NULL
+        ELSE false END
+        AND (actor_kind='system' OR (actor_principal_id IS NOT NULL AND actor_label IS NOT NULL
+            AND acting_role IS NOT NULL)))
 );
+CREATE INDEX department_administration_events_recent_idx
+    ON public.department_administration_events (company_id, department_id, created_at DESC, id DESC);
 CREATE FUNCTION public.guard_department_retirement_audit() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    IF NEW.actor_kind='person' THEN
+        -- A person's write snapshots its current same-company actor, department and subject.
+        IF octet_length(to_jsonb(NEW)::text)>4096 OR NOT EXISTS (
+            SELECT 1 FROM public.principals AS actor
+            JOIN public.departments AS department
+              ON department.company_id=NEW.company_id AND department.id=NEW.department_id
+            WHERE actor.company_id=NEW.company_id AND actor.id=NEW.actor_principal_id
+              AND actor.kind='person' AND actor.display_label=NEW.actor_label
+              AND NEW.department_label=public.department_audit_label(department.name))
+          OR (NEW.principal_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM public.principals AS subject
+            WHERE subject.company_id=NEW.company_id AND subject.id=NEW.principal_id
+              AND subject.kind=NEW.principal_kind AND subject.display_label=NEW.principal_label)) THEN
+            RAISE EXCEPTION 'administration audit must snapshot its actual same-company actor, department and subject'
+                USING ERRCODE='23514',CONSTRAINT='department_administration_audit_source';
+        END IF;
+        RETURN NEW;
+    END IF;
     -- Only the installed principal boundary produces these observations; no late company/account lock.
     IF pg_trigger_depth()<2 OR octet_length(to_jsonb(NEW)::text)>4096 OR NOT EXISTS (
         SELECT 1 FROM public.department_roles AS holder
@@ -17101,7 +17583,8 @@ CREATE TRIGGER department_retirement_audit_immutable BEFORE UPDATE OR DELETE ON 
     FOR EACH ROW EXECUTE FUNCTION public.department_retirement_audit_immutable();
 CREATE FUNCTION public.check_department_retirement_role_cleared() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) AND EXISTS (
+    -- Only a system retirement promises the role is gone; a person's role_assigned keeps it.
+    IF NEW.actor_kind='system' AND EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) AND EXISTS (
         SELECT 1 FROM public.department_roles WHERE company_id=NEW.company_id AND department_id=NEW.department_id
           AND principal_id=NEW.principal_id AND role=NEW.role) THEN
         RAISE EXCEPTION 'retirement audit requires material role clearing in its insertion transaction'
@@ -17211,7 +17694,7 @@ CREATE TABLE public.workflow_escalation_cases (
     policy jsonb NOT NULL CHECK (public.workflow_escalation_policy_valid(policy)),
     reason_code text NOT NULL CHECK (reason_code ~ '^[a-z][a-z0-9_.]{0,63}$'),
     step_id text CHECK (step_id ~ '^[A-Za-z_][A-Za-z0-9_-]{0,127}$'),
-    role text CHECK (role IN ('lead','reviewer','sponsor')),
+    role text CHECK (role IN ('lead','reviewer','sponsor','owner','admin')),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY(company_id,id),
     CHECK ((source_kind='admission' AND admission_refusal_id IS NOT NULL AND run_id IS NULL
@@ -17485,7 +17968,7 @@ CREATE FUNCTION public.workflow_escalation_role_selection(company uuid, context 
 RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
 DECLARE chosen uuid; invalid boolean; found_context boolean; selected jsonb;
 BEGIN
-    IF scope IS NULL OR selected_role IS NULL OR scope NOT IN ('ancestry','department') OR selected_role NOT IN ('lead','reviewer','sponsor') THEN
+    IF scope IS NULL OR selected_role IS NULL OR scope NOT IN ('ancestry','department') OR selected_role NOT IN ('lead','reviewer','sponsor','owner','admin') THEN
         RAISE EXCEPTION 'invalid escalation role selection scope' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_hop_guard';
     END IF;
     WITH RECURSIVE ancestry AS (
@@ -17534,7 +18017,7 @@ CREATE TABLE public.workflow_run_escalations (
     decision_id uuid NOT NULL,
     origin_department_id uuid,
     chosen_department_id uuid,
-    role text NOT NULL CHECK (role IN ('lead','reviewer','sponsor')),
+    role text NOT NULL CHECK (role IN ('lead','reviewer','sponsor','owner','admin')),
     reason_code text NOT NULL CHECK (reason_code ~ '^[a-z][a-z0-9_.]{0,63}$'),
     resolution text NOT NULL CHECK (resolution IN ('holders','no_holder','no_decider','missing_context','recipient_limit','invalid_ancestry','invalid_identity')),
     recipient_facts jsonb NOT NULL CHECK (public.workflow_escalation_recipient_facts_valid(recipient_facts)),
@@ -17778,7 +18261,7 @@ CREATE FUNCTION public.workflow_escalation_person_eligible(checked_company uuid,
         JOIN public.workflow_escalation_cases AS escalation ON escalation.company_id=notice.company_id AND escalation.id=notice.case_id
         JOIN public.principals AS principal ON principal.company_id=notice.company_id AND principal.id=notice.principal_id
         JOIN public.users AS account ON account.id=principal.user_id
-        JOIN public.company_members AS member ON member.company_id=principal.company_id AND member.user_id=account.id
+        JOIN LATERAL public.membership_of(account.id, principal.company_id) AS member ON true
         JOIN public.companies AS company ON company.id=notice.company_id
         LEFT JOIN public.workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
         LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
@@ -17967,7 +18450,7 @@ LANGUAGE sql STABLE AS $$
         JOIN public.workflow_escalation_cases AS escalation ON escalation.company_id=notice.company_id AND escalation.id=notice.case_id
         CROSS JOIN LATERAL public.workflow_escalation_agent_route(notice.company_id,notice.principal_id) AS route
         JOIN public.principals AS actor ON actor.company_id=notice.company_id AND actor.user_id=route.run_as_user_id AND actor.kind='person'
-        JOIN public.company_members AS member ON member.company_id=actor.company_id AND member.user_id=actor.user_id
+        JOIN LATERAL public.membership_of(actor.user_id, actor.company_id) AS member ON true
         JOIN public.companies AS company ON company.id=notice.company_id
         LEFT JOIN public.workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
         LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
@@ -18655,8 +19138,7 @@ CREATE FUNCTION public.relay_desk_can_participate(tenant uuid, target uuid, writ
 RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT COALESCE((SELECT desk.enabled AND CASE desk.access_mode
         WHEN 'public' THEN true
-        WHEN 'team' THEN actor.kind='agent'
-        WHEN 'allowlist' THEN actor.kind='agent' AND EXISTS(
+        WHEN 'members' THEN actor.kind='agent' AND EXISTS(
             SELECT 1 FROM public.channel_principal_grants AS permission
             WHERE permission.company_id=tenant AND permission.channel_id=desk.id
                 AND permission.principal_id=actor.id AND permission.capability='participate')
@@ -18879,14 +19361,15 @@ BEGIN
             OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_decisions WHERE company_id=OLD.company_id AND id=OLD.decision_id)) THEN RETURN OLD; END IF;
         RAISE EXCEPTION 'escalation command receipts are immutable' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM public.principals AS principal JOIN public.company_members AS member
-        ON member.company_id=principal.company_id AND member.user_id=principal.user_id
+    IF NOT EXISTS (SELECT 1 FROM public.principals AS principal
+        JOIN LATERAL public.membership_of(principal.user_id, principal.company_id) AS member ON true
         WHERE principal.company_id=NEW.company_id AND principal.id=NEW.actor_principal_id
             AND principal.kind='person' AND principal.user_id=NEW.actor_user_id) THEN
         RAISE EXCEPTION 'escalation command requires the current authenticated person' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM public.company_members AS member JOIN public.companies AS company ON company.id=member.company_id
-        WHERE member.company_id=NEW.company_id AND member.user_id=NEW.actor_user_id
+    IF NOT EXISTS (SELECT 1 FROM public.membership_of(NEW.actor_user_id, NEW.company_id) AS member
+        JOIN public.companies AS company ON company.id=member.company_id
+        WHERE true
             AND (member.role IN ('owner','admin') OR company.user_id=NEW.actor_user_id))
         AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_notices WHERE company_id=NEW.company_id
             AND decision_id=NEW.decision_id AND principal_id=NEW.actor_principal_id AND principal_kind='person') THEN
@@ -18898,7 +19381,7 @@ BEGIN
         RAISE EXCEPTION 'escalation command must commit its matching progression' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
     END IF;
     IF NEW.settlement IN ('cancelled','already_terminal') AND (NOT EXISTS (
-        SELECT 1 FROM public.company_members WHERE company_id=NEW.company_id AND user_id=NEW.actor_user_id AND role IN ('owner','admin'))
+        SELECT 1 FROM public.membership_of(NEW.actor_user_id, NEW.company_id) AS member WHERE member.role IN ('owner','admin'))
         OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_cases AS escalation JOIN public.workflow_runs AS run
             ON run.company_id=escalation.company_id AND run.id=escalation.run_id
             WHERE escalation.company_id=NEW.company_id AND escalation.id=NEW.case_id
@@ -19194,7 +19677,7 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
         JOIN public.notification_events AS event ON event.company_id=association.company_id AND event.source_id=association.id
             AND event.source_kind='direct_message' AND event.action_kind='direct_message_received' AND event.source_generation=1
         JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
-        JOIN public.company_members AS membership ON membership.company_id=target.company_id AND membership.user_id=target.user_id
+        JOIN LATERAL public.membership_of(target.user_id, target.company_id) AS membership ON true
         JOIN public.users AS account ON account.id=target.user_id
         WHERE association.company_id=tenant AND association.id=association_id AND association.entry_kind='conversation'
             AND message.direction='inbound' AND target.kind='person' AND target.id=viewer
@@ -19210,7 +19693,7 @@ BEGIN
         SELECT 1 FROM public.thread_messages AS association
         JOIN public.messages AS message ON message.company_id=association.company_id AND message.id=association.message_id
         JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
-        JOIN public.company_members AS membership ON membership.company_id=target.company_id AND membership.user_id=target.user_id
+        JOIN LATERAL public.membership_of(target.user_id, target.company_id) AS membership ON true
         WHERE association.company_id=NEW.company_id AND association.id=NEW.source_id
             AND association.entry_kind='conversation' AND message.direction='inbound'
             AND target.kind='person' AND target.user_id=target.historical_person_user_id
@@ -19232,7 +19715,7 @@ BEGIN
     SELECT NEW.company_id,'direct_message',NEW.id,'direct_message_received',1,message.author_principal_id,membership.id
     FROM public.messages AS message
     JOIN public.principals AS target ON target.company_id=message.company_id AND target.id=NEW.principal_id
-    JOIN public.company_members AS membership ON membership.company_id=target.company_id AND membership.user_id=target.user_id
+    JOIN LATERAL public.membership_of(target.user_id, target.company_id) AS membership ON true
     WHERE message.company_id=NEW.company_id AND message.id=NEW.message_id
         AND NEW.entry_kind='conversation' AND message.direction='inbound' AND target.kind='person'
         AND target.user_id=target.historical_person_user_id
@@ -19698,7 +20181,7 @@ BEGIN
         JOIN public.local_machines AS machine ON machine.company_id=call.company_id AND machine.id=call.machine_id
         JOIN public.local_machine_credentials AS credential ON credential.company_id=machine.company_id
             AND credential.machine_id=machine.id AND credential.generation=machine.credential_generation
-        JOIN public.company_members AS member ON member.company_id=call.company_id AND member.user_id=call.actor_id
+        JOIN LATERAL public.membership_of(call.actor_id, call.company_id) AS member ON true
         JOIN public.principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id
             AND principal.id=broker.actor_principal_id
         JOIN public.users AS account ON account.id=member.user_id
@@ -19731,6 +20214,552 @@ BEGIN
     );
 END $$;
 
+
+-- Root unit: declarative tenant membership edges form an intentional deferred cycle.
+ALTER TABLE public.principals ADD CONSTRAINT principals_company_user_fk
+    FOREIGN KEY (company_id, user_id) REFERENCES public.department_members(company_id, root_user_id)
+    DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.companies ADD CONSTRAINT companies_owner_member_fk
+    FOREIGN KEY (id, user_id) REFERENCES public.department_members(company_id, root_user_id)
+    DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_recipient_member_fk
+    FOREIGN KEY (company_id, member_recipient_user_id)
+    REFERENCES public.department_members(company_id, root_user_id) ON DELETE CASCADE;
+CREATE UNIQUE INDEX department_roles_one_owner ON public.department_roles(department_id)
+    WHERE role = 'owner';
+
+CREATE FUNCTION public.guard_root_roles() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE row_data jsonb := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+    tenant uuid := (row_data->>'company_id')::uuid; department uuid := (row_data->>'department_id')::uuid;
+    holder uuid := (row_data->>'principal_id')::uuid; selected_role text := row_data->>'role';
+    root boolean; owner_account uuid; holder_account uuid;
+BEGIN
+    IF selected_role NOT IN ('owner', 'admin') THEN RETURN COALESCE(NEW, OLD); END IF;
+    SELECT company.user_id INTO owner_account FROM public.companies AS company
+    WHERE company.id = tenant FOR NO KEY UPDATE;
+    IF owner_account IS NULL AND TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    SELECT is_root INTO root FROM public.departments WHERE company_id = tenant AND id = department;
+    SELECT principal.user_id INTO holder_account FROM public.principals AS principal
+    WHERE principal.company_id = tenant AND principal.id = holder AND principal.kind = 'person' FOR KEY SHARE;
+    IF TG_OP = 'DELETE' THEN
+        IF selected_role = 'owner' AND holder_account = owner_account THEN
+            RAISE EXCEPTION 'change the company owner to replace its owner role'
+                USING ERRCODE='23514', CONSTRAINT='department_roles_owner_mirror';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF root IS DISTINCT FROM true OR holder_account IS NULL OR NOT EXISTS (
+        SELECT 1 FROM public.department_members AS member
+        WHERE member.company_id = tenant AND member.department_id = department
+          AND member.principal_id = holder AND member.root_user_id = holder_account
+    ) OR (selected_role = 'owner' AND holder_account IS DISTINCT FROM owner_account) THEN
+        RAISE EXCEPTION 'owner and admin require a current person member on the root; owner mirrors company'
+            USING ERRCODE='23514', CONSTRAINT='department_roles_root_only';
+    END IF;
+    RETURN NEW;
+END $$;
+-- Take the company before the existing principal-kind guard's principal lock.
+CREATE TRIGGER a_root_role_guard BEFORE INSERT OR UPDATE OR DELETE ON public.department_roles
+    FOR EACH ROW EXECUTE FUNCTION public.guard_root_roles();
+
+CREATE FUNCTION public.follow_company_root() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE root_id uuid; next_principal uuid;
+BEGIN
+    UPDATE public.departments SET name = NEW.name, slug = NEW.slug
+    WHERE company_id = NEW.id AND is_root RETURNING id INTO root_id;
+    IF NEW.user_id IS DISTINCT FROM OLD.user_id THEN
+        SELECT member.principal_id INTO next_principal FROM public.department_members AS member
+        WHERE member.company_id = NEW.id AND member.department_id = root_id AND member.root_user_id = NEW.user_id
+        FOR UPDATE;
+        IF next_principal IS NULL THEN
+            RAISE EXCEPTION 'new company owner must be a root member'
+                USING ERRCODE='23514', CONSTRAINT='companies_root_owner_agreement';
+        END IF;
+        UPDATE public.department_members SET access_level = 9
+        WHERE company_id = NEW.id AND department_id = root_id AND principal_id = next_principal;
+        DELETE FROM public.department_roles WHERE company_id = NEW.id AND department_id = root_id AND role = 'owner';
+        INSERT INTO public.department_roles(company_id, department_id, role, principal_id)
+        VALUES(NEW.id, root_id, 'owner', next_principal);
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER companies_follow_root AFTER UPDATE OF user_id, name, slug ON public.companies
+    FOR EACH ROW EXECUTE FUNCTION public.follow_company_root();
+CREATE CONSTRAINT TRIGGER departments_owner_agreement AFTER INSERT OR UPDATE OR DELETE ON public.departments
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_company_owner_agreement();
+CREATE CONSTRAINT TRIGGER department_members_owner_agreement AFTER INSERT OR UPDATE OR DELETE ON public.department_members
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_company_owner_agreement();
+CREATE CONSTRAINT TRIGGER department_roles_owner_agreement AFTER INSERT OR UPDATE OR DELETE ON public.department_roles
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_company_owner_agreement();
+CREATE TRIGGER notification_membership_recheck AFTER DELETE OR UPDATE OF access_level ON public.department_members
+    FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_membership();
+
+CREATE FUNCTION public.notification_recheck_root_role() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE row_data jsonb := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+BEGIN
+    IF row_data->>'role' IN ('owner', 'admin') THEN
+        PERFORM public.withdraw_unauthorized_notifications((row_data->>'company_id')::uuid, NULL);
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END $$;
+CREATE TRIGGER notification_root_role_recheck AFTER INSERT OR UPDATE OR DELETE ON public.department_roles
+    FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_root_role();
+
+-- Ordinary tenant cascades must finish before ordered tree cleanup: retained history can only
+-- disappear after its company. The three direct company FKs above are deferred NO ACTION;
+-- this statement trigger owns those deletions, independent of row-trigger cascade order.
+CREATE FUNCTION public.delete_company_tree() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    DELETE FROM public.channels WHERE company_id IN (SELECT id FROM removed_companies);
+    DELETE FROM public.departments WHERE company_id IN (SELECT id FROM removed_companies);
+    DELETE FROM public.principals WHERE company_id IN (SELECT id FROM removed_companies);
+    RETURN NULL;
+END $$;
+CREATE TRIGGER companies_delete_tree AFTER DELETE ON public.companies
+    REFERENCING OLD TABLE AS removed_companies
+    FOR EACH STATEMENT EXECUTE FUNCTION public.delete_company_tree();
+
+-- Attribution identity bridge. No backward compatibility; reset the database.
+ALTER TABLE public.user_sessions ADD CONSTRAINT user_sessions_identity_key
+    UNIQUE (id, user_id, auth_revision);
+CREATE TABLE public.attribution_login_continuations (
+    verifier bytea PRIMARY KEY CHECK (octet_length(verifier) = 32),
+    state text NOT NULL CHECK (state ~ '^[A-Za-z0-9_-]{43,128}$'),
+    challenge text NOT NULL CHECK (challenge ~ '^[A-Za-z0-9_-]{43}$'),
+    callback text NOT NULL CHECK (length(callback) BETWEEN 1 AND 2048),
+    expires_at timestamptz NOT NULL DEFAULT (clock_timestamp() + interval '10 minutes')
+);
+CREATE INDEX attribution_continuation_expiry ON public.attribution_login_continuations (expires_at);
+CREATE TABLE public.attribution_identity_codes (
+    verifier bytea PRIMARY KEY CHECK (octet_length(verifier) = 32),
+    user_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    auth_revision bigint NOT NULL,
+    client_id text NOT NULL CHECK (client_id = 'attribution'),
+    callback text NOT NULL CHECK (length(callback) BETWEEN 1 AND 2048),
+    challenge text NOT NULL CHECK (challenge ~ '^[A-Za-z0-9_-]{43}$'),
+    expires_at timestamptz NOT NULL,
+    consumed_at timestamptz,
+    FOREIGN KEY (session_id, user_id, auth_revision)
+        REFERENCES public.user_sessions (id, user_id, auth_revision) ON DELETE CASCADE
+);
+CREATE INDEX attribution_code_expiry ON public.attribution_identity_codes (expires_at);
+CREATE TABLE public.attribution_identity_grants (
+    verifier bytea PRIMARY KEY CHECK (octet_length(verifier) = 32),
+    user_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    auth_revision bigint NOT NULL,
+    client_id text NOT NULL CHECK (client_id = 'attribution'),
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz,
+    FOREIGN KEY (session_id, user_id, auth_revision)
+        REFERENCES public.user_sessions (id, user_id, auth_revision) ON DELETE CASCADE
+);
+CREATE INDEX attribution_grant_expiry ON public.attribution_identity_grants (expires_at);
+
+-- No company FK: terminal evidence must survive either owning deletion path.
+CREATE TABLE public.attribution_company_lifecycles (
+    company_id uuid PRIMARY KEY,
+    version bigint NOT NULL CHECK (version > 0),
+    state text NOT NULL CHECK (state IN ('active', 'suspended', 'deleted')),
+    changed_at timestamptz NOT NULL
+);
+CREATE TABLE public.attribution_lifecycle_outbox (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id uuid NOT NULL REFERENCES public.attribution_company_lifecycles (company_id),
+    version bigint NOT NULL CHECK (version > 0),
+    state text NOT NULL CHECK (state IN ('active', 'suspended', 'deleted')),
+    changed_at timestamptz NOT NULL,
+    delivery_state text NOT NULL DEFAULT 'pending'
+        CHECK (delivery_state IN ('pending', 'delivering', 'delivered', 'failed')),
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 12),
+    available_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    execution_id uuid,
+    lease_until timestamptz,
+    completed_at timestamptz,
+    last_failure text CHECK (last_failure IN ('unavailable', 'rejected', 'lease_expired')),
+    UNIQUE (company_id, version),
+    CHECK ((delivery_state = 'delivering' AND execution_id IS NOT NULL AND lease_until IS NOT NULL)
+        OR (delivery_state <> 'delivering' AND execution_id IS NULL AND lease_until IS NULL)),
+    CHECK ((delivery_state IN ('delivered', 'failed')) = (completed_at IS NOT NULL))
+);
+CREATE INDEX attribution_outbox_due ON public.attribution_lifecycle_outbox (available_at, id)
+    WHERE delivery_state = 'pending';
+CREATE INDEX attribution_outbox_leases ON public.attribution_lifecycle_outbox (lease_until, id)
+    WHERE delivery_state = 'delivering';
+CREATE FUNCTION public.guard_attribution_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.state <> 'active' THEN
+            RAISE EXCEPTION 'Attribution lifecycle must begin active' USING ERRCODE = '23514';
+        END IF;
+        NEW.version := 1;
+    ELSE
+        IF NEW.company_id <> OLD.company_id OR NEW.version <> OLD.version
+            OR NEW.changed_at <> OLD.changed_at THEN
+            RAISE EXCEPTION 'Attribution lifecycle identity/version are generated' USING ERRCODE = '23514';
+        END IF;
+        IF NEW.state = OLD.state THEN RETURN OLD; END IF;
+        IF OLD.state = 'deleted' THEN
+            RAISE EXCEPTION 'Attribution deletion is terminal' USING ERRCODE = '23514';
+        END IF;
+        NEW.version := OLD.version + 1;
+    END IF;
+    NEW.changed_at := clock_timestamp();
+    RETURN NEW;
+END $$;
+CREATE TRIGGER attribution_lifecycle_guard BEFORE INSERT OR UPDATE
+    ON public.attribution_company_lifecycles FOR EACH ROW
+    EXECUTE FUNCTION public.guard_attribution_lifecycle();
+CREATE FUNCTION public.enqueue_attribution_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' OR NEW.version <> OLD.version THEN
+        INSERT INTO public.attribution_lifecycle_outbox (company_id, version, state, changed_at)
+            VALUES (NEW.company_id, NEW.version, NEW.state, NEW.changed_at);
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER attribution_lifecycle_enqueue AFTER INSERT OR UPDATE
+    ON public.attribution_company_lifecycles FOR EACH ROW
+    EXECUTE FUNCTION public.enqueue_attribution_lifecycle();
+CREATE FUNCTION public.record_attribution_company_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO public.attribution_company_lifecycles (company_id, state, version, changed_at)
+            VALUES (NEW.id, 'active', 1, clock_timestamp());
+    ELSE
+        UPDATE public.attribution_company_lifecycles SET state = 'deleted' WHERE company_id = OLD.id;
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER companies_attribution_created AFTER INSERT ON public.companies
+    FOR EACH ROW EXECUTE FUNCTION public.record_attribution_company_lifecycle();
+CREATE TRIGGER companies_attribution_deleted AFTER DELETE ON public.companies
+    FOR EACH ROW EXECUTE FUNCTION public.record_attribution_company_lifecycle();
+CREATE FUNCTION public.guard_attribution_outbox_payload() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (NEW.id, NEW.company_id, NEW.version, NEW.state, NEW.changed_at)
+        IS DISTINCT FROM (OLD.id, OLD.company_id, OLD.version, OLD.state, OLD.changed_at) THEN
+        RAISE EXCEPTION 'Attribution notification payload is immutable' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER attribution_outbox_immutable BEFORE UPDATE ON public.attribution_lifecycle_outbox
+    FOR EACH ROW EXECUTE FUNCTION public.guard_attribution_outbox_payload();
+
+-- Definition ownership is fixed at creation; active bindings determine current management.
+ALTER TABLE ONLY public.workflow_definitions
+    ADD CONSTRAINT workflow_definitions_managing_department_fk
+        FOREIGN KEY (company_id, managing_department_id)
+        REFERENCES public.departments(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+CREATE FUNCTION public.initialize_workflow_managing_department() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.managing_department_id IS NULL THEN
+        SELECT id INTO NEW.managing_department_id FROM public.departments
+            WHERE company_id=NEW.company_id AND is_root;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_definition_managing_department_default BEFORE INSERT
+    ON public.workflow_definitions FOR EACH ROW
+    EXECUTE FUNCTION public.initialize_workflow_managing_department();
+
+CREATE FUNCTION public.keep_workflow_managing_department() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.managing_department_id IS DISTINCT FROM OLD.managing_department_id THEN
+        RAISE EXCEPTION 'A workflow definition keeps its creating department' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_definition_managing_department_immutable
+    BEFORE UPDATE OF managing_department_id ON public.workflow_definitions FOR EACH ROW
+    EXECUTE FUNCTION public.keep_workflow_managing_department();
+
+-- Canonical root membership is implicit; only an unambiguous non-root placement is selected.
+CREATE FUNCTION public.workflow_creating_department(checked_user uuid, checked_company uuid)
+    RETURNS uuid LANGUAGE sql STABLE AS $$
+    WITH placements AS (
+        SELECT placed.department_id FROM public.principals AS principal
+        JOIN (
+            SELECT company_id, department_id, principal_id FROM public.department_members
+            UNION SELECT company_id, department_id, principal_id FROM public.department_roles
+        ) AS placed ON placed.company_id=principal.company_id AND placed.principal_id=principal.id
+        JOIN public.departments AS department
+            ON department.company_id=placed.company_id AND department.id=placed.department_id
+        WHERE principal.company_id=checked_company AND principal.user_id=checked_user
+            AND principal.kind='person' AND NOT department.is_root
+        GROUP BY placed.department_id LIMIT 2
+    )
+    SELECT CASE WHEN (SELECT count(*) FROM placements)=1
+        THEN (SELECT department_id FROM placements LIMIT 1)
+        ELSE (SELECT id FROM public.departments WHERE company_id=checked_company AND is_root)
+    END
+$$;
+
+-- One agent-placement projection serves both target checks and scoped configuration lists.
+CREATE FUNCTION public.agent_management_role(
+    checked_user uuid, checked_company uuid, checked_agent uuid
+) RETURNS text LANGUAGE sql STABLE AS $$
+    WITH target AS (
+        SELECT id FROM public.principals
+        WHERE company_id=checked_company AND agent_id=checked_agent AND kind='agent'
+    ), placements AS (
+        SELECT member.department_id FROM public.department_members AS member
+        JOIN target ON target.id=member.principal_id WHERE member.company_id=checked_company
+        UNION SELECT holder.department_id FROM public.department_roles AS holder
+        JOIN target ON target.id=holder.principal_id WHERE holder.company_id=checked_company
+    ), units AS (
+        SELECT department_id FROM placements
+        UNION ALL SELECT NULL::uuid WHERE EXISTS(SELECT 1 FROM target)
+            AND NOT EXISTS(SELECT 1 FROM placements)
+    )
+    SELECT management.role FROM units CROSS JOIN LATERAL (
+        SELECT public.unit_management_role(checked_user,checked_company,units.department_id) AS role
+    ) AS management WHERE management.role IS NOT NULL ORDER BY management.role LIMIT 1
+$$;
+
+CREATE FUNCTION public.workflow_definition_management_role(
+    checked_user uuid, checked_company uuid, checked_workflow uuid
+) RETURNS text LANGUAGE sql STABLE AS $$
+    WITH definition AS MATERIALIZED (
+        SELECT managing_department_id FROM public.workflow_definitions
+        WHERE company_id=checked_company AND id=checked_workflow
+            AND NOT EXISTS (SELECT 1 FROM public.native_mcp_brokers AS broker
+                WHERE broker.company_id=checked_company AND broker.workflow_id=checked_workflow)
+    ), active AS MATERIALIZED (
+        SELECT binding.channel_id, binding.principal_id FROM public.workflow_bindings AS binding
+        JOIN public.workflow_binding_revisions AS configuration
+            ON configuration.company_id=binding.company_id AND configuration.binding_id=binding.id
+                AND configuration.revision=binding.configuration_revision
+        JOIN public.workflow_versions AS version
+            ON version.company_id=configuration.company_id AND version.id=configuration.version_id
+        WHERE binding.company_id=checked_company AND binding.active
+            AND version.workflow_id=checked_workflow AND EXISTS(SELECT 1 FROM definition)
+    ), units AS (
+        SELECT channel.department_id FROM active JOIN public.channels AS channel
+            ON channel.company_id=checked_company AND channel.id=active.channel_id
+        UNION
+        SELECT NULL::uuid FROM active LEFT JOIN public.principals AS principal
+            ON principal.company_id=checked_company AND principal.id=active.principal_id
+        WHERE active.channel_id IS NULL AND (active.principal_id IS NULL OR principal.kind<>'agent')
+        UNION
+        SELECT managing_department_id FROM definition WHERE NOT EXISTS(SELECT 1 FROM active)
+    )
+    , candidates AS (
+        SELECT public.unit_management_role(checked_user,checked_company,units.department_id) AS role
+        FROM units
+        UNION
+        SELECT public.agent_management_role(checked_user,checked_company,principal.agent_id)
+        FROM active JOIN public.principals AS principal
+            ON principal.company_id=checked_company AND principal.id=active.principal_id
+                AND principal.kind='agent'
+    )
+    SELECT role FROM candidates WHERE role IS NOT NULL ORDER BY role LIMIT 1
+$$;
+
+-- Plan05 p02: an admission seals all actors' memory/knowledge topology together.
+-- Retained owner IDs intentionally have no live-owner FK: historical snapshots
+-- survive rename/retirement, and current readers still require a live owner.
+CREATE TABLE public.workflow_run_scope_snapshots (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    state text NOT NULL CHECK (state IN ('available','unavailable')),
+    reason text,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,run_id),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+    CHECK ((state='available' AND reason IS NULL)
+        OR (state='unavailable' AND reason='source_scope_unavailable'))
+);
+
+CREATE TABLE public.workflow_run_scopes (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    acting_principal_id uuid,
+    unit_id uuid,
+    principal_id uuid,
+    access text NOT NULL CHECK (access IN ('read','write','personal')),
+    unit_slug text,
+    chain_depth smallint CHECK (chain_depth BETWEEN 0 AND 7),
+    own boolean NOT NULL DEFAULT false,
+    ancestor boolean NOT NULL DEFAULT false,
+    report boolean NOT NULL DEFAULT false,
+    UNIQUE NULLS NOT DISTINCT (company_id,run_id,acting_principal_id,unit_id,principal_id,access),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_run_scope_snapshots(company_id,run_id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    CHECK ((access='personal' AND principal_id IS NOT NULL AND unit_id IS NULL
+            AND unit_slug IS NULL AND chain_depth IS NULL AND NOT own AND NOT ancestor AND NOT report)
+        OR (access IN ('read','write') AND unit_id IS NOT NULL AND principal_id IS NULL
+            AND unit_slug IS NOT NULL AND octet_length(unit_slug) BETWEEN 1 AND 63
+            AND unit_slug ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
+            AND (own OR ancestor OR report)
+            AND own=(chain_depth IS NOT NULL AND chain_depth=0)
+            AND (NOT own OR NOT ancestor)
+            AND (chain_depth IS NULL OR chain_depth=0 OR ancestor)
+            AND (access<>'write' OR own)))
+);
+CREATE INDEX workflow_run_scopes_actor ON public.workflow_run_scopes(company_id,run_id,acting_principal_id);
+
+-- One retained tuple representation also handles NULL base actors exactly.
+CREATE FUNCTION public.workflow_scope_tuples(tenant uuid, selected_run uuid)
+RETURNS TABLE(acting_principal_id uuid,unit_id uuid,principal_id uuid,access text,
+    unit_slug text,chain_depth smallint,own boolean,ancestor boolean,report boolean)
+LANGUAGE sql STABLE AS $$
+    SELECT scope.acting_principal_id,scope.unit_id,scope.principal_id,scope.access,
+        scope.unit_slug,scope.chain_depth,scope.own,scope.ancestor,scope.report
+    FROM public.workflow_run_scopes AS scope WHERE scope.company_id=tenant AND scope.run_id=selected_run
+$$;
+
+-- A broker's canonical native session supplies the source and harness. No caller
+-- can nominate an arbitrary source run or another actor's report group.
+CREATE FUNCTION public.workflow_native_scope_tuples(tenant uuid, source_run uuid, harness uuid, actor uuid)
+RETURNS TABLE(acting_principal_id uuid,unit_id uuid,principal_id uuid,access text,
+    unit_slug text,chain_depth smallint,own boolean,ancestor boolean,report boolean)
+LANGUAGE sql STABLE AS $$
+    SELECT scope.* FROM public.workflow_scope_tuples(tenant,source_run) AS scope
+    WHERE scope.acting_principal_id=harness
+        OR (scope.acting_principal_id IS NULL AND (scope.access<>'personal' OR EXISTS (
+            SELECT 1 FROM public.workflow_runs AS source
+            JOIN public.principals AS person ON person.company_id=source.company_id
+                AND person.id=scope.principal_id AND person.historical_person_user_id=actor
+            WHERE source.company_id=tenant AND source.id=source_run AND source.actor_id=actor)))
+$$;
+
+CREATE FUNCTION public.guard_workflow_scope_row() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
+    ) THEN RETURN OLD; END IF;
+    IF TG_OP<>'INSERT' THEN
+        RAISE EXCEPTION 'run scope snapshot is immutable' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_row';
+    END IF;
+    -- Read prefix matches native NOWAIT authority; the new run is the seal mutex.
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR SHARE NOWAIT;
+    PERFORM 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE NOWAIT;
+    IF NOT FOUND OR EXISTS (SELECT 1 FROM public.workflow_run_scope_snapshots
+        WHERE company_id=NEW.company_id AND run_id=NEW.run_id) THEN
+        RAISE EXCEPTION 'run scope cannot be appended after its seal' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_row';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_scope_row_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_scopes
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_scope_row();
+
+CREATE FUNCTION public.guard_workflow_scope_seal() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE admitted public.workflow_runs%ROWTYPE; inherited uuid; harness uuid; native_source uuid;
+    source_state text; expected_available boolean;
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
+    ) THEN RETURN OLD; END IF;
+    IF TG_OP<>'INSERT' THEN
+        RAISE EXCEPTION 'run scope seal is immutable' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_seal';
+    END IF;
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR SHARE NOWAIT;
+    SELECT * INTO admitted FROM public.workflow_runs
+        WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE NOWAIT;
+    IF NOT FOUND THEN RAISE EXCEPTION 'scope seal has no run' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    inherited := admitted.parent_run_id;
+    IF admitted.native_mcp_call_id IS NOT NULL THEN
+        SELECT session.workflow_run_id,principal.id INTO native_source,harness
+        FROM public.native_mcp_calls AS call
+        JOIN public.local_agent_sessions AS session ON session.company_id=call.company_id
+            AND session.id=call.source_session_id
+        LEFT JOIN public.principals AS principal ON principal.company_id=session.company_id
+            AND principal.agent_id=session.agent_id AND principal.kind='agent'
+        WHERE call.company_id=NEW.company_id AND call.id=admitted.native_mcp_call_id
+            AND call.run_id=admitted.id AND call.actor_id=admitted.actor_id;
+        IF NOT FOUND THEN RAISE EXCEPTION 'scope seal has no canonical native source' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    END IF;
+    IF inherited IS NOT NULL THEN
+        SELECT state INTO source_state FROM public.workflow_run_scope_snapshots
+            WHERE company_id=NEW.company_id AND run_id=inherited;
+        IF source_state IS DISTINCT FROM 'available' OR NEW.state<>'available'
+            OR admitted.actor_id IS DISTINCT FROM (SELECT actor_id FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=inherited) OR EXISTS (
+            (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id)
+                EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,inherited))
+            UNION ALL
+            (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,inherited)
+                EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id))
+        ) THEN RAISE EXCEPTION 'child scopes must exactly copy its sealed parent' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    ELSIF native_source IS NOT NULL THEN
+        SELECT state INTO source_state FROM public.workflow_run_scope_snapshots
+            WHERE company_id=NEW.company_id AND run_id=native_source;
+        expected_available := source_state='available' AND harness IS NOT NULL AND EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id
+                AND run_id=native_source AND acting_principal_id=harness AND access='personal'
+                AND principal_id=harness);
+        IF COALESCE(expected_available,false) THEN
+            IF NEW.state<>'available' OR EXISTS (
+                (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id)
+                    EXCEPT SELECT * FROM public.workflow_native_scope_tuples(NEW.company_id,native_source,harness,admitted.actor_id))
+                UNION ALL
+                (SELECT * FROM public.workflow_native_scope_tuples(NEW.company_id,native_source,harness,admitted.actor_id)
+                    EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id))
+            ) THEN RAISE EXCEPTION 'native scopes must copy its canonical harness projection' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+        ELSIF NEW.state<>'unavailable' OR EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id AND run_id=NEW.run_id
+        ) THEN RAISE EXCEPTION 'missing native source scope confers zero authority' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    ELSE
+        -- Fresh admission validates live owner identity, never a historical slug.
+        IF NEW.state<>'available' OR EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes AS scope
+            LEFT JOIN public.departments AS unit ON unit.company_id=scope.company_id AND unit.id=scope.unit_id
+            LEFT JOIN public.principals AS person ON person.company_id=scope.company_id AND person.id=scope.principal_id
+            LEFT JOIN public.principals AS acting ON acting.company_id=scope.company_id AND acting.id=scope.acting_principal_id
+            WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id
+                AND ((scope.unit_id IS NOT NULL AND (unit.id IS NULL OR unit.slug::text<>scope.unit_slug))
+                    OR (scope.principal_id IS NOT NULL AND (person.id IS NULL OR person.kind NOT IN ('person','agent')))
+                    OR (scope.acting_principal_id IS NOT NULL AND (acting.id IS NULL OR acting.kind<>'agent'))
+                    OR (scope.acting_principal_id IS NOT NULL AND scope.access='personal'
+                        AND scope.principal_id<>scope.acting_principal_id)
+                    OR (scope.acting_principal_id IS NULL AND scope.access='personal' AND (
+                        person.kind IS DISTINCT FROM 'person' OR person.user_id IS DISTINCT FROM admitted.actor_id
+                        OR NOT EXISTS (SELECT 1 FROM public.workflow_agent_sessions AS bound
+                            JOIN public.agent_history_sessions AS session ON session.company_id=bound.company_id AND session.id=bound.session_id
+                            JOIN public.workflow_admissions AS admission ON admission.company_id=bound.company_id AND admission.run_id=bound.run_id
+                            WHERE bound.company_id=NEW.company_id AND bound.run_id=NEW.run_id
+                                AND session.creator_user_id=admitted.actor_id AND session.channel_id IS NULL AND session.thread_id IS NULL
+                                AND jsonb_array_length(substring(admission.source_key FROM 4)::jsonb)=2
+                                AND substring(admission.source_key FROM 4)::jsonb->>0='manual')))))
+            OR NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS scope
+                JOIN public.departments AS root ON root.company_id=scope.company_id AND root.id=scope.unit_id AND root.is_root
+                WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id
+                    AND scope.acting_principal_id IS NULL AND scope.access='read')
+        THEN RAISE EXCEPTION 'fresh scope seal requires valid live owners and base root' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes AS scope
+        WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id AND scope.acting_principal_id IS NOT NULL
+            AND (NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS personal
+                WHERE personal.company_id=scope.company_id AND personal.run_id=scope.run_id
+                    AND personal.acting_principal_id=scope.acting_principal_id AND personal.access='personal'
+                    AND personal.principal_id=scope.acting_principal_id)
+                OR NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS readable
+                    JOIN public.departments AS root ON root.company_id=readable.company_id AND root.id=readable.unit_id AND root.is_root
+                    WHERE readable.company_id=scope.company_id AND readable.run_id=scope.run_id
+                        AND readable.acting_principal_id=scope.acting_principal_id AND readable.access='read'))
+    ) OR EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes AS scope
+        WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id AND scope.access='write'
+            AND NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS readable
+                WHERE readable.company_id=scope.company_id AND readable.run_id=scope.run_id
+                    AND readable.acting_principal_id IS NOT DISTINCT FROM scope.acting_principal_id
+                    AND readable.unit_id=scope.unit_id AND readable.access='read' AND readable.own)
+    ) OR EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id AND run_id=NEW.run_id
+            AND access='read' GROUP BY acting_principal_id HAVING count(*)>256
+    ) THEN RAISE EXCEPTION 'invalid write authority or read scope budget' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_scope_seal_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_scope_snapshots
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_scope_seal();
 
 -- Goals p01: information recipients are selected by sealed capacity, never reviewer authority.
 CREATE FUNCTION public.workflow_decision_information_members(company uuid, decision_identity uuid)

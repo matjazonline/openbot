@@ -44,9 +44,13 @@ async fn autonomous_agent_publication_capture_serializes_before_actual_skill_del
     );
     deletion.rollback().await.unwrap();
     publication.commit().await.unwrap();
-    f.p.delete_company(f.scope.company.as_uuid(), skill.id)
-        .await
-        .unwrap();
+    f.p.delete_company(
+        f.scope.company.as_uuid(),
+        f.p.test_root_unit(f.scope.company.as_uuid()).await,
+        skill.id,
+    )
+    .await
+    .unwrap();
     let old =
         f.p.published_agent_revision(f.scope, result.id)
             .await

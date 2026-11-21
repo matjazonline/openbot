@@ -165,9 +165,8 @@ impl Fixture {
     /// A channel of the company; `restricted` makes it one an admin who is not on its allowlist
     /// cannot see (the owner still can).
     async fn channel(&self, name: &str, slug: &str, restricted: bool) -> Uuid {
-        use crate::application::ports::channel::ChannelPersistence;
         use crate::application::ports::channel::ChannelWrite;
-        let channel = ChannelPersistence::create(
+        let channel = crate::adapters::persistence::test_support::create_channel(
             &self.persistence,
             self.company,
             ChannelWrite {
@@ -181,11 +180,11 @@ impl Fixture {
         .unwrap()
         .id;
         if restricted {
-            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
-                .bind(channel)
-                .execute(self.persistence.pool())
-                .await
-                .unwrap();
+            crate::adapters::persistence::test_support::restrict_channel_to_configured_grants(
+                self.persistence.pool(),
+                channel,
+            )
+            .await;
         }
         channel
     }
@@ -193,8 +192,8 @@ impl Fixture {
     /// A company agent with a model, by slug.
     async fn agent(&self, name: &str, slug: &str) -> Uuid {
         sqlx::query(
-            "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
-             VALUES ($1, 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
+            "INSERT INTO company_model_connections(company_id, unit_id, provider, api_key, models) \
+             VALUES ($1, (SELECT id FROM departments WHERE company_id=$1 AND is_root), 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
         )
         .bind(self.company)
         .execute(self.persistence.pool())
@@ -346,6 +345,7 @@ async fn a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph
         .reads()
         .list_definitions(
             CompanyId::new(f.company),
+            None,
             PageRequest::new(None, None).unwrap(),
         )
         .await
@@ -420,6 +420,7 @@ async fn a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused() {
         .reads()
         .list_definitions(
             CompanyId::new(f.company),
+            None,
             PageRequest::new(None, None).unwrap(),
         )
         .await
@@ -485,8 +486,8 @@ async fn the_catalogue_lists_memory_steps_only_when_the_memory_service_is_config
 async fn approved_rows(f: &Fixture, slug: &str, tools: &[String]) -> Uuid {
     let connection = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO company_mcp_connections(company_id, id, slug, endpoint_url, enabled, auth_type) \
-         VALUES ($1, $2, $3, 'https://mcp.example.test/rpc/super-secret-token', true, 'none')",
+        "INSERT INTO company_mcp_connections(company_id, id, slug, endpoint_url, enabled, auth_type, unit_id) \
+         VALUES ($1, $2, $3, 'https://mcp.example.test/rpc/super-secret-token', true, 'none', (SELECT id FROM departments WHERE company_id=$1 AND is_root))",
     )
     .bind(f.company)
     .bind(connection)
@@ -542,6 +543,7 @@ async fn reviewed_connection_at(f: &Fixture, endpoint: &str) -> Uuid {
     let connection = McpPersistence::create_mcp_connection(
         &f.persistence,
         f.company,
+        f.persistence.test_root_unit(f.company).await,
         McpConnectionWrite {
             slug: "tickets-server".into(),
             endpoint: endpoint.to_string().try_into().unwrap(),

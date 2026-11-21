@@ -1,7 +1,7 @@
 //! Managing departments, their members and their roles (01-departments).
 //!
-//! Managing needs the authority managing channels needs: the company's owner or an admin. A plain
-//! member is refused exactly like a stranger, with `NotFound`, so a department id cannot be probed.
+//! Configuration follows the unit hierarchy. A refusal is `NotFound`, so department ids
+//! cannot be probed and management never confers conversation visibility.
 //! Persistence re-checks that authority under the company write lock.
 use crate::application::ports::department::{DepartmentRoleAssignment, DepartmentRoleRemoval};
 use std::sync::Arc;
@@ -29,7 +29,7 @@ use crate::{
     },
     use_cases::{
         channel::{SlugKind, validate_slug},
-        company::{CompanyPersistence, company_not_found, managed_company, readable_company},
+        company::{CompanyPersistence, readable_company},
     },
 };
 
@@ -121,7 +121,9 @@ pub struct DepartmentDetail {
     #[serde(flatten)]
     pub department: Department,
     pub members: Vec<DepartmentMember>,
+    pub members_truncated: bool,
     pub roles: Vec<DepartmentRoleHolder>,
+    pub roles_truncated: bool,
 }
 
 /// One department as the Departments tab shows it: its detail, the people and agents that detail
@@ -159,18 +161,101 @@ impl DepartmentUseCases {
         }
     }
 
-    /// The caller manages this company, or it does not exist for them: a member's `Forbidden`
-    /// becomes the stranger's `NotFound`.
-    async fn managed(&self, user_id: Uuid, company_id: Uuid) -> AppResult<DepartmentScope> {
-        match managed_company(self.companies.as_ref(), user_id, company_id).await {
-            Ok(_) => {}
-            Err(AppError::Forbidden(_)) => return Err(company_not_found()),
-            Err(error) => return Err(error),
-        }
+    async fn managed(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        unit: Option<DepartmentId>,
+    ) -> AppResult<DepartmentScope> {
+        use crate::application::ports::administration::{ManagementTarget, require_management};
+        require_management(
+            self.departments.as_ref(),
+            user_id,
+            CompanyId::new(company_id),
+            unit.map_or(ManagementTarget::Root, ManagementTarget::Unit),
+        )
+        .await?;
         Ok(DepartmentScope {
             actor: WorkflowActor::authenticated(user_id)?,
             company: CompanyId::new(company_id),
         })
+    }
+
+    /// Collection entry for unit workspaces: the person manages at least one unit.
+    async fn administering(&self, user_id: Uuid, company_id: Uuid) -> AppResult<DepartmentScope> {
+        use crate::application::ports::administration::{ManagementTarget, require_management};
+        require_management(
+            self.departments.as_ref(),
+            user_id,
+            CompanyId::new(company_id),
+            ManagementTarget::AnyUnit,
+        )
+        .await?;
+        Ok(DepartmentScope {
+            actor: WorkflowActor::authenticated(user_id)?,
+            company: CompanyId::new(company_id),
+        })
+    }
+
+    /// The departments a non-administrator may see: those they belong to or hold a role in, and
+    /// every department they manage (Plan06 02A). `None` means all of them, for a company
+    /// administrator.
+    async fn visible_set(
+        &self,
+        access: &crate::entities::company::CompanyAccess,
+        user_id: Uuid,
+    ) -> AppResult<Option<std::collections::HashSet<DepartmentId>>> {
+        if access.membership.administers_company() {
+            return Ok(None);
+        }
+        let company = CompanyId::new(access.company.id);
+        let mut seen: std::collections::HashSet<DepartmentId> = self
+            .departments
+            .list_for_user(company, user_id)
+            .await?
+            .into_iter()
+            .map(|department| department.id)
+            .collect();
+        seen.extend(self.departments.managed_units(user_id, company).await?);
+        Ok(Some(seen))
+    }
+
+    async fn managed_parent(
+        &self,
+        user: Uuid,
+        company: Uuid,
+        unit: DepartmentId,
+    ) -> AppResult<DepartmentScope> {
+        let department = self
+            .departments
+            .get(CompanyId::new(company), unit)
+            .await?
+            .ok_or_else(department_not_found)?;
+        self.managed(user, company, department.parent_id).await
+    }
+
+    async fn managed_roles(
+        &self,
+        user: Uuid,
+        company: Uuid,
+        unit: DepartmentId,
+    ) -> AppResult<DepartmentScope> {
+        use crate::application::ports::administration::{ManagementRole, ManagementTarget};
+        let department = self
+            .departments
+            .get(CompanyId::new(company), unit)
+            .await?
+            .ok_or_else(department_not_found)?;
+        if department.is_root
+            && self
+                .departments
+                .management_role(user, CompanyId::new(company), ManagementTarget::Root)
+                .await?
+                != Some(ManagementRole::Owner)
+        {
+            return Err(department_not_found());
+        }
+        self.managed(user, company, department.parent_id).await
     }
 
     #[instrument(skip_all)]
@@ -181,7 +266,7 @@ impl DepartmentUseCases {
         mut write: DepartmentWrite,
         lead: Option<PrincipalId>,
     ) -> AppResult<Department> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, write.parent_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
         info!(%company_id, "Creating department");
@@ -196,7 +281,10 @@ impl DepartmentUseCases {
         department: DepartmentId,
         mut edit: DepartmentEdit,
     ) -> AppResult<Department> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_parent(user_id, company_id, department).await?;
+        if let Some(parent) = edit.parent_id {
+            self.managed(user_id, company_id, parent).await?;
+        }
         edit.normalize()?;
         info!(%company_id, %department, "Updating department");
         self.departments.update(scope, department, edit).await
@@ -209,7 +297,7 @@ impl DepartmentUseCases {
         company_id: Uuid,
         department: DepartmentId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_parent(user_id, company_id, department).await?;
         info!(%company_id, %department, "Deleting department");
         self.departments.delete(scope, department).await
     }
@@ -222,7 +310,7 @@ impl DepartmentUseCases {
         department: DepartmentId,
         assignment: DepartmentRoleAssignment,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_roles(user_id, company_id, department).await?;
         info!(%company_id, %department, role=%assignment.role, principal=%assignment.principal, "Assigning department role");
         self.departments
             .assign_role(scope, department, assignment)
@@ -237,7 +325,7 @@ impl DepartmentUseCases {
         department: DepartmentId,
         removal: DepartmentRoleRemoval,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed_roles(user_id, company_id, department).await?;
         info!(%company_id, %department, role=%removal.role, principal=%removal.principal, "Clearing department role");
         self.departments
             .clear_role(scope, department, removal)
@@ -252,7 +340,7 @@ impl DepartmentUseCases {
         department: DepartmentId,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, Some(department)).await?;
         info!(%company_id, %department, %principal, "Adding department member");
         self.departments
             .add_member(scope, department, principal)
@@ -267,26 +355,56 @@ impl DepartmentUseCases {
         department: DepartmentId,
         principal: PrincipalId,
     ) -> AppResult<()> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.managed(user_id, company_id, Some(department)).await?;
         info!(%company_id, %department, %principal, "Removing department member");
         self.departments
             .remove_member(scope, department, principal)
             .await
     }
 
-    /// Every department of the company, for someone who manages it.
+    /// The ids of the departments the caller manages (none for a plain member), to decide which
+    /// controls a page offers. Each write still checks its own target.
+    #[instrument(skip_all)]
+    pub async fn managed_units(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<std::collections::HashSet<DepartmentId>> {
+        readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        Ok(self
+            .departments
+            .managed_units(user_id, CompanyId::new(company_id))
+            .await?
+            .into_iter()
+            .collect())
+    }
+
+    /// The departments the caller manages, for pickers and destinations: every one for a root
+    /// manager. Each write still checks its own target.
     #[instrument(skip_all)]
     pub async fn list_departments(
         &self,
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<Department>> {
-        let scope = self.managed(user_id, company_id).await?;
-        self.departments.list_by_company(scope.company).await
+        let scope = self.administering(user_id, company_id).await?;
+        let managed: std::collections::HashSet<DepartmentId> = self
+            .departments
+            .managed_units(user_id, scope.company)
+            .await?
+            .into_iter()
+            .collect();
+        Ok(self
+            .departments
+            .list_by_company(scope.company)
+            .await?
+            .into_iter()
+            .filter(|department| managed.contains(&department.id))
+            .collect())
     }
 
     /// The departments this member may see: all of them for an owner or admin, otherwise the ones
-    /// they belong to or hold a role in.
+    /// they belong to or hold a role in and every one they manage.
     #[instrument(skip_all)]
     pub async fn visible_departments(
         &self,
@@ -294,11 +412,17 @@ impl DepartmentUseCases {
         company_id: Uuid,
     ) -> AppResult<Vec<Department>> {
         let access = readable_company(self.companies.as_ref(), user_id, company_id).await?;
-        let company = CompanyId::new(company_id);
-        if access.membership.manages_company_operations() {
-            return self.departments.list_by_company(company).await;
-        }
-        self.departments.list_for_user(company, user_id).await
+        let all = self
+            .departments
+            .list_by_company(CompanyId::new(company_id))
+            .await?;
+        Ok(match self.visible_set(&access, user_id).await? {
+            None => all,
+            Some(seen) => all
+                .into_iter()
+                .filter(|department| seen.contains(&department.id))
+                .collect(),
+        })
     }
 
     /// One visible department with its members and role holders.
@@ -311,20 +435,28 @@ impl DepartmentUseCases {
     ) -> AppResult<DepartmentDetail> {
         let access = readable_company(self.companies.as_ref(), user_id, company_id).await?;
         let company = CompanyId::new(company_id);
-        let found = if access.membership.manages_company_operations() {
-            self.departments.get(company, department).await?
-        } else {
-            self.departments
-                .list_for_user(company, user_id)
-                .await?
-                .into_iter()
-                .find(|candidate| candidate.id == department)
+        let visible = self
+            .visible_set(&access, user_id)
+            .await?
+            .is_none_or(|seen| seen.contains(&department));
+        let found = match visible {
+            true => self.departments.get(company, department).await?,
+            false => None,
         };
         let department = found.ok_or_else(department_not_found)?;
+        use crate::application::ports::department::MAX_DEPARTMENT_ROSTER_ENTRIES;
+        let mut members = self.departments.members(company, department.id).await?;
+        let mut roles = self.departments.roles(company, department.id).await?;
+        let members_truncated = members.len() > MAX_DEPARTMENT_ROSTER_ENTRIES;
+        let roles_truncated = roles.len() > MAX_DEPARTMENT_ROSTER_ENTRIES;
+        members.truncate(MAX_DEPARTMENT_ROSTER_ENTRIES);
+        roles.truncate(MAX_DEPARTMENT_ROSTER_ENTRIES);
         Ok(DepartmentDetail {
-            members: self.departments.members(company, department.id).await?,
-            roles: self.departments.roles(company, department.id).await?,
             department,
+            members,
+            members_truncated,
+            roles,
+            roles_truncated,
         })
     }
 
@@ -345,9 +477,9 @@ impl DepartmentUseCases {
     }
 
     /// Which department owns each desk, as this viewer may see it: every department for an owner
-    /// or admin; for anyone else the departments they belong to or lead
-    /// ([`Self::visible_departments`]) and the owners of the desks they can read
-    /// (`readable_desks`), so the department of a desk in front of them can be named.
+    /// or admin; for anyone else the departments they may see ([`Self::visible_departments`]) and
+    /// the owners of the desks they can read (`readable_desks`), so the department of a desk in
+    /// front of them can be named.
     #[instrument(skip_all)]
     pub async fn desk_departments(
         &self,
@@ -364,22 +496,15 @@ impl DepartmentUseCases {
             .await?
             .into_iter()
             .collect();
-        if access.membership.manages_company_operations() {
+        let Some(mut seen) = self.visible_set(&access, user_id).await? else {
             return Ok(DeskDepartments {
                 departments,
                 owners,
             });
-        }
+        };
         let owners: std::collections::HashMap<Uuid, DepartmentId> = owners
             .into_iter()
             .filter(|(desk, _)| readable_desks.contains(desk))
-            .collect();
-        let mut seen: std::collections::HashSet<DepartmentId> = self
-            .departments
-            .list_for_user(company, user_id)
-            .await?
-            .into_iter()
-            .map(|department| department.id)
             .collect();
         seen.extend(owners.values().copied());
         Ok(DeskDepartments {
@@ -420,6 +545,21 @@ impl DepartmentUseCases {
         })
     }
 
+    /// The department's recent administration history (Plan06 02B.2), for its managers only:
+    /// anyone else is told the department is not found.
+    #[instrument(skip_all)]
+    pub async fn administration_history(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        department: DepartmentId,
+    ) -> AppResult<Vec<crate::entities::department::DepartmentAdministrationEntry>> {
+        let scope = self.managed(user_id, company_id, Some(department)).await?;
+        self.departments
+            .administration_history(scope.company, department)
+            .await
+    }
+
     /// The people and agents a manager may add as members or make lead, agents first; at most
     /// [`MAX_DEPARTMENT_PRINCIPAL_CHOICES`], and whether the company has more.
     #[instrument(skip_all)]
@@ -428,7 +568,7 @@ impl DepartmentUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<(Vec<DepartmentPrincipal>, bool)> {
-        let scope = self.managed(user_id, company_id).await?;
+        let scope = self.administering(user_id, company_id).await?;
         let mut choices = self
             .departments
             .principals(scope.company, MAX_DEPARTMENT_PRINCIPAL_CHOICES + 1)

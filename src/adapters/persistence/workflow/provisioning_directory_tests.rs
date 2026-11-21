@@ -13,8 +13,8 @@ const CHARTER: &str = "Win and keep customers.";
 async fn department(f: &AdmissionFixture, slug: &str) -> DepartmentId {
     let id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO departments (id, company_id, name, slug, charter, created_by) \
-         VALUES ($1, $2, initcap($3), $3, $4, \
+        "INSERT INTO departments (id, company_id, parent_id, name, slug, charter, created_by) \
+         VALUES ($1, $2, (SELECT id FROM departments WHERE company_id=$2 AND is_root), initcap($3), $3, $4, \
            '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
     )
     .bind(id)
@@ -73,7 +73,7 @@ async fn listed(f: &AdmissionFixture, claim: &ClaimedWorkflow, arguments: Value)
 /// its own desk; an agent in none lists none, and a deleted desk is null and is not recreated.
 #[tokio::test]
 async fn department_directory_lists_departments_roles_and_desks() {
-    let (f, claim) = claimed(false).await;
+    let (f, scope) = provisioning_fixture().await;
     let sales = department(&f, "sales").await;
     let closer = agent(
         &f,
@@ -108,7 +108,7 @@ async fn department_directory_lists_departments_roles_and_desks() {
     .await
     .unwrap()
     .id;
-    let plain = ChannelPersistence::create(
+    let plain = crate::adapters::persistence::test_support::create_channel(
         f.persistence(),
         company(&f).as_uuid(),
         ChannelWrite {
@@ -130,6 +130,13 @@ async fn department_directory_lists_departments_roles_and_desks() {
     .execute(f.persistence().pool())
     .await
     .unwrap();
+    let claim = f
+        .persistence()
+        .settled()
+        .claim_io(scope, worker(), policy())
+        .await
+        .unwrap()
+        .unwrap();
     let listing = listed(&f, &claim, json!({})).await;
     let entry = |slug: &str| {
         listing["agents"]
@@ -168,9 +175,14 @@ async fn department_directory_lists_departments_roles_and_desks() {
 
     let _ = scout;
 
-    ChannelPersistence::delete(f.persistence(), plain)
-        .await
-        .unwrap();
+    ChannelPersistence::delete(
+        f.persistence(),
+        f.binding.target.actor,
+        company(&f).as_uuid(),
+        plain,
+    )
+    .await
+    .unwrap();
     let desks = || async {
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM channels WHERE company_id = $1")
             .bind(company(&f).as_uuid())
@@ -212,7 +224,7 @@ fn listed_address(listing: &Value, slug: &str) -> Value {
 /// is an invalid-input refusal.
 #[tokio::test]
 async fn department_directory_filters_by_one_department() {
-    let (f, claim) = claimed(false).await;
+    let (f, scope) = provisioning_fixture().await;
     let sales = department(&f, "sales").await;
     let support = department(&f, "support").await;
     let placed = |department, role| {
@@ -241,6 +253,13 @@ async fn department_directory_filters_by_one_department() {
             .map(|agent| agent["slug"].as_str().unwrap().to_owned())
             .collect()
     };
+    let claim = f
+        .persistence()
+        .settled()
+        .claim_io(scope, worker(), policy())
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(
         slugs(&listed(&f, &claim, json!({"department": "sales"})).await),
         ["closer", "scout"]

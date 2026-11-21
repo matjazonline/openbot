@@ -19,6 +19,9 @@ and are implemented in order, each as its own resettable step:
 [08-goals](../08-goals/README.md),
 [09-rooms](../09-rooms/README.md).
 
+[10-blueprints](../10-blueprints/README.md) follows the nine. It changes no structure; it reads
+and writes the whole of it as one document.
+
 ## Intended behavior
 
 A company can organize its work into departments. A department is a named group inside one

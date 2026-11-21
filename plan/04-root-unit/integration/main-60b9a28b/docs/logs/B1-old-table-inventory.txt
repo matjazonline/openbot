@@ -1,0 +1,1 @@
+Exact-word src/migrations/.sqlx inventory, exit=1

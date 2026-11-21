@@ -107,6 +107,10 @@ async fn autonomous_agent_authority_mcp_credential_rotation_before_open_keeps_bi
         .persistence
         .replace_mcp_token(
             fixture.target.company.as_uuid(),
+            fixture
+                .persistence
+                .test_root_unit(fixture.target.company.as_uuid())
+                .await,
             binding.connection,
             current.revision,
             Some(SecretString::from("rotated-agent-secret")),

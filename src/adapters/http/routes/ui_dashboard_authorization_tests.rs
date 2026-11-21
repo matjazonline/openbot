@@ -12,6 +12,7 @@ fn dashboard(f: &Fixture, account: &crate::entities::user::User, caller: Caller)
         runtime_metrics: f.persistence.clone(),
         runtime_identity: MachineIdentity::process().clone(),
         monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+        usage: f.persistence.clone(),
         config: f.config.clone(),
         user_id: account.id,
         account: account.clone(),
@@ -41,7 +42,16 @@ async fn dashboard_resolves_operator_company_before_managed_selection_and_refuse
     let member = dashboard(&f, &f.member, Caller::user(f.member.id));
     denied(
         DashboardScope::resolve(&member, &query(f.company.id)).await,
-        StatusCode::FORBIDDEN,
+        StatusCode::NOT_FOUND,
+        &f.company.name,
+    )
+    .await;
+    // The dashboard is a company-wide read view (Plan06 U4): a unit lead is told nothing too.
+    let d = f.delegation().await;
+    let lead = dashboard(&f, &d.lead, Caller::user(d.lead.id));
+    denied(
+        DashboardScope::resolve(&lead, &query(f.company.id)).await,
+        StatusCode::NOT_FOUND,
         &f.company.name,
     )
     .await;

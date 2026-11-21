@@ -17,18 +17,17 @@ fn desk(company_id: Uuid, slug: &str) -> Channel {
         slug: slug.into(),
         alias_slugs: Vec::new(),
         participant_emails: None,
-        access_mode: ChannelAccessMode::Team,
+        access_mode: ChannelAccessMode::Members,
         principal_grants: Vec::new(),
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
         settings_revision: 0,
-        department_id: None,
-        members_only: false,
+        department_id: crate::entities::department::DepartmentId::random(),
     }
 }
 
 /// A members-only desk whose only grants are one member's derived ones.
-fn members_only_desk(company_id: Uuid, slug: &str, member: PrincipalId) -> Channel {
+fn members_desk(company_id: Uuid, slug: &str, member: PrincipalId) -> Channel {
     let derived = |capability| ChannelPrincipalGrant {
         principal_id: member,
         capability,
@@ -36,9 +35,8 @@ fn members_only_desk(company_id: Uuid, slug: &str, member: PrincipalId) -> Chann
         created_at: Utc::now(),
     };
     Channel {
-        access_mode: ChannelAccessMode::Allowlist,
-        department_id: Some(DepartmentId::random()),
-        members_only: true,
+        access_mode: ChannelAccessMode::Members,
+        department_id: DepartmentId::random(),
         principal_grants: vec![
             derived(PrincipalCapability::Participate),
             derived(PrincipalCapability::View),
@@ -48,9 +46,9 @@ fn members_only_desk(company_id: Uuid, slug: &str, member: PrincipalId) -> Chann
 }
 
 #[tokio::test]
-async fn department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_only_grants() {
+async fn department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_grants() {
     let company_id = Uuid::new_v4();
-    let target = members_only_desk(company_id, "ops", PrincipalId::random());
+    let target = members_desk(company_id, "ops", PrincipalId::random());
     let member_desk = desk(company_id, "member-agent");
     let outside_desk = desk(company_id, "outside-agent");
     let (target_id, member_id, outside_id) = (target.id, member_desk.id, outside_desk.id);
@@ -124,11 +122,11 @@ async fn department_desk_relay_without_an_authenticated_agent_cannot_bypass_memb
 /// still lets a sender reply within a thread they are a party to after their derived grant is
 /// gone; a new conversation from them is refused.
 #[tokio::test]
-async fn department_desk_members_only_thread_party_keeps_replying_after_removal() {
+async fn department_desk_members_thread_party_keeps_replying_after_removal() {
     use crate::use_cases::participant::test_support::principal_for_email;
     let company_id = Uuid::new_v4();
     let member = principal_for_email(company_id, "member@acme.com");
-    let desk = members_only_desk(company_id, "ops", member);
+    let desk = members_desk(company_id, "ops", member);
     let company_persistence = Arc::new(company_double_with_team(
         vec![Company {
             channel_defaults: Default::default(),

@@ -1,0 +1,117 @@
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 388 changed files against 18 learnings and 4 skills
+
+● migrations/20260817000000_init_schema.sql:648
+  brings back four call one, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Treating all four local-call native peers as one
+  cross-owner group then passed both actual teardown paths.
+● migrations/20260817000000_init_schema.sql:648
+  brings back company ownership owner, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● plan/04-root-unit/COORDINATION.md:15
+  brings back focused failure suite, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A focused shell probe and a regression test reproduce
+  that failure without running application suites.
+● plan/04-root-unit/COORDINATION.md:16
+  brings back complete authorization integration, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● plan/04-root-unit/COORDINATION.md:21
+  brings back cross owner path, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Treating all four local-call native peers as one
+  cross-owner group then passed both actual teardown paths.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:5
+  brings back openbot test failed, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: A default Openbot test build reached linking and
+  failed with write() errno28 while the shared volume was full.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:6
+  brings back real http call, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: A synchronous per-connection pause with a held real
+  HTTP call and actual SDK deletion entry now forces that interval;
+  removing only the registration lock makes the real wire-order
+  assertion fail.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:10
+  brings back fail command gate, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A failing build can then be followed by a successful
+  command and the gate is reported as passing.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:11
+  brings back channel department root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:11
+  brings back native source shared, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:20
+  brings back actual failed socket, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: An isolated actual Ubuntu counterexample failed with
+  Chrome FATAL Socket path too long under the shared runner's nested
+  clean TMPDIR, and passed with a short temporary base.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:20
+  brings back raw durable cache, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Raw-byte hashing and a durable/global cache would
+  change the contract and were unnecessary.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:33
+  brings back grant check exist, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:34
+  brings back real local fixture, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A real non-loopback local TCP fixture demonstrates
+  this: the supervisor can connect during group isolation, and
+  changing only the selector back to UID blocks it.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:37
+  brings back real deletion without, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Timing out an unprivileged shim after real deletion
+  passed without proving that privileged work stopped.
+● plan/04-root-unit/phases/p01/docs/REVIEW.md:3
+  brings back order department principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● plan/04-root-unit/phases/p01/docs/REVIEW.md:5
+  brings back escalation invalid boundary, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 14: A literal like `<escalation-{id}@openbot.invalid>`
+  built in persistence breaks the transport boundary in two ways: it
+  is a synthetic `.invalid` identity, and it is an RFC id made outside
+  the email adapter.
+● plan/04-root-unit/phases/p01/docs/REVIEW.md:5
+  brings back native source guard, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/04-root-unit/phases/p01/docs/REVIEW.md:5
+  brings back direct exact artifact, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Direct LaunchServices navigation downloaded the exact
+  artifact successfully within seconds.
+● plan/04-root-unit/phases/p01/docs/REVIEW.md:9
+  brings back check rejected exist, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+
+· no conflicts · 20 worth a look

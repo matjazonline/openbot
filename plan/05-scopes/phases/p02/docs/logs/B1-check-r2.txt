@@ -1,0 +1,30 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0433]: cannot find `autonomous_agent_storage_tests` in `super`
+  --> src/adapters/persistence/workflow/run_scope_admission_tests.rs:64:27
+   |
+64 |     let run=super::super::autonomous_agent_storage_tests::native_runs::unsealed_root(&f.admission,"scope-race").await;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ could not find `autonomous_agent_storage_tests` in `super`
+   |
+note: module `crate::adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::native_runs` exists but is inaccessible
+  --> src/adapters/persistence/workflow/autonomous_agent_storage_tests.rs:9:1
+   |
+ 9 | pub(super) mod native_runs;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ not accessible
+
+warning: struct `ScopeRow` is never constructed
+  --> src/adapters/persistence/workflow/run_scopes.rs:13:19
+   |
+13 | pub(super) struct ScopeRow {
+   |                   ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `rows_on` is never used
+   --> src/adapters/persistence/workflow/run_scopes.rs:243:21
+    |
+243 | pub(super) async fn rows_on(db: &mut PgConnection, company: CompanyId, run: RunId, actor: Option<PrincipalId>) -> AppResult<Vec<Sco...
+    |                     ^^^^^^^
+
+warning: `open_bots` (lib) generated 2 warnings
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

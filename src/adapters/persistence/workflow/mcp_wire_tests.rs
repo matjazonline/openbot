@@ -161,6 +161,7 @@ async fn integration_service_contract_mcp_stale_catalog_uses_the_original_live_h
     let current = f.setup.current().await;
     p.update_mcp_connection(
         current.company_id,
+        p.test_root_unit(current.company_id).await,
         current.id,
         current.revision,
         crate::application::use_cases::mcp::McpConnectionWrite {

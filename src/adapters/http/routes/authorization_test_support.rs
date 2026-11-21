@@ -10,7 +10,6 @@ use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::test_support::test_pool;
 use crate::app_error::AppResult;
 use crate::application::attention::AttentionUseCases;
-use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::thread::ThreadPersistence;
 use crate::entities::company::Company;
@@ -39,6 +38,16 @@ pub(super) struct ScopeCase<'a> {
     pub user: &'a User,
     pub company_id: Uuid,
     pub status: StatusCode,
+}
+
+/// See [`Fixture::delegation`].
+pub(super) struct Delegation {
+    pub admin: User,
+    pub lead: User,
+    pub sibling: User,
+    pub unit: crate::entities::department::DepartmentId,
+    pub sibling_unit: crate::entities::department::DepartmentId,
+    pub desk: Uuid,
 }
 
 pub(super) struct Fixture {
@@ -184,7 +193,8 @@ impl Fixture {
                 invites: self.invites.clone(),
                 user: &self.member,
                 company_id: self.company.id,
-                status: StatusCode::FORBIDDEN,
+                // A plain member is told nothing, like a stranger (Plan06 02A.4).
+                status: StatusCode::NOT_FOUND,
             },
             ScopeCase {
                 companies: self.failing_companies(),
@@ -197,6 +207,75 @@ impl Fixture {
                 status: StatusCode::INTERNAL_SERVER_ERROR,
             },
         ]
+    }
+
+    /// Plan06 actors in this company: a root admin, the lead of "Managed" (which owns `desk`),
+    /// and the lead of a sibling "Beside". Built on demand so existing tests keep their setup.
+    pub async fn delegation(&self) -> Delegation {
+        use crate::application::ports::department::DepartmentWrite;
+        let company = crate::domain::workflow::CompanyId::new(self.company.id);
+        let level = crate::entities::access_level::AccessLevel::try_from(5_i16).unwrap();
+        let admin = account(&self.persistence, "admin").await;
+        crate::adapters::persistence::test_support::insert_root_member(
+            self.persistence.pool(),
+            company,
+            admin.id,
+            CompanyAccessRole::Admin,
+            level,
+        )
+        .await;
+        let mut units = Vec::new();
+        let mut leads = Vec::new();
+        for name in ["Managed", "Beside"] {
+            let lead = account(&self.persistence, &name.to_lowercase()).await;
+            let principal = crate::adapters::persistence::test_support::insert_root_member(
+                self.persistence.pool(),
+                company,
+                lead.id,
+                CompanyAccessRole::Member,
+                level,
+            )
+            .await;
+            let unit = self
+                .departments()
+                .create_department(
+                    self.owner.id,
+                    self.company.id,
+                    DepartmentWrite {
+                        name: name.into(),
+                        slug: name.to_lowercase(),
+                        ..Default::default()
+                    },
+                    Some(principal),
+                )
+                .await
+                .expect("a led department");
+            units.push(unit.id);
+            leads.push(lead);
+        }
+        let desk = crate::adapters::persistence::test_support::create_channel(
+            &self.persistence,
+            self.company.id,
+            ChannelWrite {
+                name: "Managed desk".into(),
+                slug: "managed-desk".into(),
+                department_id: Some(units[0]),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("a desk in the managed unit")
+        .id;
+        let sibling = leads.pop().unwrap();
+        let lead = leads.pop().unwrap();
+        Delegation {
+            admin,
+            lead,
+            sibling,
+            unit: units[0],
+            sibling_unit: units[1],
+            desk,
+        }
     }
 
     pub fn auth(user: &User) -> AuthenticatedUser {
@@ -248,7 +327,7 @@ async fn create_company(p: &PostgresPersistence, owner: &User) -> Company {
 }
 
 async fn create_channel(p: &PostgresPersistence, company: Uuid) -> Uuid {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         p,
         company,
         ChannelWrite {

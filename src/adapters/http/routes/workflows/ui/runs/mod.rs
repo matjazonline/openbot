@@ -252,7 +252,8 @@ impl Ui {
         Ok(self
             .engine
             .authoring_reads()
-            .binding_options(super::company(company))
+            // Only the people are read here; the connection lists' reach is irrelevant.
+            .binding_options(super::company(company), self.user)
             .await?
             .people
             .into_iter()
@@ -346,6 +347,7 @@ impl Ui {
             .reads()
             .list_definitions(
                 super::company(company),
+                None,
                 PageRequest::new(None, Some(MAX_BINDING_OPTIONS))?,
             )
             .await?;

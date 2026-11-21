@@ -1,0 +1,16 @@
+--- B2R1/src/adapters/persistence/workflow/bindings.rs
++++ B2R2/src/adapters/persistence/workflow/bindings.rs
+@@ -28,7 +28,12 @@
+     }
+ 
+     async fn save_binding(&self, command: PreparedBinding) -> AppResult<()> {
+-        let mut tx = self.pool.begin().await?;
++        let mut tx = management::begin(
++            self,
++            command.state().configuration.company_id(),
++            command.actor(),
++        )
++        .await?;
+         save_binding_on(&mut tx, &command).await?;
+         tx.commit().await?;
+         Ok(())

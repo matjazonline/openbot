@@ -105,7 +105,14 @@ fn execute(bundle: Arc<PublishedBundle>, mut request: SampleRequest) -> AppResul
                                 operation: tool.contract.name.clone(),
                             }
                         };
+                        // A connection tool records its unit (Plan07); others have none.
+                        let unit_id = matches!(
+                            source,
+                            AgentBindingSource::Http { .. } | AgentBindingSource::Mcp { .. }
+                        )
+                        .then(Uuid::nil);
                         ResolvedAgentTool {
+                            unit_id,
                             binding: AgentToolBinding {
                                 id: AgentBindingId::new(Uuid::from_u128(100 + index as u128)),
                                 alias: AgentToolAlias::parse(tool.contract.name.as_str()).unwrap(),

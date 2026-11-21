@@ -1,0 +1,30 @@
+--- B2R1/src/adapters/persistence/channel.rs
++++ B2R2/src/adapters/persistence/channel.rs
+@@ -334,7 +334,12 @@
+         write: ChannelWrite,
+     ) -> AppResult<Channel> {
+         let uuid = Uuid::new_v4();
+-        let mut tx = super::agent_publication::begin_bounded(self).await?;
++        let mut tx = super::workflow::management::begin(
++            self,
++            crate::domain::workflow::CompanyId::new(company_id),
++            actor,
++        )
++        .await?;
+         use crate::application::use_cases::administration::ManagementTarget;
+         super::workflow::management::authorize_target_on(
+             &mut tx,
+@@ -484,7 +489,12 @@
+         company_id: Uuid,
+         id: Uuid,
+     ) -> AppResult<()> {
+-        let mut tx = super::agent_publication::begin_bounded(self).await?;
++        let mut tx = super::workflow::management::begin(
++            self,
++            crate::domain::workflow::CompanyId::new(company_id),
++            actor,
++        )
++        .await?;
+         super::workflow::management::authorize_association_on(
+             &mut tx,
+             crate::domain::workflow::CompanyId::new(company_id),

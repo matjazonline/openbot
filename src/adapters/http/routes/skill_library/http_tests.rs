@@ -251,6 +251,7 @@ fn dump_skill_bundle_browser_fixtures() {
     std::fs::create_dir_all(&directory).unwrap();
     let now = chrono::Utc::now();
     let skill = Skill {
+        unit_id: None,
         id: Uuid::from_u128(901),
         company_id: Some(Uuid::from_u128(902)),
         slug: crate::entities::value_objects::SkillSlug::parse("script-directory").unwrap(),
@@ -274,6 +275,8 @@ fn dump_skill_bundle_browser_fixtures() {
     let summaries = [crate::entities::skill::SkillSummary::from(&skill)];
     let render = |error, notice| {
         pages::company_skills_section(&pages::SkillSection {
+            units: &[],
+            default_unit: None,
             company_id: skill.company_id,
             skills: &summaries,
             next_url: None,

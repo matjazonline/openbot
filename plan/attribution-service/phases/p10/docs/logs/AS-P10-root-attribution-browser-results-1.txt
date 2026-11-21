@@ -1,0 +1,66 @@
+   Compiling hyper-util v0.1.21
+   Compiling sqlx-core v0.8.6
+   Compiling tokio-rustls v0.26.6
+   Compiling hickory-net v0.26.3
+   Compiling sqlx-postgres v0.8.6
+   Compiling hyper-rustls v0.27.10
+   Compiling axum v0.8.9
+   Compiling sqlx v0.8.6
+   Compiling reqwest v0.13.4
+   Compiling hickory-resolver v0.26.3
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 17.44s
+    Finished `test` profile [unoptimized] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/attribution_service-24e48f1414edb70b)
+    Finished `test` profile [unoptimized] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 2 tests
+PASS: setup and catalog browser journey (12 checks): store forms, escaping, DNS proof, public installation, secret once, rotation/revoke, domain/install status, live member view, campaigns/ads/links, lost-response stable retry, product edit, real tracked browser navigation
+
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... ok
+PASS: website SDK and merchant cart journey: consent, AdA/AdB, URL removal, return history, exact retry, viewport duration, immutable server checkout, multiple tabs, competing before-read and before-cleanup writes persist after navigation, withdrawal, no-reference visit, blocked storage, invalid candidate fallbacks, history expiry/bound, cancelled retries, privacy (11 observed browser attempts)
+
+test adapters::identity::http_tests::website_tests::attribution_checkout_handoff_browser_sdk_cart_and_freeze ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 121 filtered out; finished in 10.60s
+
+warning: unused import: `super::support::*`
+ --> src/adapters/persistence/workflow/reconciliation_fixture.rs:7:5
+  |
+7 | use super::support::*;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 2 warnings (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 2.78s
+     Running unittests src/lib.rs (/tmp/as-openbot-target/debug/deps/open_bots-fda01552d3c282dd)
+warning: unused import: `super::support::*`
+ --> src/adapters/persistence/workflow/reconciliation_fixture.rs:7:5
+  |
+7 | use super::support::*;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 2 warnings (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 0.35s
+     Running unittests src/lib.rs (/tmp/as-openbot-target/debug/deps/open_bots-fda01552d3c282dd)
+
+running 1 test
+{"checks":["new-password-login","already-authenticated-login","independent-secure-cookies","current-company-access","local-logout","session-rotation","upstream-revocation","session-recovery"],"result":"PASS"}
+
+test adapters::http::routes::user::attribution_browser_tests::attribution_sso_browser_real_openbot_password_and_existing_session ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4256 filtered out; finished in 5.16s
+
+

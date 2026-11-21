@@ -1,0 +1,35 @@
+{
+  "round": "04RU-P02-B1-R1",
+  "stage": "whole B1 implementation review",
+  "phase": "p02",
+  "reviewer": "/root/p04_reviewer",
+  "requested_model": "gpt-6-astra",
+  "requested_effort": "high",
+  "actual_settings": "unexposed",
+  "workflow": "implement-astra-reviewed-2-3",
+  "worktree": "/Users/mac02/orca/workspaces/openbot/plan03-04",
+  "branch": "feature/plan03_04",
+  "start_review_base_head": "334e79c74b383dffd8e0d565c33a77c6ac24c94d",
+  "artifact": "7ce85fba312130879a9e00c49febd3e48f54e71f42483284637524f51ed72539",
+  "exclusions": [
+    "plan/04-root-unit/phases/p02/docs",
+    "plan/04-root-unit/COORDINATION.md"
+  ],
+  "coordination_revision": 9,
+  "applicable_notices": [
+    "04RU-C001/r1",
+    "04RU-C002/r1",
+    "04RU-C003/r2",
+    "04RU-C004/r1",
+    "01DEP-C002/r1"
+  ],
+  "decisions": [
+    "04RU-P02-D1/r1",
+    "04RU-P02-D1/r2"
+  ],
+  "outcome": "CHANGES REQUIRED",
+  "findings": [
+    "04RU-P02-B1-F1"
+  ],
+  "reviewer_runtime_executed": false
+}

@@ -1,0 +1,4 @@
+{"probe": "valid_company_page_wire_size", "items": 100, "name_characters": 120, "utf8_body_bytes": 73530}
+{"probe": "valid_company_page_response", "service_status": 200}
+{"probe": "lost_logout_response_retry", "first_status": 302, "retry_status": 302, "retry_clears_cookie": true, "shell_status": 200, "shell_sign_in_link": true}
+{"probe": "idle_expiry_browser_recovery", "with_cookie_status": 200, "with_cookie_sign_in_link": true, "with_cookie_cleared": true, "without_cookie_status": 200, "without_cookie_sign_in_link": true}

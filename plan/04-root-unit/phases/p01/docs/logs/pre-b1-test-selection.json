@@ -1,0 +1,8 @@
+{
+  "source_prerequisite": "8fdb892b6e279ed0c09150e2336bbdc7462f877d",
+  "binary": "pa03-p04-r23-lifecycle-baseline-libtest",
+  "inventory_sha256": "7a394b4f267ecfdf1f996b57e0c23bfb2446da7465c3f0aee91971977e6af4ac",
+  "names": 4705,
+  "authorization_names": [],
+  "source_projection": "Plan03 accepted library unchanged through main publication; src/main.rs warning inventory is outside libtest"
+}

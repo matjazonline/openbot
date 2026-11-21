@@ -121,12 +121,12 @@ async fn workflow_harness_owner_store_fence_and_actor_revocation() {
         WriteOutcome::OwnershipLost
     ));
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    sqlx::query("DELETE FROM principals WHERE company_id=$1 AND user_id=$2")
-        .bind(fence.scope.company.as_uuid())
-        .bind(f.binding.target.actor.user_id())
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership(
+        &mut tx,
+        fence.scope.company.as_uuid(),
+        f.binding.target.actor.user_id(),
+    )
+    .await;
     let revoke = async {
         tokio::time::sleep(Duration::from_millis(50)).await;
         tx.commit().await.unwrap();

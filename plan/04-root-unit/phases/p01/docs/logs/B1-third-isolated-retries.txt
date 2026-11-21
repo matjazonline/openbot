@@ -1,0 +1,59 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+Focused attempt 1/3, original third-run binary/schema3; no source or bound changes
+
+running 3 tests
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks' (26622362) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("workflow_action_dispatch_commit_guard"), message: "error returned from database: workflow action dispatch lost live fence" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department' (26622361) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lifecycle revision or command conflict")
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 4718 filtered out; finished in 6.11s
+
+Focused attempt 2/3, original third-run binary/schema3; no source or bound changes
+
+running 3 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department' (26622953) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lifecycle revision or command conflict")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 4718 filtered out; finished in 5.75s
+
+Focused attempt 3/3, original third-run binary/schema3; no source or bound changes
+
+running 3 tests
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department' (26623153) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lifecycle revision or command conflict")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 4718 filtered out; finished in 5.24s
+

@@ -1,0 +1,111 @@
+⬆ trail 0.29.0 → 0.30.5 available: run `trail upgrade` (restart your agent after).
+checking 147 changed files against 31 learnings and 4 skills
+
+✗ migrations/20260817000000_init_schema.sql:15693
+  brings back order department principal, which Mac02's learning ruled out
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● migrations/20260817000000_init_schema.sql:15692
+  brings back authority unit exist, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Identity-free creation authority exposes another
+  unit's existing definition via
+● migrations/20260817000000_init_schema.sql:15693
+  brings back company owner union, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● migrations/20260817000000_init_schema.sql:19966
+  brings back foreign key deferred, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: After tenant teardown required the peer foreign key to
+  be deferred, no backend blocked: insertion no longer performed that
+  check.
+● src/adapters/persistence/channel_edit.rs:5
+  brings back account company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/channel_edit.rs:112
+  brings back department user bind, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Always using the recorded department contradicts the
+  user's chosen binding rule.
+● src/adapters/persistence/company_agent.rs:37
+  brings back clone desk creation, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: A populated temporary clone failed to reproduce
+  repeated production desk creation because its statistics and
+  generic-plan shape differed.
+● src/adapters/persistence/department_lead_desk_tests.rs:660
+  brings back department principal root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● src/adapters/persistence/thread/inbound_tests.rs:734
+  brings back nowait wait lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/workflow/admission.rs:40
+  brings back admission claim message, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Checking whether admission_claim was present
+  incorrectly grouped Message and Schedule together.
+● src/adapters/persistence/workflow/agent_preparation.rs:81
+  brings back order channel principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● src/adapters/persistence/workflow/checkpoint_model_accounts.rs:139
+  brings back wait company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/workflow/definitions.rs:69
+  brings back source company owner, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● src/adapters/persistence/workflow/message.rs:77
+  brings back wait company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/workflow/schedules.rs:173
+  brings back wait company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/application/workflow/authorization.rs:126
+  brings back creation unit definition, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Identity-free creation authority exposes another
+  unit's existing definition via
+● src/application/workflow/authorization.rs:264
+  brings back channel department principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● src/application/workflow/service.rs:53
+  brings back admission claim message, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Checking whether admission_claim was present
+  incorrectly grouped Message and Schedule together.
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: This leaves its company/desk/principal/capability/provenance identity unchanged while giving PostgreSQL
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+
+· 1 conflict · fix it, or say why in the commit message or PR description

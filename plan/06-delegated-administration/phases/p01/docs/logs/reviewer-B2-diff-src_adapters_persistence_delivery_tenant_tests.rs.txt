@@ -1,0 +1,11 @@
+--- B1/src/adapters/persistence/delivery/tenant_tests.rs
++++ B2/src/adapters/persistence/delivery/tenant_tests.rs
+@@ -540,7 +540,7 @@
+     )
+     .await;
+     park(&persistence, fixture.delivery.id).await;
+-    let other = ChannelPersistence::create(
++    let other = crate::adapters::persistence::test_support::create_channel(
+         &persistence,
+         scope.company.id,
+         ChannelWrite {

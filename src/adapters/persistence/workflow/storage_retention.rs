@@ -121,9 +121,9 @@ async fn lock_dependents(db: &mut PgConnection, company: Uuid, root: Uuid) -> Ap
 }
 
 async fn archive_usage(db: &mut PgConnection, company: Uuid, root: Uuid) -> AppResult<u64> {
-    Ok(sqlx::query("INSERT INTO model_usage_history(company_id,request_id,agent_id,workflow_id,version_id,provider,model,
+    Ok(sqlx::query("INSERT INTO model_usage_history(company_id,request_id,agent_id,workflow_id,version_id,unit_id,provider,model,
         requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at)
-        SELECT call.company_id,call.request_id,call.agent_id,call.workflow_id,call.version_id,call.provider,call.model,
+        SELECT call.company_id,call.request_id,call.agent_id,call.workflow_id,call.version_id,call.unit_id,call.provider,call.model,
         call.requested_at,call.reserved_input,call.reserved_output,call.input_tokens,call.output_tokens,call.usage_source,call.settled_at
         FROM model_usage_calls AS call JOIN workflow_run_budgets AS link ON link.company_id=call.company_id AND link.run_id=call.run_id
         WHERE link.company_id=$1 AND link.root_run_id=$2")

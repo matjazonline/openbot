@@ -80,7 +80,11 @@ async fn direct_transport_binding_retirement_rejoin_release_endpoint_and_reuse_l
     let original = active(&f, person).await;
     let slug = ChannelSlug::from(f.addresses_of(person).await[0].0.clone());
     f.persistence
-        .remove_member(f.company.id, user)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.company.user_id,
+            company_id: f.company.id,
+            member_user_id: user,
+        })
         .await
         .unwrap();
     let retired = saved(&f, original.id).await;

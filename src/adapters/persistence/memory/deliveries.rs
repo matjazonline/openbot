@@ -27,31 +27,6 @@ fn invalid() -> AppError {
     AppError::Internal("Invalid memory delivery state".into())
 }
 
-/// Which namespace a save targets. Steps have company and agent scope only; the save tool may
-/// also name the user scope of a private session (E2), resolved by the host.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SaveScope {
-    Company,
-    Agent(Uuid),
-    User(Uuid),
-}
-impl SaveScope {
-    fn columns(self) -> (&'static str, Option<Uuid>, Option<Uuid>) {
-        match self {
-            Self::Company => ("company", None, None),
-            Self::Agent(agent) => ("agent", Some(agent), None),
-            Self::User(user) => ("user", None, Some(user)),
-        }
-    }
-    fn exactness_target(self) -> ExactnessTarget {
-        match self {
-            Self::Company => ExactnessTarget::CompanyScope,
-            Self::Agent(_) => ExactnessTarget::AgentScope,
-            Self::User(_) => ExactnessTarget::UserScope,
-        }
-    }
-}
-
 /// One logical save: its origin, its scope, its deterministic key and the facts to freeze.
 pub(crate) struct SaveIntent<'a> {
     pub company: CompanyId,
@@ -59,9 +34,11 @@ pub(crate) struct SaveIntent<'a> {
     pub execution: ExecutionId,
     pub invocation: Option<Uuid>,
     pub wait: Option<Uuid>,
-    pub scope: SaveScope,
+    pub scope: NamespaceOwner,
     pub key: &'a str,
     pub facts: &'a [String],
+    pub producer: crate::entities::transport::PrincipalId,
+    pub subject: Option<crate::entities::transport::PrincipalId>,
     pub external_sources: Vec<ExternalSourceRef>,
 }
 
@@ -97,11 +74,14 @@ struct LockedRunRow {
 pub(crate) fn consumed_for(
     content: AccessLevel,
     content_exact: bool,
-    scope: SaveScope,
+    scope: NamespaceOwner,
 ) -> ConsumedEvidence {
     let configuration_exact = human_input_exactness(
         HumanInputClass::AuthoredConfiguration,
-        scope.exactness_target(),
+        match scope {
+            NamespaceOwner::Unit(_) => ExactnessTarget::UnitScope,
+            NamespaceOwner::Principal(_) => ExactnessTarget::PrincipalScope,
+        },
     );
     if content_exact && configuration_exact {
         ConsumedEvidence::Exact {
@@ -184,18 +164,18 @@ pub(crate) async fn freeze_save_on(
     if state != "enabled" {
         return Ok(SaveEnqueue::NotEnabled);
     }
-    let (kind, agent, user) = intent.scope.columns();
+    let owner_key = super::namespace_columns(intent.scope);
     let namespace: Option<Uuid> = sqlx::query_scalar(
         "SELECT namespace.id FROM memory_namespaces AS namespace \
          WHERE namespace.company_id = $1 AND namespace.scope_kind = $2 \
-           AND namespace.agent_id IS NOT DISTINCT FROM $3 \
-           AND namespace.user_id IS NOT DISTINCT FROM $4 AND namespace.state = 'ready' \
+           AND namespace.unit_id IS NOT DISTINCT FROM $3 \
+           AND namespace.principal_id IS NOT DISTINCT FROM $4 AND namespace.state = 'ready' \
          FOR SHARE",
     )
     .bind(company)
-    .bind(kind)
-    .bind(agent)
-    .bind(user)
+    .bind(owner_key.kind)
+    .bind(owner_key.unit)
+    .bind(owner_key.principal)
     .fetch_optional(&mut *db)
     .await?;
     let Some(namespace) = namespace else {
@@ -232,6 +212,7 @@ pub(crate) async fn freeze_save_on(
                 title: fact_title(fact),
                 body: fact.clone(),
                 occurred_at: now,
+                subject: intent.subject.map(|subject| subject.as_uuid().to_string()),
             })
             .collect(),
     };
@@ -243,8 +224,8 @@ pub(crate) async fn freeze_save_on(
     sqlx::query(
         "INSERT INTO memory_deliveries (company_id, id, namespace_id, kind, run_id, execution_id, \
            invocation_id, wait_id, idempotency_key, expires_at, request, disable_epoch, state, \
-           available_at) \
-         VALUES ($1, $2, $3, 'save', $4, $5, $6, $7, $8, $9, $10, $11, 'pending', clock_timestamp())",
+           available_at, unit_id, principal_id, subject_principal_id) \
+         VALUES ($1, $2, $3, 'save', $4, $5, $6, $7, $8, $9, $10, $11, 'pending', clock_timestamp(), $12, $13, $14)",
     )
     .bind(company)
     .bind(id)
@@ -257,6 +238,9 @@ pub(crate) async fn freeze_save_on(
     .bind(request.expires_at)
     .bind(&frozen)
     .bind(epoch)
+    .bind(owner_key.unit)
+    .bind(intent.producer.as_uuid())
+    .bind(intent.subject.map(|subject|subject.as_uuid()))
     .execute(&mut *db)
     .await?;
     Ok(SaveEnqueue::Enqueued {
@@ -277,7 +261,7 @@ pub(crate) struct CaptureIntent<'a> {
     pub exchange: Uuid,
     pub agent: Uuid,
     pub kind: MemoryCaptureKind,
-    pub scope: SaveScope,
+    pub scope: NamespaceOwner,
     pub input: &'a str,
     pub output: &'a str,
 }
@@ -365,18 +349,18 @@ pub(crate) async fn freeze_capture_on(
         // The operator's tenant cap (cached at the last create) leaves generation off.
         return Ok(CaptureEnqueue::Skipped("generation_off"));
     }
-    let (kind, agent, user) = intent.scope.columns();
+    let owner_key = super::namespace_columns(intent.scope);
     let namespace: Option<Uuid> = sqlx::query_scalar(
         "SELECT namespace.id FROM memory_namespaces AS namespace \
          WHERE namespace.company_id = $1 AND namespace.scope_kind = $2 \
-           AND namespace.agent_id IS NOT DISTINCT FROM $3 \
-           AND namespace.user_id IS NOT DISTINCT FROM $4 AND namespace.state = 'ready' \
+           AND namespace.unit_id IS NOT DISTINCT FROM $3 \
+           AND namespace.principal_id IS NOT DISTINCT FROM $4 AND namespace.state = 'ready' \
          FOR SHARE",
     )
     .bind(company)
-    .bind(kind)
-    .bind(agent)
-    .bind(user)
+    .bind(owner_key.kind)
+    .bind(owner_key.unit)
+    .bind(owner_key.principal)
     .fetch_optional(&mut *db)
     .await?;
     let Some(namespace) = namespace else {
@@ -433,12 +417,13 @@ pub(crate) async fn freeze_capture_on(
     if frozen.to_string().len() > MAX_FROZEN_SAVE_BYTES {
         return Ok(CaptureEnqueue::Skipped("too_large"));
     }
+    let producer = super::agent_principal_on(db, company, intent.agent).await?;
     let id = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO memory_deliveries (company_id, id, namespace_id, kind, run_id, execution_id, \
-           exchange_id, idempotency_key, expires_at, request, disable_epoch, state, available_at) \
+           exchange_id, idempotency_key, expires_at, request, disable_epoch, state, available_at, unit_id, principal_id) \
          VALUES ($1, $2, $3, 'generation', $4, $5, $6, $7, $8, $9, $10, 'pending', \
-           clock_timestamp())",
+           clock_timestamp(), $11, $12)",
     )
     .bind(company)
     .bind(id)
@@ -450,6 +435,8 @@ pub(crate) async fn freeze_capture_on(
     .bind(request.expires_at)
     .bind(&frozen)
     .bind(epoch)
+    .bind(owner_key.unit)
+    .bind(producer.as_uuid())
     .execute(&mut *db)
     .await?;
     Ok(CaptureEnqueue::Enqueued {

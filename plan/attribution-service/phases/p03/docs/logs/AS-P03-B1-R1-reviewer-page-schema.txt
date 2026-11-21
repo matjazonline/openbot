@@ -1,0 +1,2 @@
+PASS: 100-item, 120-character names page validates against accepted Openbot CompanyPage schema
+Compact UTF-8 JSON bytes: 73530

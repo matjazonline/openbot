@@ -1,0 +1,15 @@
+--- B1/src/adapters/persistence/test_support.rs
++++ B2/src/adapters/persistence/test_support.rs
+@@ -41,6 +41,12 @@
+ #[path = "channel_access_test_support.rs"]
+ mod channel_access;
+ pub use channel_access::{empty_channel_department, restrict_channel_to_configured_grants};
++
++#[path = "managed_desk_test_support.rs"]
++mod managed_desk;
++pub(crate) use managed_desk::{
++    company_owner_actor, create_channel, delegated_unit, wait_until_blocked_by,
++};
+ 
+ use sqlx::postgres::PgPoolOptions;
+ use sqlx::{Connection, PgConnection, PgPool};

@@ -1,0 +1,12 @@
+    Checking attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+warning: unused import: `crypto`
+ --> src/adapters/catalog/postgres.rs:3:20
+  |
+3 |         identity::{crypto, tenants::lock_tenant},
+  |                    ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `attribution_service` (lib) generated 1 warning (run `cargo fix --lib -p attribution_service` to apply 1 suggestion)
+warning: `attribution_service` (lib test) generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized] target(s) in 2.56s

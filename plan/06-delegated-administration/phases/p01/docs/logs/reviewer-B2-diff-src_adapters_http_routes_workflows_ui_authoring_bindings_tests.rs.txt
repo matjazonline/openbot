@@ -1,0 +1,22 @@
+--- B1/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
++++ B2/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
+@@ -299,7 +299,7 @@
+ }
+ 
+ #[tokio::test]
+-async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card() {
++async fn binding_configuration_does_not_grant_conversation_view_in_the_tab_form_or_card() {
+     let Some(f) = Fixture::new().await else {
+         return;
+     };
+@@ -338,8 +338,8 @@
+     assert!(admin.contains(&format!(
+         r#"<option value="channel:{open}">Desk Open desk</option>"#
+     )));
+-    let refused = bind(f.admin, board, "").await;
+-    assert!(refused.contains("Not saved: A chosen desk"), "{refused}");
++    let configured = bind(f.admin, board, "").await;
++    assert!(configured.contains("Saved binding"), "{configured}");
+     let card = async |user: Uuid, channel: Uuid| {
+         channel_bindings(f.ui(user), Path(channel), f.query())
+             .await

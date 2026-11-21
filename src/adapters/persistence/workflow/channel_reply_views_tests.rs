@@ -222,8 +222,17 @@ async fn classified_intents() -> Intents {
         .execute(&mut *tx)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',5)")
-        .bind(Uuid::new_v4()).bind(company).bind(user).execute(&mut *tx).await.unwrap();
+    crate::adapters::persistence::company::join_root_on(
+        &mut tx,
+        crate::adapters::persistence::company::RootJoin {
+            company: crate::domain::workflow::CompanyId::new(company),
+            user,
+            role: crate::entities::company_member::CompanyAccessRole::Member,
+            access_level: crate::entities::access_level::AccessLevel::try_from(5_i16).unwrap(),
+        },
+    )
+    .await
+    .expect("fixture root member");
     sqlx::query("UPDATE principals SET kind='person',user_id=$3 WHERE company_id=$1 AND id=$2")
         .bind(company)
         .bind(principal)

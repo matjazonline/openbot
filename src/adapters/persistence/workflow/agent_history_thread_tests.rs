@@ -380,3 +380,6 @@ async fn agent_history_identity_actual_agents_in_same_thread_remain_distinct() {
 
 #[path = "agent_history_ordering_tests.rs"]
 mod ordering;
+
+#[path = "delegated_model_authority_tests.rs"]
+mod delegated_model_authority;

@@ -33,12 +33,14 @@ async fn agent_history_level_lower_private_session_reuse_filters_hidden_pairs_wi
     )
     .await;
     let company = f.f.s.fixture.target.company.as_uuid();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(admin)
-        .execute(f.f.s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company)
+    .bind(admin)
+    .execute(f.f.s.pool())
+    .await
+    .unwrap();
     f.actor = WorkflowActor::authenticated(admin).unwrap();
     let mut llm = scripted_llm(vec![
         LlmTurn::text("\"public accepted\""),
@@ -57,12 +59,14 @@ async fn agent_history_level_lower_private_session_reuse_filters_hidden_pairs_wi
     finish(&f, &private, json!("private accepted")).await;
     let private_preparation = frozen(&f.f, &private).await;
     assert_eq!(private_preparation["history"]["content_level"], 5);
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(admin)
-        .execute(f.f.s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company)
+    .bind(admin)
+    .execute(f.f.s.pool())
+    .await
+    .unwrap();
     let lower = f.start(json!({"question":"next public task"})).await;
     finish(&f, &lower, json!("lower member answer")).await;
     let selected = frozen(&f.f, &lower).await;

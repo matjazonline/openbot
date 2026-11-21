@@ -49,7 +49,14 @@ where
                 request.company_id,
                 request.actor,
                 request.association,
-                WorkflowOperation::Admit,
+                if matches!(
+                    request.admission_claim,
+                    Some(super::AdmissionClaim::Message(_))
+                ) {
+                    WorkflowOperation::AdmitMessage
+                } else {
+                    WorkflowOperation::Admit
+                },
             )
             .await?;
         let AdmissionBinding { binding, saved } = self

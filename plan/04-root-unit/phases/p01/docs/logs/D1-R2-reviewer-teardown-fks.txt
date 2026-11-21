@@ -1,0 +1,76 @@
+9568:    ADD CONSTRAINT agent_skills_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
+9664:    ADD CONSTRAINT channel_principal_grants_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+9711:    ADD CONSTRAINT addresses_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+9715:-- Name: channels channels_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+9719:    ADD CONSTRAINT channels_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9881:    ADD CONSTRAINT internal_note_tombstones_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+9897:    ADD CONSTRAINT internal_notes_author_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+10040:    ADD CONSTRAINT messages_author_principal_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id);
+10072:    ADD CONSTRAINT notification_events_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (actor_principal_id);
+10121:    ADD CONSTRAINT notifications_recipient_fk FOREIGN KEY (company_id, recipient_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (recipient_principal_id);
+10140:    ADD CONSTRAINT participant_identities_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+10152:-- Name: principals principals_company_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+10160:    ADD CONSTRAINT principals_company_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id);
+10164:-- Name: principals principals_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10168:    ADD CONSTRAINT principals_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10172:-- Name: principals principals_company_user_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+10176:    ADD CONSTRAINT principals_company_user_fk FOREIGN KEY (company_id, user_id) REFERENCES public.company_members(company_id, user_id) ON DELETE CASCADE;
+10240:    ADD CONSTRAINT task_harness_runs_company_id_agent_id_fkey FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+10272:    ADD CONSTRAINT thread_principals_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+11126:    ADD CONSTRAINT workflow_message_intent_responder FOREIGN KEY (company_id, responder_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responder_principal_id);
+11142:    ADD CONSTRAINT workflow_message_destination_principal FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+11481:    FOREIGN KEY(company_id, agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12087:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12414:    agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+12430:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12455:    agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+12464:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED
+12468:    agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+12475:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12496:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12530:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) ON DELETE CASCADE,
+12831:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+12954:    FOREIGN KEY (company_id,responder_principal_id) REFERENCES public.principals(company_id,id)
+13723:    FOREIGN KEY (company_id, respondent_id) REFERENCES public.principals(company_id,id) DEFERRABLE INITIALLY DEFERRED
+13953:    FOREIGN KEY (company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED
+14347:        FOREIGN KEY (company_id,live_creator_principal_id) REFERENCES public.principals(company_id,id)
+14381:    FOREIGN KEY (company_id,agent_id) REFERENCES public.agents(company_id,id),
+15652:        REFERENCES public.departments(company_id, id),
+15671:        REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+15673:        REFERENCES public.principals(company_id, id) ON DELETE CASCADE
+15687:        REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+15689:        REFERENCES public.principals(company_id, id) ON DELETE CASCADE
+15700:        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+15891:    FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE
+16059:    FOREIGN KEY (company_id,department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+16281:    REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED;
+16401:        REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+16403:        REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED
+16550:        REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED
+17177:    FOREIGN KEY(company_id,origin_department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+17494:    FOREIGN KEY(company_id,origin_department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+17495:    FOREIGN KEY(company_id,chosen_department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+18591:    FOREIGN KEY(company_id,source_principal_id) REFERENCES public.principals(company_id,id) ON DELETE CASCADE,
+18592:    FOREIGN KEY(company_id,sender_principal_id) REFERENCES public.principals(company_id,id)
+18972:        REFERENCES public.principals(company_id, id) ON DELETE CASCADE,
+19052:ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19054:ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19056:ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19058:ALTER TABLE public.channel_reply_contexts ADD CONSTRAINT channel_reply_contexts_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19060:ALTER TABLE public.channel_reply_settings ADD CONSTRAINT channel_reply_settings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+19063:ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19066:ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19069:ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19070:ALTER TABLE public.notifications ADD CONSTRAINT notifications_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+19072:ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19074:ALTER TABLE public.thread_principals ADD CONSTRAINT thread_principals_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19077:ALTER TABLE public.threads ADD CONSTRAINT threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19079:ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19081:ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+19084:ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19087:ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destinations_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19089:ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19091:ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+19099:    REFERENCES public.principals(company_id, id, kind)
+19245:        REFERENCES public.agents(company_id,id) ON DELETE CASCADE,
+19261:    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id)

@@ -2,12 +2,13 @@
 use super::*;
 
 /// Create a department with its desk, and its lead when one is named (01DEP-P03-D8). The caller
-/// holds the company write lock and `actor`'s account row.
+/// holds the company write lock and `actor`'s account row, and authorized the create as `acting`.
 pub(crate) async fn create_department_on(
     tx: &mut Transaction<'_, Postgres>,
     templates: &ProvisioningDeployment,
     company: CompanyId,
     actor: WorkflowActor,
+    acting: ManagementRole,
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
 ) -> AppResult<Department> {
@@ -16,6 +17,7 @@ pub(crate) async fn create_department_on(
         templates,
         company,
         actor,
+        acting,
         DepartmentId::random(),
         write,
         lead,
@@ -25,19 +27,71 @@ pub(crate) async fn create_department_on(
 
 /// [`create_department_on`] under a caller-chosen id, for a creator that replays by id
 /// (onboarding's first department, 01DEP-P03-D4).
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn create_department_with_id_on(
     tx: &mut Transaction<'_, Postgres>,
     templates: &ProvisioningDeployment,
     company: CompanyId,
     actor: WorkflowActor,
+    acting: ManagementRole,
     id: DepartmentId,
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
 ) -> AppResult<Department> {
-    if let Some(parent) = write.parent_id {
+    let parent_id = Some(match write.parent_id {
+        Some(parent) => parent,
+        None => super::super::company::root_on(tx, company).await?,
+    });
+    if let Some(parent) = parent_id {
         let parent = lock_parent_on(tx, company, parent).await?;
         check_shape_on(tx, company, id, &write.name, &parent).await?;
     }
+    let department = insert_department_on(tx, company, id, write, parent_id).await?;
+    // First, so the department's history starts with its creation; a named lead follows.
+    super::audit::record_on(
+        tx,
+        company,
+        actor,
+        acting,
+        department.id,
+        super::AdministrationEvent::Created,
+    )
+    .await?;
+    if let Some(lead) = lead {
+        assign_department_role_on(
+            tx,
+            templates,
+            company,
+            actor,
+            department.id,
+            DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: lead,
+                decider: false,
+            },
+        )
+        .await?;
+    }
+    // Boxed: an agent lead's desk descends into template compilation and publication.
+    Box::pin(provision_department_desk_on(
+        tx,
+        templates,
+        company,
+        actor,
+        &department,
+        lead,
+    ))
+    .await?;
+    Ok(department)
+}
+
+async fn insert_department_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    id: DepartmentId,
+    write: &DepartmentWrite,
+    parent_id: Option<DepartmentId>,
+) -> AppResult<Department> {
     let created_by = serde_json::to_value(
         write
             .created_by
@@ -56,7 +110,7 @@ pub(crate) async fn create_department_with_id_on(
     .bind(&write.slug)
     .bind(&write.description)
     .bind(&write.charter)
-    .bind(write.parent_id.map(DepartmentId::as_uuid))
+    .bind(parent_id.map(DepartmentId::as_uuid))
     .bind(created_by)
     .bind(
         write
@@ -69,31 +123,12 @@ pub(crate) async fn create_department_with_id_on(
     .await
     .map_err(|error| slug_conflict(error, &write.slug))?;
     let department = Department::try_from(department)?;
-    // Boxed: an agent lead's desk descends into template compilation and publication.
-    Box::pin(provision_department_desk_on(
+    super::super::memory::ensure_on(
         tx,
-        templates,
-        company,
-        actor,
-        &department,
-        lead,
-    ))
+        company.as_uuid(),
+        crate::application::memory::NamespaceOwner::Unit(department.id),
+    )
     .await?;
-    if let Some(lead) = lead {
-        assign_department_role_on(
-            tx,
-            templates,
-            company,
-            actor,
-            department.id,
-            DepartmentRoleAssignment {
-                role: DepartmentRole::Lead,
-                principal: lead,
-                decider: false,
-            },
-        )
-        .await?;
-    }
     Ok(department)
 }
 
@@ -118,7 +153,22 @@ pub(crate) async fn update_department_on(
         .charter
         .clone()
         .unwrap_or_else(|| current.charter.clone());
-    let parent_id = edit.parent_id.unwrap_or(current.parent_id);
+    if current.is_root
+        && (edit.parent_id.unwrap_or(current.parent_id) != current.parent_id
+            || slug != current.slug.as_str())
+    {
+        return Err(AppError::BadRequest(
+            "The company root cannot be reparented or renamed independently.".into(),
+        ));
+    }
+    let parent_id = if current.is_root {
+        None
+    } else {
+        Some(match edit.parent_id.unwrap_or(current.parent_id) {
+            Some(parent) => parent,
+            None => super::super::company::root_on(tx, company).await?,
+        })
+    };
     let escalation = edit.escalation.unwrap_or(current.escalation);
     if parent_id != current.parent_id
         && let Some(parent) = parent_id
@@ -166,6 +216,11 @@ async fn guard_department_delete_on(
     company: CompanyId,
     current: &Department,
 ) -> AppResult<()> {
+    if current.is_root {
+        return Err(AppError::BadRequest(
+            "The company root cannot be deleted.".into(),
+        ));
+    }
     let department = current.id;
     let has_children: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM departments AS child \
@@ -193,6 +248,37 @@ async fn guard_department_delete_on(
         return Err(AppError::Conflict(format!(
             "Department '{}' still owns desks. Move them to another department or delete them first.",
             current.name
+        )));
+    }
+    // Skills and connections belong to a unit (Plan07); the foreign keys enforce this and the
+    // message names what to move first.
+    let (owned, total) = crate::adapters::persistence::unit_resources::owned_resources_on(
+        tx,
+        company.as_uuid(),
+        department.as_uuid(),
+        10,
+    )
+    .await?;
+    if total > 0 {
+        let more = total - owned.len() as i64;
+        let more = if more > 0 {
+            format!(" (and {more} more)")
+        } else {
+            String::new()
+        };
+        return Err(AppError::Conflict(format!(
+            "Department '{}' still owns skills or connections: {}{more}. Move them first.",
+            current.name,
+            owned.join(", "),
+        )));
+    }
+    let owns_definitions: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_definitions WHERE company_id=$1 AND managing_department_id=$2)",
+    ).bind(company.as_uuid()).bind(department.as_uuid()).fetch_one(&mut **tx).await?;
+    if owns_definitions {
+        return Err(AppError::Conflict(format!(
+            "Department '{}' still owns workflow definitions and cannot be deleted.",
+            current.name,
         )));
     }
     let captured: bool = sqlx::query_scalar(
@@ -228,24 +314,18 @@ pub(crate) async fn delete_department_on(
     .fetch_all(&mut **tx)
     .await?;
     lock_principals_on(tx, company, &placed).await?;
+    super::super::memory::retire_namespaces_on(
+        tx,
+        company.as_uuid(),
+        crate::application::memory::NamespaceOwner::Unit(department),
+    )
+    .await?;
     sqlx::query("DELETE FROM departments WHERE company_id = $1 AND id = $2")
         .bind(company.as_uuid())
         .bind(department.as_uuid())
         .execute(&mut **tx)
         .await
-        .map_err(|error| {
-            if error
-                .as_database_error()
-                .is_some_and(|database| database.is_foreign_key_violation())
-            {
-                AppError::Conflict(format!(
-                    "Department '{}' is still referenced and cannot be deleted.",
-                    current.name
-                ))
-            } else {
-                AppError::from(error)
-            }
-        })?;
+        .map_err(delete_error)?;
     super::super::workflow::role_binding::check_principals_on(tx, company, &placed).await?;
     // Its lead was a child lead of the parent's desks.
     if let Some(parent) = current.parent_id {
@@ -260,4 +340,15 @@ pub(crate) async fn delete_department_on(
     .execute(&mut **tx)
     .await?;
     Ok(())
+}
+
+pub(super) fn delete_error(error: sqlx::Error) -> AppError {
+    if error
+        .as_database_error()
+        .is_some_and(|database| database.is_foreign_key_violation())
+    {
+        AppError::Conflict("The department is still referenced and cannot be deleted.".into())
+    } else {
+        AppError::from(error)
+    }
 }

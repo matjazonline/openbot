@@ -44,6 +44,7 @@ pub mod ui_schedules;
 pub mod ui_team;
 pub mod ui_uploads;
 pub mod ui_vault;
+pub(crate) mod unit_resources;
 pub mod user;
 pub mod webhooks;
 pub mod workflows;

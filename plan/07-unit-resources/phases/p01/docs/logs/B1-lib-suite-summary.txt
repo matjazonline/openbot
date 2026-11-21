@@ -1,0 +1,69 @@
+# cargo test --locked --offline --lib (no filter), DATABASE_URL openbot_p07_b1 @55407, Node default 26.13.1, 2026-11-20
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io ... FAILED
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences' (38119535) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches' (38119540) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry' (38119539) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once' (38119637) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:202:84:
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer' (38119643) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once' (38120650) panicked at src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs:82:22:
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io' (38136953) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:435:5:
+test result: FAILED. 4882 passed; 7 failed; 30 ignored; 0 measured; 0 filtered out; finished in 2099.10s
+## failures
+failures:
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences' (38119535) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+counted peer exited before event
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches' (38119540) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+counted peer exited before event
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry' (38119539) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+counted peer exited before event
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once' (38119637) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:202:84:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer' (38119643) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:162:22:
+counted peer exited before event
+
+---- adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once' (38120650) panicked at src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs:82:22:
+counted peer exited before its event
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io' (38136953) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:435:5:
+assertion `left == right` failed
+  left: Number(8)
+ right: 7
+
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer
+    adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io
+
+test result: FAILED. 4882 passed; 7 failed; 30 ignored; 0 measured; 0 filtered out; finished in 2099.10s
+
+error: test failed, to rerun pass `--lib`

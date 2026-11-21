@@ -9,11 +9,7 @@
 use super::*;
 use crate::adapters::persistence::agent_publication::publish_initial_on;
 use crate::adapters::persistence::company_agent::refusal_error;
-use crate::adapters::persistence::department_desks::{
-    prelock_ownership_on, set_desk_ownership_on, sync_desk_grants_on,
-};
 use crate::application::agent::AgentPublicationScope;
-use crate::application::ports::channel::ChannelOwnershipWrite;
 use crate::application::workflow::channel_reply::{
     ChannelReplySettings, ConfigureChannelReply, ConfigureResponder,
 };
@@ -25,13 +21,6 @@ use crate::entities::transport::PrincipalId;
 /// The command key that records a department's desk and the binding it owns.
 pub(crate) fn department_desk_key(department: DepartmentId) -> String {
     format!("department:{department}")
-}
-
-fn owned_by(department: DepartmentId) -> ChannelOwnershipWrite {
-    ChannelOwnershipWrite {
-        department_id: Some(Some(department)),
-        members_only: Some(false),
-    }
 }
 
 /// The agent a lead principal is, when it is one: its id and slug.
@@ -67,30 +56,18 @@ pub(crate) async fn provision_department_desk_on(
     department: &Department,
     lead: Option<PrincipalId>,
 ) -> AppResult<()> {
-    let Some((_, agent_slug)) = lead_agent_on(tx, company, lead).await? else {
-        return plain_desk_on(tx, templates, company, actor, department).await;
-    };
-    // Boxed: the desk descends into template compilation and workflow publication.
-    let created = Box::pin(assistant_channel_on(
+    plain_desk_on(tx, templates, company, actor, department).await?;
+    // Placement is already committed to this transaction: publication and the desk's
+    // binding use the same unit authority, with no temporary root-owned desk.
+    Box::pin(follow_department_lead_on(
         tx,
         templates,
         company,
         actor,
-        AssistantChannelRequest {
-            agent_slug,
-            channel_slug: department.slug.to_string(),
-            channel_name: department.name.clone(),
-            reply_mode: ReplyMode::Autonomous,
-            command_key: department_desk_key(department.id),
-        },
+        department.id,
+        lead,
     ))
-    .await?
-    .map_err(refusal_error)?;
-    let desk = created["channel"]["id"]
-        .as_str()
-        .and_then(|id| Uuid::parse_str(id).ok())
-        .ok_or_else(|| AppError::Internal("A department desk result has no channel id".into()))?;
-    set_desk_ownership_on(tx, company, desk, &owned_by(department.id)).await
+    .await
 }
 
 /// A plain team desk through the owned-desk create sequence `ChannelPersistence::create` uses,
@@ -111,19 +88,17 @@ async fn plain_desk_on(
             .bind(company.as_uuid())
             .fetch_one(&mut **tx)
             .await?;
-    let ownership = owned_by(department.id);
     let mut write = ChannelWrite {
         name: department.name.clone(),
         slug,
         enabled: true,
         add_3rd_party,
         created_by: Some(CreationProvenance::user(actor.user_id())),
-        ownership: Some(ownership),
+        department_id: Some(department.id),
         ..ChannelWrite::default()
     };
     write.normalize()?;
     let desk = Uuid::new_v4();
-    prelock_ownership_on(tx, company, None, &ownership).await?;
     // In a savepoint: a desk created meanwhile by a writer that takes no company lock claims the
     // address with a unique violation, which is then the conflict (as `provision_guarded`).
     let mut savepoint = sqlx::Acquire::begin(&mut **tx).await?;
@@ -173,7 +148,7 @@ async fn insert_plain_desk_on(
     insert_channel_row_on(tx, company.as_uuid(), desk, write).await?;
     insert_desk_addresses(tx, company.as_uuid(), desk, &write.slug, &write.alias_slugs).await?;
     write_channel_email_binding(tx, company.as_uuid(), desk, write).await?;
-    sync_desk_grants_on(tx, company, desk).await
+    Ok(())
 }
 
 /// The department's recorded desk and the binding it owns, while the desk still belongs to it.
@@ -344,20 +319,14 @@ async fn guard_on(
             "The department desk asks reviewers to approve replies; remove that policy or detach the desk before changing the lead.".into(),
         ));
     }
-    match super::association::authorize_association(
+    super::management::authorize_association_on(
         tx,
         company,
         actor,
         RelatedAssociation::Channel(desk.channel),
     )
-    .await
-    {
-        Err(AppError::NotFound(_)) => Err(AppError::BadRequest(format!(
-            "You cannot see the department desk '{}', so its replies cannot follow the new lead.",
-            desk.slug
-        ))),
-        other => other,
-    }
+    .await?;
+    Ok(())
 }
 
 /// The owned binding's bound version re-targeted to `slug`: a new draft revision of exactly that
@@ -420,7 +389,8 @@ async fn repoint_on(
         },
         previous.origin().cloned(),
     );
-    super::definitions::save_draft_on(tx, &draft, actor, Some(previous.revision()), false).await?;
+    super::definitions::save_draft_on(tx, &draft, actor, Some(previous.revision()), false, None)
+        .await?;
     let version = VersionId::new(Uuid::new_v4());
     let bundle = match compiled(tx, templates, &decoder, &draft, version).await? {
         Ok(bundle) => Arc::new(bundle),

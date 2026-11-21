@@ -37,7 +37,8 @@ async fn attention_application_gating_refuses_team_work_and_hides_foreign_tenant
             query("team_work"),
         )
         .await,
-        StatusCode::FORBIDDEN,
+        // Company administration; anyone else is told nothing (Plan06 02A.4).
+        StatusCode::NOT_FOUND,
         &f.company.name,
     )
     .await;
@@ -48,7 +49,7 @@ async fn attention_application_gating_refuses_team_work_and_hides_foreign_tenant
             Path(f.company.id),
         )
         .await,
-        StatusCode::FORBIDDEN,
+        StatusCode::NOT_FOUND,
         &f.company.name,
     )
     .await;
@@ -179,7 +180,7 @@ async fn department_views_attention_reads_only_the_departments_desks() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    let owned = crate::application::ports::channel::ChannelPersistence::create(
+    let owned = crate::adapters::persistence::test_support::create_channel(
         f.persistence.as_ref(),
         f.company.id,
         crate::application::ports::channel::ChannelWrite {
@@ -193,7 +194,7 @@ async fn department_views_attention_reads_only_the_departments_desks() {
     .id;
     let sales = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO departments (id, company_id, name, slug, created_by) VALUES ($1, $2, 'Sales', \
+        "INSERT INTO departments (id, company_id, parent_id, name, slug, created_by) VALUES ($1, $2, (SELECT id FROM departments WHERE company_id=$2 AND is_root), 'Sales', \
          'sales', '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
     )
     .bind(sales)
@@ -284,8 +285,7 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
         )
         .await
         .unwrap();
-    // The member reads none of `hidden`'s desks (its own desk is a team desk they could read,
-    // so take it out of what they read here).
+    // Hidden has no member or role grant for this person.
     let seen = departments
         .desk_departments(f.member.id, f.company.id, &[])
         .await
@@ -298,6 +298,8 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
         .fetch_one(f.persistence.pool())
         .await
         .unwrap();
+    sqlx::query("INSERT INTO channel_principal_grants (company_id,channel_id,principal_id,capability,provenance) VALUES($1,$2,$3,'view','configured_allowlist')")
+        .bind(f.company.id).bind(hidden_desk).bind(member).execute(f.persistence.pool()).await.unwrap();
     let through_desk = departments
         .desk_departments(f.member.id, f.company.id, &[hidden_desk])
         .await
@@ -332,9 +334,8 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
     .await
     .unwrap();
     assert!(listed.0.items.is_empty());
-    // `hidden`'s own desk is a team desk the member can read, so it is named — make it
-    // members-only of `hidden` first, which takes it out of what the member reads.
-    sqlx::query("UPDATE channels SET access_mode = 'allowlist', members_only = true WHERE id = $1")
+    // Removing the explicit grant makes the real attention reader stop revealing this department.
+    sqlx::query("DELETE FROM channel_principal_grants WHERE channel_id=$1 AND provenance='configured_allowlist'")
         .bind(hidden_desk)
         .execute(f.persistence.pool())
         .await
@@ -352,4 +353,68 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
         &f.company.name,
     )
     .await;
+}
+
+/// Plan06 U4/U5: the team view and the operational summary are company administration; a unit
+/// lead keeps its own queue and is told nothing about the rest.
+#[tokio::test]
+async fn delegated_admin_routes_attention_team_views_hide_from_unit_leads() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let d = f.delegation().await;
+    let query = |view: &str| {
+        Query(ListQuery {
+            view: Some(view.into()),
+            cursor: None,
+            limit: None,
+            department_id: None,
+        })
+    };
+    denied(
+        list_attention(
+            State(f.attention.clone()),
+            State(f.departments()),
+            Fixture::viewer(&d.lead),
+            Path(f.company.id),
+            query("team_work"),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.company.name,
+    )
+    .await;
+    denied(
+        operational_summary(
+            State(f.attention.clone()),
+            Fixture::viewer(&d.lead),
+            Path(f.company.id),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.company.name,
+    )
+    .await;
+    assert!(
+        list_attention(
+            State(f.attention.clone()),
+            State(f.departments()),
+            Fixture::viewer(&d.lead),
+            Path(f.company.id),
+            query("my_work"),
+        )
+        .await
+        .is_ok()
+    );
+    for user in [&d.admin, &f.owner] {
+        assert!(
+            operational_summary(
+                State(f.attention.clone()),
+                Fixture::viewer(user),
+                Path(f.company.id),
+            )
+            .await
+            .is_ok()
+        );
+    }
 }

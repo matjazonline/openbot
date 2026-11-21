@@ -95,3 +95,38 @@ async fn check_fragments(f: &Fixture, case: ScopeCase<'_>, invite_id: Uuid) {
     )
     .await;
 }
+
+/// The legacy invite pages stay the owner's; a unit lead is told nothing (Plan06 02A.4).
+#[tokio::test]
+async fn delegated_admin_routes_legacy_invite_pages_hide_from_unit_leads() {
+    use crate::use_cases::company_invite::CompanyInvitePersistence;
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let d = f.delegation().await;
+    let invite = f
+        .persistence
+        .create_invite(
+            crate::adapters::persistence::test_support::invite_command(
+                &f.persistence,
+                f.company.id,
+                &format!("invite-{}@example.test", Uuid::new_v4().simple()),
+                CompanyAccessRole::Member,
+            )
+            .await,
+        )
+        .await
+        .unwrap();
+    check_fragments(
+        &f,
+        ScopeCase {
+            companies: f.companies.clone(),
+            invites: f.invites.clone(),
+            user: &d.lead,
+            company_id: f.company.id,
+            status: axum::http::StatusCode::NOT_FOUND,
+        },
+        invite.id,
+    )
+    .await;
+}

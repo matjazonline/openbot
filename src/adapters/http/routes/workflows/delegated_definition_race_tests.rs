@@ -1,0 +1,136 @@
+use super::*;
+
+use crate::adapters::persistence::test_support::{
+    WriteBarrier as BarrierTable, competing_writes as contend,
+};
+
+async fn edited(m: &ManagedDefinitions, workflow: Uuid) {
+    let (status, body) =
+        m.f.save(
+            m.a_actor.user_id(),
+            m.f.company,
+            workflow,
+            Some(1),
+            &example("data.map", workflow),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+}
+
+#[tokio::test]
+async fn delegated_admin_competing_role_removal_precedes_definition_publication() {
+    let Some(m) = ManagedDefinitions::new().await else {
+        return;
+    };
+    let (workflow, _) = m.published().await;
+    edited(&m, workflow).await;
+    let events = m.events(workflow).await;
+    let result = contend(
+        m.f.persistence.pool(),
+        BarrierTable::DeskGrants,
+        m.revoke_a(),
+        m.f.publish(
+            m.a_actor.user_id(),
+            m.f.company,
+            workflow,
+            2,
+            "revocation-first",
+        ),
+    )
+    .await;
+    assert_eq!(
+        result.second.0,
+        StatusCode::NOT_FOUND,
+        "{}",
+        result.second.1
+    );
+    assert_eq!(m.events(workflow).await, events);
+    assert!(!m.manages(m.a_actor, workflow).await);
+}
+
+#[tokio::test]
+async fn delegated_admin_competing_definition_publication_precedes_role_removal() {
+    let Some(m) = ManagedDefinitions::new().await else {
+        return;
+    };
+    let (workflow, _) = m.published().await;
+    edited(&m, workflow).await;
+    let events = m.events(workflow).await;
+    let result = contend(
+        m.f.persistence.pool(),
+        BarrierTable::DefinitionEvents,
+        m.f.publish(
+            m.a_actor.user_id(),
+            m.f.company,
+            workflow,
+            2,
+            "publication-first",
+        ),
+        m.revoke_a(),
+    )
+    .await;
+    assert_eq!(result.first.0, StatusCode::OK, "{}", result.first.1);
+    assert_eq!(m.events(workflow).await, events + 1);
+    assert!(!m.manages(m.a_actor, workflow).await);
+}
+
+#[tokio::test]
+async fn delegated_admin_competing_binding_deactivation_precedes_definition_publication() {
+    let Some(m) = ManagedDefinitions::new().await else {
+        return;
+    };
+    let (workflow, version) = m.published().await;
+    edited(&m, workflow).await;
+    let binding = m
+        .active(m.b_actor, m.b, version, "deactivation-first")
+        .await;
+    let events = m.events(workflow).await;
+    let result = contend(
+        m.f.persistence.pool(),
+        BarrierTable::BindingEvents,
+        m.pause(m.b_actor, &binding),
+        m.f.publish(
+            m.b_actor.user_id(),
+            m.f.company,
+            workflow,
+            2,
+            "deactivation-first",
+        ),
+    )
+    .await;
+    assert_eq!(
+        result.second.0,
+        StatusCode::NOT_FOUND,
+        "{}",
+        result.second.1
+    );
+    assert_eq!(m.events(workflow).await, events);
+    assert!(m.manages(m.a_actor, workflow).await && !m.manages(m.b_actor, workflow).await);
+}
+
+#[tokio::test]
+async fn delegated_admin_competing_definition_publication_precedes_binding_deactivation() {
+    let Some(m) = ManagedDefinitions::new().await else {
+        return;
+    };
+    let (workflow, version) = m.published().await;
+    edited(&m, workflow).await;
+    let binding = m.active(m.b_actor, m.b, version, "publication-first").await;
+    let events = m.events(workflow).await;
+    let result = contend(
+        m.f.persistence.pool(),
+        BarrierTable::DefinitionEvents,
+        m.f.publish(
+            m.b_actor.user_id(),
+            m.f.company,
+            workflow,
+            2,
+            "publication-first",
+        ),
+        m.pause(m.b_actor, &binding),
+    )
+    .await;
+    assert_eq!(result.first.0, StatusCode::OK, "{}", result.first.1);
+    assert_eq!(m.events(workflow).await, events + 1);
+    assert!(m.manages(m.a_actor, workflow).await && !m.manages(m.b_actor, workflow).await);
+}

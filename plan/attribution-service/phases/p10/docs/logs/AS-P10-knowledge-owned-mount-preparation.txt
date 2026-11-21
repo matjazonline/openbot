@@ -1,0 +1,80 @@
+COMMAND: docker stop --time 30 as-final-postgres-fb07042291b6444983511ac71f79fe92
+Flag --time has been deprecated, use --timeout instead
+as-final-postgres-fb07042291b6444983511ac71f79fe92
+COMMAND: colima stop --profile as-attribution-integration
+time="2026-11-16T20:14:53+01:00" level=info msg="stopping colima [profile=as-attribution-integration]"
+time="2026-11-16T20:14:53+01:00" level=info msg="stopping ..." context=docker
+Stopping 'docker.service', but its triggering units are still active:
+docker.socket
+time="2026-11-16T20:14:54+01:00" level=info msg="stopping ..." context=vm
+time="2026-11-16T20:14:54+01:00" level=info msg="Sending SIGINT to hostagent process 52015"
+time="2026-11-16T20:14:54+01:00" level=info msg="Waiting for the host agent and the driver processes to shut down"
+time="2026-11-16T20:14:54+01:00" level=info msg="[hostagent] Received SIGINT, shutting down the host agent"
+time="2026-11-16T20:14:54+01:00" level=info msg="[hostagent] Shutting down the host agent"
+time="2026-11-16T20:14:54+01:00" level=info msg="[hostagent] Stopping forwarding `/var/run/docker.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/docker.sock` (host)"
+time="2026-11-16T20:14:54+01:00" level=info msg="[hostagent] Stopping forwarding `/var/run/containerd/containerd.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/containerd.sock` (host)"
+time="2026-11-16T20:14:54+01:00" level=info msg="[hostagent] Unmounting disk `colima-as-attribution-integration`"
+time="2026-11-16T20:14:54+01:00" level=info msg="[hostagent] Shutting down VZ"
+time="2026-11-16T20:14:58+01:00" level=info msg="[hostagent] [VZ] - vm state change: stopped"
+time="2026-11-16T20:14:58+01:00" level=info msg="Waiting for the instance to shut down"
+time="2026-11-16T20:14:59+01:00" level=info msg="The instance colima-as-attribution-integration has shut down"
+time="2026-11-16T20:14:59+01:00" level=info msg=done
+COMMAND: colima start --profile as-attribution-integration --mount /Users/mac02/as-p10-knowledge-pnc6k864:w
+time="2026-11-16T20:15:00+01:00" level=info msg="starting colima [profile=as-attribution-integration]"
+time="2026-11-16T20:15:00+01:00" level=info msg="runtime: docker"
+time="2026-11-16T20:15:01+01:00" level=info msg="starting ..." context=vm
+time="2026-11-16T20:15:01+01:00" level=info msg="Using the existing instance `colima-as-attribution-integration`"
+time="2026-11-16T20:15:02+01:00" level=info msg="Starting the instance `colima-as-attribution-integration` with internal VM driver `vz`"
+time="2026-11-16T20:15:03+01:00" level=info msg="[hostagent] hostagent socket created at /Users/mac02/.colima/_lima/colima-as-attribution-integration/ha.sock"
+time="2026-11-16T20:15:03+01:00" level=info msg="[hostagent] Starting VZ (hint: to watch the boot progress, see `/Users/mac02/.colima/_lima/colima-as-attribution-integration/serial*.log`)"
+time="2026-11-16T20:15:03+01:00" level=info msg="[hostagent] Mounting disk `colima-as-attribution-integration` on `/mnt/lima-colima-as-attribution-integration`"
+time="2026-11-16T20:15:03+01:00" level=info msg="[hostagent] Converting `/Users/mac02/.colima/_lima/_disks/colima-as-attribution-integration/datadisk` (raw) to a raw disk `/Users/mac02/.colima/_lima/_disks/colima-as-attribution-integration/datadisk`"
+time="2026-11-16T20:15:03+01:00" level=info msg="[hostagent] [VZ] - vm state change: running"
+time="2026-11-16T20:15:10+01:00" level=info msg="[hostagent] SSH server does not seem to be running on vsock port, using usernet forwarder"
+time="2026-11-16T20:15:11+01:00" level=info msg="SSH Local Port: 62574"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 1/5) 🕐 SSH connection (essential)"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 1/5) ✅ SSH connection"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 2/5) 🕐 User session to be ready for SSH (essential)"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 2/5) ✅ User session to be ready for SSH"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 3/5) 🕐 Persistent SSH ControlMaster (essential)"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 3/5) ✅ Persistent SSH ControlMaster"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Forwarding `/var/run/docker.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/docker.sock` (host)"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 4/5) 🕐 Guest agent to be running"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Forwarding `/var/run/containerd/containerd.sock` (guest) to `/Users/mac02/.colima/as-attribution-integration/containerd.sock` (host)"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Guest agent is running"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 4/5) ✅ Guest agent to be running"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Time sync: guest agent is alive, starting time synchronization"
+time="2026-11-16T20:15:11+01:00" level=info msg="( 5/5) 🕐 Boot scripts to be finished"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Forwarding TCP from 127.0.0.1:53 to 127.0.0.1:53"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Forwarding `127.0.0.1:53` (guest) to `/tmp/lima-psl-127.0.0.1-53-2967693492/sock` (host)"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Not forwarding TCP 0.0.0.0:22"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Not forwarding TCP 192.168.5.1:53"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Forwarding TCP from [::1]:53 to 127.0.0.1:53"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Forwarding `[::1]:53` (guest) to `/tmp/lima-psl-127.0.0.1-53-3801093273/sock` (host)"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Stopping forwarding `[::1]:53` (guest) to `/tmp/lima-psl-127.0.0.1-53-3801093273/sock` (host)"
+time="2026-11-16T20:15:11+01:00" level=warning msg="[hostagent] failed to set up forwarding tcp port 53 (negligible if already forwarded)" error="listen tcp 0.0.0.0:53: bind: address already in use"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Not forwarding TCP [fe80::5055:55ff:fe86:c04a]:53"
+time="2026-11-16T20:15:11+01:00" level=info msg="[hostagent] Not forwarding TCP [::]:22"
+time="2026-11-16T20:15:14+01:00" level=info msg="( 5/5) ✅ Boot scripts to be finished"
+time="2026-11-16T20:15:14+01:00" level=info msg="READY. Run `limactl shell colima-as-attribution-integration` to open the shell."
+installing: 386 OK
+installing: amd64 OK
+{
+  "supported": [
+    "linux/arm64",
+    "linux/amd64",
+    "linux/386"
+  ],
+  "emulators": [
+    "python3.12",
+    "qemu-i386",
+    "qemu-x86_64"
+  ]
+}
+time="2026-11-16T20:15:16+01:00" level=info msg="provisioning ..." context=docker
+colima-as-attribution-integration
+Successfully created context "colima-as-attribution-integration"
+time="2026-11-16T20:15:20+01:00" level=info msg="starting ..." context=docker
+time="2026-11-16T20:15:23+01:00" level=info msg=done
+
+Owned fixture visible inside task VM.

@@ -1,0 +1,11 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+error[E0433]: cannot find module or crate `futures_util` in this scope
+   --> src/adapters/identity/../catalog/http_tests.rs:265:35
+    |
+265 |     let slow=|| Body::from_stream(futures_util::stream::pending::<Result<axum::body::Bytes,std::io::Error>>());
+    |                                   ^^^^^^^^^^^^ use of unresolved module or unlinked crate `futures_util`
+    |
+    = help: if you wanted to use a crate named `futures_util`, use `cargo add futures_util` to add it to your `Cargo.toml`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `attribution_service` (lib test) due to 1 previous error

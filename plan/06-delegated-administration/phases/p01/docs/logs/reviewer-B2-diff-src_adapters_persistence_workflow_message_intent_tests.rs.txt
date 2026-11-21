@@ -1,0 +1,19 @@
+--- B1/src/adapters/persistence/workflow/message_intent_tests.rs
++++ B2/src/adapters/persistence/workflow/message_intent_tests.rs
+@@ -1791,7 +1791,6 @@
+ 
+ #[tokio::test]
+ async fn link_visibility_loads_only_requested_source_channels() {
+-    use crate::application::ports::channel::ChannelPersistence;
+     use crate::application::ports::channel::ChannelWrite;
+     use crate::application::thread_activity::ThreadActivityReader;
+     let s = Intents::new().await;
+@@ -1801,7 +1800,7 @@
+     let run = s.runs(binding).await[0];
+     let company = s.fixture.target.company.as_uuid();
+     for index in 0..64 {
+-        ChannelPersistence::create(
++        crate::adapters::persistence::test_support::create_channel(
+             s.p(),
+             company,
+             ChannelWrite {

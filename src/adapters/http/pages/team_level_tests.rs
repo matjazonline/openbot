@@ -111,7 +111,31 @@ fn access_level_both_team_pages_give_admins_only_level_controls() {
         std::slice::from_ref(&f.member),
         TeamRole::Admin.level_actor(AccessLevel::L4),
     );
-    for html in [member, invite, legacy] {
+    // Plan06 decision b: an admin edits a member invitation (address, level, withdrawal) but
+    // never its role; an invitation carrying the admin role offers an admin nothing.
+    assert!(invite.contains("name=\"email\"") && invite.contains("hx-delete="));
+    assert!(invite.contains("name=\"access_level\"") && !invite.contains("name=\"role\""));
+    let admin_invite = invite_pane(&InvitePane {
+        company: &f.company,
+        invite: &CompanyInvite {
+            role: CompanyAccessRole::Admin,
+            ..f.invite.clone()
+        },
+        role: TeamRole::Admin,
+        viewer_access_level: AccessLevel::L4,
+        email_draft: None,
+        role_draft: None,
+        error: None,
+    });
+    for power in [
+        "name=\"email\"",
+        "hx-delete=",
+        "name=\"access_level\"",
+        "name=\"role\"",
+    ] {
+        assert!(!admin_invite.contains(power), "unexpected control {power}");
+    }
+    for html in [member, legacy] {
         assert!(html.contains("name=\"access_level\""));
         assert!(!html.contains("value=\"5\""));
         for power in [

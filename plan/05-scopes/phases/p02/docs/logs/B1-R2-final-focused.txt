@@ -1,0 +1,22 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.63s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 10 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_accepts_a_real_desk_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_fresh_seal_rejects_missing_root_and_unpaired_local_write ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_default_and_explicit_unit_saves_freeze_only_the_local_target ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_explicit_unit_save_without_a_local_unit_creates_no_intent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_refuses_before_root_effects ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_valid_looking_rows_cannot_commit_without_the_deferred_seal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::seals::memory_scope_admission_fresh_seal_rejects_foreign_and_ineligible_live_owners ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::selectors::memory_scope_tools_unit_reports_filter_deduplicate_and_keep_exact_labels_and_references ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::races::memory_scope_admission_competing_topology_change_captures_coherent_scopes_in_both_orders ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 4784 filtered out; finished in 7.39s
+

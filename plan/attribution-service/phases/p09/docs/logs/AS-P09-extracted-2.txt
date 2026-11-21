@@ -1,0 +1,123 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (32.370166ms)
++ cargo sqlx prepare --check -- --locked --offline --all-targets
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_gxurugec/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 5.34s
++ cargo fmt --all -- --check
++ cargo check --locked --offline --all-targets
+    Finished `dev` profile [unoptimized] target(s) in 0.15s
++ /private/tmp/as-p02-contract-clean/bin/python scripts/boundary.py
+attribution boundary passed: resolved dependencies, source/assets/config, owned SQL
++ /private/tmp/as-p02-contract-clean/bin/python scripts/test_boundary.py
+test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source (__main__.BoundaryTests.test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source) ... ok
+test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected (__main__.BoundaryTests.test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected) ... ok
+test_attribution_boundary_foreign_sql_is_rejected (__main__.BoundaryTests.test_attribution_boundary_foreign_sql_is_rejected) ... ok
+test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout (__main__.BoundaryTests.test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout) ... ok
+test_attribution_boundary_local_source_and_owned_sql_pass (__main__.BoundaryTests.test_attribution_boundary_local_source_and_owned_sql_pass) ... ok
+test_attribution_boundary_locking_and_separate_ctes_keep_table_checks (__main__.BoundaryTests.test_attribution_boundary_locking_and_separate_ctes_keep_table_checks) ... ok
+test_attribution_boundary_materialized_ctes_and_lateral_keep_nested_checks (__main__.BoundaryTests.test_attribution_boundary_materialized_ctes_and_lateral_keep_nested_checks) ... ok
+test_attribution_boundary_private_import_and_parent_asset_are_rejected (__main__.BoundaryTests.test_attribution_boundary_private_import_and_parent_asset_are_rejected) ... ok
+test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers (__main__.BoundaryTests.test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers) ... ok
+test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency (__main__.BoundaryTests.test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency) ... ok
+test_attribution_boundary_unpinned_git_is_rejected (__main__.BoundaryTests.test_attribution_boundary_unpinned_git_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.050s
+
+OK
++ cargo test --locked --offline --all-targets attribution_startup_ -- --list
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_gxurugec/attribution)
+    Finished `test` profile [unoptimized] target(s) in 9.17s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+     Running unittests src/main.rs (/tmp/as-attribution-target/debug/deps/attribution_service-04d745e2849fd972)
+adapters::http::tests::attribution_startup_body_and_error_boundaries_are_safe_and_correlated: test
+adapters::http::tests::attribution_startup_competing_requests_are_bounded_and_health_stays_cheap: test
+adapters::http::tests::attribution_startup_readiness_assets_and_shutdown_use_the_own_database: test
+adapters::http::tests::attribution_startup_request_deadline_cancels_handler_and_returns_slot: test
+adapters::http::tests::attribution_startup_safe_html_errors_preserve_redaction_and_headers: test
+adapters::postgres::tests::attribution_startup_migration_checksum_failure_is_not_ready_success: test
+adapters::postgres::tests::attribution_startup_refuses_foreign_schema_and_privileged_role: test
+infra::config::tests::attribution_startup_loopback_development_and_stock_budgets: test
+infra::config::tests::attribution_startup_rejects_bad_config_without_echoing_secrets: test
+infra::connection::tests::attribution_startup_competing_connections_wait_for_owned_slot: test
+infra::connection::tests::attribution_startup_connection_lifetime_bounds_slow_progress: test
+infra::connection::tests::attribution_startup_forced_shutdown_wakes_blocked_io: test
+infra::connection::tests::attribution_startup_idle_connection_times_out: test
+
+13 tests, 0 benchmarks
+0 tests, 0 benchmarks
+Selected 13 tests for attribution_startup_
++ cargo test --locked --offline --all-targets attribution_startup_
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 13 tests
+test infra::connection::tests::attribution_startup_forced_shutdown_wakes_blocked_io ... ok
+test infra::config::tests::attribution_startup_rejects_bad_config_without_echoing_secrets ... ok
+test infra::config::tests::attribution_startup_loopback_development_and_stock_budgets ... ok
+test adapters::http::tests::attribution_startup_body_and_error_boundaries_are_safe_and_correlated ... ok
+test adapters::http::tests::attribution_startup_safe_html_errors_preserve_redaction_and_headers ... ok
+test adapters::http::tests::attribution_startup_request_deadline_cancels_handler_and_returns_slot ... ok
+test adapters::http::tests::attribution_startup_competing_requests_are_bounded_and_health_stays_cheap ... ok
+test infra::connection::tests::attribution_startup_competing_connections_wait_for_owned_slot ... ok
+test infra::connection::tests::attribution_startup_idle_connection_times_out ... ok
+test infra::connection::tests::attribution_startup_connection_lifetime_bounds_slow_progress ... ok
+test adapters::postgres::tests::attribution_startup_refuses_foreign_schema_and_privileged_role ... ok
+test adapters::http::tests::attribution_startup_readiness_assets_and_shutdown_use_the_own_database ... ok
+test adapters::postgres::tests::attribution_startup_migration_checksum_failure_is_not_ready_success ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 109 filtered out; finished in 0.55s
+
+     Running unittests src/main.rs (/tmp/as-attribution-target/debug/deps/attribution_service-04d745e2849fd972)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
++ cargo test --locked --offline --all-targets attribution_storage_boundary_ -- --list
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+     Running unittests src/main.rs (/tmp/as-attribution-target/debug/deps/attribution_service-04d745e2849fd972)
+adapters::postgres::tests::attribution_storage_boundary_fresh_nonprivileged_database_migrates: test
+adapters::postgres::tests::attribution_storage_boundary_other_role_cannot_connect_or_read: test
+
+2 tests, 0 benchmarks
+0 tests, 0 benchmarks
+Selected 2 tests for attribution_storage_boundary_
++ cargo test --locked --offline --all-targets attribution_storage_boundary_
+    Finished `test` profile [unoptimized] target(s) in 0.13s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 2 tests
+test adapters::postgres::tests::attribution_storage_boundary_fresh_nonprivileged_database_migrates ... ok
+test adapters::postgres::tests::attribution_storage_boundary_other_role_cannot_connect_or_read ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 120 filtered out; finished in 0.49s
+
+     Running unittests src/main.rs (/tmp/as-attribution-target/debug/deps/attribution_service-04d745e2849fd972)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+test_attribution_contract_ad_product_update_preserves_absent_and_clear (__main__.AttributionContracts.test_attribution_contract_ad_product_update_preserves_absent_and_clear) ... ok
+test_attribution_contract_both_openapi_documents_validate (__main__.AttributionContracts.test_attribution_contract_both_openapi_documents_validate) ... ok
+test_attribution_contract_bounds_and_errors_are_declared_for_all_routes (__main__.AttributionContracts.test_attribution_contract_bounds_and_errors_are_declared_for_all_routes) ... ok
+test_attribution_contract_every_management_mutation_has_a_retry_identity (__main__.AttributionContracts.test_attribution_contract_every_management_mutation_has_a_retry_identity) ... ok
+test_attribution_contract_examples_match_wire_schemas (__main__.AttributionContracts.test_attribution_contract_examples_match_wire_schemas) ... ok
+test_attribution_contract_identity_pkce_and_credential_classes (__main__.AttributionContracts.test_attribution_contract_identity_pkce_and_credential_classes) ... ok
+test_attribution_contract_lost_key_response_replays_metadata_without_secret (__main__.AttributionContracts.test_attribution_contract_lost_key_response_replays_metadata_without_secret) ... ok
+test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant (__main__.AttributionContracts.test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant) ... ok
+test_attribution_contract_money_currency_and_collection_bounds (__main__.AttributionContracts.test_attribution_contract_money_currency_and_collection_bounds) ... ok
+test_attribution_contract_pixel_retry_clock_and_explicit_head (__main__.AttributionContracts.test_attribution_contract_pixel_retry_clock_and_explicit_head) ... ok
+test_attribution_contract_public_observations_cannot_describe_sales (__main__.AttributionContracts.test_attribution_contract_public_observations_cannot_describe_sales) ... ok
+test_attribution_contract_refund_business_identity_example_is_discriminating (__main__.AttributionContracts.test_attribution_contract_refund_business_identity_example_is_discriminating) ... ok
+test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds (__main__.AttributionContracts.test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds) ... ok
+test_attribution_contract_sdk_integrity_matches_pinned_asset (__main__.AttributionContracts.test_attribution_contract_sdk_integrity_matches_pinned_asset) ... ok
+test_attribution_contract_two_ad_product_refund_ledger_reconciles (__main__.AttributionContracts.test_attribution_contract_two_ad_product_refund_ledger_reconciles) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.436s
+
+OK
+standalone service copy passed

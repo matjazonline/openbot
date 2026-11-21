@@ -1,0 +1,47 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9m 18s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 17 tests
+test adapters::persistence::company_invite::owner_tests::root_department_owner_role_follows_company_owner ... ok
+test adapters::http::routes::department::tests::root::root_membership_department_routes_preserve_owner_only_team_mutations ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_roster_is_bounded_and_does_not_bound_authorization ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_roles_and_equivalent_department_mutations_keep_owner_authority ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_department_database_guards_preserve_shape_level_and_incarnation ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::competing::root_competing_invite_first_account_deletion_cleans_the_new_root_membership ... ok
+test application::workflow::reviewer_assignment::tests::root_membership_assignment_canonical_roles_follow_stored_strings ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_department_creation_and_company_rename_round_trip ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::root_membership_builder_infers_no_working_department_but_accepts_an_explicit_root ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::root_membership_reacceptance_preserves_level_and_rejoin_changes_only_membership_identity ... ok
+test adapters::persistence::company_invite::owner_tests::root_unit::competing::root_competing_account_deletion_first_invite_cannot_restore_membership ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::root_roles::root_membership_followed_human_reviewers_refresh_after_root_admin_role_removal' (26482662) panicked at src/adapters/persistence/workflow/root_role_consumer_tests.rs:90:9:
+assertion `left == right` failed
+  left: []
+ right: [e7fb6824-1ab9-4167-a560-21793412a6cc]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::root_roles::root_membership_followed_human_reviewers_refresh_after_root_admin_role_removal ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::root_roles::root_membership_frozen_human_reviewers_capture_owner_and_admin_from_parent_root ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::root_department_company_and_account_teardown_remove_tree_documents_and_direct_native_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::root_department_company_and_account_teardown_remove_tree_documents_and_refusal_history ... ok
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::root_department_company_and_account_teardown_remove_tree_documents_and_native_history' (26483331) panicked at src/adapters/persistence/root_teardown_test_support.rs:224:18:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: update or delete on table \"workflow_action_dispatches\" violates foreign key constraint \"workflow_local_agent_calls_company_id_run_id_execution_id_fkey2\" on table \"workflow_local_agent_calls\"")
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::root_department_company_and_account_teardown_remove_tree_documents_and_native_history ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::root_department_company_and_account_teardown_remove_populated_message_identity_and_action_history ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::root_roles::root_membership_followed_human_reviewers_refresh_after_root_admin_role_removal
+    adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::root_department_company_and_account_teardown_remove_tree_documents_and_native_history
+
+test result: FAILED. 15 passed; 2 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 27.66s
+
+error: test failed, to rerun pass `--lib`

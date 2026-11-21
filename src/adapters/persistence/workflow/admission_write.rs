@@ -62,7 +62,16 @@ pub(super) async fn create(
         command.actor().user_id(),
     )
     .await?;
-    agent_history_sessions::capture(tx, command).await
+    agent_history_sessions::capture(tx, command).await?;
+    super::run_scopes::capture_on(tx, command, &manifest).await?;
+    // Unit spend caps, from the run's write unit just captured (Plan07 02B.2): a refusal rolls
+    // the whole admission back, so nothing above is written.
+    crate::adapters::persistence::unit_budgets::check_admission_on(
+        tx,
+        command.company_id(),
+        command.proposed_run_id(),
+    )
+    .await
 }
 
 /// When a new run must finish. External admission opens a fresh window; a runtime child

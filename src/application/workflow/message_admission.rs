@@ -466,6 +466,14 @@ pub(super) fn classify(result: AppResult<AdmissionResult>) -> Classified {
         Err(AppError::BadRequest(_)) => {
             Classified::Settled(BindingOutcome::Refused("input_rejected"))
         }
+        Err(AppError::ResourceOutsideUnit(refusal)) => {
+            tracing::warn!(code = refusal.code(), "Workflow admission refused");
+            Classified::Settled(BindingOutcome::Refused(refusal.code()))
+        }
+        Err(AppError::BudgetExhausted(refusal)) => {
+            tracing::warn!(code = refusal.code(), "Workflow admission refused");
+            Classified::Settled(BindingOutcome::Refused(refusal.code()))
+        }
         Err(AppError::KnowledgeTrigger { content, ceiling }) => {
             tracing::warn!(
                 content_level = content.as_i16(),
@@ -604,6 +612,29 @@ mod tests {
         assert!(matches!(
             classify(Err(AppError::BadRequest("input".into()))),
             Classified::Settled(BindingOutcome::Refused("input_rejected"))
+        ));
+        // Plan07: a resource outside the run's reach is a definite refusal naming its code.
+        assert!(matches!(
+            classify(Err(AppError::ResourceOutsideUnit(
+                crate::app_error::ResourceOutsideUnit {
+                    stage: crate::app_error::UnitCheckStage::Admission,
+                    kind: crate::application::ports::unit_resources::UnitResourceKind::Skill,
+                    resource: uuid::Uuid::nil(),
+                    name: "policy".into(),
+                }
+            ))),
+            Classified::Settled(BindingOutcome::Refused("admission.resource_outside_unit"))
+        ));
+        // Plan07 02B.2: an exhausted unit budget is a definite refusal naming its code.
+        assert!(matches!(
+            classify(Err(AppError::BudgetExhausted(
+                crate::app_error::BudgetExhausted {
+                    unit: uuid::Uuid::nil(),
+                    name: "Billing".into(),
+                    period: "day",
+                }
+            ))),
+            Classified::Settled(BindingOutcome::Refused("budget.unit_exhausted"))
         ));
         assert!(matches!(
             classify(Err(AppError::Database("down".into()))),

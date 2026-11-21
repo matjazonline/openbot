@@ -163,7 +163,12 @@ impl HttpActionPreparation for PostgresPersistence {
             .ok_or_else(missing)?;
         let id = match &tool.contract.connection {
             Some(slot) => facts.resources.get(slot).ok_or_else(missing)?.as_uuid(),
-            None => registered_on(&mut tx, scope.company, &tool).await?,
+            None => {
+                let reach =
+                    super::super::resources::run_reach_on(&mut tx, scope.company, scope.run)
+                        .await?;
+                registered_on(&mut tx, scope.company, &tool, ConnectionReach::From(reach)).await?
+            }
         };
         policy_on(&mut tx, scope.company, id, &tool).await?;
         let mut result = request(scope, &facts, id, tool, arguments)?;
@@ -233,7 +238,11 @@ impl HttpActionPreparation for PostgresPersistence {
             .find(|tool| tool.contract.name == call.operation && tool.contract.connection.is_none())
             .cloned()
             .ok_or_else(missing)?;
-        if registered_on(&mut tx, scope.company, &tool).await? != call.connection {
+        let reach =
+            super::super::resources::run_reach_on(&mut tx, scope.company, scope.run).await?;
+        if registered_on(&mut tx, scope.company, &tool, ConnectionReach::From(reach)).await?
+            != call.connection
+        {
             return Err(missing());
         }
         if matches!(

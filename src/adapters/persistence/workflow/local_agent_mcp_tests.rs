@@ -13,10 +13,28 @@ use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use std::time::Duration;
 #[path = "local_agent_mcp_history_tests.rs"]
 mod history;
+#[path = "run_scope_native_tests.rs"]
+mod scopes;
 #[path = "local_agent_mcp_source_tests.rs"]
 mod source_tests;
 
-async fn configure(s: &mut Setup, endpoint: &str) {
+fn native_agent_write() -> AgentWrite {
+    AgentWrite {
+        name: "Workflow native MCP".into(),
+        slug: "workflow-native-mcp".into(),
+        native_permissions: LocalPermissions::Full,
+        ..Default::default()
+    }
+}
+
+fn configure<'a>(
+    s: &'a mut Setup,
+    endpoint: &'a str,
+) -> impl std::future::Future<Output = ()> + 'a {
+    configure_with_agent(s, endpoint, native_agent_write())
+}
+
+async fn configure_with_agent(s: &mut Setup, endpoint: &str, mut write: AgentWrite) {
     let p = &s.fixture.persistence;
     let company = s.fixture.target.company;
     let tool = crate::adapters::persistence::local_agents::test_support::native_mcp_binding(
@@ -26,19 +44,10 @@ async fn configure(s: &mut Setup, endpoint: &str) {
         endpoint,
     )
     .await;
-    let agent = AgentPersistence::create(
-        p,
-        company.as_uuid(),
-        AgentWrite {
-            name: "Workflow native MCP".into(),
-            slug: "workflow-native-mcp".into(),
-            native_permissions: LocalPermissions::Full,
-            tool_bindings: Some(vec![tool]),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
+    write.tool_bindings = Some(vec![tool]);
+    let agent = AgentPersistence::create(p, company.as_uuid(), write)
+        .await
+        .unwrap();
     p.publish_agent(PublishAgent {
         scope: AgentPublicationScope {
             company,
@@ -80,30 +89,34 @@ async fn originating_at(endpoint: &str) -> (Setup, NativeTurn) {
     let p = &s.fixture.persistence;
     let company = s.scope.company;
     let admin: Uuid = sqlx::query_scalar(
-        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin' LIMIT 1",
+        "SELECT member.user_id FROM principals AS member_principal JOIN LATERAL membership_of(member_principal.user_id, member_principal.company_id) AS member ON true WHERE member_principal.company_id=$1 AND role='admin' LIMIT 1",
     )
     .bind(company.as_uuid())
     .fetch_one(p.pool())
     .await
     .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(company.as_uuid())
-        .bind(admin)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(admin)
+    .execute(p.pool())
+    .await
+    .unwrap();
     let scope=s.activate(WorkflowActor::authenticated(admin).unwrap(),json!({"profile_id":{"literal":s.profile.id},"prompt":{"literal":"native workflow MCP"}}),RelatedAssociation::Company).await;
     s.scope = scope;
     let claim = s.claim().await;
     s.park(&claim).await;
     let native = s.native_started().await;
     // Current actor knowledge can grow; the originating workflow's immutable ceiling cannot.
-    sqlx::query("UPDATE company_members SET access_level=9 WHERE company_id=$1 AND user_id=$2")
-        .bind(company.as_uuid())
-        .bind(admin)
-        .execute(s.fixture.persistence.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=9 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(admin)
+    .execute(s.fixture.persistence.pool())
+    .await
+    .unwrap();
     (s, native)
 }
 
@@ -178,6 +191,22 @@ async fn native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and
     assert!(matches!(denied, Err(AppError::ServiceUnavailable(_))));
     competitor.rollback().await.unwrap();
     let response = p.native_mcp(&request).await.unwrap();
+    let seal: (String, i64) = sqlx::query_as(
+        "SELECT seal.state,(SELECT count(*) FROM workflow_run_scopes AS scope
+            WHERE scope.company_id=seal.company_id AND scope.run_id=seal.run_id)
+         FROM workflow_run_scope_snapshots AS seal WHERE seal.company_id=$1 AND seal.run_id=$2",
+    )
+    .bind(s.scope.company.as_uuid())
+    .bind(response.run_id.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        seal,
+        ("unavailable".into(), 0),
+        "this source did not capture the native harness agent"
+    );
+    assert_unavailable_memory(&s, response.run_id).await;
     let facts:(i16,i16,bool,Uuid)=sqlx::query_as("SELECT run.knowledge_ceiling::smallint,run.content_level::smallint,run.content_exact,session.workflow_run_id FROM workflow_runs AS run JOIN native_mcp_calls AS call ON call.company_id=run.company_id AND call.run_id=run.id JOIN local_agent_sessions AS session ON session.company_id=call.company_id AND session.id=call.session_id WHERE run.company_id=$1 AND run.id=$2")
         .bind(s.scope.company.as_uuid()).bind(response.run_id.as_uuid()).fetch_one(p.pool()).await.unwrap();
     assert_eq!(facts, (5, 5, false, s.scope.run.as_uuid()));
@@ -187,6 +216,46 @@ async fn native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and
         p.mcp_step_request(&claim, &WorkflowStepKind("mcp.call".into()))
             .await
             .is_ok()
+    );
+}
+
+async fn assert_unavailable_memory(s: &Setup, run: RunId) {
+    let p = &s.fixture.persistence;
+    let company = s.scope.company;
+    let agent: Uuid = sqlx::query_scalar(
+        "SELECT session.agent_id FROM native_mcp_calls AS call
+         JOIN local_agent_sessions AS session ON session.company_id=call.company_id
+            AND session.id=call.source_session_id
+         WHERE call.company_id=$1 AND call.run_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    let before: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_namespaces WHERE company_id=$1")
+            .bind(company.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    let result = crate::adapters::persistence::workflow::checkpoints::memory_tools::eligible_on(
+        &mut p.pool().acquire().await.unwrap(),
+        company,
+        run,
+        agent,
+    )
+    .await;
+    assert!(matches!(result, Err(AppError::BadRequest(code)) if code=="memory.scope_unavailable"));
+    let after: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM memory_namespaces WHERE company_id=$1")
+            .bind(company.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    assert_eq!(
+        before, after,
+        "the zero-authority source cannot provision a namespace"
     );
 }
 

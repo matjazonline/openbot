@@ -107,7 +107,7 @@ pub struct AppConfig {
     pub gcs: Option<GcsConfig>,
     /// Addresses allowed to see the whole system rather than one company on `/ui/dashboard`.
     ///
-    /// Deliberately deploy-controlled rather than a database role: `company_members.role` grants
+    /// Deliberately deploy-controlled rather than a database role: root department roles grant
     /// `admin` *within one company*, which is not the same authority as reading every company's
     /// traffic. Empty by default, so the global view does not exist until someone is named.
     pub operator_emails: Vec<EmailAddress>,

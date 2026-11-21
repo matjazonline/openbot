@@ -414,7 +414,7 @@ async fn eligible_reviewer_row(
     principal: Uuid,
 ) -> AppResult<Option<ReviewerRow>> {
     Ok(sqlx::query_as("SELECT principal.user_id,principal.id AS principal_id,account.email::text AS email FROM principals AS principal \
-        JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id \
+        JOIN department_members AS member ON member.company_id=principal.company_id AND member.root_user_id=principal.user_id \
         JOIN users AS account ON account.id=principal.user_id \
         JOIN companies AS company ON company.id=principal.company_id \
         JOIN workflow_runs AS run ON run.company_id=principal.company_id AND run.id=$3 \

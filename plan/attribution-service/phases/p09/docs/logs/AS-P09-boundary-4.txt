@@ -1,0 +1,1 @@
+SQL table outside owned migrations/catalog: clock_timestamp in src/adapters/commerce/worker.rs

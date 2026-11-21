@@ -25,7 +25,7 @@ async fn integrated_source() -> (Source, PostgresVault, ConnectedAccount, Uuid) 
     configure(&mut local, "https://mcp.example.test/rpc").await;
     let p = &local.fixture.persistence;
     let owner: Uuid = sqlx::query_scalar(
-        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='member' LIMIT 1",
+        "SELECT member.user_id FROM principals AS member_principal JOIN LATERAL membership_of(member_principal.user_id, member_principal.company_id) AS member ON true WHERE member_principal.company_id=$1 AND role='member' LIMIT 1",
     )
     .bind(local.scope.company.as_uuid())
     .fetch_one(p.pool())
@@ -49,7 +49,10 @@ async fn integrated_source() -> (Source, PostgresVault, ConnectedAccount, Uuid) 
         .await
         .unwrap();
     let connection = p
-        .list_mcp_connections(local.scope.company.as_uuid())
+        .list_mcp_connections(
+            local.scope.company.as_uuid(),
+            &p.test_all_units(local.scope.company.as_uuid()).await,
+        )
         .await
         .unwrap()
         .remove(0);

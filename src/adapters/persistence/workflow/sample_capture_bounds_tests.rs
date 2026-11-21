@@ -74,6 +74,7 @@ fn request(root: &PublishedBundle, children: &[Arc<PublishedBundle>]) -> SampleR
         .map(|(index, child)| {
             let definition = child.compiled().graph().definition();
             ResolvedAgentTool {
+                unit_id: None,
                 binding: AgentToolBinding {
                     id: AgentBindingId::new(Uuid::from_u128(3000 + index as u128)),
                     alias: AgentToolAlias::parse(format!("child_{index}")).unwrap(),

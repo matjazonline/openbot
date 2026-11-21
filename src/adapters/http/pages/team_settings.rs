@@ -26,9 +26,31 @@ pub enum TeamRole {
 }
 
 impl TeamRole {
-    /// Role, address and membership changes remain owner-only.
+    /// Role and membership changes remain owner-only.
     pub fn manages(self) -> bool {
         self == TeamRole::Owner
+    }
+
+    /// Inviting into the company is company administration: the owner or a root admin.
+    pub fn invites(self) -> bool {
+        matches!(self, Self::Owner | Self::Admin)
+    }
+
+    /// An admin writes member invitations only; one carrying the admin role is the owner's.
+    pub fn manages_invite(self, role: CompanyAccessRole) -> bool {
+        match self {
+            Self::Owner => true,
+            Self::Admin => role == CompanyAccessRole::Member,
+            Self::Member => false,
+        }
+    }
+
+    /// The access roles this person may put on an invitation.
+    fn invite_roles(self) -> &'static [CompanyAccessRole] {
+        match self {
+            Self::Owner => &CompanyAccessRole::ALL,
+            Self::Admin | Self::Member => &[CompanyAccessRole::Member],
+        }
     }
 }
 
@@ -120,6 +142,8 @@ pub struct InviteCreatePane<'a> {
     pub company: &'a Company,
     pub email_draft: &'a str,
     pub role_draft: CompanyAccessRole,
+    /// Who is inviting, which decides the roles the form offers.
+    pub role: TeamRole,
     pub error: Option<&'a str>,
 }
 
@@ -206,7 +230,7 @@ pub fn team_invite_form_url(company_id: Uuid) -> String {
 /// [`ui_shell`]: super::ui_shell
 pub fn team_tab(list: &TeamSettingsList<'_>, pane_html: &str) -> String {
     let company_id = list.company.id;
-    let invite_button = if list.role.manages() {
+    let invite_button = if list.role.invites() {
         format!(
             r##"
                     <div class="border-t border-base-300 p-2">
@@ -568,8 +592,13 @@ fn member_access_role_form(pane: &MemberPane<'_>) -> String {
 }
 
 fn access_role_options(selected: CompanyAccessRole) -> String {
-    CompanyAccessRole::ALL
-        .into_iter()
+    role_options(&CompanyAccessRole::ALL, selected)
+}
+
+fn role_options(roles: &[CompanyAccessRole], selected: CompanyAccessRole) -> String {
+    roles
+        .iter()
+        .copied()
         .map(|role| {
             format!(
                 r#"<option value="{}"{}>{}</option>"#,
@@ -642,10 +671,7 @@ fn pending_invite_details(pane: &InvitePane<'_>) -> String {
                             class="input w-full font-mono">
                         <div class="label"><span class="text-[11px] opacity-60">They join the team by accepting this invite from their own account.</span></div>
                     </label>
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Access Role</span></div>
-                        <select name="role" class="select w-full">{role_options}</select>
-                    </label>
+                    {role_field}
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -666,8 +692,26 @@ fn pending_invite_details(pane: &InvitePane<'_>) -> String {
                 </form>
             "##,
         email = escape_html_attr(email),
-        role_options = access_role_options(role),
+        role_field = role_field(pane.role, role),
     )
+}
+
+/// The access-role choice, when there is one: an admin's invitations are always members, so the
+/// form says so and sends no role, leaving the stored one unchanged.
+fn role_field(viewer: TeamRole, role: CompanyAccessRole) -> String {
+    match viewer.invite_roles() {
+        [only] => format!(
+            r#"<p class="text-sm"><span class="text-xs opacity-70">Access Role</span><br>{}</p>"#,
+            only.label()
+        ),
+        roles => format!(
+            r#"<label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Access Role</span></div>
+                        <select name="role" class="select w-full">{}</select>
+                    </label>"#,
+            role_options(roles, role)
+        ),
+    }
 }
 
 fn answered_invite_details(pane: &InvitePane<'_>) -> String {
@@ -676,7 +720,7 @@ fn answered_invite_details(pane: &InvitePane<'_>) -> String {
     let invite_endpoint = team_endpoint(pane.company.id, &format!("/invites/{}", invite.id));
     let close_endpoint = team_endpoint(pane.company.id, "/close");
     let cleared_url = team_url(pane.company.id, TeamSelection::None);
-    let delete_button = if pane.role.manages() {
+    let delete_button = if pane.role.manages_invite(invite.role) {
         format!(
             r##"<button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="{invite_endpoint}"
@@ -710,7 +754,7 @@ fn invite_details(pane: &InvitePane<'_>) -> String {
     if InviteStatus::parse(&pane.invite.status) != InviteStatus::Pending {
         return answered_invite_details(pane);
     }
-    if pane.role.manages() {
+    if pane.role.manages_invite(pane.invite.role) {
         return pending_invite_details(pane);
     }
     format!("<p>Pending invitation · {}</p>", pane.invite.role.label())
@@ -747,7 +791,7 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
         badge = status.badge_class(),
         label = status.label(),
         error_html = form_error_banner(pane.error),
-        level = if status == InviteStatus::Pending {
+        level = if status == InviteStatus::Pending && pane.role.manages_invite(invite.role) {
             level_control(LevelControl {
                 actor: pane.role.level_actor(pane.viewer_access_level),
                 target: LevelTarget::Assignable(invite.access_level),
@@ -807,7 +851,7 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
         cleared_url = team_url(pane.company.id, TeamSelection::None),
         error_html = form_error_banner(pane.error),
         email = escape_html_text(pane.email_draft),
-        role_options = access_role_options(pane.role_draft),
+        role_options = role_options(pane.role.invite_roles(), pane.role_draft),
         level_options = level_options(
             TeamRole::Owner.level_actor(AccessLevel::MAX),
             LevelTarget::Assignable(AccessLevel::PUBLIC),

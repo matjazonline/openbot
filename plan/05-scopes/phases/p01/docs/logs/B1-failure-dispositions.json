@@ -1,0 +1,40 @@
+{
+  "initial": "B1-focused2.txt",
+  "corrections": "B1-focused-corrections1.txt",
+  "failures": [
+    {
+      "test": "adapters::persistence::memory::delivery_tests::memory_integration_delivery_claims_are_fair_across_companies",
+      "cause": "changed ownership fixture assumptions / exact schema catalog; see TASK",
+      "status": "PASS on correction",
+      "retained_original": true
+    },
+    {
+      "test": "adapters::persistence::memory::delivery_tests::memory_integration_delivery_fences_competing_claimants_and_bounds_attempts",
+      "cause": "changed ownership fixture assumptions / exact schema catalog; see TASK",
+      "status": "PASS on correction",
+      "retained_original": true
+    },
+    {
+      "test": "adapters::persistence::memory::delivery_tests::memory_integration_delivery_lanes_send_companies_concurrently",
+      "cause": "changed ownership fixture assumptions / exact schema catalog; see TASK",
+      "status": "PASS on correction",
+      "retained_original": true
+    },
+    {
+      "test": "adapters::persistence::tests::the_memory_provider_schema_is_gone",
+      "cause": "changed ownership fixture assumptions / exact schema catalog; see TASK",
+      "status": "PASS on correction",
+      "retained_original": true
+    },
+    {
+      "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_capture_a_child_branch_is_never_captured",
+      "cause": "changed ownership fixture assumptions / exact schema catalog; see TASK",
+      "status": "PASS on correction",
+      "retained_original": true
+    }
+  ],
+  "incidental_doop": [
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_database_first_freeze_binds_current_version_and_trusted_mcp_policy"
+  ]
+}

@@ -90,6 +90,26 @@ async fn workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_pr
 }
 
 #[tokio::test]
+async fn root_department_company_and_account_teardown_remove_populated_message_identity_and_action_history()
+ {
+    use crate::adapters::persistence::test_support::root_teardown::{
+        Teardown, identities, tree_and_document,
+    };
+    for operation in [Teardown::Company, Teardown::Account] {
+        let prepared = Box::pin(prepared(ReviewerOwnership::RunCompany)).await;
+        let f = &prepared.fixture;
+        let company = f.scope.company;
+        let owner = prepared.retiring_user;
+        let protected: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$1 AND run_id=$2 AND subject_kind='action_approval')")
+            .bind(company.as_uuid()).bind(f.scope.run.as_uuid()).fetch_one(f.p.pool()).await.unwrap();
+        assert!(protected);
+        Box::pin(identities::assert_relationships(&f.p, company, owner)).await;
+        Box::pin(tree_and_document(&f.p, company, owner)).await;
+        Box::pin(operation.remove(&f.p, company, owner)).await;
+    }
+}
+
+#[tokio::test]
 async fn workflow_reviewer_principal_final_publication_rechecks_approved_reviewer_privilege() {
     let PreparedPublication {
         fixture: f,
@@ -98,7 +118,7 @@ async fn workflow_reviewer_principal_final_publication_rechecks_approved_reviewe
         retiring_user: reviewer,
         retiring_principal: principal,
     } = Box::pin(prepared(ReviewerOwnership::OtherCompany)).await;
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
         .bind(f.scope.company.as_uuid())
         .bind(reviewer)
         .execute(f.p.pool())
@@ -119,13 +139,14 @@ async fn assert_send_and_clearance_remain_valid(
     reviewer: Uuid,
     principal: PrincipalId,
 ) {
-    let role: String =
-        sqlx::query_scalar("SELECT role FROM company_members WHERE company_id=$1 AND user_id=$2")
-            .bind(f.scope.company.as_uuid())
-            .bind(reviewer)
-            .fetch_one(f.p.pool())
-            .await
-            .unwrap();
+    let role: String = sqlx::query_scalar(
+        "SELECT role FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(reviewer)
+    .fetch_one(f.p.pool())
+    .await
+    .unwrap();
     assert_eq!(role, "member");
     let mut tx = f.p.pool().begin().await.unwrap();
     let actor = crate::adapters::persistence::workflow::action_authority::prelock_on(

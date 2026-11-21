@@ -1,0 +1,117 @@
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 135 changed files against 30 learnings and 4 skills
+
+✗ migrations/20260817000000_init_schema.sql:19981
+  brings back live read insert, which Mac02's learning ruled out
+  Mac02 · Nov 17: The separate live sample caught BuffileRead during the
+  original insert.
+✗ migrations/20260817000000_init_schema.sql:19986
+  brings back handle local check, which Mac02's learning ruled out
+  Mac02 · Nov 17: Returning only cloned Handles from a helper with a
+  local RcDom type-checks and preserves node attributes, but the
+  document root's destruction drains descendant child lists.
+✗ migrations/20260817000000_init_schema.sql:19989
+  brings back local miss authority, which Mac02's learning ruled out
+  Mac02 · Nov 16: A local HTTPS reproduction isolated Missing Authority
+  Key Identifier.
+✗ migrations/20260817000000_init_schema.sql:19998
+  brings back channel department principal, which Mac02's learning ruled out
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+✗ migrations/20260817000000_init_schema.sql:20001
+  brings back one read another, which Mac02's learning ruled out
+  Mac02 · Nov 16: Independent review paused one real Chromium tab
+  between reading candidates and cleanup, let another tab persist a
+  new click, then resumed cleanup: the newer click was deleted.
+● migrations/20260817000000_init_schema.sql:14791
+  sets checkpoint to 8, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: In the code: migrations/20260817000000_init_schema.sql
+  functions agent_history_checkpoint_matches and
+  agent_history_preparation_valid; src/application/workflow/agent.rs
+  PREPARED_AGENT_VERSION;
+  plan/05-scopes/phases/p02/docs/logs/B1-scope-tests-r4.txt,
+  B1-core-schema-refresh-r3.txt and B1-memory-focused-r2.txt (192
+  passed, 8 live checks separately required).
+● migrations/20260817000000_init_schema.sql:15871
+  brings back shared company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● migrations/20260817000000_init_schema.sql:19982
+  brings back agent retirement principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: The old agent retirement test inserted a principal and
+  waited for its concurrent agent deletion to block.
+● plan/05-scopes/COORDINATION.md:4
+  brings back order department principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● plan/05-scopes/COORDINATION.md:12
+  brings back original schema company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: The original 64 KiB cap rejected a schema-valid
+  100-company page with 120 four-byte Unicode characters per name: the
+  reviewer measured 73,530 serialized bytes before adding a cursor.
+● plan/05-scopes/COORDINATION.md:17
+  brings back native source nowait, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/05-scopes/COORDINATION.md:22
+  brings back direct service exact, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Direct LaunchServices navigation downloaded the exact
+  artifact successfully within seconds.
+● plan/05-scopes/COORDINATION.md:27
+  brings back tool child test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Tool and child tests then stopped before the provider
+  with agent.unresolved or unused scripted exchanges.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:1
+  brings back conflict already accepted, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Reducing the public page size would conflict with the
+  already accepted limit of 100.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:3
+  brings back rust sql required, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 17: Offline compilation passed while Rust wrote version 8
+  and both SQL readers still required 7.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:3
+  brings back command gate pass, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A failing build can then be followed by a successful
+  command and the gate is reported as passing.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:3
+  brings back native source guard, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:4
+  brings back separate read original, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: The separate live sample caught BuffileRead during the
+  original insert.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:4
+  brings back local check preserve, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Returning only cloned Handles from a helper with a
+  local RcDom type-checks and preserves node attributes, but the
+  document root's destruction drains descendant child lists.
+● plan/05-scopes/phases/p01/docs/HANDOFF.md:4
+  brings back separate local test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+
+· 5 conflicts · fix them, or say why in the commit message or PR description
+
+🔀 trail · Matjazonline's branch anthropic-latest-models also changes src/main.rs (pushed Nov 6)

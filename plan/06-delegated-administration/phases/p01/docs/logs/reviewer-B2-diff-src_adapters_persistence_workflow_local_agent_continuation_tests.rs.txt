@@ -1,0 +1,19 @@
+--- B1/src/adapters/persistence/workflow/local_agent_continuation_tests.rs
++++ B2/src/adapters/persistence/workflow/local_agent_continuation_tests.rs
+@@ -1,6 +1,6 @@
+ use super::*;
+ use crate::application::local_agents::workflow::{LocalRunInputs, LocalRunProgress};
+-use crate::application::ports::channel::{ChannelPersistence, ChannelWrite};
++use crate::application::ports::channel::ChannelWrite;
+ use crate::application::workflow::actions::ActionService;
+ use std::time::Duration;
+ 
+@@ -134,7 +134,7 @@
+     p.save_profile(s.fixture.target.actor.user_id(), &other)
+         .await
+         .unwrap();
+-    let channel = ChannelPersistence::create(
++    let channel = crate::adapters::persistence::test_support::create_channel(
+         p,
+         s.scope.company.as_uuid(),
+         ChannelWrite {

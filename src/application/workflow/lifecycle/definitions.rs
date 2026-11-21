@@ -8,7 +8,12 @@ impl<
 > DefinitionService<A, P, D, C>
 {
     pub async fn save(&self, request: SaveDraft) -> LifecycleResult<CompanyWorkflowDraft> {
-        self.authorize(request.target).await?;
+        let operation = if request.expected.is_none() {
+            WorkflowOperation::CreateDefinition(request.target.workflow)
+        } else {
+            WorkflowOperation::ManageDefinition(request.target.workflow)
+        };
+        self.authorize(request.target, operation).await?;
         request.content.check()?;
         let current = self
             .persistence
@@ -49,7 +54,8 @@ impl<
         target: DefinitionTarget,
         expected: DraftRevision,
     ) -> LifecycleResult<Arc<PublishedBundle>> {
-        self.authorize(target).await?;
+        self.authorize(target, WorkflowOperation::ManageDefinition(target.workflow))
+            .await?;
         let state = self
             .persistence
             .draft(target.company, target.workflow)
@@ -66,7 +72,11 @@ impl<
     }
 
     pub async fn publish(&self, request: PublishDraft) -> LifecycleResult<Arc<PublishedBundle>> {
-        self.authorize(request.target).await?;
+        self.authorize(
+            request.target,
+            WorkflowOperation::ManageDefinition(request.target.workflow),
+        )
+        .await?;
         if request.version.as_uuid().is_nil() {
             return Err(
                 AppError::BadRequest("A publication version identity is required".into()).into(),
@@ -137,7 +147,8 @@ impl<
         target: DefinitionTarget,
         expected: DraftRevision,
     ) -> LifecycleResult<()> {
-        self.authorize(target).await?;
+        self.authorize(target, WorkflowOperation::ManageDefinition(target.workflow))
+            .await?;
         let state = self
             .persistence
             .draft(target.company, target.workflow)
@@ -169,7 +180,11 @@ impl<
         Ok(())
     }
 
-    async fn authorize(&self, target: DefinitionTarget) -> AppResult<()> {
+    async fn authorize(
+        &self,
+        target: DefinitionTarget,
+        operation: WorkflowOperation,
+    ) -> AppResult<()> {
         if target.company.as_uuid().is_nil() || target.workflow.as_uuid().is_nil() {
             return Err(AppError::BadRequest(
                 "Non-nil company and workflow identities required".into(),
@@ -180,7 +195,7 @@ impl<
                 target.company,
                 target.actor,
                 RelatedAssociation::Company,
-                WorkflowOperation::ManageDefinition,
+                operation,
             )
             .await
     }

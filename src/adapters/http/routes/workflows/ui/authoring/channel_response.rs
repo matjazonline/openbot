@@ -91,7 +91,7 @@ pub(super) async fn save_response(
     Query(query): Query<CompanyQuery>,
     body: Bytes,
 ) -> WorkflowResult<Html<String>> {
-    let company = ui.company(query.company_id).await?.id;
+    let company = ui.unit_company(query.company_id).await?.id;
     // Scope the channel before returning any validation text or binding choices.
     ui.engine
         .channel_replies()

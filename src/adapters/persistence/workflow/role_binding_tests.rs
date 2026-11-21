@@ -1,8 +1,6 @@
 use super::binding_tests::BindingFixture;
 use super::*;
-use crate::application::ports::channel::{
-    ChannelOwnershipWrite, ChannelPersistence, ChannelUpdate, ChannelWrite,
-};
+use crate::application::ports::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
 use crate::application::ports::department::DepartmentWrite;
 use crate::entities::department::{DepartmentId, DepartmentRole};
 use crate::entities::transport::PrincipalId;
@@ -40,16 +38,13 @@ fn write(department: Option<DepartmentId>) -> ChannelWrite {
         name: "Intake".into(),
         slug: "intake".into(),
         enabled: true,
-        ownership: Some(ChannelOwnershipWrite {
-            department_id: Some(department),
-            members_only: Some(false),
-        }),
+        department_id: department,
         ..Default::default()
     }
 }
 
 async fn desk(f: &BindingFixture, department: Option<DepartmentId>) -> Uuid {
-    ChannelPersistence::create(
+    crate::adapters::persistence::test_support::create_channel(
         &f.fixture.persistence,
         f.target.company.as_uuid(),
         write(department),
@@ -66,7 +61,7 @@ async fn configure(f: &BindingFixture, desk: Uuid) -> BindingState {
 }
 
 #[tokio::test]
-async fn workflow_role_binding_needs_a_department_only_while_active() {
+async fn workflow_role_binding_company_requires_context_but_default_desk_has_root_context() {
     let f = fixture().await;
     let configured = f.service().configure(f.request(None)).await.unwrap();
     let error = f
@@ -84,22 +79,33 @@ async fn workflow_role_binding_needs_a_department_only_while_active() {
     let f = fixture().await;
     let desk = desk(&f, None).await;
     let configured = configure(&f, desk).await;
-    let error = f
-        .service()
+    f.service()
         .activate(SetBindingActivity {
             target: f.target,
             expected: configured.revision,
         })
         .await
-        .err()
         .unwrap();
-    assert!(format!("{error:?}").contains("binding.role_needs_department"));
-    assert!(format!("{error:?}").contains("start"));
-    assert!(!f.state().await.active);
+    assert!(
+        f.state().await.active,
+        "a default desk has its root context"
+    );
+    let owned = ChannelPersistence::get_by_id(&f.fixture.persistence, desk)
+        .await
+        .unwrap()
+        .unwrap();
+    let is_root: bool =
+        sqlx::query_scalar("SELECT is_root FROM departments WHERE company_id=$1 AND id=$2")
+            .bind(f.target.company.as_uuid())
+            .bind(owned.department_id.as_uuid())
+            .fetch_one(f.fixture.persistence.pool())
+            .await
+            .unwrap();
+    assert!(is_root);
 }
 
 #[tokio::test]
-async fn workflow_role_binding_blocks_both_detach_writers_until_deactivation() {
+async fn workflow_role_binding_preserves_required_owner_and_allows_reassignment() {
     let f = fixture().await;
     let department = department(&f).await;
     let desk = desk(&f, Some(department)).await;
@@ -114,34 +120,49 @@ async fn workflow_role_binding_blocks_both_detach_writers_until_deactivation() {
         .unwrap();
     let p = &f.fixture.persistence;
     let update = ChannelUpdate {
+        actor: f.target.actor,
         company_id: f.target.company.as_uuid(),
         channel_id: desk,
         write: write(None),
     };
-    let error = ChannelPersistence::update(p, update.clone())
+    let kept = ChannelPersistence::update(p, update.clone()).await.unwrap();
+    assert_eq!(kept.department_id, department);
+    let error = sqlx::query("UPDATE channels SET department_id=NULL WHERE company_id=$1 AND id=$2")
+        .bind(f.target.company.as_uuid())
+        .bind(desk)
+        .execute(p.pool())
         .await
         .unwrap_err();
-    assert!(format!("{error:?}").contains("binding.role_needs_department"));
-    assert!(format!("{error:?}").contains("start"));
+    assert_eq!(
+        error.as_database_error().unwrap().code().as_deref(),
+        Some("23502")
+    );
+    let root = crate::entities::department::DepartmentId::new(
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(f.target.company.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap(),
+    );
     let mut tx = p.pool().begin().await.unwrap();
-    let error = crate::adapters::persistence::department_desks::set_desk_ownership_on(
+    crate::adapters::persistence::department_desks::set_desk_ownership_on(
         &mut tx,
         f.target.company,
         desk,
-        &ChannelOwnershipWrite {
-            department_id: Some(None),
-            members_only: Some(false),
-        },
+        root,
     )
     .await
-    .unwrap_err();
-    assert!(format!("{error:?}").contains("binding.role_needs_department"));
-    tx.rollback().await.unwrap();
-    let retained = ChannelPersistence::get_by_id(p, desk)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(retained.department_id, Some(department));
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        ChannelPersistence::get_by_id(p, desk)
+            .await
+            .unwrap()
+            .unwrap()
+            .department_id,
+        root
+    );
+    assert!(f.state().await.active);
     f.service()
         .deactivate(SetBindingActivity {
             target: f.target,
@@ -149,23 +170,31 @@ async fn workflow_role_binding_blocks_both_detach_writers_until_deactivation() {
         })
         .await
         .unwrap();
-    ChannelPersistence::update(p, update).await.unwrap();
-    let detached = ChannelPersistence::get_by_id(p, desk)
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(detached.department_id.is_none());
+    assert_eq!(
+        ChannelPersistence::update(p, update)
+            .await
+            .unwrap()
+            .department_id,
+        root
+    );
     assert!(!f.state().await.active);
 }
 
 #[tokio::test]
-async fn workflow_role_binding_competing_activation_and_detachment_preserve_eligibility() {
+async fn workflow_role_binding_competing_activation_and_reassignment_keep_required_context() {
     let f = fixture().await;
     let department = department(&f).await;
     let desk = desk(&f, Some(department)).await;
     let configured = configure(&f, desk).await;
     let activate = f.activity(configured.revision).await;
     let p = &f.fixture.persistence;
+    let root = crate::entities::department::DepartmentId::new(
+        sqlx::query_scalar("SELECT id FROM departments WHERE company_id=$1 AND is_root")
+            .bind(f.target.company.as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap(),
+    );
     let mut gate = p.pool().begin().await.unwrap();
     sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
         .bind(f.target.company.as_uuid())
@@ -173,11 +202,12 @@ async fn workflow_role_binding_competing_activation_and_detachment_preserve_elig
         .await
         .unwrap();
     let update = ChannelUpdate {
+        actor: f.target.actor,
         company_id: f.target.company.as_uuid(),
         channel_id: desk,
-        write: write(None),
+        write: write(Some(root)),
     };
-    let (activated, detached, ()) = tokio::join!(
+    let (activated, reassigned, ()) = tokio::join!(
         p.save_binding(activate),
         ChannelPersistence::update(p, update),
         async {
@@ -189,21 +219,16 @@ async fn workflow_role_binding_competing_activation_and_detachment_preserve_elig
             gate.commit().await.unwrap();
         }
     );
-    assert_ne!(
-        activated.is_ok(),
-        detached.is_ok(),
-        "one succeeds, the conflicting write refuses"
-    );
-    let active = f.state().await.active;
-    let owned = ChannelPersistence::get_by_id(p, desk)
-        .await
-        .unwrap()
-        .unwrap()
-        .department_id
-        .is_some();
-    assert!(
-        !active || owned,
-        "no active role binding on an unowned desk"
+    activated.unwrap();
+    assert_eq!(reassigned.unwrap().department_id, root);
+    assert!(f.state().await.active);
+    assert_eq!(
+        ChannelPersistence::get_by_id(p, desk)
+            .await
+            .unwrap()
+            .unwrap()
+            .department_id,
+        root
     );
 }
 
@@ -223,18 +248,16 @@ async fn workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders(
         .create_user("second", "second@example.test", "hash")
         .await
         .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id,company_id,user_id,role) VALUES ($1,$2,$3,'member')",
+    let principal = crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(f.target.company.as_uuid()),
+        other.id,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(f.target.company.as_uuid())
-    .bind(other.id)
-    .execute(p.pool())
     .await
-    .unwrap();
-    let principal = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals (id,company_id,kind,user_id,display_label) VALUES ($1,$2,'person',$3,'Second')")
-        .bind(principal).bind(f.target.company.as_uuid()).bind(other.id).execute(p.pool()).await.unwrap();
+    .as_uuid();
+
     let use_cases = crate::adapters::persistence::test_support::department_use_cases(p);
     for holder in [owner, principal] {
         use_cases

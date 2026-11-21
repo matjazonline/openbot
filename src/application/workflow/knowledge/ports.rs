@@ -27,6 +27,19 @@ pub fn validate_knowledge_observation(
         .min(crate::services::harness::runs::MAX_RESULT_BYTES);
     if observation.highest().is_some_and(|level| level > ceiling)
         || observation.result().to_string().len() > max_bytes
+        || observation.items().len() > 8
+        || observation.highest()
+            != observation
+                .items()
+                .iter()
+                .map(|item| item.access_level)
+                .max()
+        || observation
+            .result()
+            .get("passages")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len)
+            != observation.items().len()
     {
         return Err(missing());
     }
@@ -62,8 +75,28 @@ pub struct KnowledgeSearchAccess {
 }
 
 pub enum KnowledgeSearchContext {
-    Pending(KnowledgeSearchAccess),
+    Pending {
+        access: KnowledgeSearchAccess,
+        units: Vec<crate::entities::department::DepartmentId>,
+    },
+    Unavailable,
     Recorded(Value),
+}
+
+pub struct KnowledgeSearchObservation {
+    pub queried_units: Vec<crate::entities::department::DepartmentId>,
+    pub observation: KnowledgeObservation,
+}
+
+pub fn scope_unavailable() -> KnowledgeObservation {
+    KnowledgeObservation::new(
+        crate::application::workflow::tools::tool_error(
+            "knowledge.scope_unavailable",
+            "Knowledge scopes are unavailable for this run",
+        ),
+        None,
+        Vec::new(),
+    )
 }
 
 #[async_trait]
@@ -79,7 +112,7 @@ pub trait KnowledgeSearchPersistence: Send + Sync {
         &self,
         fence: WorkflowFence,
         call: &KnowledgeToolCall,
-        observation: KnowledgeObservation,
+        observation: KnowledgeSearchObservation,
     ) -> AppResult<Value>;
 }
 
