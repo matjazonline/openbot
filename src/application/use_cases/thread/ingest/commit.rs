@@ -216,6 +216,7 @@ mod tests {
 
     fn channel(company_id: Uuid, slug: &str) -> Channel {
         Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: false,
             id: Uuid::new_v4(),

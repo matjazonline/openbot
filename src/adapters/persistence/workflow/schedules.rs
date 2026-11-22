@@ -5,6 +5,7 @@
 //! the schedule materializer under a worker/generation fence.
 
 use super::*;
+use crate::adapters::persistence::department::require_active_desk_on;
 use crate::application::use_cases::schedule::{ScheduleBindingChoice, SchedulePersistence};
 use crate::application::workflow::binding::ConfiguredBinding;
 use crate::application::workflow::schedule_admission::{
@@ -342,6 +343,7 @@ impl SchedulePersistence for PostgresPersistence {
     ) -> AppResult<ChannelSchedule> {
         let mut tx = super::management::begin(self, company, actor).await?;
         authorize_channel(&mut tx, company, actor, channel_id).await?;
+        require_active_desk_on(&mut tx, company, channel_id).await?;
         let binding_channel = check_binding(&mut tx, company, write.binding_id, channel_id).await?;
         let schedule = sqlx::query_as::<_, ScheduleRow>(&format!(
             "INSERT INTO channel_schedules (id, company_id, channel_id, binding_id, name, \
@@ -381,6 +383,7 @@ impl SchedulePersistence for PostgresPersistence {
                 "A schedule cannot change its channel".into(),
             ));
         }
+        require_active_desk_on(&mut tx, company, channel_id).await?;
         let binding_channel = check_binding(&mut tx, company, write.binding_id, channel_id).await?;
         // Only a changed cadence re-anchors the next run, and `enabled` belongs to
         // `set_enabled` alone, so renaming a paused schedule cannot resume it.
@@ -431,7 +434,11 @@ impl SchedulePersistence for PostgresPersistence {
         enabled: bool,
     ) -> AppResult<()> {
         let mut tx = super::management::begin(self, company, actor).await?;
-        managed(&mut tx, company, actor, id).await?;
+        let schedule = managed(&mut tx, company, actor, id).await?;
+        // Disabling stops work and stays allowed on an archived unit; enabling configures it.
+        if enabled {
+            require_active_desk_on(&mut tx, company, schedule.channel_id).await?;
+        }
         sqlx::query(
             "UPDATE channel_schedules SET enabled = $3, updated_at = CURRENT_TIMESTAMP \
              WHERE company_id = $1 AND id = $2",
@@ -461,6 +468,7 @@ impl SchedulePersistence for PostgresPersistence {
             channel_association(schedule.channel_id),
         )
         .await?;
+        require_active_desk_on(&mut tx, company, schedule.channel_id).await?;
         let captured = sqlx::query(
             "INSERT INTO schedule_runs (id, schedule_id, scheduled_for, \
                company_id, channel_id, binding_id, command_key) \
@@ -669,9 +677,17 @@ impl ScheduleOccurrences for PostgresPersistence {
         // Only the columns the capture writes: decoding the whole schedule here would let one row
         // that no longer parses fail capture and claim for every tenant.
         let due = sqlx::query_as::<_, DueSchedule>(
-            "SELECT id, company_id, channel_id, binding_id, next_run_at FROM channel_schedules \
-             WHERE enabled AND next_run_at IS NOT NULL AND next_run_at <= CURRENT_TIMESTAMP \
-             ORDER BY next_run_at, id FOR UPDATE SKIP LOCKED LIMIT $1",
+            // Plan08 02B.2: a schedule on a desk of an archived unit is skipped and keeps every
+            // column as it was, so a restore returns it unchanged (one catch-up slot at most).
+            "SELECT schedule.id, schedule.company_id, schedule.channel_id, schedule.binding_id, \
+                    schedule.next_run_at FROM channel_schedules AS schedule \
+             WHERE schedule.enabled AND schedule.next_run_at IS NOT NULL \
+               AND schedule.next_run_at <= CURRENT_TIMESTAMP \
+               AND NOT EXISTS (SELECT 1 FROM channels AS desk JOIN departments AS unit \
+                   ON unit.company_id = desk.company_id AND unit.id = desk.department_id \
+                 WHERE desk.company_id = schedule.company_id AND desk.id = schedule.channel_id \
+                   AND unit.archived_at IS NOT NULL) \
+             ORDER BY schedule.next_run_at, schedule.id FOR UPDATE OF schedule SKIP LOCKED LIMIT $1",
         )
         .bind(page.max(1))
         .fetch_all(&mut *tx)
@@ -866,6 +882,22 @@ impl ScheduleOccurrences for PostgresPersistence {
              AND materialization_status='failed' AND run_id IS NULL AND refusal=$3 AND role_refusal=$4",
         ).bind(claim.company.as_uuid()).bind(claim.occurrence).bind(refusal).bind(role)
             .fetch_optional(&self.pool).await?.is_some())
+    }
+
+    async fn discard_skipped(&self, claim: OccurrenceClaim) -> AppResult<bool> {
+        Ok(sqlx::query(
+            "DELETE FROM schedule_runs WHERE company_id = $1 AND id = $2 \
+               AND materialization_status = 'materializing' AND run_id IS NULL \
+               AND materialization_worker_id = $3 AND materialization_generation = $4",
+        )
+        .bind(claim.company.as_uuid())
+        .bind(claim.occurrence)
+        .bind(claim.worker.0)
+        .bind(claim.generation)
+        .execute(&self.pool)
+        .await?
+        .rows_affected()
+            == 1)
     }
 
     async fn record_error(&self, claim: OccurrenceClaim, error: &str) -> AppResult<ErrorRecorded> {

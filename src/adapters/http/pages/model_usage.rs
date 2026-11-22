@@ -65,6 +65,7 @@ fn filter_form(company: Uuid, query: &UsageQuery) -> String {
 <label>Group by <select class="select" name="group"><option value="model" {}>Model</option><option value="workflow" {}>Workflow</option><option value="department" {}>Department</option>{}</select></label>{}
 <label>Agent ID (optional) <input class="input" name="agent" value="{}" maxlength="36"></label>
 <label>Workflow ID (optional) <input class="input" name="workflow" value="{}" maxlength="36"></label>
+<label class="label cursor-pointer gap-2"><input class="checkbox" type="checkbox" name="include_archived" value="true"{}> Include archived departments</label>
 <button class="btn btn-primary" type="submit"><span data-label>Show usage</span></button></form>"#,
         (query.end - query.start).num_days(),
         if query.grouping == UsageGrouping::Model {
@@ -98,7 +99,12 @@ fn filter_form(company: Uuid, query: &UsageQuery) -> String {
             r#"<input type="hidden" name="unit" value="{unit}">"#
         )),
         query.agent.map_or(String::new(), |id| id.to_string()),
-        query.workflow.map_or(String::new(), |id| id.to_string())
+        query.workflow.map_or(String::new(), |id| id.to_string()),
+        if query.archived.included() {
+            " checked"
+        } else {
+            ""
+        },
     )
 }
 fn usage_row(company: Uuid, query: &UsageQuery, group: &UsageGroup) -> String {
@@ -169,7 +175,11 @@ fn budgets_section(report: &UsageReport) -> String {
             };
             format!(
                 "<tr><th scope=\"row\">{}</th><td>{}</td><td>{}</td><td>{}{unpriced}</td><td>{}</td></tr>",
-                escape_html_text(&budget.name),
+                escape_html_text(&if budget.archived {
+                    format!("{} (archived)", budget.name)
+                } else {
+                    budget.name.clone()
+                }),
                 if budget.period == "day" { "Today (UTC)" } else { "This month (UTC)" },
                 escape_html_text(budget.cap_usd.as_deref().unwrap_or("No cap")),
                 escape_html_text(&budget.spent_usd),

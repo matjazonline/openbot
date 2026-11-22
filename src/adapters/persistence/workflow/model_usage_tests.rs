@@ -66,6 +66,7 @@ async fn model_usage_workflow_exact_provenance_and_grouping() {
         .bind(row.clone()).execute(f.persistence().pool()).await.unwrap();
     let end = chrono::Utc::now();
     let query = UsageQuery {
+        archived: crate::entities::department::ArchivedUnits::Include,
         scope: UsageScope {
             company,
             actor: f.binding.target.actor.user_id(),

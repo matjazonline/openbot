@@ -830,7 +830,7 @@ impl ThreadUseCases {
                 .collect();
         let mut entries = Vec::new();
         for channel in directory.channels(company.id).await? {
-            if !channel.enabled || !channel.participant_access(context).authorized {
+            if !channel.takes_traffic() || !channel.participant_access(context).authorized {
                 continue;
             }
             let owner: Option<(usize, String)> = order
@@ -1045,7 +1045,7 @@ fn addressed_slug(
         Some(AddressTarget::Principal(_)) | None => None,
     };
     match desk {
-        Some(desk) if desk.enabled => AddressedSlug::Desk(Box::new(desk.clone())),
+        Some(desk) if desk.takes_traffic() => AddressedSlug::Desk(Box::new(desk.clone())),
         Some(desk) => AddressedSlug::DisabledDesk(desk.id),
         None => AddressedSlug::Unknown(find_similar_channel_slugs(slug, available)),
     }

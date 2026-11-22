@@ -65,7 +65,13 @@ pub(super) async fn list_on(
     truncated |= rows.len() > MAX_LISTED_AGENTS;
     let rows: Vec<ListedAgent> = rows.into_iter().take(MAX_LISTED_AGENTS).collect();
     let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
-    let mut departments = agent_departments_on(tx, company, &ids).await?;
+    let mut departments = agent_departments_on(
+        tx,
+        company,
+        &ids,
+        crate::entities::department::ArchivedUnits::Exclude,
+    )
+    .await?;
     let mut addresses = CompanyAddresses::new(company, Some(&templates.app_domain));
     let mut desks = agent_addresses_on(tx, &mut addresses, &ids).await?;
     let name = |name: &str| name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>();

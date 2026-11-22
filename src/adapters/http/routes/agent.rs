@@ -251,7 +251,12 @@ async fn agent_response(
     skill_ids: Vec<Uuid>,
 ) -> AppResult<AgentResponse> {
     let (departments, more_departments) = departments
-        .agent_departments(user, company, &[agent.id])
+        .agent_departments(
+            user,
+            company,
+            &[agent.id],
+            crate::entities::department::ArchivedUnits::Exclude,
+        )
         .await?
         .remove(&agent.id)
         .unwrap_or_default();
@@ -557,7 +562,12 @@ async fn list_agents_json(
         .await?;
     let ids: Vec<Uuid> = agents.iter().map(|agent| agent.id).collect();
     let mut placed = departments
-        .agent_departments(user.id, company_id, &ids)
+        .agent_departments(
+            user.id,
+            company_id,
+            &ids,
+            crate::entities::department::ArchivedUnits::Exclude,
+        )
         .await?;
     let mut response = Vec::with_capacity(agents.len());
     for agent in agents {

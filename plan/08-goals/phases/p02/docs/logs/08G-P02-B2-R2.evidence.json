@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "round": "08G-P02-B2-R2",
+  "artifact": "6de44ac6cdd14b58bf950e56b1332842be5b4d24585f50c3e196eb4d3d33e2b5",
+  "checks": [
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "F3",
+        "F4"
+      ],
+      "command": "cargo test -j 4 --lib -- unit_archive memory_scope memory_tool memory_recall memory_tools unit_budget model_usage recall agent_memory knowledge run_scope role_binding role_context provisioning --test-threads 4",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost, recreated after the F3 migration edit), SQLX_OFFLINE=true, -j 4 --test-threads 4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-R2-focused.txt",
+          "sha256": "66f5a7b3d547601bbd878ee16215d0e67fc2a01dd4a10b6b690d29d9164d52ac"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "affected-callers",
+        "F3-placement-function"
+      ],
+      "command": "cargo test -j 4 --lib -- knowledge unit_resources department model_usage unit_budget attention channel skill mcp administration dashboard roster provisioning agent_authoring reviewer_picker runs:: memory escalation admission role local_agents message_ingress --test-threads 4",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost, recreated after the F3 migration edit), SQLX_OFFLINE=true, -j 4 --test-threads 4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-R2-affected.txt",
+          "sha256": "536da20ce83a21b2095df4d82c56e2f119075d1cfcfdde28ef596788c92de4ca"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "formatting"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-R2-fmt.txt",
+          "sha256": "95b5d824575729046eaa7e40e2e09d635c85b893ea380bdbfcb54229fecdfcf7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "artifact"
+      ],
+      "command": "snapshot.sh plan/08-goals/phases/p02/docs",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-snapshot-r2.txt",
+          "sha256": "029c875c0a2dd3a5089cea5c7edd734b85291521df834c55527a49065ee6a35b"
+        }
+      ]
+    }
+  ]
+}

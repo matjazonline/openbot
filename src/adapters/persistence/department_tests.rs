@@ -800,7 +800,13 @@ async fn department_write_refuses_members_and_strangers_with_not_found() {
                 .await,
             uc.remove_member(user, company, department, f.member_principal)
                 .await,
-            uc.list_departments(user, company).await.map(drop),
+            uc.list_departments(
+                user,
+                company,
+                crate::entities::department::ArchivedUnits::Include,
+            )
+            .await
+            .map(drop),
             uc.delete_department(user, company, department).await,
         ]
     };
@@ -884,7 +890,11 @@ async fn department_write_shows_a_member_only_their_departments() {
     assert_eq!(
         ids(f
             .use_cases
-            .visible_departments(f.member, f.company)
+            .visible_departments(
+                f.member,
+                f.company,
+                crate::entities::department::ArchivedUnits::Include
+            )
             .await
             .unwrap()),
         theirs
@@ -895,7 +905,11 @@ async fn department_write_shows_a_member_only_their_departments() {
         assert_eq!(
             ids(f
                 .use_cases
-                .visible_departments(manager, f.company)
+                .visible_departments(
+                    manager,
+                    f.company,
+                    crate::entities::department::ArchivedUnits::Include
+                )
                 .await
                 .unwrap()),
             every
@@ -912,7 +926,14 @@ async fn department_write_shows_a_member_only_their_departments() {
         .visible_department(f.member, f.company, other.id)
         .await;
     assert!(matches!(hidden, Err(AppError::NotFound(_))), "{hidden:?}");
-    let stranger = f.use_cases.visible_departments(f.stranger, f.company).await;
+    let stranger = f
+        .use_cases
+        .visible_departments(
+            f.stranger,
+            f.company,
+            crate::entities::department::ArchivedUnits::Include,
+        )
+        .await;
     assert!(
         matches!(stranger, Err(AppError::NotFound(_))),
         "{stranger:?}"
@@ -947,7 +968,10 @@ async fn department_write_persistence_reauthorizes_every_write_under_the_lock() 
         .unwrap();
     let before = (
         f.departments
-            .list_by_company(CompanyId::new(f.company))
+            .list_by_company(
+                CompanyId::new(f.company),
+                crate::entities::department::ArchivedUnits::Include,
+            )
             .await
             .unwrap(),
         f.members(department.id).await,
@@ -1004,7 +1028,10 @@ async fn department_write_persistence_reauthorizes_every_write_under_the_lock() 
     }
     let after = (
         f.departments
-            .list_by_company(CompanyId::new(f.company))
+            .list_by_company(
+                CompanyId::new(f.company),
+                crate::entities::department::ArchivedUnits::Include,
+            )
             .await
             .unwrap(),
         f.members(department.id).await,
@@ -1087,6 +1114,8 @@ mod roster;
 #[path = "department_ui_reads_tests.rs"]
 mod ui_reads;
 
+#[path = "department_archive_tests.rs"]
+mod archive_tests;
 #[path = "delegated_administration_tests.rs"]
 mod delegated_administration;
 #[path = "department_sponsor_tests.rs"]

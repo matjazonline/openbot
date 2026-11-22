@@ -51,7 +51,7 @@ pub(crate) async fn clear_department_role_on(
         role, principal, ..
     } = removal;
     let acting = root_role_authority_on(tx, company, actor, department, role).await?;
-    lock_department_on(tx, company, department).await?;
+    active(lock_department_on(tx, company, department).await?)?;
     clear_sponsor_on(tx, company, department, removal).await?;
     lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let cleared = sqlx::query(

@@ -10,8 +10,8 @@ use crate::{
     entities::{
         creation::CreationProvenance,
         department::{
-            Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
-            DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,
+            ArchivedUnits, Department, DepartmentDesk, DepartmentId, DepartmentMember,
+            DepartmentPrincipal, DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,
         },
         transport::PrincipalId,
     },
@@ -48,6 +48,15 @@ pub struct DepartmentEdit {
     pub charter: Option<Option<String>>,
     pub parent_id: Option<Option<DepartmentId>>,
     pub escalation: Option<Option<crate::entities::workflow_escalation::EscalationPolicy>>,
+}
+
+/// What archiving does with runs on the subtree's desks that have not finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenWork {
+    Refuse,
+    /// Cancel them and archive in one write; the archiving manager may end runs on desks they
+    /// cannot read (decision U3), and each cancellation records who did it.
+    Cancel,
 }
 
 /// The actor explicitly chooses whether this sponsor decides.
@@ -91,6 +100,21 @@ pub trait DepartmentPersistence:
         edit: DepartmentEdit,
     ) -> AppResult<Department>;
     async fn delete(&self, scope: DepartmentScope, department: DepartmentId) -> AppResult<()>;
+    /// Archive the unit and its subtree (Plan08 02A.3). Refuses with
+    /// `AppError::UnitArchiveOpenWork` while runs on its desks are unfinished, unless `open`
+    /// asks to cancel them in the same write.
+    async fn archive(
+        &self,
+        scope: DepartmentScope,
+        department: DepartmentId,
+        open: OpenWork,
+    ) -> AppResult<Department>;
+    /// Restore the unit alone; its parent must be active (Plan08 02A.4).
+    async fn restore(
+        &self,
+        scope: DepartmentScope,
+        department: DepartmentId,
+    ) -> AppResult<Department>;
     async fn assign_role(
         &self,
         scope: DepartmentScope,
@@ -121,9 +145,18 @@ pub trait DepartmentPersistence:
         company: CompanyId,
         department: DepartmentId,
     ) -> AppResult<Option<Department>>;
-    async fn list_by_company(&self, company: CompanyId) -> AppResult<Vec<Department>>;
+    async fn list_by_company(
+        &self,
+        company: CompanyId,
+        archived: ArchivedUnits,
+    ) -> AppResult<Vec<Department>>;
     /// The departments where `user`'s person principal is a member or holds a role.
-    async fn list_for_user(&self, company: CompanyId, user: Uuid) -> AppResult<Vec<Department>>;
+    async fn list_for_user(
+        &self,
+        company: CompanyId,
+        user: Uuid,
+        archived: ArchivedUnits,
+    ) -> AppResult<Vec<Department>>;
     /// At most MAX_DEPARTMENT_ROSTER_ENTRIES + 1 rows, ordered for the roster.
     async fn members(
         &self,
@@ -159,11 +192,12 @@ pub trait DepartmentPersistence:
         ids: &[PrincipalId],
     ) -> AppResult<Vec<DepartmentPrincipal>>;
     /// Each agent's departments (member or role holder) by slug, at most 16, and whether it has
-    /// more.
+    /// more; archived ones only when asked.
     async fn agent_departments(
         &self,
         company: CompanyId,
         agents: &[Uuid],
+        archived: ArchivedUnits,
     ) -> AppResult<
         std::collections::HashMap<Uuid, (Vec<crate::entities::department::HeldDepartment>, bool)>,
     >;

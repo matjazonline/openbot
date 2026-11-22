@@ -349,7 +349,11 @@ async fn list_channels_page(
         .list_managed_channels(user.id, company_id)
         .await?;
     let departments = department_use_cases
-        .list_departments(user.id, company_id)
+        .list_departments(
+            user.id,
+            company_id,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?;
 
     Ok(Html(pages::channels_page(&pages::ChannelsPage {
@@ -448,7 +452,11 @@ impl ChannelListView<'_> {
             .await?;
         let departments = self
             .department_use_cases
-            .list_departments(self.user_id, company_id)
+            .list_departments(
+                self.user_id,
+                company_id,
+                crate::entities::department::ArchivedUnits::Include,
+            )
             .await?;
         let list = pages::channel_list_fragment(
             self.company,
@@ -506,7 +514,11 @@ async fn edit_channel_form(
     )
     .await?;
     let departments = department_use_cases
-        .list_departments(user.id, company_id)
+        .list_departments(
+            user.id,
+            company_id,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?;
     Ok(Html(pages::channel_edit_fragment(
         &company,
@@ -536,13 +548,17 @@ async fn cancel_channel_edit(
     )
     .await?;
     let departments = department_use_cases
-        .list_departments(user.id, company_id)
+        .list_departments(
+            user.id,
+            company_id,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?;
     Ok(Html(pages::channel_row_fragment(
         &company,
         &config.app_domain_name,
         &channel,
-        pages::department_name(&departments, &channel),
+        pages::department_name(&departments, &channel).as_deref(),
     )))
 }
 
@@ -609,13 +625,17 @@ async fn update_channel_handler(
         Err(error) => return Err(error),
     };
     let departments = department_use_cases
-        .list_departments(user.id, company_id)
+        .list_departments(
+            user.id,
+            company_id,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?;
     Ok(Html(pages::channel_row_fragment(
         &company,
         &config.app_domain_name,
         &updated,
-        pages::department_name(&departments, &updated),
+        pages::department_name(&departments, &updated).as_deref(),
     )))
 }
 
@@ -930,6 +950,7 @@ mod tests {
         };
 
         let channel = Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: Uuid::new_v4(),

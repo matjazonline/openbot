@@ -38,8 +38,47 @@ pub struct Department {
     pub parent_id: Option<DepartmentId>,
     pub is_root: bool,
     pub escalation: Option<super::workflow_escalation::EscalationPolicy>,
+    /// Set while the unit is archived (Plan08 02A): it admits no work and accepts no
+    /// configuration, and everything it held stays readable.
+    pub archived: Option<UnitArchive>,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
+}
+
+impl Department {
+    pub fn is_archived(&self) -> bool {
+        self.archived.is_some()
+    }
+
+    /// The name as a label of existing work: an archived unit says so.
+    pub fn label(&self) -> String {
+        match self.is_archived() {
+            true => format!("{} (archived)", self.name),
+            false => self.name.clone(),
+        }
+    }
+}
+
+/// Whether a read that lists units includes archived ones (Plan08 02A.5). Every such read takes
+/// one, so no caller gets archived units by omission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArchivedUnits {
+    Exclude,
+    Include,
+}
+
+impl ArchivedUnits {
+    /// The SQL flag for `($n OR unit.archived_at IS NULL)`.
+    pub fn included(self) -> bool {
+        self == Self::Include
+    }
+}
+
+/// When and by whom a unit was archived. A unit archived with its parent carries the parent's.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnitArchive {
+    pub at: DateTime<Utc>,
+    pub by: CreationProvenance,
 }
 
 /// A role a principal holds in a department. Owner and admin are confined to the company root.
@@ -270,6 +309,8 @@ pub enum DepartmentAdministrationAction {
     Updated,
     Moved,
     Deleted,
+    Archived,
+    Restored,
     MemberAdded,
     MemberRemoved,
     RoleAssigned,
@@ -287,6 +328,8 @@ impl DepartmentAdministrationAction {
             Self::Updated => "edited the department",
             Self::Moved => "moved the department",
             Self::Deleted => "deleted the department",
+            Self::Archived => "archived the department",
+            Self::Restored => "restored the department",
             Self::MemberAdded => "added a member",
             Self::MemberRemoved => "removed a member",
             Self::RoleAssigned => "assigned a role",
@@ -306,6 +349,8 @@ impl FromStr for DepartmentAdministrationAction {
             "department_updated" => Self::Updated,
             "department_moved" => Self::Moved,
             "department_deleted" => Self::Deleted,
+            "department_archived" => Self::Archived,
+            "department_restored" => Self::Restored,
             "member_added" => Self::MemberAdded,
             "member_removed" => Self::MemberRemoved,
             "role_assigned" => Self::RoleAssigned,
@@ -348,6 +393,16 @@ impl DeskDepartments {
             .find(|department| department.id == id)
     }
 
+    /// The departments a filter offers: archived ones are left out unless `selected`, so a
+    /// filter already set on one keeps its option.
+    pub fn choices(&self, selected: Option<DepartmentId>) -> Vec<Department> {
+        self.departments
+            .iter()
+            .filter(|department| !department.is_archived() || Some(department.id) == selected)
+            .cloned()
+            .collect()
+    }
+
     /// The department that owns `desk`, if any.
     pub fn of_desk(&self, desk: Option<Uuid>) -> Option<&Department> {
         desk.and_then(|desk| self.owners.get(&desk))
@@ -372,7 +427,7 @@ impl DeskDepartments {
                         self.of_desk(desk(item)).map(|owner| owner.id) == Some(department.id)
                     })
                     .collect::<Vec<_>>();
-                (Some(department.name.clone()), owned)
+                (Some(department.label()), owned)
             })
             .filter(|(_, owned)| !owned.is_empty())
             .collect();

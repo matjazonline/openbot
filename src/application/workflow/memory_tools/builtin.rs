@@ -110,7 +110,8 @@ fn item_schema(with_text: &str) -> Value {
             "title":{"type":"string"},
             with_text:{"type":"string"},
             "occurred_at":{"type":"string"},
-            "access_level":{"type":"integer","minimum":0,"maximum":9}
+            "access_level":{"type":"integer","minimum":0,"maximum":9},
+            "archived":{"const":true}
         }
     })
 }

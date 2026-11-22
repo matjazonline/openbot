@@ -51,6 +51,7 @@ pub struct ChannelDb {
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub department_id: Uuid,
+    pub unit_archived: bool,
 }
 
 impl TryFrom<ChannelDb> for Channel {
@@ -83,6 +84,7 @@ impl TryFrom<ChannelDb> for Channel {
             })?,
             created_at: db.created_at,
             department_id: DepartmentId::new(db.department_id),
+            unit_archived: db.unit_archived,
         })
     }
 }
@@ -122,7 +124,9 @@ const CHANNEL_SELECT: &str = r#"
                 WHERE channel_grant.company_id = channel.company_id AND channel_grant.channel_id = channel.id),
                '[]'::jsonb) AS principal_grants,
            channel.enabled, channel.add_3rd_party, channel.settings_revision, channel.created_by, channel.created_at,
-           channel.department_id
+           channel.department_id,
+           EXISTS (SELECT 1 FROM departments AS unit WHERE unit.company_id = channel.company_id
+               AND unit.id = channel.department_id AND unit.archived_at IS NOT NULL) AS unit_archived
     FROM channels AS channel
 "#;
 
@@ -392,10 +396,12 @@ impl ChannelPersistence for PostgresPersistence {
     async fn list_departments(
         &self,
         company_id: Uuid,
+        archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<crate::entities::department::Department>> {
         crate::adapters::persistence::department::departments_of_company(
             &self.pool,
             crate::domain::workflow::CompanyId::new(company_id),
+            archived,
         )
         .await
     }

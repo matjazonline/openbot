@@ -378,6 +378,47 @@ desks; a department's manager sees the departments they manage, root managers al
 only root managers change prices. Its "Spend counted toward caps" section and the dashboard's
 "Spend by department" panel show each cap, the counted spend and what remains.
 
+## Archive
+
+Archive a department that should stop working for now but whose history, knowledge and spend you
+want to keep: a team on pause, a project that ended, a unit being merged into another. Delete it
+when nothing it holds is worth keeping. Archiving is undone by a restore; deleting is not.
+
+Archiving a department archives every department below it in one step. Departments below that
+were archived earlier keep their own date. The root cannot be archived. The parent's manager
+archives and restores; a department's own lead does not. While it is archived:
+
+- Nothing new starts on its desks: no message, schedule, retry, local-agent session or prompt to
+  one, or native call admits work there. Mail and relays to its desks are refused as for a
+  disabled desk, and the mail directory leaves its desks out. Each desk's own `enabled` setting is
+  untouched, so a restore returns every desk exactly as it was.
+- Nothing is configured there: members, roles, the charter, name, parent and escalation default,
+  desk settings, bindings, schedules, responders, transport bindings, spend caps, knowledge uploads,
+  and creating or moving a desk, document, skill or connection into it are refused with
+  `unit.archived`. Deleting a desk, document or schedule, moving a desk, document, skill or
+  connection out to an active department, disabling a schedule or binding, and deleting the
+  department itself still work, so an archived department can be emptied and deleted. A skill or
+  connection left in it can still be edited by its managers; nothing below can select it.
+- Its threads, runs, decisions and escalations stay readable under the desk grants that existed,
+  and membership and roles in it grant that reading and nothing else. Its knowledge and memory are
+  kept and read from above: the parent's lead and the root's managers read them, and an agent's
+  results mark such hits `"archived": true`. Its own members and leads no longer read them, and
+  no longer place an agent there. Its caps and counted spend are kept. An agent placed only in
+  archived departments is managed by the root's managers.
+
+A department with unfinished runs here or below cannot be archived. The refusal says how many,
+and the department page offers to cancel them and archive; each cancellation is recorded with who
+asked for it. More than 64 open runs must finish or be cancelled first.
+An archive is also refused while an active binding addressed to an agent placed only there has
+roles to resolve, since the agent would be left in no department; a restore is refused when it
+would place such an agent in two. Deactivate the binding first, as for removing the agent.
+
+Restoring brings back that one department, and only when its parent is active. Departments below
+it stay archived until each is restored. The department list keeps archived departments under
+"Show archived"; pickers and filters leave them out, the usage page shows their caps and the
+calls attributed to them only when "Include archived departments" is ticked (or when you drill
+into one), and desks, groups and run lists of past work name them "(archived)".
+
 ## Delete
 
 The root cannot be deleted. A child department is deleted only when it owns no desks, knowledge
@@ -395,15 +436,19 @@ for someone outside the company.
 
 | Method and path | Does |
 | --- | --- |
-| `GET /departments` | Lists the departments the caller can see. |
+| `GET /departments` | Lists the active departments the caller can see; `?include_archived=true` adds archived ones. |
 | `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id), `escalation` (role/hops or null). |
 | `GET /departments/{department_id}` | One department with its `members` and `roles`. |
 | `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for a child's `parent_id` selects the root. The root cannot be re-parented. |
 | `DELETE /departments/{department_id}` | Deletes it (see "Delete"). |
+| `POST /departments/{department_id}/archive` | Archives it and every department below it (see "Archive"). Optional JSON `{ "cancel_open_runs": true }` cancels their unfinished runs first. |
+| `POST /departments/{department_id}/restore` | Restores that department alone; its parent must be active. |
 | `PUT` / `DELETE /departments/{department_id}/members/{principal_id}` | Adds or removes a member. |
 | `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role. PUT requires JSON `{ "decider": false }` (`true` selects a sponsor decider); DELETE accepts `?successor={principal_id}` for sponsor handover. Reads include `decider` for every role holder. |
 
-Refusals: `409 Conflict` for a taken slug or a department that still owns desks, knowledge documents, skills or connections, or has children;
+Refusals: `409 Conflict` with `code` `unit.archived` for a write to an archived department, and
+`unit.archive_open_work` with `count` and `cancellable` for an archive with unfinished runs;
+`409 Conflict` for a taken slug or a department that still owns desks, knowledge documents, skills or connections, or has children;
 `400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither
 a person nor an agent; `404 Not Found` for a principal or parent department that is not the
 company's.

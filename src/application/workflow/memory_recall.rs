@@ -50,6 +50,8 @@ pub struct RecallRequest {
 pub struct RecallNamespace {
     pub namespace: NamespaceExternalId,
     pub label: String,
+    /// The unit is archived (Plan08 02C.1); the freeze rereads it from the eligible scope.
+    pub archived: bool,
 }
 
 /// What a fresh attempt fetched, frozen by the preparation unless it already has a freeze.
@@ -284,6 +286,7 @@ impl MemoryRecall {
                         .map(|entry| RecallNamespace {
                             namespace: entry.namespace,
                             label: entry.scope.label.clone(),
+                            archived: entry.scope.archived,
                         })
                         .zip(answers)
                         .collect(),

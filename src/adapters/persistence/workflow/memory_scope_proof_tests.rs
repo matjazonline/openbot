@@ -15,6 +15,7 @@ fn pack(
         RecallNamespace {
             namespace: NamespaceExternalId(namespace),
             label: label.into(),
+            archived: false,
         },
         MemoryPack {
             items: (0..count)

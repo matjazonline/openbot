@@ -80,7 +80,7 @@ pub(crate) async fn prepare_new_agent_placement_on(
     if let Some(role) = placement.role {
         root_role_authority_on(tx, scope.company, scope.actor, placement.department, role).await?;
     }
-    lock_department_on(tx, scope.company, placement.department).await?;
+    active(lock_department_on(tx, scope.company, placement.department).await?)?;
     check_principal_on(tx, scope.company, principal).await?;
     let added = department_member_insert(scope.company, placement.department, principal)
         .execute(&mut **tx)

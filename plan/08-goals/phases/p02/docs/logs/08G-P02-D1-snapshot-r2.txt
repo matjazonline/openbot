@@ -1,0 +1,4 @@
+base:   42bc327e61674dcd5114f3c948454036dfd51506
+digest: dfb7097b05f83153178c265aad32a87fb36534839a74fa3c624daf5f930bed34
+files:
+  .trail/learnings/2026-11-21-adding-a-department-role-makes-it-mac02.md

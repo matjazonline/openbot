@@ -488,6 +488,7 @@ impl crate::application::ports::administration::AdministrationPersistence
         &self,
         _actor: uuid::Uuid,
         _company: crate::domain::workflow::CompanyId,
+        _archived: crate::entities::department::ArchivedUnits,
     ) -> crate::app_error::AppResult<Vec<crate::application::ports::administration::ManagedUnit>>
     {
         // This double models only the root, identified by the company id (see `managed_units`).

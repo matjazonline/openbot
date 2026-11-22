@@ -163,7 +163,7 @@ impl KnowledgeDocuments for PostgresPersistence {
             let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
                 let permissions = permissions::load(&mut tx, scope).await?;
-                permissions.require_write(&mut tx, target).await?;
+                permissions.require_write_into(&mut tx, target).await?;
                 // The multipart boundary may authorize its target before reading any files.
                 if !layers.is_empty() {
                     authorize_layers(permissions.actor, layers)?;
@@ -187,7 +187,7 @@ impl KnowledgeDocuments for PostgresPersistence {
             let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
                 let permissions = permissions::load(&mut tx, scope).await?;
-                permissions.require_write(&mut tx, target).await?;
+                permissions.require_write_into(&mut tx, target).await?;
                 let layers: Vec<_> = documents
                     .iter()
                     .map(|document| document.file.size())

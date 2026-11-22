@@ -110,7 +110,10 @@ fn publication_failure(error: &AppError) -> &'static str {
         AppError::WorkflowRole(_) => "role_resolution_refused",
         AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
         AppError::BadRequest(_) | AppError::NativeMcpNotAdmitted => "invalid_definition",
-        AppError::Conflict(_) | AppError::Superseded(_) => "conflict",
+        AppError::Conflict(_)
+        | AppError::Superseded(_)
+        | AppError::UnitArchived
+        | AppError::UnitArchiveOpenWork { .. } => "conflict",
         AppError::Forbidden(_) | AppError::InvalidCredentials => "forbidden",
         AppError::NotFound(_) => "missing",
         AppError::ServiceUnavailable(_) => "unavailable",

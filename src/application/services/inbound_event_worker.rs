@@ -660,6 +660,8 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         AppError::WorkflowRole(_)
         | AppError::ResourceOutsideUnit(_)
         | AppError::BudgetExhausted(_)
+        | AppError::UnitArchived
+        | AppError::UnitArchiveOpenWork { .. }
         | AppError::KnowledgeTrigger { .. }
         | AppError::KnowledgeRelease { .. }
         | AppError::Execution(_)

@@ -38,7 +38,7 @@ use crate::application::workflow::WorkflowActor;
 use crate::domain::workflow::CompanyId;
 use crate::entities::creation::CreationProvenance;
 use crate::entities::department::{
-    Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
+    ArchivedUnits, Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
     DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,
 };
 use crate::entities::participant::PrincipalKind;
@@ -53,9 +53,13 @@ pub(crate) use audit::{
 };
 mod placement;
 pub(crate) use placement::{place_in_department_on, prepare_new_agent_placement_on};
+mod archive;
 mod lifecycle;
 mod roles;
 mod root;
+#[cfg(test)]
+pub(crate) use archive::{MAX_ARCHIVE_CANCELLATIONS, archive_department_on};
+pub(crate) use archive::{require_active_desk_on, require_active_unit_on};
 pub(crate) use lifecycle::{
     create_department_on, create_department_with_id_on, delete_department_on, update_department_on,
 };
@@ -122,7 +126,7 @@ fn principal_choices(
 const DEPARTMENT_COLUMNS: &str = "department.id, department.company_id, department.name, \
      department.slug::text AS slug, department.description, department.charter, \
      department.parent_id, department.is_root, department.created_by, department.created_at, \
-     department.escalation";
+     department.escalation, department.archived_at, department.archived_by";
 
 #[derive(sqlx::FromRow)]
 struct DepartmentDb {
@@ -136,6 +140,8 @@ struct DepartmentDb {
     is_root: bool,
     created_by: serde_json::Value,
     escalation: Option<serde_json::Value>,
+    archived_at: Option<DateTime<Utc>>,
+    archived_by: Option<serde_json::Value>,
     created_at: DateTime<Utc>,
 }
 
@@ -168,6 +174,24 @@ impl TryFrom<DepartmentDb> for Department {
                     ))
                 })?,
             is_root: db.is_root,
+            archived: match (db.archived_at, db.archived_by) {
+                (Some(at), Some(by)) => Some(crate::entities::department::UnitArchive {
+                    at,
+                    by: serde_json::from_value(by).map_err(|error| {
+                        AppError::Internal(format!(
+                            "Invalid departments.archived_by provenance for {}: {error}",
+                            db.id
+                        ))
+                    })?,
+                }),
+                (None, None) => None,
+                _ => {
+                    return Err(AppError::Internal(format!(
+                        "departments.archived_at and archived_by disagree for {}",
+                        db.id
+                    )));
+                }
+            },
             created_at: db.created_at,
         })
     }
@@ -373,6 +397,15 @@ async fn follow_lead_on(
     .await
 }
 
+/// Plan08 02B.4: an archived unit accepts no configuration write; restore and delete are the
+/// writes left. The row is already locked, so an archive cannot commit in between.
+fn active(department: Department) -> AppResult<Department> {
+    if department.is_archived() {
+        return Err(AppError::UnitArchived);
+    }
+    Ok(department)
+}
+
 /// Membership and role rows for one principal, under the department row and the principals the
 /// write touches (sorted), then one sync of the derived grants: the department's for membership,
 /// the role's reach for a role.
@@ -412,7 +445,7 @@ async fn write_placement_on(
     member: bool,
     role: Option<DepartmentRoleAssignment>,
 ) -> AppResult<Placed> {
-    lock_department_on(tx, company, department).await?;
+    active(lock_department_on(tx, company, department).await?)?;
     // The holder a single-holder role replaces loses a row: lock them with the new one, first.
     let mut involved: Vec<Uuid> = match role
         .filter(|write| write.role.is_single_holder() || write.role == DepartmentRole::Sponsor)
@@ -474,7 +507,7 @@ pub(crate) async fn remove_department_member_on(
     department: DepartmentId,
     principal: PrincipalId,
 ) -> AppResult<()> {
-    lock_department_on(tx, company, department).await?;
+    active(lock_department_on(tx, company, department).await?)?;
     lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let removed = sqlx::query(
         "DELETE FROM department_members \
@@ -520,16 +553,19 @@ async fn role_reach_on(
         .collect())
 }
 
-/// Every department of the company, by slug.
+/// Every department of the company, by slug; archived ones only when asked.
 pub(crate) async fn departments_of_company(
     pool: &sqlx::PgPool,
     company: CompanyId,
+    archived: ArchivedUnits,
 ) -> AppResult<Vec<Department>> {
     sqlx::query_as::<_, DepartmentDb>(&format!(
         "SELECT {DEPARTMENT_COLUMNS} FROM departments AS department \
-         WHERE department.company_id = $1 ORDER BY department.slug, department.id"
+         WHERE department.company_id = $1 AND ($2 OR department.archived_at IS NULL) \
+         ORDER BY department.slug, department.id"
     ))
     .bind(company.as_uuid())
+    .bind(archived.included())
     .fetch_all(pool)
     .await?
     .into_iter()
@@ -610,6 +646,32 @@ impl DepartmentPersistence for PostgresDepartments {
         .await?;
         tx.commit().await?;
         Ok(department)
+    }
+
+    async fn archive(
+        &self,
+        scope: DepartmentScope,
+        department: DepartmentId,
+        open: crate::application::ports::department::OpenWork,
+    ) -> AppResult<Department> {
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
+        let (acting, _) = require_parent_management_on(&mut tx, scope, department).await?;
+        let archived =
+            archive::archive_department_on(&mut tx, scope, acting, department, open).await?;
+        tx.commit().await?;
+        Ok(archived)
+    }
+
+    async fn restore(
+        &self,
+        scope: DepartmentScope,
+        department: DepartmentId,
+    ) -> AppResult<Department> {
+        let mut tx = begin_department_write(&self.persistence, scope).await?;
+        let (acting, _) = require_parent_management_on(&mut tx, scope, department).await?;
+        let restored = archive::restore_department_on(&mut tx, scope, acting, department).await?;
+        tx.commit().await?;
+        Ok(restored)
     }
 
     async fn delete(&self, scope: DepartmentScope, department: DepartmentId) -> AppResult<()> {
@@ -743,17 +805,26 @@ impl DepartmentPersistence for PostgresDepartments {
         .transpose()
     }
 
-    async fn list_by_company(&self, company: CompanyId) -> AppResult<Vec<Department>> {
-        departments_of_company(&self.persistence.pool, company).await
+    async fn list_by_company(
+        &self,
+        company: CompanyId,
+        archived: ArchivedUnits,
+    ) -> AppResult<Vec<Department>> {
+        departments_of_company(&self.persistence.pool, company, archived).await
     }
 
-    async fn list_for_user(&self, company: CompanyId, user: Uuid) -> AppResult<Vec<Department>> {
+    async fn list_for_user(
+        &self,
+        company: CompanyId,
+        user: Uuid,
+        archived: ArchivedUnits,
+    ) -> AppResult<Vec<Department>> {
         sqlx::query_as::<_, DepartmentDb>(&format!(
             "SELECT {DEPARTMENT_COLUMNS} FROM departments AS department \
              JOIN principals AS principal \
                ON principal.company_id = department.company_id \
               AND principal.user_id = $2 AND principal.kind = 'person' \
-             WHERE department.company_id = $1 \
+             WHERE department.company_id = $1 AND ($3 OR department.archived_at IS NULL) \
                AND (EXISTS (SELECT 1 FROM department_members AS member \
                              WHERE member.company_id = department.company_id \
                                AND member.department_id = department.id \
@@ -766,6 +837,7 @@ impl DepartmentPersistence for PostgresDepartments {
         ))
         .bind(company.as_uuid())
         .bind(user)
+        .bind(archived.included())
         .fetch_all(&self.persistence.pool)
         .await?
         .into_iter()
@@ -910,6 +982,7 @@ impl DepartmentPersistence for PostgresDepartments {
         &self,
         company: CompanyId,
         agents: &[Uuid],
+        archived: ArchivedUnits,
     ) -> AppResult<
         std::collections::HashMap<Uuid, (Vec<crate::entities::department::HeldDepartment>, bool)>,
     > {
@@ -918,6 +991,7 @@ impl DepartmentPersistence for PostgresDepartments {
             &mut connection,
             company,
             agents,
+            archived,
         )
         .await?;
         Ok(placed

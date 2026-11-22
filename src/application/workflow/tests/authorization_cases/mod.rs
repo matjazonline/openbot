@@ -10,6 +10,7 @@ use crate::domain::entities::{
 
 fn channel(company_id: CompanyId, mode: ChannelAccessMode) -> Channel {
     Channel {
+        unit_archived: false,
         id: Uuid::new_v4(),
         company_id: company_id.as_uuid(),
         name: "Related".into(),

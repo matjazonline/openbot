@@ -72,6 +72,7 @@ impl MemoryToolScope {
 
 /// One exact admitted owner. A unit can match several selectors while it is
 /// queried once. The frozen label describes this run, never the current live tree.
+/// `archived` is the unit's current state (Plan08 02C.1): results mark the unit, the label stays.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemoryScope {
     pub owner: NamespaceOwner,
@@ -79,6 +80,7 @@ pub struct MemoryScope {
     pub selectors: Vec<MemoryToolScope>,
     pub writable: bool,
     pub private_person: bool,
+    pub archived: bool,
 }
 
 impl MemoryScope {

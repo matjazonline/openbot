@@ -18,9 +18,13 @@ fn decode(role: Option<String>) -> AppResult<Option<ManagementRole>> {
         "owner" => Ok(ManagementRole::Owner),
         "admin" => Ok(ManagementRole::Admin),
         _ => role
-            .strip_prefix("lead:")
-            .and_then(|unit| Uuid::parse_str(unit).ok())
-            .map(|unit| ManagementRole::Lead(DepartmentId::new(unit)))
+            .split_once(':')
+            .and_then(|(kind, unit)| Some((kind, DepartmentId::new(Uuid::parse_str(unit).ok()?))))
+            .and_then(|(kind, unit)| match kind {
+                "lead" => Some(ManagementRole::Lead(unit)),
+                "sponsor" => Some(ManagementRole::Sponsor(unit)),
+                _ => None,
+            })
             .ok_or_else(|| AppError::Internal("Invalid stored management role".into())),
     })
     .transpose()
@@ -128,13 +132,16 @@ impl AdministrationPersistence for PostgresPersistence {
         &self,
         actor: Uuid,
         company: CompanyId,
+        archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<ManagedUnit>> {
         let rows: Vec<(Uuid, String, bool)> = sqlx::query_as(
             "SELECT id, name, is_root FROM departments WHERE company_id=$2 \
+             AND ($3 OR archived_at IS NULL) \
              AND unit_management_role($1,$2,id) IS NOT NULL ORDER BY is_root DESC, name, id",
         )
         .bind(actor)
         .bind(company.as_uuid())
+        .bind(archived.included())
         .fetch_all(self.pool())
         .await?;
         Ok(rows
@@ -182,8 +189,11 @@ impl AdministrationPersistence for PostgresDepartments {
         &self,
         actor: Uuid,
         company: CompanyId,
+        archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<ManagedUnit>> {
-        self.persistence.managed_unit_choices(actor, company).await
+        self.persistence
+            .managed_unit_choices(actor, company, archived)
+            .await
     }
 
     async fn default_resource_unit(

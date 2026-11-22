@@ -55,6 +55,14 @@ pub fn router() -> Router<AppState> {
                 .delete(delete_department),
         )
         .route(
+            "/ui/companies/{company_id}/departments/{department_id}/archive",
+            post(archive_department),
+        )
+        .route(
+            "/ui/companies/{company_id}/departments/{department_id}/restore",
+            post(restore_department),
+        )
+        .route(
             "/ui/companies/{company_id}/departments/{department_id}/members",
             post(add_member),
         )
@@ -130,7 +138,14 @@ pub(super) async fn department_section(
     let company_id = access.company.id;
     let managed = departments.managed_units(user_id, company_id).await?;
     let editable = !managed.is_empty();
-    let listed = departments.visible_departments(user_id, company_id).await?;
+    // Archived departments sit behind "Show archived" and still name parents and acting roles.
+    let listed = departments
+        .visible_departments(
+            user_id,
+            company_id,
+            crate::entities::department::ArchivedUnits::Include,
+        )
+        .await?;
     let (choices, choices_cut) = if editable {
         departments.principal_choices(user_id, company_id).await?
     } else {
@@ -144,16 +159,22 @@ pub(super) async fn department_section(
         ),
         _ => None,
     };
+    // An archived department's connections take no edit (Plan08 02B.4), so its form is left out.
     let models = match &view {
-        Some(view) if managed.contains(&view.detail.department.id) => Some(
-            companies
-                .list_unit_model_connections(
-                    user_id,
-                    company_id,
-                    Some(view.detail.department.id.as_uuid()),
-                )
-                .await?,
-        ),
+        Some(view)
+            if managed.contains(&view.detail.department.id)
+                && !view.detail.department.is_archived() =>
+        {
+            Some(
+                companies
+                    .list_unit_model_connections(
+                        user_id,
+                        company_id,
+                        Some(view.detail.department.id.as_uuid()),
+                    )
+                    .await?,
+            )
+        }
         _ => None,
     };
     let budgets = match &view {
@@ -592,6 +613,101 @@ async fn delete_department(
                     },
                     DepartmentForm::Delete,
                     format!("Failed to delete department: {error}"),
+                )
+                .await
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ArchiveFormData {
+    cancel_open_runs: Option<String>,
+}
+
+/// Archive `department` and its subtree (Plan08 02E.1). Open runs refuse it with their count;
+/// when they may be cancelled the card then offers to cancel them and archive.
+async fn archive_department(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<ArchiveFormData>,
+) -> AppResult<Response> {
+    use crate::application::ports::department::OpenWork;
+    let access = workspace.managed(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    let open = match form.cancel_open_runs.as_deref() {
+        Some("true") => OpenWork::Cancel,
+        _ => OpenWork::Refuse,
+    };
+    let selection = || DepartmentSelection::Department {
+        id: department,
+        draft: None,
+    };
+    match workspace
+        .department_use_cases
+        .archive_department(workspace.user_id, company_id, department, open)
+        .await
+    {
+        Ok(_) => {
+            workspace
+                .saved(&access, Some(department), "Department archived.")
+                .await
+        }
+        Err(AppError::UnitArchiveOpenWork { count, cancellable }) => {
+            let runs = if count == 1 { "run is" } else { "runs are" };
+            let (form, message) = if cancellable {
+                (
+                    DepartmentForm::ArchiveOpenWork,
+                    format!("{count} {runs} still open here or below. Cancel them to archive."),
+                )
+            } else {
+                (
+                    DepartmentForm::Archive,
+                    format!(
+                        "{count} {runs} still open here or below, more than can be cancelled at once. Let them finish or cancel some first."
+                    ),
+                )
+            };
+            workspace.refused(&access, selection(), form, message).await
+        }
+        Err(error) => {
+            workspace
+                .refused(
+                    &access,
+                    selection(),
+                    DepartmentForm::Archive,
+                    format!("Failed to archive department: {error}"),
+                )
+                .await
+        }
+    }
+}
+
+async fn restore_department(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<Response> {
+    let access = workspace.managed(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    match workspace
+        .department_use_cases
+        .restore_department(workspace.user_id, company_id, department)
+        .await
+    {
+        Ok(_) => {
+            workspace
+                .saved(&access, Some(department), "Department restored.")
+                .await
+        }
+        Err(error) => {
+            workspace
+                .refused(
+                    &access,
+                    DepartmentSelection::Department {
+                        id: department,
+                        draft: None,
+                    },
+                    DepartmentForm::Archive,
+                    format!("Failed to restore department: {error}"),
                 )
                 .await
         }

@@ -96,6 +96,7 @@ fn memory_access_level_bounded_hits_record_exactly_what_is_shown() {
         .map(|level| LabeledHit {
             namespace: NamespaceExternalId(Uuid::new_v4()),
             label: "unit:root".into(),
+            archived: false,
             hit: hit(level),
         })
         .collect();
@@ -112,6 +113,7 @@ fn memory_access_level_bounded_hits_record_exactly_what_is_shown() {
     let invalid = [LabeledHit {
         namespace: NamespaceExternalId(Uuid::new_v4()),
         label: "personal".into(),
+        archived: false,
         hit: hit(10),
     }];
     assert!(

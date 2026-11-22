@@ -107,7 +107,8 @@ impl<'a> DirectoryCache<'a> {
         Ok(loaded)
     }
 
-    /// The company's departments, to group its desk directory by.
+    /// The company's active departments, to group its desk directory by: an archived unit's
+    /// desks take no mail, so the directory leaves them out with it.
     pub(crate) async fn departments(
         &mut self,
         company_id: Uuid,
@@ -118,7 +119,10 @@ impl<'a> DirectoryCache<'a> {
         let loaded = self
             .use_cases
             .channel_persistence
-            .list_departments(company_id)
+            .list_departments(
+                company_id,
+                crate::entities::department::ArchivedUnits::Exclude,
+            )
             .await?;
         self.departments.insert(company_id, loaded.clone());
         Ok(loaded)

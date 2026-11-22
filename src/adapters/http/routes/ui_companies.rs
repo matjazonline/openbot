@@ -203,7 +203,11 @@ impl Workspace {
             .await?;
         let departments = self
             .department_use_cases
-            .list_departments(self.user_id, company_id)
+            .list_departments(
+                self.user_id,
+                company_id,
+                crate::entities::department::ArchivedUnits::Exclude,
+            )
             .await?;
 
         Ok(CompanyCounts {

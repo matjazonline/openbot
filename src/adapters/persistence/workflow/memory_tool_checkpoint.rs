@@ -221,6 +221,7 @@ pub(in crate::adapters::persistence::workflow) async fn eligible_on(
                 selectors: vec![MemoryToolScope::Personal],
                 writable: person || !has_person,
                 private_person: person,
+                archived: false,
             });
         } else {
             let unit = DepartmentId::new(row.unit_id.ok_or_else(invalid)?);
@@ -248,10 +249,44 @@ pub(in crate::adapters::persistence::workflow) async fn eligible_on(
                     .iter()
                     .any(|write| write.access == "write" && write.unit_id == row.unit_id),
                 private_person: false,
+                archived: false,
             });
         }
     }
+    mark_archived_on(tx, company, &mut scopes).await?;
     Ok(scopes)
+}
+
+/// Plan08 02C.1: a parent's lead still reads an archived child; its hits say so.
+async fn mark_archived_on(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    scopes: &mut [MemoryScope],
+) -> AppResult<()> {
+    let units: Vec<Uuid> = scopes
+        .iter()
+        .filter_map(|scope| match scope.owner {
+            NamespaceOwner::Unit(unit) => Some(unit.as_uuid()),
+            _ => None,
+        })
+        .collect();
+    if units.is_empty() {
+        return Ok(());
+    }
+    let archived: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM departments \
+         WHERE company_id=$1 AND id=ANY($2) AND archived_at IS NOT NULL",
+    )
+    .bind(company.as_uuid())
+    .bind(&units)
+    .fetch_all(&mut *tx)
+    .await?;
+    for scope in scopes {
+        if let NamespaceOwner::Unit(unit) = scope.owner {
+            scope.archived = archived.contains(&unit.as_uuid());
+        }
+    }
+    Ok(())
 }
 
 /// The frozen person row also needs the existing own-session proof. Native brokers

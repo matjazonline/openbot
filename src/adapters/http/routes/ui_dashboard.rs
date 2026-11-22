@@ -244,7 +244,12 @@ impl DashboardScope {
                 dashboard
                     .department_use_cases
                     // A company view is the managers': every department.
-                    .desk_departments(dashboard.user_id, company.id, &[])
+                    .desk_departments(
+                        dashboard.user_id,
+                        company.id,
+                        &[],
+                        crate::entities::department::ArchivedUnits::Include,
+                    )
                     .await?
             }
             _ => crate::entities::department::DeskDepartments::default(),

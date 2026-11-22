@@ -335,17 +335,17 @@ pub(super) async fn freeze_memory_on(
             ceiling,
         ));
     };
-    for (scope, _) in &packs {
+    let mut packs = packs;
+    for (scope, _) in &mut packs {
         let selected = ready
             .iter()
             .find(|entry| entry.namespace == scope.namespace)
             .ok_or_else(crate::application::workflow::scopes::unavailable)?;
-        if !eligible
+        let entry = eligible
             .iter()
-            .any(|entry| entry.owner == selected.owner && entry.label == scope.label)
-        {
-            return Err(crate::application::workflow::scopes::unavailable());
-        }
+            .find(|entry| entry.owner == selected.owner && entry.label == scope.label)
+            .ok_or_else(crate::application::workflow::scopes::unavailable)?;
+        scope.archived = entry.archived;
     }
     let memory = assemble_memory(packs, ceiling)?;
     let scope = fence.scope;
@@ -397,6 +397,7 @@ fn assemble_memory(
             memory.items.push(RecalledMemory {
                 namespace: scope.namespace,
                 scope: scope.label.clone(),
+                archived: scope.archived,
                 observation_id: item.observation_id,
                 kind: item.kind,
                 title: item.title,
@@ -531,6 +532,7 @@ mod freeze_bounds {
                 RecallNamespace {
                     namespace: NamespaceExternalId(uuid::Uuid::new_v4()),
                     label: "unit:example".into(),
+                    archived: false,
                 },
                 pack,
             )],

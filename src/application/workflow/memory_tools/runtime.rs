@@ -244,6 +244,7 @@ impl MemoryToolRuntime {
                 hits.push(LabeledHit {
                     namespace: entry.namespace,
                     label: entry.scope.label.clone(),
+                    archived: entry.scope.archived,
                     hit,
                 });
             }
@@ -322,6 +323,7 @@ impl MemoryToolRuntime {
                 fetched.push(LabeledDetail {
                     namespace: entry.namespace,
                     label: entry.scope.label.clone(),
+                    archived: entry.scope.archived,
                     detail,
                 });
             }
@@ -540,27 +542,43 @@ fn parse_scopes(value: Option<&Value>) -> Option<Option<Vec<MemoryToolScope>>> {
 struct LabeledHit {
     namespace: NamespaceExternalId,
     label: String,
+    archived: bool,
     hit: MemoryHit,
 }
 
 struct LabeledDetail {
     namespace: NamespaceExternalId,
     label: String,
+    archived: bool,
     detail: MemoryDetail,
 }
 
 fn hit_json(item: &LabeledHit) -> Value {
     let hit = &item.hit;
-    json!({"scope": item.label,"namespace":item.namespace, "id": hit.observation_id, "revision": hit.revision,
+    mark_archived(
+        json!({"scope": item.label,"namespace":item.namespace, "id": hit.observation_id, "revision": hit.revision,
         "kind": hit.kind, "title": hit.title, "snippet": hit.snippet,
-        "occurred_at": hit.occurred_at.to_rfc3339(), "access_level": hit.access_level})
+        "occurred_at": hit.occurred_at.to_rfc3339(), "access_level": hit.access_level}),
+        item.archived,
+    )
 }
 
 fn detail_json(item: &LabeledDetail) -> Value {
     let detail = &item.detail;
-    json!({"scope": item.label,"namespace":item.namespace, "id": detail.observation_id, "revision": detail.revision,
+    mark_archived(
+        json!({"scope": item.label,"namespace":item.namespace, "id": detail.observation_id, "revision": detail.revision,
         "kind": detail.kind, "title": detail.title, "text": detail.body,
-        "occurred_at": detail.occurred_at.to_rfc3339(), "access_level": detail.access_level})
+        "occurred_at": detail.occurred_at.to_rfc3339(), "access_level": detail.access_level}),
+        item.archived,
+    )
+}
+
+/// Plan08 02C.1: a hit from an archived unit says so; others carry no flag.
+pub(crate) fn mark_archived(mut item: Value, archived: bool) -> Value {
+    if archived {
+        item["archived"] = Value::Bool(true);
+    }
+    item
 }
 
 /// Interleave namespaces before applying the shared limit, preserving every
@@ -589,6 +607,7 @@ fn merge_searches(
                 merged.push(LabeledHit {
                     namespace: scope.namespace,
                     label: scope.scope.label.clone(),
+                    archived: scope.scope.archived,
                     hit,
                 });
                 progressed = true;

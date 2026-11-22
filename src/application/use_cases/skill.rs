@@ -426,7 +426,11 @@ impl SkillUseCases {
         let company = crate::domain::workflow::CompanyId::new(company_id);
         let units = self
             .companies
-            .managed_unit_choices(user_id, company)
+            .managed_unit_choices(
+                user_id,
+                company,
+                crate::entities::department::ArchivedUnits::Exclude,
+            )
             .await?;
         let default = self
             .companies

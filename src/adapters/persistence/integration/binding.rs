@@ -39,6 +39,16 @@ impl ChannelBindingPersistence for PostgresPersistence {
         let access_snapshot = serde_json::to_value(&write.access_snapshot)
             .map_err(|error| AppError::Internal(error.to_string()))?;
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        // Plan08 02B.4: no transport binding is linked to a desk of an archived unit.
+        if let Some(desk) = write.target.desk_id() {
+            let company = crate::domain::workflow::CompanyId::new(write.company_id);
+            crate::adapters::persistence::department::require_active_desk_on(
+                &mut transaction,
+                company,
+                desk,
+            )
+            .await?;
+        }
 
         let query = format!(
             r#"INSERT INTO channel_bindings
@@ -206,6 +216,18 @@ impl ChannelBindingPersistence for PostgresPersistence {
         if previous.status == change.status && previous.disabled_reason == change.reason {
             transaction.commit().await?;
             return Ok(previous);
+        }
+        // Re-activating configures the desk; pausing, disabling and unlinking stop work and stay
+        // allowed on an archived unit (Plan08 02B.4).
+        if change.status.is_active()
+            && let Some(desk) = previous.target.desk_id()
+        {
+            crate::adapters::persistence::department::require_active_desk_on(
+                &mut transaction,
+                crate::domain::workflow::CompanyId::new(change.company_id),
+                desk,
+            )
+            .await?;
         }
 
         let query = format!(

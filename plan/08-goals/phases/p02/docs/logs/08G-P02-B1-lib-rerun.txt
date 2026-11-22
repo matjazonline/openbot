@@ -1,0 +1,37 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 15s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 6 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::candidate_tests::workflow_action_reconciliation_claim_sql_multiple_applicable_candidates ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_revocation_and_rotation_racing_dispatch_never_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_invalid_created_path_segment_cannot_invoke_editor_or_deliver has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_identity_failures_stop_at_distinct_steps_without_writes has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_identity_failures_stop_at_distinct_steps_without_writes ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_invalid_created_path_segment_cannot_invoke_editor_or_deliver ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io' (42178768) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:435:5:
+assertion `left == right` failed
+  left: Number(8)
+ right: 7
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 5034 filtered out; finished in 224.54s
+
+error: test failed, to rerun pass `--lib`

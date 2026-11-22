@@ -35,6 +35,9 @@ struct Filters {
     /// One department's calls, for the drill-down by desk (Plan07 02C).
     #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
     unit: Option<Uuid>,
+    /// Archived departments' spend rows too (Plan08 02C.3).
+    #[serde(default)]
+    include_archived: bool,
 }
 impl Filters {
     fn query(self, scope: UsageScope) -> AppResult<UsageQuery> {
@@ -67,6 +70,10 @@ impl Filters {
             agent: self.agent,
             workflow: self.workflow,
             unit: self.unit,
+            archived: match self.include_archived {
+                true => crate::entities::department::ArchivedUnits::Include,
+                false => crate::entities::department::ArchivedUnits::Exclude,
+            },
         })
     }
 }

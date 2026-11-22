@@ -127,6 +127,7 @@ async fn jev_runtime_corrupt_credential_is_terminal_and_optional_agent_usage_rep
     let report = f
         .persistence
         .usage_report(UsageQuery {
+            archived: crate::entities::department::ArchivedUnits::Include,
             scope: UsageScope {
                 company: c.company.as_uuid(),
                 actor: target.actor.user_id(),

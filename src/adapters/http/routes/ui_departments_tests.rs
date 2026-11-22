@@ -154,7 +154,11 @@ async fn department_ui_writes_answer_404_to_members_strangers_and_foreign_compan
     assert!(detail.members.is_empty() && detail.roles.is_empty());
     assert_eq!(
         f.departments()
-            .list_departments(f.owner.id, f.company.id)
+            .list_departments(
+                f.owner.id,
+                f.company.id,
+                crate::entities::department::ArchivedUnits::Include
+            )
             .await
             .unwrap()
             .len(),
@@ -238,7 +242,11 @@ async fn department_ui_owner_writes_render_and_refusals_land_on_their_form() {
     assert!(html.contains("Win customers."));
     let sales = f
         .departments()
-        .list_departments(f.owner.id, company)
+        .list_departments(
+            f.owner.id,
+            company,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap()
         .into_iter()
@@ -311,7 +319,11 @@ async fn department_ui_owner_writes_render_and_refusals_land_on_their_form() {
         .unwrap();
     let root = f
         .departments()
-        .list_departments(f.owner.id, company)
+        .list_departments(
+            f.owner.id,
+            company,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap()
         .into_iter()
@@ -620,7 +632,11 @@ async fn department_ui_foreign_ids_under_the_owners_path_change_nothing() {
     assert!(detail.members.is_empty() && detail.roles.is_empty());
     assert!(
         !f.departments()
-            .list_departments(f.owner.id, company)
+            .list_departments(
+                f.owner.id,
+                company,
+                crate::entities::department::ArchivedUnits::Include
+            )
             .await
             .unwrap()
             .iter()
@@ -685,7 +701,11 @@ async fn delegated_admin_routes_department_writes_follow_the_lead_unit() {
     assert!(!refused.contains("Department created."), "{refused}");
     let names: Vec<String> = f
         .departments()
-        .list_departments(f.owner.id, f.company.id)
+        .list_departments(
+            f.owner.id,
+            f.company.id,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap()
         .into_iter()
@@ -1035,4 +1055,62 @@ async fn department_sponsor_ui_mutations_hide_unauthorized_and_foreign_units() {
         &f.foreign.name,
     )
     .await;
+}
+
+/// Plan08 02E.1: the card's archive and restore round trip, the refusal landing on the card, and
+/// the stranger's `404`.
+#[tokio::test]
+async fn unit_archive_ui_routes_archive_restore_and_refuse_on_the_card() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let company = f.company.id;
+    let unit = create(&f, "Paused", "paused").await;
+    let ws = || workspace(&f, &f.owner);
+    let path = || Path((company, unit.as_uuid()));
+    let plain = || Form(ArchiveFormData::default());
+
+    let (status, pushed, html) =
+        body(archive_department(ws(), path(), plain()).await.unwrap()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Department archived."), "{html}");
+    assert!(html.contains(r#"id="department-archived-badge""#));
+    assert!(html.contains(r#"id="department-restore""#));
+    assert!(html.contains(r#"<details id="department-archived" class="mt-2" open>"#));
+    assert_eq!(
+        pushed.as_deref(),
+        Some(
+            format!("/ui/companies?company_id={company}&tab=departments&department_id={unit}")
+                .as_str()
+        )
+    );
+    // A second archive is refused on the card; nothing else on the page changes.
+    let (status, _, html) = body(archive_department(ws(), path(), plain()).await.unwrap()).await;
+    assert_eq!(status, StatusCode::OK);
+    let card = &html[html.find(r#"id="department-lifecycle""#).unwrap()..];
+    assert!(card.contains("Failed to archive department"), "{card}");
+
+    let (status, _, html) = body(restore_department(ws(), path()).await.unwrap()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Department restored."));
+    assert!(html.contains(r#"id="department-archive""#));
+    assert!(!html.contains("department-archived-badge"));
+
+    for (user, hidden) in [
+        (&f.member, f.company.name.as_str()),
+        (&f.stranger, f.company.name.as_str()),
+    ] {
+        denied(
+            archive_department(workspace(&f, user), path(), plain()).await,
+            StatusCode::NOT_FOUND,
+            hidden,
+        )
+        .await;
+        denied(
+            restore_department(workspace(&f, user), path()).await,
+            StatusCode::NOT_FOUND,
+            hidden,
+        )
+        .await;
+    }
 }

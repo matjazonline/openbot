@@ -118,6 +118,9 @@ fn write_error(error: sqlx::Error) -> AppError {
     let Some(database) = error.as_database_error() else {
         return AppError::from(error);
     };
+    if super::refused_for_archived_unit(&error) {
+        return AppError::UnitArchived;
+    }
     match database.code().as_deref() {
         Some("23505") => {
             AppError::Conflict("A skill with that slug already exists in this library.".into())

@@ -397,3 +397,68 @@ async fn unit_resource_selection_native_session_and_mcp_call_refuse_a_moved_conn
         .await
         .unwrap();
 }
+
+/// Plan08 02B.1–2: a session started before the archive cannot open a native MCP run on the
+/// archived unit's desk; once restored the call runs, and a live native call then refuses
+/// cancel-and-archive, since only its local agent may end it.
+#[tokio::test]
+async fn unit_archive_runs_native_mcp_refuses_on_an_archived_units_desk() {
+    use crate::application::ports::department::OpenWork;
+    let f = McpSetup::new().await;
+    let p = f.s.f.persistence.as_ref();
+    let company = f.s.f.company;
+    let unit = p.test_unit(company, "native-unit").await;
+    let desk: Uuid = sqlx::query_scalar(
+        "UPDATE channels SET department_id=$3 WHERE company_id=$1 \
+         AND id=(SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2) RETURNING id",
+    )
+    .bind(company)
+    .bind(f.s.conversation)
+    .bind(unit)
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    let departments = crate::adapters::persistence::test_support::department_use_cases(p);
+    let unit = crate::entities::department::DepartmentId::new(unit);
+    departments
+        .archive_department(f.s.f.owner, company, unit, OpenWork::Refuse)
+        .await
+        .expect("a started session is no run");
+    let runs = || async {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM workflow_runs WHERE channel_id=$1")
+            .bind(desk)
+            .fetch_one(p.pool())
+            .await
+            .unwrap()
+    };
+    let refused = p
+        .native_mcp(&f.request(json!({"query":"archived"})))
+        .await
+        .err();
+    assert!(
+        matches!(refused, Some(AppError::UnitArchived)),
+        "{refused:?}"
+    );
+    assert_eq!(runs().await, 0);
+    departments
+        .restore_department(f.s.f.owner, company, unit)
+        .await
+        .unwrap();
+    p.native_mcp(&f.request(json!({"query":"restored"})))
+        .await
+        .expect("the restored desk takes the call");
+    assert_eq!(runs().await, 1);
+    let cancel = departments
+        .archive_department(f.s.f.owner, company, unit, OpenWork::Cancel)
+        .await;
+    assert!(
+        matches!(
+            cancel,
+            Err(AppError::UnitArchiveOpenWork {
+                count: 1,
+                cancellable: false
+            })
+        ),
+        "{cancel:?}"
+    );
+}

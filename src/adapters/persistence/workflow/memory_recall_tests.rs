@@ -326,6 +326,7 @@ async fn memory_preparation_a_changed_ceiling_discards_the_fetched_pack_unseen()
             crate::application::workflow::memory_recall::RecallNamespace {
                 namespace: crate::application::memory::NamespaceExternalId(Uuid::new_v4()),
                 label: "unit:root".into(),
+                archived: false,
             },
             crate::application::memory::MemoryPack {
                 items: vec![item],

@@ -387,6 +387,7 @@ mod tests {
             administers_units: CompanyMembership::Owner.administers_company(),
         };
         let channel = Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: Uuid::new_v4(),

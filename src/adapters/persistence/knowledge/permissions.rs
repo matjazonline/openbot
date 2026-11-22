@@ -83,10 +83,13 @@ pub(super) async fn load(
     .await
     .map_err(authority::database)?;
     let placements: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT department_id FROM (
+        // Plan08 02C.4: membership and roles in an archived unit grant only desk history.
+        "SELECT placement.department_id FROM (
             SELECT department_id FROM department_members WHERE company_id=$1 AND principal_id=$2 AND root_user_id IS NULL
             UNION SELECT department_id FROM department_roles WHERE company_id=$1 AND principal_id=$2
-         ) AS placement ORDER BY department_id LIMIT $3",
+         ) AS placement JOIN departments AS unit ON unit.company_id=$1 AND unit.id=placement.department_id
+           AND unit.archived_at IS NULL
+         ORDER BY placement.department_id LIMIT $3",
     ).bind(scope.company.as_uuid()).bind(principal).bind((MAX_RUN_READ_UNITS + 1) as i64)
         .fetch_all(&mut **tx).await.map_err(authority::database)?;
     let default_unit = match placements.as_slice() {
@@ -132,6 +135,7 @@ async fn ordinary(
     let children: Vec<UnitRow> = sqlx::query_as(
         "SELECT child.id,child.parent_id,child.slug::text AS slug FROM departments AS child
          JOIN department_roles AS holder ON holder.company_id=child.company_id AND holder.department_id=child.parent_id
+         JOIN departments AS held ON held.company_id=holder.company_id AND held.id=holder.department_id AND held.archived_at IS NULL
          WHERE child.company_id=$1 AND holder.principal_id=$2 AND holder.role='lead' ORDER BY child.id LIMIT $3",
     ).bind(scope.company.as_uuid()).bind(principal).bind((MAX_RUN_READ_UNITS + 1) as i64)
         .fetch_all(&mut **tx).await.map_err(authority::database)?;
@@ -265,6 +269,25 @@ impl Permissions {
         authorize_unit(tx, target.scope, target.unit, &self.write).await
     }
 
+    /// A write that adds knowledge to `target`: an upload, or the destination of a move. An
+    /// archived unit takes none (Plan08 02C.1); deleting or moving a document out of it stays
+    /// with [`Self::require_write`].
+    pub(super) async fn require_write_into(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        target: KnowledgeUploadTarget,
+    ) -> AppResult<()> {
+        self.require_write(tx, target).await?;
+        crate::adapters::persistence::department::require_active_unit_on(
+            tx,
+            target.scope.company,
+            target.unit,
+        )
+        .await
+    }
+
+    /// Units a document may be uploaded or moved into: archived ones are left out, except the
+    /// `selected` unit a document already sits in.
     pub(super) async fn choices(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -280,6 +303,7 @@ impl Permissions {
         let mut rows: Vec<Choice> = sqlx::query_as(
             "SELECT unit.id,unit.name,unit.is_root FROM departments AS unit
              WHERE unit.company_id=$1 AND ($2::uuid[] IS NULL OR unit.id=ANY($2))
+                AND unit.archived_at IS NULL
                 AND ($4::uuid IS NULL OR (NOT unit.is_root,lower(unit.name),unit.id) >
                     (SELECT NOT previous.is_root,lower(previous.name),previous.id FROM departments AS previous
                      WHERE previous.company_id=$1 AND previous.id=$4))

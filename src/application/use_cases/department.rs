@@ -21,9 +21,9 @@ use crate::{
     entities::{
         creation::CreationProvenance,
         department::{
-            Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
-            DepartmentRoleHolder, DeskDepartments, MAX_DEPARTMENT_CHARTER_BYTES,
-            MAX_DEPARTMENT_PRINCIPAL_CHOICES,
+            ArchivedUnits, Department, DepartmentDesk, DepartmentId, DepartmentMember,
+            DepartmentPrincipal, DepartmentRoleHolder, DeskDepartments,
+            MAX_DEPARTMENT_CHARTER_BYTES, MAX_DEPARTMENT_PRINCIPAL_CHOICES,
         },
         transport::PrincipalId,
     },
@@ -211,7 +211,7 @@ impl DepartmentUseCases {
         let company = CompanyId::new(access.company.id);
         let mut seen: std::collections::HashSet<DepartmentId> = self
             .departments
-            .list_for_user(company, user_id)
+            .list_for_user(company, user_id, ArchivedUnits::Include)
             .await?
             .into_iter()
             .map(|department| department.id)
@@ -288,6 +288,32 @@ impl DepartmentUseCases {
         edit.normalize()?;
         info!(%company_id, %department, "Updating department");
         self.departments.update(scope, department, edit).await
+    }
+
+    /// Archive needs what delete needs: managing the parent (Plan08 02D.1).
+    #[instrument(skip_all)]
+    pub async fn archive_department(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        department: DepartmentId,
+        open: crate::application::ports::department::OpenWork,
+    ) -> AppResult<Department> {
+        let scope = self.managed_parent(user_id, company_id, department).await?;
+        info!(%company_id, %department, ?open, "Archiving department");
+        self.departments.archive(scope, department, open).await
+    }
+
+    #[instrument(skip_all)]
+    pub async fn restore_department(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        department: DepartmentId,
+    ) -> AppResult<Department> {
+        let scope = self.managed_parent(user_id, company_id, department).await?;
+        info!(%company_id, %department, "Restoring department");
+        self.departments.restore(scope, department).await
     }
 
     #[instrument(skip_all)]
@@ -380,12 +406,13 @@ impl DepartmentUseCases {
     }
 
     /// The departments the caller manages, for pickers and destinations: every one for a root
-    /// manager. Each write still checks its own target.
+    /// manager; archived ones only when asked. Each write still checks its own target.
     #[instrument(skip_all)]
     pub async fn list_departments(
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        archived: ArchivedUnits,
     ) -> AppResult<Vec<Department>> {
         let scope = self.administering(user_id, company_id).await?;
         let managed: std::collections::HashSet<DepartmentId> = self
@@ -396,7 +423,7 @@ impl DepartmentUseCases {
             .collect();
         Ok(self
             .departments
-            .list_by_company(scope.company)
+            .list_by_company(scope.company, archived)
             .await?
             .into_iter()
             .filter(|department| managed.contains(&department.id))
@@ -404,17 +431,18 @@ impl DepartmentUseCases {
     }
 
     /// The departments this member may see: all of them for an owner or admin, otherwise the ones
-    /// they belong to or hold a role in and every one they manage.
+    /// they belong to or hold a role in and every one they manage; archived ones only when asked.
     #[instrument(skip_all)]
     pub async fn visible_departments(
         &self,
         user_id: Uuid,
         company_id: Uuid,
+        archived: ArchivedUnits,
     ) -> AppResult<Vec<Department>> {
         let access = readable_company(self.companies.as_ref(), user_id, company_id).await?;
         let all = self
             .departments
-            .list_by_company(CompanyId::new(company_id))
+            .list_by_company(CompanyId::new(company_id), archived)
             .await?;
         Ok(match self.visible_set(&access, user_id).await? {
             None => all,
@@ -467,29 +495,32 @@ impl DepartmentUseCases {
         user_id: Uuid,
         company_id: Uuid,
         agents: &[Uuid],
+        archived: ArchivedUnits,
     ) -> AppResult<
         std::collections::HashMap<Uuid, (Vec<crate::entities::department::HeldDepartment>, bool)>,
     > {
         readable_company(self.companies.as_ref(), user_id, company_id).await?;
         self.departments
-            .agent_departments(CompanyId::new(company_id), agents)
+            .agent_departments(CompanyId::new(company_id), agents, archived)
             .await
     }
 
     /// Which department owns each desk, as this viewer may see it: every department for an owner
     /// or admin; for anyone else the departments they may see ([`Self::visible_departments`]) and
     /// the owners of the desks they can read (`readable_desks`), so the department of a desk in
-    /// front of them can be named.
+    /// front of them can be named. Labels of past work need archived owners
+    /// ([`ArchivedUnits::Include`]); option lists take [`DeskDepartments::choices`].
     #[instrument(skip_all)]
     pub async fn desk_departments(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         readable_desks: &[Uuid],
+        archived: ArchivedUnits,
     ) -> AppResult<DeskDepartments> {
         let access = readable_company(self.companies.as_ref(), user_id, company_id).await?;
         let company = CompanyId::new(company_id);
-        let departments = self.departments.list_by_company(company).await?;
+        let departments = self.departments.list_by_company(company, archived).await?;
         let owners: std::collections::HashMap<Uuid, DepartmentId> = self
             .departments
             .desk_owners(company)

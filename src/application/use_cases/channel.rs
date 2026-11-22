@@ -757,6 +757,7 @@ mod tests {
         async fn list_departments(
             &self,
             _company_id: Uuid,
+            _archived: crate::entities::department::ArchivedUnits,
         ) -> AppResult<Vec<crate::entities::department::Department>> {
             Ok(Vec::new())
         }
@@ -831,6 +832,7 @@ mod tests {
         let (access_mode, principal_grants) =
             email_allowlist_policy(company_id, participant_emails.as_deref());
         Channel {
+            unit_archived: false,
             id,
             company_id,
             name: write.name,
@@ -1397,6 +1399,7 @@ mod tests {
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
             Channel {
+                unit_archived: false,
                 enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
@@ -1414,6 +1417,7 @@ mod tests {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),

@@ -143,6 +143,9 @@ async fn capture_agent_on(
             "SELECT child.id,child.parent_id,child.slug::text AS slug
              FROM departments AS child JOIN department_roles AS holder
                 ON holder.company_id=child.company_id AND holder.department_id=child.parent_id
+             -- Plan08 02C.4: a lead role on an archived unit grants no reads.
+             JOIN departments AS held ON held.company_id=holder.company_id
+                AND held.id=holder.department_id AND held.archived_at IS NULL
              WHERE child.company_id=$1 AND holder.principal_id=$2 AND holder.role='lead'
              ORDER BY child.id LIMIT $3",
         )

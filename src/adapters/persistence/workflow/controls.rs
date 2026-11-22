@@ -116,6 +116,15 @@ async fn control(
                 "applied"
             }
             Operation::Retry => {
+                // Plan08 02B.2: a retry reopens the run, which is new work on its desk.
+                if let Some(AddressTarget::Desk(desk)) = head.association.target() {
+                    crate::adapters::persistence::department::require_active_desk_on(
+                        &mut tx,
+                        command.company_id,
+                        desk,
+                    )
+                    .await?;
+                }
                 if control_retry::retry_on(&mut tx, &command, &head).await? {
                     "applied"
                 } else {
@@ -181,6 +190,37 @@ pub(super) async fn cancel_on(db: &mut PgConnection, command: &CancelCommand) ->
         command.actor.user_id(),
     )
     .await
+}
+
+/// Cancel one root run for cancel-and-archive (Plan08 02B.1, decision U3): the archiving manager
+/// may end it without desk access. The caller holds the company lock; this takes the run head,
+/// skips a run that finished meanwhile, and records the actor-bearing `control_cancel` event an
+/// operator cancel writes, so the run's history names who ended it.
+pub(crate) async fn cancel_for_archive_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    actor: WorkflowActor,
+) -> AppResult<()> {
+    let live: Option<bool> = sqlx::query_scalar(
+        "SELECT state IN ('queued','running','waiting') FROM workflow_runs \
+          WHERE company_id=$1 AND id=$2 FOR UPDATE",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?;
+    if live != Some(true) {
+        return Ok(());
+    }
+    cancel_tree_on(db, company, run, actor.user_id()).await?;
+    sqlx::query("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id) SELECT $1,$2,COALESCE(MAX(sequence),0)+1,'control_cancel',$3 FROM workflow_run_events WHERE company_id=$1 AND run_id=$2")
+        .bind(company.as_uuid())
+        .bind(run.as_uuid())
+        .bind(actor.user_id())
+        .execute(&mut *db)
+        .await?;
+    Ok(())
 }
 
 /// Cancel a run and every live descendant (07-D1 §D1.5). A live runtime child is always named

@@ -117,6 +117,7 @@ pub(super) async fn capture_catalog(f: &AdmissionFixture) -> Value {
             "workflow_run_knowledge",
             "workflow_run_revision",
             "workflow_run_snapshot_immutable",
+            "workflow_runs_active_unit",
             "workflow_runs_preserve_association"
         ]
     );

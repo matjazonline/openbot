@@ -137,6 +137,7 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
                 State(departments.clone()),
                 Fixture::auth(user),
                 Path(company),
+                Query(ListQuery::default()),
             )
             .await,
             StatusCode::NOT_FOUND,
@@ -150,6 +151,7 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
         State(departments.clone()),
         Fixture::auth(&f.member),
         Path(f.company.id),
+        Query(ListQuery::default()),
     )
     .await
     .unwrap()
@@ -292,7 +294,13 @@ async fn assert_department_lookup_errors(f: &Fixture) {
     )
     .await;
     denied(
-        list_departments_json(State(failing), Fixture::auth(&f.owner), Path(f.company.id)).await,
+        list_departments_json(
+            State(failing),
+            Fixture::auth(&f.owner),
+            Path(f.company.id),
+            Query(ListQuery::default()),
+        )
+        .await,
         StatusCode::INTERNAL_SERVER_ERROR,
         &f.foreign.name,
     )

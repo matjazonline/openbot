@@ -1069,7 +1069,9 @@ fn department_picker(
     let DashboardTarget::Company(company_id, chosen) = target else {
         return String::new();
     };
-    if departments.departments.is_empty() {
+    // Archived departments are left out unless already chosen (Plan08 02E.2).
+    let choices = departments.choices(chosen);
+    if choices.is_empty() {
         return String::new();
     }
     let link = |label: &str, depth: usize, department: Option<DepartmentId>| {
@@ -1089,9 +1091,9 @@ fn department_picker(
     };
     let items: String = std::iter::once(link("All departments", 0, None))
         .chain(
-            crate::entities::department::department_tree(&departments.departments)
+            crate::entities::department::department_tree(&choices)
                 .into_iter()
-                .map(|(depth, department)| link(&department.name, depth, Some(department.id))),
+                .map(|(depth, department)| link(&department.label(), depth, Some(department.id))),
         )
         .collect();
     format!(
@@ -1275,6 +1277,7 @@ mod tests {
     fn unit_budget_usage_page_dashboard_panel_lists_department_spend() {
         use crate::services::model_usage::UnitBudgetStatus;
         let rows = [UnitBudgetStatus {
+            archived: false,
             unit: uuid::Uuid::nil(),
             name: "<Sales>".into(),
             period: "month".into(),
@@ -1859,6 +1862,7 @@ mod tests {
         let department = |name: &str, parent: Option<DepartmentId>| Department {
             is_root: false,
             escalation: None,
+            archived: None,
             id: DepartmentId::new(Uuid::new_v4()),
             company_id: Uuid::nil(),
             name: name.into(),

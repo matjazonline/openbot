@@ -132,6 +132,7 @@ fn mailbox_company() -> Company {
 
 fn mailbox_channel(company_id: Uuid) -> Channel {
     Channel {
+        unit_archived: false,
         enabled: true,
         add_3rd_party: true,
         id: Uuid::new_v4(),

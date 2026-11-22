@@ -1064,3 +1064,134 @@ async fn unit_model_default_a_department_form_keeps_the_last_connection() {
         "{last:?}"
     );
 }
+
+/// `unit_archive_scopes_` for resources (Plan08 02C.2–3): what an archived unit owns stays there
+/// and may be moved out to an active unit; nothing is created in or moved into it, and its unit
+/// is offered by no picker. The triggers refuse what the application skips.
+#[tokio::test]
+async fn unit_archive_scopes_a_resource_moves_out_and_never_in() {
+    let Some(database) = own_database().await else {
+        return;
+    };
+    let d = Delegated::on(database.pool.clone()).await;
+    let company = d.f.company;
+    let pool = d.f.pool();
+    let (cases, connections) = (skills(&d), mcp(&d));
+    let (sales, support) = (d.unit.id, d.sibling.id);
+    let stranded = cases
+        .create_company(
+            d.f.owner,
+            company,
+            Some(support.as_uuid()),
+            skill_write("stranded"),
+        )
+        .await
+        .unwrap();
+    let server = connections
+        .create(
+            d.f.owner,
+            company,
+            Some(sales.as_uuid()),
+            mcp_write("server"),
+        )
+        .await
+        .unwrap();
+    let endpoint = http(&d, d.f.owner, Some(sales), "endpoint").await.unwrap();
+    crate::adapters::persistence::test_support::department_use_cases(&d.f.persistence)
+        .archive_department(
+            d.f.owner,
+            company,
+            support,
+            crate::application::ports::department::OpenWork::Refuse,
+        )
+        .await
+        .unwrap();
+    let archived = |result: &AppResult<_>| matches!(result, Err(AppError::UnitArchived));
+
+    // Nothing is created in or moved into the archived unit.
+    let fresh = cases
+        .create_company(
+            d.f.owner,
+            company,
+            Some(support.as_uuid()),
+            skill_write("fresh"),
+        )
+        .await
+        .map(|_| ());
+    assert!(archived(&fresh), "{fresh:?}");
+    assert!(archived(
+        &connections
+            .create(
+                d.f.owner,
+                company,
+                Some(support.as_uuid()),
+                mcp_write("fresh")
+            )
+            .await
+            .map(|_| ())
+    ));
+    assert!(archived(
+        &http(&d, d.f.owner, Some(support), "fresh")
+            .await
+            .map(|_| ())
+    ));
+    assert!(archived(
+        &connections
+            .move_to(d.f.owner, company, server.id, support.as_uuid())
+            .await
+            .map(|_| ())
+    ));
+    assert!(archived(
+        &d.f.persistence
+            .move_http(d.company(), actor(d.f.owner), endpoint.id, support)
+            .await
+            .map(|_| ())
+    ));
+    assert_eq!(
+        unit_of(pool, "company_mcp_connections", server.id).await.0,
+        Some(sales.as_uuid())
+    );
+    assert_eq!(
+        unit_of(pool, "workflow_http_connections", endpoint.id)
+            .await
+            .0,
+        Some(sales.as_uuid())
+    );
+    // The database refuses a raw move in and a raw cap on the archived unit.
+    for (sql, binds) in [
+        (
+            "UPDATE company_mcp_connections SET unit_id=$1 WHERE id=$2",
+            [support.as_uuid(), server.id],
+        ),
+        (
+            "INSERT INTO unit_budgets (company_id, unit_id, period, cap_micros, created_by) \
+             VALUES ($1, $2, 'day', 1, '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}')",
+            [company, support.as_uuid()],
+        ),
+    ] {
+        let mut query = sqlx::query(sql);
+        for bind in binds {
+            query = query.bind(bind);
+        }
+        let error = query.execute(pool).await.unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().constraint(),
+            Some("unit_archived"),
+            "{sql}"
+        );
+    }
+
+    // Moving out to an active unit is allowed, so a credential is not stranded.
+    let moved = cases
+        .move_company(d.f.owner, company, stranded.id, sales.as_uuid())
+        .await
+        .expect("a resource moves out of an archived unit");
+    assert_eq!((moved.from, moved.to), (support, sales));
+
+    // No picker offers the archived unit.
+    let (units, _) = cases.unit_choices(d.f.owner, company).await.unwrap();
+    assert!(units.iter().all(|unit| unit.id != support));
+    assert!(units.iter().any(|unit| unit.id == sales));
+    let (units, _) = connections.unit_choices(d.f.owner, company).await.unwrap();
+    assert!(units.iter().all(|unit| unit.id != support));
+}

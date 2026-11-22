@@ -83,6 +83,7 @@ pub(super) async fn start(
         tx.commit().await?;
         return Ok(saved);
     }
+    require_active_association_on(&mut tx, request.company, &association).await?;
     let locked = shared::capture_profile_on(
         &mut tx,
         CompanyId::new(request.company),
@@ -172,6 +173,7 @@ pub(super) async fn control(
         return Ok(saved);
     }
     if command.is_effect() {
+        require_active_association_on(&mut tx, request.company, &session.association).await?;
         super::super::native::selected_on(
             &mut tx,
             request.company,
@@ -212,6 +214,42 @@ pub(super) async fn control(
         .ok_or_else(missing)?;
     tx.commit().await?;
     Ok(saved)
+}
+
+/// Plan08 02B.2: starting a session or sending it a prompt is new work on the desk its
+/// conversation or run belongs to, so an archived unit's desk refuses it. Inspect, stop and
+/// archive stay available.
+async fn require_active_association_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    association: &SessionAssociation,
+) -> AppResult<()> {
+    let (sql, id) = match association {
+        SessionAssociation::Conversation { conversation_id } => (
+            "SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2",
+            *conversation_id,
+        ),
+        SessionAssociation::Workflow { run_id } => (
+            "SELECT channel_id FROM workflow_runs WHERE company_id=$1 AND id=$2",
+            *run_id,
+        ),
+    };
+    let desk: Option<Option<Uuid>> = sqlx::query_scalar(sql)
+        .bind(company)
+        .bind(id)
+        .fetch_optional(&mut *db)
+        .await?;
+    match desk.flatten() {
+        Some(desk) => {
+            crate::adapters::persistence::department::require_active_desk_on(
+                db,
+                CompanyId::new(company),
+                desk,
+            )
+            .await
+        }
+        None => Ok(()),
+    }
 }
 
 async fn verify_actor_on(

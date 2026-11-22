@@ -49,6 +49,10 @@ pub enum DepartmentForm {
     Escalation,
     Members,
     Delete,
+    /// Archiving or restoring (Plan08 02E.1).
+    Archive,
+    /// An archive refused for open runs it may cancel: the card offers to cancel and archive.
+    ArchiveOpenWork,
 }
 
 /// The right-hand column: a department, the create form, or nothing picked yet.
@@ -112,26 +116,39 @@ impl DepartmentSection<'_> {
                 .is_some_and(|root| self.manages(root.id))
     }
 
-    /// Editing, moving or deleting a department needs its parent; the root needs root management.
+    /// Editing or moving a department needs its parent; the root needs root management. An
+    /// archived department takes no configuration (Plan08 02B.4), so offers no form.
     fn manages_placement(&self, department: &Department) -> bool {
-        match department.parent_id {
-            Some(parent) => self.manages(parent),
-            None => self.manages(department.id),
-        }
+        !department.is_archived()
+            && match department.parent_id {
+                Some(parent) => self.manages(parent),
+                None => self.manages(department.id),
+            }
+    }
+
+    /// Archiving, restoring and deleting a department needs its parent's manager; the root has
+    /// none of the three.
+    fn manages_lifecycle(&self, department: &Department) -> bool {
+        department
+            .parent_id
+            .is_some_and(|parent| self.manages(parent))
     }
 
     /// The lead of a department is assigned by its parent's manager; the root's roles by the owner.
     fn assigns_roles(&self, department: &Department) -> bool {
-        match department.parent_id {
-            Some(parent) => self.manages(parent),
-            None => self.membership.is_owner(),
-        }
+        !department.is_archived()
+            && match department.parent_id {
+                Some(parent) => self.manages(parent),
+                None => self.membership.is_owner(),
+            }
     }
 
     /// Members follow the department's own manager. The root's membership is the company's
     /// team: only company administrators add or remove root agents (persons: the owner).
     fn manages_members(&self, department: &Department) -> bool {
-        if department.is_root {
+        if department.is_archived() {
+            false
+        } else if department.is_root {
             self.membership.administers_company()
         } else {
             self.manages(department.id)
@@ -227,11 +244,46 @@ fn department_tree_list(section: &DepartmentSection<'_>) -> String {
             r#"<p class="rounded-box border border-dashed border-base-300 p-5 text-sm opacity-60">{message}</p>"#
         );
     }
+    let (archived, active): (Vec<Department>, Vec<Department>) = section
+        .departments
+        .iter()
+        .cloned()
+        .partition(Department::is_archived);
+    let hidden = if archived.is_empty() {
+        String::new()
+    } else {
+        // Open when the selected department is one of them, so the selection stays in view.
+        let open = section
+            .selected()
+            .is_some_and(|selected| archived.iter().any(|unit| unit.id == selected));
+        format!(
+            r#"<details id="department-archived" class="mt-2"{open}>
+                <summary class="cursor-pointer text-sm opacity-70">Show archived ({count})</summary>
+                <ul class="menu w-full rounded-box bg-base-200 p-2 mt-2">{tree}</ul>
+            </details>"#,
+            open = if open { " open" } else { "" },
+            count = archived.len(),
+            tree = tree_items(section, &archived),
+        )
+    };
+    let tree = if active.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"<ul id="department-tree" class="menu w-full rounded-box bg-base-200 p-2">{}</ul>"#,
+            tree_items(section, &active)
+        )
+    };
+    format!("{tree}{hidden}")
+}
+
+/// One tree's items, nested: a child department sits indented under its parent.
+fn tree_items(section: &DepartmentSection<'_>, departments: &[Department]) -> String {
     let company_id = section.company.id;
     let selected = section.selected();
     let mut html = String::new();
     let mut open: Option<usize> = None;
-    for (depth, department) in department_tree(section.departments) {
+    for (depth, department) in department_tree(departments) {
         match open {
             None => {}
             Some(last) if depth > last => html.push_str("<ul>"),
@@ -266,9 +318,7 @@ fn department_tree_list(section: &DepartmentSection<'_>) -> String {
             html.push_str("</ul></li>");
         }
     }
-    format!(
-        r#"<ul id="department-tree" class="menu w-full rounded-box bg-base-200 p-2">{html}</ul>"#
-    )
+    html
 }
 
 fn detail_column(section: &DepartmentSection<'_>) -> String {
@@ -320,7 +370,10 @@ fn parent_options(
     department_tree(section.departments)
         .into_iter()
         .filter(|(_, department)| {
-            Some(department.id) != editing && !department.is_root && section.manages(department.id)
+            Some(department.id) != editing
+                && !department.is_root
+                && !department.is_archived()
+                && section.manages(department.id)
         })
         .map(|(depth, department)| {
             let id = department.id.as_uuid();
@@ -506,6 +559,8 @@ fn department_header(section: &DepartmentSection<'_>, view: &DepartmentView) -> 
         slug = escape_html_text(department.slug.as_str()),
         root_badge = if department.is_root {
             r#"<span class="badge badge-ghost badge-sm">Company root</span>"#
+        } else if department.is_archived() {
+            r#"<span id="department-archived-badge" class="badge badge-warning badge-sm">Archived</span>"#
         } else {
             ""
         },
@@ -543,8 +598,10 @@ fn department_detail(
             {budgets}
             {history}
             {edit}
+            {lifecycle}
         </div>"##,
         id = department.id,
+        lifecycle = lifecycle_card(section, department),
         history = if section.manages(department.id) {
             history_card(section)
         } else {
@@ -573,6 +630,22 @@ fn budgets_card(section: &DepartmentSection<'_>, department: &Department) -> Str
     let Some(states) = section.budgets else {
         return String::new();
     };
+    // An archived department keeps its caps and spend for reading; they change with a restore.
+    let form = if department.is_archived() {
+        String::new()
+    } else {
+        format!(
+            r##"<form class="flex flex-wrap gap-3 items-end" hx-post="/ui/companies/{company}/departments/{unit}/budgets" hx-target="#department-section" hx-swap="outerHTML">
+                <label class="form-control"><span class="text-xs opacity-70">Daily cap (USD)</span><input name="day_cap" value="{day}" inputmode="decimal" class="input input-sm"></label>
+                <label class="form-control"><span class="text-xs opacity-70">Monthly cap (USD)</span><input name="month_cap" value="{month}" inputmode="decimal" class="input input-sm"></label>
+                <button type="submit" class="btn btn-sm btn-primary">Save spend caps</button>
+            </form>"##,
+            company = section.company.id,
+            unit = department.id,
+            day = escape_html_attr(&cap(states, "day")),
+            month = escape_html_attr(&cap(states, "month")),
+        )
+    };
     let usd = crate::services::model_usage::usd;
     let rows: String = states
         .iter()
@@ -594,28 +667,102 @@ fn budgets_card(section: &DepartmentSection<'_>, department: &Department) -> Str
             )
         })
         .collect();
-    let value = |period: &str| {
-        states
-            .iter()
-            .find(|state| state.period == period)
-            .and_then(|state| state.cap_micros)
-            .map_or(String::new(), usd)
-    };
     format!(
         r##"<section id="department-budgets" class="card bg-base-200 p-4 space-y-3">
             <h3 class="font-semibold">Spend caps</h3>
             <p class="text-xs opacity-70">Counted spend is each settled model call's priced cost, for this department and every one below it. Once a cap is reached, new runs here and below are refused until the next UTC day or month; runs already started finish.</p>
             <table class="table table-sm"><thead><tr><th scope="col">Period</th><th scope="col">Cap (USD)</th><th scope="col">Counted (USD)</th><th scope="col"></th></tr></thead><tbody>{rows}</tbody></table>
-            <form class="flex flex-wrap gap-3 items-end" hx-post="/ui/companies/{company}/departments/{unit}/budgets" hx-target="#department-section" hx-swap="outerHTML">
-                <label class="form-control"><span class="text-xs opacity-70">Daily cap (USD)</span><input name="day_cap" value="{day}" inputmode="decimal" class="input input-sm"></label>
-                <label class="form-control"><span class="text-xs opacity-70">Monthly cap (USD)</span><input name="month_cap" value="{month}" inputmode="decimal" class="input input-sm"></label>
-                <button type="submit" class="btn btn-sm btn-primary">Save spend caps</button>
-            </form>
+            {form}
         </section>"##,
-        company = section.company.id,
-        unit = department.id,
-        day = escape_html_attr(&value("day")),
-        month = escape_html_attr(&value("month")),
+    )
+}
+
+/// The cap set for `period`, as the form shows it.
+fn cap(
+    states: &[crate::application::ports::unit_resources::UnitBudgetState],
+    period: &str,
+) -> String {
+    states
+        .iter()
+        .find(|state| state.period == period)
+        .and_then(|state| state.cap_micros)
+        .map_or(String::new(), crate::services::model_usage::usd)
+}
+
+/// Archive or restore, and delete, for the parent's manager (Plan08 02E.1). An archive refused
+/// for open runs it may cancel offers to cancel them and archive; an archived department says
+/// when and by whom, and is restored only under an active parent.
+fn lifecycle_card(section: &DepartmentSection<'_>, department: &Department) -> String {
+    if !section.manages_lifecycle(department) {
+        return String::new();
+    }
+    let endpoint = section_endpoint(section.company.id, &format!("/{}", department.id));
+    let name = escape_html_attr(&department.name);
+    let lifecycle = match &department.archived {
+        None => {
+            let cancel = match section.error {
+                Some((DepartmentForm::ArchiveOpenWork, _)) => format!(
+                    r##"<button type="button" id="department-archive-cancel" class="btn btn-warning btn-sm"
+                    hx-post="{endpoint}/archive" hx-vals='{{"cancel_open_runs":"true"}}'
+                    hx-target="#department-section" hx-swap="outerHTML"
+                    hx-confirm="Cancel the open runs of '{name}' and the departments below it, then archive?"
+                    hx-disabled-elt="this">Cancel open runs and archive</button>"##
+                ),
+                _ => String::new(),
+            };
+            format!(
+                r##"{error}{open_work}<div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm opacity-70">Archiving stops all work in this department and every one below it. What it holds stays readable, and a restore brings it back as it was.</p>
+                <div class="flex gap-2">{cancel}<button type="button" id="department-archive" class="btn btn-outline btn-sm"
+                    hx-post="{endpoint}/archive" hx-target="#department-section" hx-swap="outerHTML"
+                    hx-confirm="Archive department '{name}' and every department below it?"
+                    hx-disabled-elt="this">Archive department</button></div>
+            </div>"##,
+                error = section.error_for(DepartmentForm::Archive),
+                open_work = section.error_for(DepartmentForm::ArchiveOpenWork),
+            )
+        }
+        Some(archive) => {
+            let parent_archived = department.parent_id.is_some_and(|parent| {
+                section
+                    .departments
+                    .iter()
+                    .any(|unit| unit.id == parent && unit.is_archived())
+            });
+            let restore = if parent_archived {
+                r#"<p id="department-restore-blocked" class="text-sm opacity-70">Restore the department above it first.</p>"#.to_owned()
+            } else {
+                format!(
+                    r##"<button type="button" id="department-restore" class="btn btn-primary btn-sm"
+                    hx-post="{endpoint}/restore" hx-target="#department-section" hx-swap="outerHTML"
+                    hx-disabled-elt="this">Restore department</button>"##
+                )
+            };
+            format!(
+                r##"{error}<div class="flex flex-wrap items-center justify-between gap-3">
+                <p id="department-archived-at" class="text-sm">Archived <time datetime="{at}">{shown}</time> by {by}. Departments below it stay archived until each is restored.</p>
+                {restore}
+            </div>"##,
+                error = section.error_for(DepartmentForm::Archive),
+                at = archive.at.to_rfc3339(),
+                shown = archive.at.format("%Y-%m-%d %H:%M UTC"),
+                by = escape_html_text(&archive.by.actor_name),
+            )
+        }
+    };
+    format!(
+        r##"<section id="department-lifecycle" class="space-y-3">
+        <div class="rounded-box border border-base-300 p-4 space-y-2">{lifecycle}</div>
+        <div id="department-delete" class="rounded-box border border-error/40 p-4">
+            {error}<div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm opacity-70">A department is deleted only when it owns no desks and has no child departments.</p>
+                <button type="button" class="btn btn-error btn-outline btn-sm"
+                    hx-delete="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
+                    hx-confirm="Delete department '{name}'? Its members and roles go with it."
+                    hx-disabled-elt="this">Delete department</button>
+            </div></div>
+        </section>"##,
+        error = section.error_for(DepartmentForm::Delete),
     )
 }
 
@@ -689,18 +836,24 @@ fn history_card(section: &DepartmentSection<'_>) -> String {
     )
 }
 
-/// `owner`, `admin` or `lead:<id>` as a reader names it: the lead of which department.
+/// `owner`, `admin`, `lead:<id>` or `sponsor:<id>` as a reader names it: the lead or deciding
+/// sponsor of which department.
 fn acting_role_label(section: &DepartmentSection<'_>, acting: &str) -> String {
-    let Some(unit) = acting.strip_prefix("lead:") else {
-        return acting.to_owned();
+    let (role, unit) = match (
+        acting.strip_prefix("lead:"),
+        acting.strip_prefix("sponsor:"),
+    ) {
+        (Some(unit), _) => ("lead", unit),
+        (_, Some(unit)) => ("sponsor", unit),
+        _ => return acting.to_owned(),
     };
     section
         .departments
         .iter()
         .find(|department| department.id.as_uuid().to_string() == unit)
         .map_or_else(
-            || "a department lead".to_owned(),
-            |department| format!("lead of {}", department.name),
+            || format!("a department {role}"),
+            |department| format!("{role} of {}", department.name),
         )
 }
 
@@ -992,26 +1145,6 @@ fn edit_form(
 ) -> String {
     let company_id = section.company.id;
     let endpoint = section_endpoint(company_id, &format!("/{department}"));
-    let delete = if section
-        .departments
-        .iter()
-        .any(|entry| entry.id == department && entry.is_root)
-    {
-        String::new()
-    } else {
-        format!(
-            r##"<div id="department-delete" class="rounded-box border border-error/40 p-4">
-            {error}<div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm opacity-70">A department is deleted only when it owns no desks and has no child departments.</p>
-                <button type="button" class="btn btn-error btn-outline btn-sm"
-                    hx-delete="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
-                    hx-confirm="Delete department '{name}'? Its members and roles go with it."
-                    hx-disabled-elt="this">Delete department</button>
-            </div></div>"##,
-            error = section.error_for(DepartmentForm::Delete),
-            name = escape_html_attr(&draft.name)
-        )
-    };
     format!(
         r##"<form id="department-edit" class="space-y-4 rounded-box border border-base-300 bg-base-200 p-4"
             hx-put="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -1022,8 +1155,7 @@ fn edit_form(
             <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                 {submit}
             </div>
-        </form>
-        {delete}"##,
+        </form>"##,
         error = section.error_for(DepartmentForm::Edit),
         fields = department_fields(section, &draft, Some(department)),
         submit = busy_submit_button("Save department"),

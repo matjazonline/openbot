@@ -33,7 +33,13 @@ async fn placed(
         CompanyAddresses, agent_addresses_on, agent_departments_on,
     };
     let ids: Vec<Uuid> = entries.iter().map(|entry| entry.id.as_uuid()).collect();
-    let mut departments = agent_departments_on(db, scope.company, &ids).await?;
+    let mut departments = agent_departments_on(
+        db,
+        scope.company,
+        &ids,
+        crate::entities::department::ArchivedUnits::Exclude,
+    )
+    .await?;
     let mut addresses = CompanyAddresses::new(scope.company, domain);
     let mut desks = agent_addresses_on(db, &mut addresses, &ids).await?;
     for entry in entries {

@@ -19,6 +19,16 @@ pub enum AppError {
     /// refusal for this admission: the next period, a raised cap or another desk may admit it.
     #[error("{0}")]
     BudgetExhausted(BudgetExhausted),
+    /// The unit, or the unit of the desk, is archived (Plan08 02B): it admits no work and accepts
+    /// no configuration. Definite: restoring the unit is the only way the same write succeeds.
+    #[error("This department is archived; restore it to change it or start work on its desks")]
+    UnitArchived,
+    /// Archiving refused because runs on the subtree's desks are not finished (Plan08 02B.1).
+    /// `cancellable` is false when cancel-and-archive cannot end them in one write.
+    #[error(
+        "{count} unfinished run(s) on this department's desks; cancel them or let them finish first"
+    )]
+    UnitArchiveOpenWork { count: i64, cancellable: bool },
     #[error("The destination cannot receive this run's content")]
     KnowledgeRelease {
         content: crate::entities::access_level::AccessLevel,
@@ -230,6 +240,11 @@ impl BudgetExhausted {
     pub fn code(&self) -> &'static str {
         Self::CODE
     }
+}
+
+impl AppError {
+    pub const UNIT_ARCHIVED: &'static str = "unit.archived";
+    pub const UNIT_ARCHIVE_OPEN_WORK: &'static str = "unit.archive_open_work";
 }
 
 impl std::fmt::Display for BudgetExhausted {

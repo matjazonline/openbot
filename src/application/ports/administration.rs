@@ -25,6 +25,8 @@ pub enum ManagementRole {
     Owner,
     Admin,
     Lead(DepartmentId),
+    /// The person deciding sponsor of the unit or an ancestor (Plan08 proposal 2).
+    Sponsor(DepartmentId),
 }
 
 impl std::fmt::Display for ManagementRole {
@@ -33,6 +35,7 @@ impl std::fmt::Display for ManagementRole {
             Self::Owner => f.write_str("owner"),
             Self::Admin => f.write_str("admin"),
             Self::Lead(unit) => write!(f, "lead:{unit}"),
+            Self::Sponsor(unit) => write!(f, "sponsor:{unit}"),
         }
     }
 }
@@ -60,11 +63,13 @@ pub trait AdministrationPersistence: Send + Sync {
     /// configuration lists. Listing is not authority: each write still checks its own target.
     async fn managed_units(&self, actor: Uuid, company: CompanyId) -> AppResult<Vec<DepartmentId>>;
 
-    /// [`Self::managed_units`] with names, root first, for a unit picker.
+    /// [`Self::managed_units`] with names, root first, for a unit picker; archived units only
+    /// when asked (Plan08 02A.5), since nothing is created in or moved into one.
     async fn managed_unit_choices(
         &self,
         actor: Uuid,
         company: CompanyId,
+        archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<ManagedUnit>>;
 
     /// The unit a new skill or connection gets when its creator names none (Plan07): the root for

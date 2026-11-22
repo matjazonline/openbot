@@ -7,3 +7,4 @@ mod runtime;
 pub use builtin::*;
 pub use ports::*;
 pub use runtime::MemoryToolRuntime;
+pub(crate) use runtime::mark_archived;

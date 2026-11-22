@@ -77,6 +77,17 @@ pub struct Channel {
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// The department this desk belongs to. Ownership never blocks deleting the desk.
     pub department_id: crate::entities::department::DepartmentId,
+    /// Whether that department is archived (Plan08 02B), read with `settings_revision`. Routing
+    /// and relays treat such a desk as disabled without touching `enabled`, so a restore returns
+    /// the desk to exactly the state it had.
+    pub unit_archived: bool,
+}
+
+impl Channel {
+    /// Whether the desk takes traffic now: enabled, and its department is not archived.
+    pub fn takes_traffic(&self) -> bool {
+        self.enabled && !self.unit_archived
+    }
 }
 
 /// Participant list entry that opens a channel to any sender.
@@ -222,6 +233,7 @@ mod tests {
 
     fn channel_with_aliases(aliases: &[&str]) -> Channel {
         Channel {
+            unit_archived: false,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Support".to_string(),

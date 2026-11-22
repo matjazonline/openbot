@@ -12,6 +12,8 @@ mod constraints;
 #[path = "delegated_scope_tests.rs"]
 mod delegated_scopes;
 mod races;
+#[path = "scope_archive_tests.rs"]
+mod scope_archive;
 #[path = "scope_race_tests.rs"]
 mod scope_races;
 #[path = "scope_test_support.rs"]

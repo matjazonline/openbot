@@ -142,7 +142,11 @@ impl Workspace {
             // The departments the caller manages: the groups and the destinations it may choose.
             departments: self
                 .department_use_cases
-                .list_departments(self.user_id, company.id)
+                .list_departments(
+                    self.user_id,
+                    company.id,
+                    crate::entities::department::ArchivedUnits::Include,
+                )
                 .await?,
         })
     }

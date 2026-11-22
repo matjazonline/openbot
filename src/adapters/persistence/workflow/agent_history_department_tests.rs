@@ -207,6 +207,7 @@ async fn department_views_usage_names_the_department_of_the_runs_desk() {
     let report =
         f.s.p()
             .usage_report(UsageQuery {
+                archived: crate::entities::department::ArchivedUnits::Include,
                 scope: UsageScope {
                     company,
                     actor: owner,

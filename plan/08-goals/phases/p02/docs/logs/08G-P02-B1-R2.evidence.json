@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "round": "08G-P02-B1-R2",
+  "artifact": "a10ec4c20a9011c4af28694f27467765e02ed34dd8cf54d33e193229771012ad",
+  "checks": [
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "F3",
+        "02A",
+        "02B",
+        "02D",
+        "competing"
+      ],
+      "command": "cargo test --lib -- unit_archive message_admission_classifies local_agents::management routes::department",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost), SQLX_OFFLINE=true; cloudroom-plugin node_modules rebuilt for Node v26.13.1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-R2-focused.txt",
+          "sha256": "5d9b4d1726b169b495eeca9065bafad749ac4028378219269d55a0bd65a1dac5"
+        },
+        {
+          "path": "logs/08G-P02-B1-R2-focused-list.txt",
+          "sha256": "3156a747c209ac4bc9eedfd57bd9dd3df33c62a4a394d18b4de967cb1ea2912c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F4"
+      ],
+      "command": "cargo test --lib -- local_agent_tests::e2e local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost), SQLX_OFFLINE=true; cloudroom-plugin node_modules rebuilt for Node v26.13.1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-R2-cloudroom.txt",
+          "sha256": "2cc6dea6d528df9865369ea388ce982d36e46a4f2afd44ee726ffad847521c27"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "formatting"
+      ],
+      "command": "cargo fmt --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-R2-fmt.txt",
+          "sha256": "6af00a72c76eb2d8e5f1526c0f7b3458309814810a296b10f2375b67a67a97c1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline-compilation"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "dev DB openbot_merge08_mac02",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-R2-sqlx-check.txt",
+          "sha256": "8b50a2744d8f26f11072393b83c3ba5a8dd86728666c73c320a3c35f3bd8c770"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "02B.3 channel.call"
+      ],
+      "command": "none",
+      "fixture": "n/a",
+      "status": "NOT EXERCISED",
+      "reason": "no channel.call producer targets a desk in this build"
+    }
+  ]
+}

@@ -1157,6 +1157,7 @@ mod tests {
         async fn list_departments(
             &self,
             _company_id: Uuid,
+            _archived: crate::entities::department::ArchivedUnits,
         ) -> AppResult<Vec<crate::entities::department::Department>> {
             Ok(Vec::new())
         }
@@ -1227,6 +1228,7 @@ mod tests {
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1451,6 +1453,7 @@ regis";
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),

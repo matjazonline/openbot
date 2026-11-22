@@ -213,7 +213,12 @@ async fn preview(
     };
     let departments = ui
         .departments
-        .desk_departments(ui.user, company, &[desk])
+        .desk_departments(
+            ui.user,
+            company,
+            &[desk],
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?;
     let mut department = departments.owners.get(&desk).copied();
     let mut chain = Vec::new();

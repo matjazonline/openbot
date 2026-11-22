@@ -335,7 +335,12 @@ impl Ui {
         company: Uuid,
     ) -> AppResult<crate::entities::department::DeskDepartments> {
         self.departments
-            .desk_departments(self.user, company, &[])
+            .desk_departments(
+                self.user,
+                company,
+                &[],
+                crate::entities::department::ArchivedUnits::Include,
+            )
             .await
     }
 
@@ -375,8 +380,9 @@ impl Ui {
                 label: agent.label,
             })
             .collect();
-        let departments = self.desk_departments(company).await?;
-        let departments = crate::entities::department::department_tree(&departments.departments)
+        // Archived departments are no scope to start from (Plan08 02E.2).
+        let departments = self.desk_departments(company).await?.choices(None);
+        let departments = crate::entities::department::department_tree(&departments)
             .into_iter()
             .map(|(depth, department)| pages::ScopeOption {
                 id: department.id.as_uuid(),

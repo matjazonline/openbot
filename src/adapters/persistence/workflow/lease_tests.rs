@@ -794,3 +794,6 @@ pub(super) async fn retry_scope(f: &AdmissionFixture, scope: ActivationRequest) 
 
 #[path = "schema_constraint_tests.rs"]
 mod schema_constraint_tests;
+
+#[path = "unit_archive_runs_tests.rs"]
+mod unit_archive_runs;

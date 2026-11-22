@@ -173,6 +173,7 @@ mod maintenance;
 
 mod control_retry;
 mod controls;
+pub(crate) use controls::cancel_for_archive_on;
 mod inspection;
 mod message_outcomes;
 

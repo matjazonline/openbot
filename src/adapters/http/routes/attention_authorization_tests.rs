@@ -287,7 +287,12 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
         .unwrap();
     // Hidden has no member or role grant for this person.
     let seen = departments
-        .desk_departments(f.member.id, f.company.id, &[])
+        .desk_departments(
+            f.member.id,
+            f.company.id,
+            &[],
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap();
     assert!(seen.department(mine.id).is_some());
@@ -301,7 +306,12 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
     sqlx::query("INSERT INTO channel_principal_grants (company_id,channel_id,principal_id,capability,provenance) VALUES($1,$2,$3,'view','configured_allowlist')")
         .bind(f.company.id).bind(hidden_desk).bind(member).execute(f.persistence.pool()).await.unwrap();
     let through_desk = departments
-        .desk_departments(f.member.id, f.company.id, &[hidden_desk])
+        .desk_departments(
+            f.member.id,
+            f.company.id,
+            &[hidden_desk],
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap();
     assert!(through_desk.department(hidden.id).is_some());
@@ -311,7 +321,12 @@ async fn department_views_a_member_filters_only_by_departments_they_may_see() {
     );
     // An owner sees every department.
     let all = departments
-        .desk_departments(f.owner.id, f.company.id, &[])
+        .desk_departments(
+            f.owner.id,
+            f.company.id,
+            &[],
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap();
     assert!(all.department(hidden.id).is_some() && all.department(mine.id).is_some());

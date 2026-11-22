@@ -80,7 +80,8 @@ pub(crate) async fn authorize_resource_on(
 
 /// Requires managing the resource's current unit and the target, under the company and person
 /// locks and the resource's row lock. Changes only `unit_id`: revisions stay, so forms, pending
-/// actions and published snapshots are untouched (G1 r2 F6).
+/// actions and published snapshots are untouched (G1 r2 F6). An archived unit may be moved out
+/// of but not into (Plan08 02C.2), so its resources are never stranded.
 pub(crate) async fn move_resource_on(
     db: &mut PgConnection,
     actor: WorkflowActor,
@@ -112,6 +113,7 @@ pub(crate) async fn move_resource_on(
             .ok_or_else(|| not_found(kind))?;
     }
     if current != target {
+        super::department::require_active_unit_on(db, company, target).await?;
         if kind == UnitResourceKind::ModelConnection {
             move_model_connection_on(db, company, id, target).await?;
         } else {

@@ -139,7 +139,7 @@ fn focused_channel_list(page: &ChannelsPage<'_>) -> String {
                     page.company,
                     page.app_domain_name,
                     channel,
-                    department_name(page.departments, channel),
+                    department_name(page.departments, channel).as_deref(),
                 )
             }
         })
@@ -147,12 +147,13 @@ fn focused_channel_list(page: &ChannelsPage<'_>) -> String {
 }
 
 /// The name of the department that owns `channel`, when it is one of `departments`.
-pub fn department_name<'d>(departments: &'d [Department], channel: &Channel) -> Option<&'d str> {
+/// The desk's department as its row names it: an archived one says so (Plan08 02E.2).
+pub fn department_name(departments: &[Department], channel: &Channel) -> Option<String> {
     let owner = channel.department_id;
     departments
         .iter()
         .find(|department| department.id == owner)
-        .map(|department| department.name.as_str())
+        .map(Department::label)
 }
 
 pub fn channel_list_fragment(
@@ -180,7 +181,7 @@ pub fn channel_list_fragment(
                         company,
                         app_domain_name,
                         channel,
-                        department_name(departments, channel),
+                        department_name(departments, channel).as_deref(),
                     )
                 })
                 .collect();

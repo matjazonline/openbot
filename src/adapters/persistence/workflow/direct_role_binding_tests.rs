@@ -216,3 +216,75 @@ async fn direct_binding_competing_activation_and_roster_write_preserve_unambiguo
     let error = activation.err().or_else(|| placement.err()).unwrap();
     assert!(format!("{error:?}").contains("binding.role_needs_department"));
 }
+
+/// Plan08 02C.4 (08G-P02-B2-R2-F1): a placement in an archived unit places nothing, so archive
+/// and restore move an agent's direct-binding context as a roster write does, and refuse what
+/// would leave an active role-bearing binding without exactly one department.
+#[tokio::test]
+async fn unit_archive_rechecks_direct_role_bindings_on_archive_and_restore() {
+    use crate::application::ports::department::OpenWork;
+    let direct = DirectRole::new().await;
+    let f = &direct.f;
+    let use_cases =
+        crate::adapters::persistence::test_support::department_use_cases(&f.fixture.persistence);
+    let (user, company) = (f.target.actor.user_id(), f.target.company.as_uuid());
+    let [sales, support] = [direct.departments[0], direct.departments[1]];
+    let refused = |error: AppError| format!("{error:?}").contains("binding.role_needs_department");
+    let configured = direct.configure().await;
+    use_cases
+        .add_member(user, company, sales, direct.principal)
+        .await
+        .unwrap();
+    let active = f
+        .service()
+        .activate(SetBindingActivity {
+            target: f.target,
+            expected: configured.revision,
+        })
+        .await
+        .unwrap();
+
+    // Archiving the agent's only department would leave the active binding without one.
+    let error = use_cases
+        .archive_department(user, company, sales, OpenWork::Refuse)
+        .await
+        .err()
+        .unwrap();
+    assert!(refused(error));
+    assert_eq!(direct.contexts().await, vec![sales.as_uuid()]);
+
+    // With the binding off the archive goes through and the agent is placed nowhere.
+    f.service()
+        .deactivate(SetBindingActivity {
+            target: f.target,
+            expected: active.revision,
+        })
+        .await
+        .unwrap();
+    use_cases
+        .archive_department(user, company, sales, OpenWork::Refuse)
+        .await
+        .unwrap();
+    assert!(direct.contexts().await.is_empty());
+
+    // Placed in Support and active again while Sales is archived, a restore of Sales would make
+    // the context ambiguous.
+    use_cases
+        .add_member(user, company, support, direct.principal)
+        .await
+        .unwrap();
+    f.service()
+        .activate(SetBindingActivity {
+            target: f.target,
+            expected: f.state().await.revision,
+        })
+        .await
+        .unwrap();
+    let error = use_cases
+        .restore_department(user, company, sales)
+        .await
+        .err()
+        .unwrap();
+    assert!(refused(error));
+    assert_eq!(direct.contexts().await, vec![support.as_uuid()]);
+}

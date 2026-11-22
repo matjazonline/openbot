@@ -1136,3 +1136,83 @@ async fn no_channel_has_an_email_binding_that_disagrees_with_its_primary_slug() 
          resolves to no binding: {stale:?}"
     );
 }
+
+/// Plan08 02B.4: no transport binding is linked to, or re-activated on, a desk of an archived
+/// unit; disabling one there still works.
+#[tokio::test]
+async fn unit_archive_refuses_transport_binding_link_and_reactivation() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool.clone());
+    let acme = company(&persistence, "archived").await;
+    let unit = persistence.test_unit(acme.id, "archived-unit").await;
+    let desk = crate::adapters::persistence::test_support::create_channel(
+        &persistence,
+        acme.id,
+        ChannelWrite {
+            name: "Archived desk".into(),
+            slug: format!("archived-{}", Uuid::new_v4().simple()),
+            enabled: false,
+            department_id: Some(crate::entities::department::DepartmentId::new(unit)),
+            ..ChannelWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    let installation = slack_installation(&persistence, &acme).await;
+    let binding = persistence
+        .create_binding(slack_binding_write(
+            acme.id,
+            desk.id,
+            &installation,
+            &format!("C{}", Uuid::new_v4().simple()),
+        ))
+        .await
+        .unwrap();
+    crate::adapters::persistence::test_support::department_use_cases(&persistence)
+        .archive_department(
+            acme.owner_id,
+            acme.id,
+            crate::entities::department::DepartmentId::new(unit),
+            crate::application::ports::department::OpenWork::Refuse,
+        )
+        .await
+        .unwrap();
+    let linked = persistence
+        .create_binding(slack_binding_write(
+            acme.id,
+            desk.id,
+            &installation,
+            &format!("C{}", Uuid::new_v4().simple()),
+        ))
+        .await;
+    assert!(matches!(linked, Err(AppError::UnitArchived)), "{linked:?}");
+    let change = |status| BindingStatusChange {
+        company_id: acme.id,
+        binding_id: binding.id,
+        status,
+        reason: (status == BindingStatus::Disabled).then_some(BindingChangeReason::AccessRevoked),
+        actor: CreationProvenance::user(acme.owner_id),
+    };
+    persistence
+        .set_binding_status(change(BindingStatus::Disabled))
+        .await
+        .expect("a binding on an archived unit's desk can be disabled");
+    let reactivated = persistence
+        .set_binding_status(change(BindingStatus::Active))
+        .await;
+    assert!(
+        matches!(reactivated, Err(AppError::UnitArchived)),
+        "{reactivated:?}"
+    );
+    assert_eq!(
+        persistence
+            .get_binding(acme.id, binding.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        BindingStatus::Disabled
+    );
+}

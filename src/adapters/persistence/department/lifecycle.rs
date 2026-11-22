@@ -43,7 +43,7 @@ pub(crate) async fn create_department_with_id_on(
         None => super::super::company::root_on(tx, company).await?,
     });
     if let Some(parent) = parent_id {
-        let parent = lock_parent_on(tx, company, parent).await?;
+        let parent = active(lock_parent_on(tx, company, parent).await?)?;
         check_shape_on(tx, company, id, &write.name, &parent).await?;
     }
     let department = insert_department_on(tx, company, id, write, parent_id).await?;
@@ -139,7 +139,7 @@ pub(crate) async fn update_department_on(
     department: DepartmentId,
     edit: &DepartmentEdit,
 ) -> AppResult<Department> {
-    let current = lock_department_on(tx, company, department).await?;
+    let current = active(lock_department_on(tx, company, department).await?)?;
     let name = edit.name.clone().unwrap_or_else(|| current.name.clone());
     let slug = edit
         .slug
@@ -173,7 +173,7 @@ pub(crate) async fn update_department_on(
     if parent_id != current.parent_id
         && let Some(parent) = parent_id
     {
-        let parent = lock_parent_on(tx, company, parent).await?;
+        let parent = active(lock_parent_on(tx, company, parent).await?)?;
         check_shape_on(tx, company, department, &name, &parent).await?;
     }
     let updated = sqlx::query_as::<_, DepartmentDb>(&format!(
@@ -301,18 +301,7 @@ pub(crate) async fn delete_department_on(
     let current = lock_department_on(tx, company, department).await?;
     guard_department_delete_on(tx, company, &current).await?;
     // Its member and role rows cascade with it: lock their principals first, as row deletes do.
-    let placed: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT member.principal_id FROM department_members AS member \
-          WHERE member.company_id = $1 AND member.department_id = $2 \
-         UNION \
-         SELECT holder.principal_id FROM department_roles AS holder \
-          WHERE holder.company_id = $1 AND holder.department_id = $2 \
-         ORDER BY 1",
-    )
-    .bind(company.as_uuid())
-    .bind(department.as_uuid())
-    .fetch_all(&mut **tx)
-    .await?;
+    let placed = super::archive::placed_principals_on(tx, company, &[department.as_uuid()]).await?;
     lock_principals_on(tx, company, &placed).await?;
     super::super::memory::retire_namespaces_on(
         tx,

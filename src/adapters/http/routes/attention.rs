@@ -101,7 +101,12 @@ async fn list_attention(
     // listed nothing and is not found.
     if query.department_id.is_some() {
         let departments = department_use_cases
-            .desk_departments(viewer.user_id, company_id, &listing.readable_desks)
+            .desk_departments(
+                viewer.user_id,
+                company_id,
+                &listing.readable_desks,
+                crate::entities::department::ArchivedUnits::Include,
+            )
             .await?;
         known_department(&departments, query.department_id)?;
     }
@@ -217,7 +222,12 @@ async fn work_page(
         .await?;
     let departments = state
         .department_use_cases
-        .desk_departments(viewer.user_id, access.company.id, &listing.readable_desks)
+        .desk_departments(
+            viewer.user_id,
+            access.company.id,
+            &listing.readable_desks,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?;
     let department = known_department(&departments, query.department_id)?;
     let page = listing.page;
@@ -264,7 +274,12 @@ async fn work_list(
         )
         .await?;
     let departments = department_use_cases
-        .desk_departments(viewer.user_id, access.company.id, &listing.readable_desks)
+        .desk_departments(
+            viewer.user_id,
+            access.company.id,
+            &listing.readable_desks,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?;
     let department = known_department(&departments, query.department_id)?;
     Ok(Html(pages::attention_list(&pages::AttentionListView {

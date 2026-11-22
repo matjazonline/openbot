@@ -90,6 +90,8 @@ pub struct UsageQuery {
     pub workflow: Option<Uuid>,
     /// Only calls attributed to this department (Plan07 02C drill-down).
     pub unit: Option<Uuid>,
+    /// Whether the per-department spend rows include archived departments (Plan08 02C.3).
+    pub archived: crate::entities::department::ArchivedUnits,
 }
 impl UsageQuery {
     pub fn validate(&self) -> AppResult<()> {
@@ -162,6 +164,8 @@ pub struct UsageDesk {
 pub struct UnitBudgetStatus {
     pub unit: Uuid,
     pub name: String,
+    /// The department is archived (Plan08 02C.3): its caps and spend are kept and shown on ask.
+    pub archived: bool,
     /// `day` or `month`.
     pub period: String,
     /// Exact USD decimals.

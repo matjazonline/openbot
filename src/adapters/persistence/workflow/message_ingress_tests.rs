@@ -53,6 +53,9 @@ mod autonomous_entrypoints;
 #[path = "channel_reply_e2e_tests.rs"]
 mod channel_reply_e2e;
 
+#[path = "unit_archive_ingress_tests.rs"]
+mod unit_archive_ingress;
+
 const CUSTOMER: &str = "customer@partner.test";
 
 /// The production engine and ingest over one company: a `support` channel the customer may

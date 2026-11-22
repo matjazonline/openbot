@@ -257,7 +257,14 @@ impl McpUseCases {
     )> {
         self.managed_units(user, company).await?;
         let company = crate::domain::workflow::CompanyId::new(company);
-        let units = self.companies.managed_unit_choices(user, company).await?;
+        let units = self
+            .companies
+            .managed_unit_choices(
+                user,
+                company,
+                crate::entities::department::ArchivedUnits::Exclude,
+            )
+            .await?;
         let default = self
             .companies
             .default_resource_unit(user, company)

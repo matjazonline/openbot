@@ -474,6 +474,10 @@ pub(super) fn classify(result: AppResult<AdmissionResult>) -> Classified {
             tracing::warn!(code = refusal.code(), "Workflow admission refused");
             Classified::Settled(BindingOutcome::Refused(refusal.code()))
         }
+        // Reported the way a disabled desk is: a definite refusal naming why (Plan08 02B.2).
+        Err(AppError::UnitArchived) => {
+            Classified::Settled(BindingOutcome::Refused(AppError::UNIT_ARCHIVED))
+        }
         Err(AppError::KnowledgeTrigger { content, ceiling }) => {
             tracing::warn!(
                 content_level = content.as_i16(),
@@ -635,6 +639,11 @@ mod tests {
                 }
             ))),
             Classified::Settled(BindingOutcome::Refused("budget.unit_exhausted"))
+        ));
+        // Plan08 02B.2: an archived unit's desk is a definite refusal naming its code.
+        assert!(matches!(
+            classify(Err(AppError::UnitArchived)),
+            Classified::Settled(BindingOutcome::Refused("unit.archived"))
         ));
         assert!(matches!(
             classify(Err(AppError::Database("down".into()))),

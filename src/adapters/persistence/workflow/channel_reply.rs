@@ -137,6 +137,10 @@ pub(super) async fn configure_reply_on(
 ) -> AppResult<ChannelReplySettings> {
     let approval_accounts = lock_settings_accounts(tx, request).await?;
     authorize_settings(tx, request.company, request.target, request.actor).await?;
+    if let AddressTarget::Desk(desk) = request.target {
+        crate::adapters::persistence::department::require_active_desk_on(tx, request.company, desk)
+            .await?;
+    }
     let reviewer_ids = request
         .approval_policy
         .as_ref()

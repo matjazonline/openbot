@@ -8,6 +8,7 @@ use crate::entities::transport::PrincipalId;
 
 fn desk(company_id: Uuid, slug: &str) -> Channel {
     Channel {
+        unit_archived: false,
         enabled: true,
         add_3rd_party: true,
         id: Uuid::new_v4(),

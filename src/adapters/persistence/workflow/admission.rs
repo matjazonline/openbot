@@ -30,6 +30,7 @@ impl WorkflowAdmission for PostgresPersistence {
                 .execute(&mut *tx)
                 .await?;
         }
+        refuse_archived_desk_on(&mut tx, command.company_id(), command.association()).await?;
         management::authorize_association_on(
             &mut tx,
             command.company_id(),
@@ -328,4 +329,24 @@ fn within_association(binding: RelatedAssociation, run: RelatedAssociation) -> b
     binding == RelatedAssociation::Company
         || binding == run
         || (binding.thread_id().is_none() && binding.target() == run.target())
+}
+
+/// Plan08 02B.2: a desk of an archived unit admits no run. Taken under the company row lock that
+/// archiving takes, and before the management check: once the unit is archived its own lead no
+/// longer manages it, and a run-as who lost management must still read `unit.archived`.
+pub(super) async fn refuse_archived_desk_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    association: RelatedAssociation,
+) -> AppResult<()> {
+    let Some(AddressTarget::Desk(desk)) = association.target() else {
+        return Ok(());
+    };
+    // Same lock and order as `authorize_person_with_locks`; re-taking it later is a no-op.
+    sqlx::query("SELECT 1 FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+        .bind(company.as_uuid())
+        .fetch_optional(&mut *db)
+        .await?
+        .ok_or_else(missing)?;
+    crate::adapters::persistence::department::require_active_desk_on(db, company, desk).await
 }

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "round": "08G-P02-B2-R1",
+  "artifact": "51dd88e18771de73170477a1a633f13bf5adeecb34f9c59835ed1fcc60849afa",
+  "checks": [
+    {
+      "criteria": [
+        "02A.5",
+        "02C.1",
+        "02C.2",
+        "02C.3",
+        "02E.1",
+        "02E.2"
+      ],
+      "command": "cargo test -j 4 --lib -- unit_archive --test-threads 4",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost), SQLX_OFFLINE=true, -j 4 --test-threads 4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-focused-first.txt",
+          "sha256": "3a53daa39eb437f7ac0a134e1f4ba41bf38b8a89241011c6c2f6a0ef3040db28"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "affected-callers"
+      ],
+      "command": "cargo test -j 4 --lib -- knowledge unit_resources department model_usage unit_budget attention channel skill mcp administration dashboard roster provisioning agent_authoring reviewer_picker runs:: --test-threads 4",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost), SQLX_OFFLINE=true, -j 4 --test-threads 4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-focused-affected.txt",
+          "sha256": "80395c73edc554bd7438052c27ab3b38c838211d1133b601a0be01b83b8ea169"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "formatting"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-fmt.txt",
+          "sha256": "95b5d824575729046eaa7e40e2e09d635c85b893ea380bdbfcb54229fecdfcf7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "artifact"
+      ],
+      "command": "snapshot.sh plan/08-goals/phases/p02/docs",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B2-snapshot-r1.txt",
+          "sha256": "832042686f52a1bf58356c4a13ef62d3558d4b45b1437cfcf064cf4070458366"
+        }
+      ]
+    }
+  ]
+}

@@ -96,6 +96,9 @@ pub(in crate::adapters::persistence) async fn admit_on(
     if let Some(saved) = reads::replay_on(db, owner, &broker, &prepared).await? {
         return Ok(saved);
     }
+    // Plan08 02B.2: a native MCP call is a run on the conversation's desk; the caller holds the
+    // company lock an archive takes.
+    super::admission::refuse_archived_desk_on(db, owner.company, owner.association).await?;
     reads::capacity_on(db, owner).await?;
     let call = NativeMcpCallId::new(Uuid::new_v4()).map_err(|_| invalid())?;
     let run = RunId::new(Uuid::new_v4());

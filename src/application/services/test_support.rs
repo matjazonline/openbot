@@ -265,6 +265,7 @@ impl ChannelPersistence for ChannelDirectoryStub {
     async fn list_departments(
         &self,
         _company_id: Uuid,
+        _archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<crate::entities::department::Department>> {
         Ok(Vec::new())
     }

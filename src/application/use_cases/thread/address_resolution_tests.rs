@@ -68,8 +68,9 @@ impl ChannelPersistence for NamespaceChannels {
     async fn list_departments(
         &self,
         company_id: Uuid,
+        archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<crate::entities::department::Department>> {
-        self.desks.list_departments(company_id).await
+        self.desks.list_departments(company_id, archived).await
     }
 
     async fn update(&self, request: ChannelUpdate) -> AppResult<Channel> {

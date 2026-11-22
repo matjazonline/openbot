@@ -1493,3 +1493,129 @@ async fn lease_loss_at_final_commit_rolls_back_every_canonical_effect() {
 
     fixture.cleanup().await;
 }
+
+/// Put the fixture's desk in a new unit, so archiving that unit covers it.
+async fn desk_in_unit(fixture: &Fixture) -> crate::entities::department::DepartmentId {
+    let unit = fixture
+        .persistence
+        .test_unit(fixture.company_id, &format!("mail-{}", fixture.suffix))
+        .await;
+    sqlx::query("UPDATE channels SET department_id = $2 WHERE id = $1")
+        .bind(fixture.channel_id)
+        .bind(unit)
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
+    crate::entities::department::DepartmentId::new(unit)
+}
+
+/// Plan08 02B.3 (D1.7a), archive first: a commit routed before the archive waits for it at the
+/// desk's gate and is superseded, storing nothing; the desk's own switch is untouched.
+#[tokio::test]
+async fn unit_archive_competing_mail_commit_queued_behind_an_archive_is_refused() {
+    let Some(fixture) = Fixture::new("inbound_archive_first").await else {
+        return;
+    };
+    switch_on(&fixture).await;
+    let unit = desk_in_unit(&fixture).await;
+    let rfc = format!("<archive-first-{}@example.com>", fixture.suffix);
+    let routed = request(&fixture, &rfc, "Still there?").await;
+    let revision = routed.intents[0].settings_revision;
+    let mut archiving = fixture.pool.begin().await.unwrap();
+    crate::adapters::persistence::department::archive_department_on(
+        &mut archiving,
+        crate::application::ports::department::DepartmentScope {
+            actor: crate::application::workflow::WorkflowActor::authenticated(fixture.owner_id)
+                .unwrap(),
+            company: crate::domain::workflow::CompanyId::new(fixture.company_id),
+        },
+        crate::application::ports::administration::ManagementRole::Owner,
+        unit,
+        crate::application::ports::department::OpenWork::Refuse,
+    )
+    .await
+    .unwrap();
+    let commit = tokio::spawn({
+        let persistence = PostgresPersistence::new(fixture.pool.clone());
+        async move { persistence.commit_inbound(routed).await }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(
+        !commit.is_finished(),
+        "the commit must wait for the archive"
+    );
+    archiving.commit().await.unwrap();
+    let refused = commit.await.unwrap();
+    assert!(
+        matches!(&refused, Err(AppError::Superseded(_))),
+        "{refused:?}"
+    );
+    assert_eq!(message_count(&fixture).await, 0);
+    assert_eq!(intent_count(&fixture).await, 0);
+    assert_eq!(channel_settings(&fixture).await, (true, revision + 1));
+
+    fixture.cleanup().await;
+}
+
+/// Commit first: an archive reaching the desk's gate while a commit holds it waits, so the
+/// message lands under the settings it was routed against and the archive applies after it.
+#[tokio::test]
+async fn unit_archive_competing_archive_queued_behind_a_mail_commit_applies_after_it() {
+    let Some(fixture) = Fixture::new("inbound_commit_before_archive").await else {
+        return;
+    };
+    switch_on(&fixture).await;
+    let unit = desk_in_unit(&fixture).await;
+    let rfc = format!("<commit-before-archive-{}@example.com>", fixture.suffix);
+    let routed = request(&fixture, &rfc, "Anyone?").await;
+    let revision = routed.intents[0].settings_revision;
+    let mut admission = fixture.pool.begin().await.unwrap();
+    super::inbound::hold_channel_settings(
+        &mut admission,
+        &routed,
+        super::inbound::InboundAuthor::Observed,
+    )
+    .await
+    .unwrap();
+    let admission_backend: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *admission)
+        .await
+        .unwrap();
+    let archive = tokio::spawn({
+        let persistence = fixture.persistence.clone();
+        let (owner, company) = (fixture.owner_id, fixture.company_id);
+        async move {
+            crate::adapters::persistence::test_support::department_use_cases(&persistence)
+                .archive_department(
+                    owner,
+                    company,
+                    unit,
+                    crate::application::ports::department::OpenWork::Refuse,
+                )
+                .await
+        }
+    });
+    crate::adapters::persistence::test_support::wait_until_blocked_by(
+        &fixture.pool,
+        admission_backend,
+    )
+    .await;
+    assert!(
+        !archive.is_finished(),
+        "the archive must wait for the commit"
+    );
+    super::inbound::commit_on(&mut admission, &routed)
+        .await
+        .unwrap();
+    admission.commit().await.unwrap();
+    let archived = archive
+        .await
+        .unwrap()
+        .expect("the archive applies once the commit is done");
+    assert!(archived.is_archived());
+    assert_eq!(message_count(&fixture).await, 1);
+    assert_eq!(intent_count(&fixture).await, 1);
+    assert_eq!(channel_settings(&fixture).await, (true, revision + 1));
+
+    fixture.cleanup().await;
+}

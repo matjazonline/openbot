@@ -121,8 +121,13 @@ impl ModelUsageStore for PostgresPersistence {
                 .collect::<AppResult<Vec<_>>>()?,
             &query,
         )?;
-        let (budgets, budgets_truncated) =
-            unit_budgets_on(&mut tx, query.scope.company, managed.as_deref()).await?;
+        let (budgets, budgets_truncated) = unit_budgets_on(
+            &mut tx,
+            query.scope.company,
+            managed.as_deref(),
+            query.archived,
+        )
+        .await?;
         tx.commit().await?;
         Ok(UsageReport {
             budgets,
@@ -144,7 +149,14 @@ impl ModelUsageStore for PostgresPersistence {
     async fn unit_spend(&self, scope: UsageScope) -> AppResult<(Vec<UnitBudgetStatus>, bool)> {
         let mut tx = self.pool.begin().await?;
         let managed = report_scope(&mut tx, scope).await?;
-        let spend = unit_budgets_on(&mut tx, scope.company, managed.as_deref()).await?;
+        // The dashboard's spend panel shows active departments only.
+        let spend = unit_budgets_on(
+            &mut tx,
+            scope.company,
+            managed.as_deref(),
+            crate::entities::department::ArchivedUnits::Exclude,
+        )
+        .await?;
         tx.commit().await?;
         Ok(spend)
     }
@@ -198,6 +210,8 @@ async fn load_calls(
     // Bound the scanned company/time working set before optional filters and grouping, with the
     // viewer's units and a drill-down unit applied first so they never truncate a lead's report.
     // The extra row makes every incomplete report explicit, including selective filters.
+    // Plan08 02C.3: calls attributed to an archived unit are shown only when asked, or when that
+    // unit is the drill-down.
     Ok(sqlx::query_as(
         "WITH calls AS MATERIALIZED (
            SELECT requested_at,request_id,provider,model,workflow_id,agent_id,run_id,unit_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
@@ -205,14 +219,19 @@ async fn load_calls(
              SELECT requested_at,request_id,provider,model,workflow_id,agent_id,run_id,unit_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
              FROM model_usage_calls WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
                AND ($5::uuid[] IS NULL OR unit_id = ANY($5)) AND ($6::uuid IS NULL OR unit_id = $6)
+               AND ($7 OR unit_id = $6 OR NOT EXISTS (SELECT 1 FROM departments AS unit
+                 WHERE unit.company_id=$1 AND unit.id=unit_id AND unit.archived_at IS NOT NULL))
              UNION ALL
              SELECT requested_at,request_id,provider,model,workflow_id,agent_id,NULL::uuid,unit_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
              FROM model_usage_history WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
                AND ($5::uuid[] IS NULL OR unit_id = ANY($5)) AND ($6::uuid IS NULL OR unit_id = $6)
+               AND ($7 OR unit_id = $6 OR NOT EXISTS (SELECT 1 FROM departments AS unit
+                 WHERE unit.company_id=$1 AND unit.id=unit_id AND unit.archived_at IS NOT NULL))
            ) AS sources ORDER BY requested_at,request_id LIMIT $4)
          SELECT calls.provider,calls.model,calls.workflow_id,calls.agent_id,
            calls.unit_id AS department_id,
-           COALESCE(department.name, 'Deleted department') AS department_name,
+           COALESCE(department.name || CASE WHEN department.archived_at IS NULL THEN ''
+             ELSE ' (archived)' END, 'Deleted department') AS department_name,
            desk.id AS desk_id,desk.name AS desk_name,
            COALESCE(calls.input_tokens,calls.reserved_input) AS input_tokens,
            COALESCE(calls.output_tokens,calls.reserved_output) AS output_tokens,calls.usage_source,
@@ -227,7 +246,7 @@ async fn load_calls(
          LEFT JOIN channels AS desk ON desk.company_id=$1 AND desk.id=run.channel_id
          ORDER BY calls.requested_at,calls.request_id",
     ).bind(query.scope.company).bind(query.start).bind(query.end).bind((MAX_CALLS + 1) as i64)
-        .bind(managed).bind(query.unit)
+        .bind(managed).bind(query.unit).bind(query.archived.included())
         .fetch_all(tx).await?)
 }
 
@@ -237,6 +256,7 @@ const MAX_BUDGET_ROWS: usize = 200;
 struct BudgetRow {
     unit: Uuid,
     name: String,
+    archived: bool,
     period: String,
     cap: Option<i64>,
     spent: i64,
@@ -244,14 +264,17 @@ struct BudgetRow {
 }
 
 /// The viewer's departments with a cap or spend in the current UTC day or month, from the
-/// running totals admission reads (Plan07 02C.1, decision j).
+/// running totals admission reads (Plan07 02C.1, decision j); archived ones, whose rows are
+/// kept (Plan08 02C.3), only when asked.
 async fn unit_budgets_on(
     tx: &mut PgConnection,
     company: Uuid,
     managed: Option<&[Uuid]>,
+    archived: crate::entities::department::ArchivedUnits,
 ) -> AppResult<(Vec<UnitBudgetStatus>, bool)> {
     let mut rows: Vec<BudgetRow> = sqlx::query_as(
-        "SELECT unit.id AS unit, unit.name, period.name AS period, budget.cap_micros AS cap,
+        "SELECT unit.id AS unit, unit.name, unit.archived_at IS NOT NULL AS archived,
+                period.name AS period, budget.cap_micros AS cap,
                 COALESCE(spend.spent_micros, 0) AS spent,
                 COALESCE(spend.unpriced_tokens, 0) AS unpriced
            FROM departments AS unit
@@ -263,6 +286,7 @@ async fn unit_budgets_on(
             AND spend.period_start = date_trunc(period.name, clock_timestamp() AT TIME ZONE 'UTC')
                 AT TIME ZONE 'UTC'
           WHERE unit.company_id = $1 AND ($2::uuid[] IS NULL OR unit.id = ANY($2))
+            AND ($4 OR unit.archived_at IS NULL)
             AND (budget.cap_micros IS NOT NULL OR spend.unit_id IS NOT NULL)
           ORDER BY unit.name, unit.id, period.name
           LIMIT $3",
@@ -270,6 +294,7 @@ async fn unit_budgets_on(
     .bind(company)
     .bind(managed)
     .bind((MAX_BUDGET_ROWS + 1) as i64)
+    .bind(archived.included())
     .fetch_all(&mut *tx)
     .await?;
     let truncated = rows.len() > MAX_BUDGET_ROWS;
@@ -279,6 +304,7 @@ async fn unit_budgets_on(
             .map(|row| UnitBudgetStatus {
                 unit: row.unit,
                 name: row.name,
+                archived: row.archived,
                 period: row.period,
                 cap_usd: row.cap.map(usd),
                 spent_usd: usd(row.spent),

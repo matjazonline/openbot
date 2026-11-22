@@ -10,6 +10,8 @@ pub(crate) enum AdministrationEvent {
     Updated,
     Moved,
     Deleted,
+    Archived,
+    Restored,
     MemberAdded(PrincipalId),
     MemberRemoved(PrincipalId),
     RoleAssigned(PrincipalId, DepartmentRole),
@@ -23,6 +25,8 @@ impl AdministrationEvent {
             Self::Updated => "department_updated",
             Self::Moved => "department_moved",
             Self::Deleted => "department_deleted",
+            Self::Archived => "department_archived",
+            Self::Restored => "department_restored",
             Self::MemberAdded(_) => "member_added",
             Self::MemberRemoved(_) => "member_removed",
             Self::RoleAssigned(..) => "role_assigned",
@@ -36,7 +40,12 @@ impl AdministrationEvent {
             | Self::MemberRemoved(principal)
             | Self::RoleAssigned(principal, _)
             | Self::RoleCleared(principal, _) => Some(principal),
-            Self::Created | Self::Updated | Self::Moved | Self::Deleted => None,
+            Self::Created
+            | Self::Updated
+            | Self::Moved
+            | Self::Deleted
+            | Self::Archived
+            | Self::Restored => None,
         }
     }
 

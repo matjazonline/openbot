@@ -173,6 +173,7 @@ mod tests {
     fn query() -> UsageQuery {
         let end = Utc::now();
         UsageQuery {
+            archived: crate::entities::department::ArchivedUnits::Include,
             scope: UsageScope {
                 company: Uuid::new_v4(),
                 actor: Uuid::new_v4(),

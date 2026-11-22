@@ -13,6 +13,8 @@ impl IntoResponse for AppError {
             AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
             AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
             AppError::BudgetExhausted(_) => "budget_exhausted",
+            AppError::UnitArchived => "unit_archived",
+            AppError::UnitArchiveOpenWork { .. } => "unit_archive_open_work",
             AppError::KnowledgeRelease { .. } => "knowledge_release",
             AppError::Execution(_) => "execution",
             AppError::Database(_) => "database",
@@ -42,6 +44,17 @@ impl IntoResponse for AppError {
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({"code":refusal.code(),"error":refusal.to_string(),
                     "unit":refusal.unit,"period":refusal.period})),
+            ).into_response(),
+            AppError::UnitArchived => (
+                StatusCode::CONFLICT,
+                axum::Json(serde_json::json!({"code":AppError::UNIT_ARCHIVED,
+                    "error":AppError::UnitArchived.to_string()})),
+            ).into_response(),
+            AppError::UnitArchiveOpenWork { count, cancellable } => (
+                StatusCode::CONFLICT,
+                axum::Json(serde_json::json!({"code":AppError::UNIT_ARCHIVE_OPEN_WORK,
+                    "error":AppError::UnitArchiveOpenWork { count, cancellable }.to_string(),
+                    "count":count,"cancellable":cancellable})),
             ).into_response(),
             AppError::ResourceOutsideUnit(refusal) => (
                 StatusCode::BAD_REQUEST,

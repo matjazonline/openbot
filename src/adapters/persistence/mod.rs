@@ -152,6 +152,20 @@ const LOCK_NOT_AVAILABLE: &str = "55P03";
 /// `query_canceled`: a statement reached `statement_timeout`, or was cancelled from outside.
 const QUERY_CANCELED: &str = "57014";
 
+/// Plan08 02B.5: the archived-unit backstop triggers name one of these constraints. Error
+/// mappers that rename a constraint class (such as `23514`) check this first.
+pub(crate) fn refused_for_archived_unit(error: &sqlx::Error) -> bool {
+    error
+        .as_database_error()
+        .and_then(|error| error.constraint())
+        .is_some_and(|constraint| {
+            matches!(
+                constraint,
+                "unit_archived" | "departments_archived_parent" | "unit_archived_subtree"
+            )
+        })
+}
+
 impl From<sqlx::Error> for AppError {
     fn from(value: sqlx::Error) -> Self {
         let gave_up_waiting = value
@@ -160,6 +174,9 @@ impl From<sqlx::Error> for AppError {
             .is_some_and(|code| matches!(code.as_ref(), LOCK_NOT_AVAILABLE | QUERY_CANCELED));
         if gave_up_waiting {
             return AppError::DatabaseTimeout(value.to_string());
+        }
+        if refused_for_archived_unit(&value) {
+            return AppError::UnitArchived;
         }
         let guard = value
             .as_database_error()

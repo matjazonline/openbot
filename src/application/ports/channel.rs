@@ -84,6 +84,7 @@ pub trait ChannelPersistence: Send + Sync {
     async fn list_departments(
         &self,
         company_id: Uuid,
+        archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<crate::entities::department::Department>>;
 
     /// Save one channel edit under the channel's gate; any failure leaves it unchanged.

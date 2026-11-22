@@ -89,6 +89,7 @@ async fn usage(f: &AdmissionFixture, scope: ActivationRequest, category: Option<
 fn query(f: &AdmissionFixture) -> UsageQuery {
     let end = Utc::now();
     UsageQuery {
+        archived: crate::entities::department::ArchivedUnits::Include,
         scope: UsageScope {
             company: f.binding.target.company.as_uuid(),
             actor: f.binding.target.actor.user_id(),

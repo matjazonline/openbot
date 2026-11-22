@@ -544,3 +544,89 @@ async fn write_agent_permissions_fixture(
     )
     .unwrap();
 }
+
+/// Plan08 02B.2: a session on a conversation of an archived unit's desk is new work there and is
+/// refused with `unit.archived`; after the restore it starts.
+#[tokio::test]
+async fn unit_archive_runs_local_session_refuses_on_an_archived_units_conversation() {
+    let s = Setup::new().await;
+    let p = s.f.persistence.as_ref();
+    let unit = p.test_unit(s.f.company, "local-unit").await;
+    sqlx::query(
+        "UPDATE channels SET department_id=$3 WHERE company_id=$1 \
+         AND id=(SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2)",
+    )
+    .bind(s.f.company)
+    .bind(s.conversation)
+    .bind(unit)
+    .execute(&s.f.database.pool)
+    .await
+    .unwrap();
+    // A session started while the unit was active: archiving does not wait for it (no run).
+    let earlier = s.start().await;
+    s.map_thread(earlier).await;
+    let departments = crate::adapters::persistence::test_support::department_use_cases(p);
+    let unit = crate::entities::department::DepartmentId::new(unit);
+    departments
+        .archive_department(
+            s.f.owner,
+            s.f.company,
+            unit,
+            crate::application::ports::department::OpenWork::Refuse,
+        )
+        .await
+        .unwrap();
+    let refused = p.start_session(&s.request()).await.err();
+    assert!(
+        matches!(refused, Some(AppError::UnitArchived)),
+        "{refused:?}"
+    );
+    let sessions: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM local_agent_sessions WHERE company_id=$1")
+            .bind(s.f.company)
+            .fetch_one(&s.f.database.pool)
+            .await
+            .unwrap();
+    assert_eq!(sessions, 1, "only the earlier session");
+    let send = || {
+        s.control(
+            earlier,
+            SessionCommand::Send {
+                prompt: LocalPrompt::try_from("more work".to_owned()).unwrap(),
+            },
+        )
+    };
+    let operations = || async {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM local_agent_operations WHERE company_id=$1",
+        )
+        .bind(s.f.company)
+        .fetch_one(&s.f.database.pool)
+        .await
+        .unwrap()
+    };
+    let before = operations().await;
+    let refused = p.control_session(&send()).await.err();
+    assert!(
+        matches!(refused, Some(AppError::UnitArchived)),
+        "a prompt to an earlier session is new work: {refused:?}"
+    );
+    assert_eq!(
+        operations().await,
+        before,
+        "the refused prompt records nothing"
+    );
+    for command in [SessionCommand::Inspect, SessionCommand::Stop] {
+        p.control_session(&s.control(earlier, command))
+            .await
+            .expect("inspect and stop stay available on an archived unit");
+    }
+    departments
+        .restore_department(s.f.owner, s.f.company, unit)
+        .await
+        .unwrap();
+    p.control_session(&send())
+        .await
+        .expect("after the restore the session takes prompts again");
+    s.start().await;
+}

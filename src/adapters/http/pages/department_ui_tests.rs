@@ -17,6 +17,7 @@ fn department(company_id: Uuid, name: &str, slug: &str, parent: Option<&Departme
     Department {
         is_root: false,
         escalation: None,
+        archived: None,
         id: DepartmentId::new(Uuid::new_v4()),
         company_id,
         name: name.into(),
@@ -751,6 +752,7 @@ fn department_views_usage_page_groups_by_department() {
     let company = Uuid::new_v4();
     let end = Utc::now();
     let query = UsageQuery {
+        archived: crate::entities::department::ArchivedUnits::Include,
         scope: UsageScope {
             company,
             actor: Uuid::new_v4(),
@@ -1161,3 +1163,6 @@ fn department_sponsor_ui_lists_decider_controls_and_named_inherited_escalation()
     assert!(!readonly.contains("Mark decides"));
     assert!(!readonly.contains("Remove sponsor"));
 }
+
+#[path = "department_archive_ui_tests.rs"]
+mod archive;

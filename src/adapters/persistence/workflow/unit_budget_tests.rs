@@ -608,6 +608,7 @@ fn usage_query(
 ) -> UsageQuery {
     let end = chrono::Utc::now() + chrono::Duration::minutes(1);
     UsageQuery {
+        archived: crate::entities::department::ArchivedUnits::Include,
         scope: UsageScope {
             company: b.company,
             actor,
@@ -786,4 +787,81 @@ async fn unit_budget_usage_page_scopes_numbers_drill_down_and_prices() {
         })
         .await;
     assert!(matches!(stranger, Err(AppError::NotFound(_))));
+}
+
+/// Plan08 02C.3: an archived department keeps its caps and its spend; the usage page lists them
+/// only when asked, marked archived, and the dashboard's panel leaves them out.
+#[tokio::test]
+async fn unit_archive_scopes_usage_shows_archived_caps_only_when_asked() {
+    use crate::entities::department::ArchivedUnits;
+    use crate::services::model_usage::ModelUsageStore;
+    let b = Budgets::new().await;
+    b.cap(b.billing, "month", 1_000).await;
+    b.cap(b.support, "day", 500).await;
+    // A Billing run's call attributed to Support, so Support has spend and no open run.
+    let billing_run = b.admit(b.desk(b.billing).await).await.unwrap();
+    let call = b.call(&billing_run, "fixture", Some(b.support), None).await;
+    b.settle(call, 7, 0).await;
+    crate::adapters::persistence::test_support::department_use_cases(b.p())
+        .archive_department(
+            b.owner,
+            b.company,
+            crate::entities::department::DepartmentId::new(b.support),
+            crate::application::ports::department::OpenWork::Refuse,
+        )
+        .await
+        .unwrap();
+    let b = &b;
+    let rows = |archived: ArchivedUnits| {
+        let query = UsageQuery {
+            archived,
+            ..usage_query(b, b.owner, UsageGrouping::Department, None)
+        };
+        async move {
+            let report = ModelUsageStore::usage_report(b.p(), query).await.unwrap();
+            let caps = report
+                .budgets
+                .into_iter()
+                .map(|row| (row.unit, row.archived))
+                .collect::<Vec<_>>();
+            let groups = report
+                .groups
+                .into_iter()
+                .map(|group| group.department.unwrap().name)
+                .collect::<Vec<_>>();
+            (caps, groups)
+        }
+    };
+    let (hidden, groups) = rows(ArchivedUnits::Exclude).await;
+    assert!(hidden.contains(&(b.billing, false)));
+    assert!(
+        hidden.iter().all(|(unit, _)| *unit != b.support),
+        "{hidden:?}"
+    );
+    assert!(
+        groups.is_empty(),
+        "the archived unit's calls stay out: {groups:?}"
+    );
+    let (shown, groups) = rows(ArchivedUnits::Include).await;
+    assert!(shown.contains(&(b.support, true)), "{shown:?}");
+    assert_eq!(groups, ["support (archived)"]);
+    let cap: i64 = sqlx::query_scalar(
+        "SELECT cap_micros FROM unit_budgets WHERE company_id=$1 AND unit_id=$2 AND period='day'",
+    )
+    .bind(b.company)
+    .bind(b.support)
+    .fetch_one(b.p().pool())
+    .await
+    .unwrap();
+    assert_eq!(cap, 500, "the archived unit's cap is kept");
+    let (panel, _) = ModelUsageStore::unit_spend(
+        b.p(),
+        UsageScope {
+            company: b.company,
+            actor: b.owner,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(panel.iter().all(|row| row.unit != b.support));
 }

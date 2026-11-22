@@ -247,7 +247,7 @@ pub fn grouped_by_department<'c>(
     let mut groups: Vec<(Option<String>, Vec<&'c Channel>)> =
         crate::entities::department::department_tree(departments)
             .into_iter()
-            .map(|(_, department)| (Some(department.name.clone()), owned(department.id)))
+            .map(|(_, department)| (Some(department.label()), owned(department.id)))
             .filter(|(_, desks)| !desks.is_empty())
             .collect();
     // A permitted desk may have an owner absent from this separately read department list.
@@ -475,7 +475,9 @@ pub(super) struct ChannelFields<'a> {
     pub(super) departments: &'a [Department],
 }
 
-/// Required owner, root by default. The same one-step audience applies to every desk.
+/// Required owner, root by default. The same one-step audience applies to every desk. An
+/// archived department is offered only as the desk's current owner, so the desk can be moved out
+/// of it and nothing is moved in (Plan08 02E.2).
 fn department_fields(departments: &[Department], draft: &ChannelDraft<'_>) -> String {
     let selected = draft.department_id.or_else(|| {
         departments
@@ -483,7 +485,12 @@ fn department_fields(departments: &[Department], draft: &ChannelDraft<'_>) -> St
             .find(|department| department.is_root)
             .map(|department| department.id.as_uuid())
     });
-    let options: String = crate::entities::department::department_tree(departments)
+    let offered: Vec<Department> = departments
+        .iter()
+        .filter(|department| !department.is_archived() || selected == Some(department.id.as_uuid()))
+        .cloned()
+        .collect();
+    let options: String = crate::entities::department::department_tree(&offered)
         .into_iter()
         .map(|(depth, department)| {
             let id = department.id.as_uuid();
@@ -495,7 +502,7 @@ fn department_fields(departments: &[Department], draft: &ChannelDraft<'_>) -> St
                     ""
                 },
                 indent = "&nbsp;&nbsp;".repeat(depth),
-                name = escape_html_text(&department.name)
+                name = escape_html_text(&department.label())
             )
         })
         .collect();

@@ -881,7 +881,7 @@ $$;
 CREATE FUNCTION public.valid_acting_role(role text) RETURNS boolean
     LANGUAGE sql IMMUTABLE STRICT
     RETURN role IN ('owner', 'admin')
-        OR role ~ '^lead:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+        OR role ~ '^(lead|sponsor):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 
 CREATE FUNCTION public.valid_creation_provenance(provenance jsonb) RETURNS boolean
     LANGUAGE sql IMMUTABLE
@@ -15717,6 +15717,10 @@ CREATE TABLE public.departments (
     charter text,
     created_by jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    -- Plan08 02A: an archived unit admits no work and accepts no configuration. Archiving a unit
+    -- archives its subtree; a unit archived earlier keeps its own timestamp.
+    archived_at timestamp with time zone,
+    archived_by jsonb,
     CONSTRAINT departments_pkey PRIMARY KEY (id),
     CONSTRAINT departments_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT departments_company_slug_key UNIQUE (company_id, slug),
@@ -15731,7 +15735,10 @@ CREATE TABLE public.departments (
     -- A department slug is a legal channel slug, so it can be the department desk's address.
     CONSTRAINT departments_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
     CONSTRAINT departments_charter_size CHECK ((charter IS NULL) OR (octet_length(charter) <= 4096)),
-    CONSTRAINT departments_created_by_shape_check CHECK (public.valid_creation_provenance(created_by))
+    CONSTRAINT departments_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
+    CONSTRAINT departments_archive_shape CHECK (((archived_at IS NULL) = (archived_by IS NULL))
+        AND (archived_by IS NULL OR public.valid_creation_provenance(archived_by))),
+    CONSTRAINT departments_root_archive CHECK (NOT (is_root AND archived_at IS NOT NULL))
 );
 CREATE UNIQUE INDEX departments_one_root ON public.departments(company_id) WHERE is_root;
 CREATE INDEX departments_parent_idx ON public.departments USING btree (company_id, parent_id)
@@ -15785,15 +15792,19 @@ CREATE UNIQUE INDEX department_roles_one_sponsor_decider ON public.department_ro
 -- Management is a person authority over configuration, never a conversation grant.
 -- NULL selects the company's root; a missing/foreign explicit unit never falls back.
 -- Root counts as level one, matching department_shape_problem's eight-level bound.
+-- The nearest lead, or deciding sponsor (Plan08 proposal 2), of the unit or an ancestor manages
+-- it; `membership_of` yields the person principal, so an agent holder never matches. Roles held
+-- on an archived unit manage nothing (02D.2): an archived unit is managed from above.
 CREATE FUNCTION public.unit_management_role(checked_user uuid, checked_company uuid, checked_unit uuid)
 RETURNS text LANGUAGE sql STABLE AS $$
-    WITH RECURSIVE ancestors(id, parent_id, depth) AS (
-        SELECT department.id, department.parent_id, 1
+    WITH RECURSIVE ancestors(id, parent_id, archived, depth) AS (
+        SELECT department.id, department.parent_id, department.archived_at IS NOT NULL, 1
         FROM public.departments AS department
         WHERE department.company_id = checked_company
           AND (department.id = checked_unit OR (checked_unit IS NULL AND department.is_root))
         UNION ALL
-        SELECT department.id, department.parent_id, ancestor.depth + 1
+        SELECT department.id, department.parent_id, department.archived_at IS NOT NULL,
+            ancestor.depth + 1
         FROM ancestors AS ancestor
         JOIN public.departments AS department
           ON department.company_id = checked_company AND department.id = ancestor.parent_id
@@ -15804,12 +15815,14 @@ RETURNS text LANGUAGE sql STABLE AS $$
         WHEN actor.role = 'owner' THEN 'owner'
         WHEN actor.role = 'admin' THEN 'admin'
         ELSE (
-            SELECT 'lead:' || ancestor.id::text
+            SELECT holder.role || ':' || ancestor.id::text
             FROM ancestors AS ancestor
             JOIN public.department_roles AS holder
               ON holder.company_id = checked_company AND holder.department_id = ancestor.id
-             AND holder.principal_id = actor.principal_id AND holder.role = 'lead'
-            ORDER BY ancestor.depth LIMIT 1
+             AND holder.principal_id = actor.principal_id
+             AND (holder.role = 'lead' OR (holder.role = 'sponsor' AND holder.decider))
+            WHERE NOT ancestor.archived
+            ORDER BY ancestor.depth, holder.role = 'sponsor' LIMIT 1
         )
     END
     FROM public.membership_of(checked_user, checked_company) AS actor
@@ -15825,7 +15838,8 @@ RETURNS text LANGUAGE sql STABLE AS $$
         SELECT holder.department_id FROM public.department_roles AS holder
         JOIN public.principals AS principal
           ON principal.company_id = holder.company_id AND principal.id = holder.principal_id
-        WHERE holder.company_id = checked_company AND holder.role = 'lead'
+        WHERE holder.company_id = checked_company
+          AND (holder.role = 'lead' OR (holder.role = 'sponsor' AND holder.decider))
           AND principal.user_id = checked_user
     ), roles AS MATERIALIZED (
         SELECT public.unit_management_role(checked_user, checked_company, candidate.id) AS role
@@ -16050,7 +16064,10 @@ CREATE FUNCTION public.resource_default_unit(checked_user uuid, checked_company 
         SELECT DISTINCT holder.department_id FROM public.principals AS principal
         JOIN public.department_roles AS holder
             ON holder.company_id=principal.company_id AND holder.principal_id=principal.id
-           AND holder.role='lead'
+           AND (holder.role='lead' OR (holder.role='sponsor' AND holder.decider))
+        JOIN public.departments AS unit
+            ON unit.company_id=holder.company_id AND unit.id=holder.department_id
+           AND unit.archived_at IS NULL
         WHERE principal.company_id=checked_company AND principal.user_id=checked_user
             AND principal.kind='person'
         LIMIT 2
@@ -16108,6 +16125,14 @@ BEGIN
             USING ERRCODE='23514', CONSTRAINT='departments_root_shape';
     END IF;
     IF NEW.parent_id IS NULL THEN RETURN NEW; END IF;
+    -- Plan08 02A.2: an active unit never sits under an archived one (insert, re-parent, restore).
+    IF NEW.archived_at IS NULL AND COALESCE((SELECT parent.archived_at IS NOT NULL
+        FROM public.departments AS parent
+        WHERE parent.company_id = NEW.company_id AND parent.id = NEW.parent_id FOR KEY SHARE),
+        false) THEN
+        RAISE EXCEPTION 'department % cannot be active under archived %', NEW.id, NEW.parent_id
+            USING ERRCODE='23514', CONSTRAINT='departments_archived_parent';
+    END IF;
     problem := public.department_shape_problem(NEW.company_id, NEW.id, NEW.parent_id);
     IF problem IS NOT NULL THEN
         RAISE EXCEPTION 'department % cannot sit under %: %', NEW.id, NEW.parent_id, problem
@@ -16115,8 +16140,102 @@ BEGIN
     END IF;
     RETURN NEW;
 END $$;
-CREATE TRIGGER guard_department_shape BEFORE INSERT OR UPDATE OF company_id, parent_id, is_root ON public.departments
+CREATE TRIGGER guard_department_shape BEFORE INSERT OR UPDATE OF company_id, parent_id, is_root, archived_at ON public.departments
     FOR EACH ROW EXECUTE FUNCTION public.guard_department_shape();
+
+-- The other direction of 02A.2, checked at commit so one statement may archive a whole subtree in
+-- any row order: an archived unit has no active child.
+CREATE FUNCTION public.guard_department_archived_subtree() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.archived_at IS NOT NULL AND EXISTS (SELECT 1 FROM public.departments AS child
+        WHERE child.company_id = NEW.company_id AND child.parent_id = NEW.id
+          AND child.archived_at IS NULL) THEN
+        RAISE EXCEPTION 'archived department % has an active child', NEW.id
+            USING ERRCODE='23514', CONSTRAINT='unit_archived_subtree';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER departments_archived_subtree
+    AFTER INSERT OR UPDATE OF archived_at, parent_id ON public.departments
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+    EXECUTE FUNCTION public.guard_department_archived_subtree();
+
+-- 02B.5: the database refuses rows that point at an archived unit, whatever the application skips.
+-- Deletes pass, so principal retirement still removes its rows. The FOR KEY SHARE read conflicts
+-- with the archive's FOR UPDATE of the subtree rows.
+CREATE FUNCTION public.department_is_archived(checked_company uuid, checked_department uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT COALESCE((SELECT archived_at IS NOT NULL FROM public.departments
+        WHERE company_id = checked_company AND id = checked_department), false)
+$$;
+-- Each guard locks the unit row whatever its state and then tests the current value: a lock
+-- taken only on rows already archived would not wait for an archive in progress.
+CREATE FUNCTION public.guard_active_unit_target() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE archived boolean;
+BEGIN
+    IF NEW.department_id IS NULL THEN RETURN NEW; END IF;
+    SELECT unit.archived_at IS NOT NULL INTO archived FROM public.departments AS unit
+        WHERE unit.company_id = NEW.company_id AND unit.id = NEW.department_id FOR KEY SHARE;
+    IF archived THEN
+        RAISE EXCEPTION 'unit % is archived', NEW.department_id
+            USING ERRCODE='23514', CONSTRAINT='unit_archived';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER department_members_active_unit BEFORE INSERT OR UPDATE ON public.department_members
+    FOR EACH ROW EXECUTE FUNCTION public.guard_active_unit_target();
+CREATE TRIGGER department_roles_active_unit BEFORE INSERT OR UPDATE ON public.department_roles
+    FOR EACH ROW EXECUTE FUNCTION public.guard_active_unit_target();
+CREATE TRIGGER channels_active_unit BEFORE INSERT OR UPDATE OF department_id ON public.channels
+    FOR EACH ROW EXECUTE FUNCTION public.guard_active_unit_target();
+
+-- 02C backstop: knowledge, resources and caps never land in an archived unit. Moving one out and
+-- deleting stay allowed, so an archived unit can be emptied and then deleted.
+CREATE FUNCTION public.guard_active_resource_unit() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE archived boolean;
+BEGIN
+    IF NEW.unit_id IS NULL THEN RETURN NEW; END IF;
+    SELECT unit.archived_at IS NOT NULL INTO archived FROM public.departments AS unit
+        WHERE unit.company_id = NEW.company_id AND unit.id = NEW.unit_id FOR KEY SHARE;
+    IF archived THEN
+        RAISE EXCEPTION 'unit % is archived', NEW.unit_id
+            USING ERRCODE='23514', CONSTRAINT='unit_archived';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER knowledge_documents_active_unit BEFORE INSERT OR UPDATE OF unit_id
+    ON public.knowledge_documents FOR EACH ROW EXECUTE FUNCTION public.guard_active_resource_unit();
+CREATE TRIGGER skills_active_unit BEFORE INSERT OR UPDATE OF unit_id
+    ON public.skills FOR EACH ROW EXECUTE FUNCTION public.guard_active_resource_unit();
+CREATE TRIGGER company_mcp_connections_active_unit BEFORE INSERT OR UPDATE OF unit_id
+    ON public.company_mcp_connections FOR EACH ROW EXECUTE FUNCTION public.guard_active_resource_unit();
+CREATE TRIGGER workflow_http_connections_active_unit BEFORE INSERT OR UPDATE OF unit_id
+    ON public.workflow_http_connections FOR EACH ROW EXECUTE FUNCTION public.guard_active_resource_unit();
+CREATE TRIGGER company_model_connections_active_unit BEFORE INSERT OR UPDATE OF unit_id
+    ON public.company_model_connections FOR EACH ROW EXECUTE FUNCTION public.guard_active_resource_unit();
+CREATE TRIGGER unit_budgets_active_unit BEFORE INSERT OR UPDATE
+    ON public.unit_budgets FOR EACH ROW EXECUTE FUNCTION public.guard_active_resource_unit();
+
+-- 02B.2 backstop: no run is admitted, or reopened by a retry, on a desk of an archived unit.
+CREATE FUNCTION public.guard_run_unit_active() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE archived boolean;
+BEGIN
+    IF NEW.channel_id IS NULL OR NEW.state NOT IN ('queued','running','waiting')
+        OR (TG_OP = 'UPDATE' AND OLD.state NOT IN ('succeeded','failed','cancelled')) THEN
+        RETURN NEW;
+    END IF;
+    SELECT unit.archived_at IS NOT NULL INTO archived FROM public.channels AS desk
+        JOIN public.departments AS unit
+          ON unit.company_id = desk.company_id AND unit.id = desk.department_id
+        WHERE desk.company_id = NEW.company_id AND desk.id = NEW.channel_id FOR KEY SHARE OF unit;
+    IF archived THEN
+        RAISE EXCEPTION 'run % is on a desk of an archived unit', NEW.id
+            USING ERRCODE='23514', CONSTRAINT='unit_archived';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_runs_active_unit BEFORE INSERT OR UPDATE OF state ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_run_unit_active();
 
 -- Departments hold people and agents. External and system principals have no place in one.
 CREATE FUNCTION public.guard_department_principal_kind() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -16805,12 +16924,15 @@ RETURNS SETOF uuid LANGUAGE sql STABLE AS $$
         SELECT channel.department_id FROM public.channels AS channel
             WHERE channel.company_id=tenant AND channel.id=desk AND target IS NULL AND channel.department_id IS NOT NULL
         UNION
+        -- Plan08 02C.4: a placement in an archived unit places nothing.
         SELECT member.department_id FROM public.department_members AS member
             JOIN public.principals AS principal ON principal.company_id=member.company_id AND principal.id=member.principal_id AND principal.kind='agent'
+            JOIN public.departments AS unit ON unit.company_id=member.company_id AND unit.id=member.department_id AND unit.archived_at IS NULL
             WHERE member.company_id=tenant AND member.principal_id=target AND desk IS NULL
         UNION
         SELECT role.department_id FROM public.department_roles AS role
             JOIN public.principals AS principal ON principal.company_id=role.company_id AND principal.id=role.principal_id AND principal.kind='agent'
+            JOIN public.departments AS unit ON unit.company_id=role.company_id AND unit.id=role.department_id AND unit.archived_at IS NULL
             WHERE role.company_id=tenant AND role.principal_id=target AND desk IS NULL
     ) AS placement ORDER BY placement.department_id LIMIT 2
 $$;
@@ -17507,6 +17629,7 @@ CREATE TABLE public.department_administration_events (
     role text CHECK (role IN ('lead','reviewer','sponsor','owner','admin')),
     transition_kind text NOT NULL CHECK (transition_kind IN ('demoted','deleted',
         'department_created','department_updated','department_moved','department_deleted',
+        'department_archived','department_restored',
         'member_added','member_removed','role_assigned','role_cleared')),
     actor_kind text NOT NULL DEFAULT 'system' CHECK (actor_kind IN ('system','person')),
     -- A person's write: who, as they were labelled then, and the role that admitted it.
@@ -17522,7 +17645,7 @@ CREATE TABLE public.department_administration_events (
             AND principal_label IS NOT NULL AND role IS NOT NULL
             AND actor_principal_id IS NULL AND actor_label IS NULL AND acting_role IS NULL
         WHEN transition_kind IN ('department_created','department_updated','department_moved',
-                'department_deleted') THEN
+                'department_deleted','department_archived','department_restored') THEN
             principal_id IS NULL AND principal_kind IS NULL AND principal_label IS NULL
             AND role IS NULL
         WHEN transition_kind IN ('member_added','member_removed') THEN
@@ -19136,7 +19259,9 @@ CREATE INDEX message_internal_relays_delivery ON public.message_internal_relays(
 -- The relay actor is either its real live agent or an unprivileged system source.
 CREATE FUNCTION public.relay_desk_can_participate(tenant uuid, target uuid, writer uuid)
 RETURNS boolean LANGUAGE sql STABLE AS $$
-    SELECT COALESCE((SELECT desk.enabled AND CASE desk.access_mode
+    -- An archived unit's desk is no relay target, as a disabled desk is not (Plan08 02B.3).
+    SELECT COALESCE((SELECT desk.enabled AND NOT public.department_is_archived(tenant, desk.department_id)
+        AND CASE desk.access_mode
         WHEN 'public' THEN true
         WHEN 'members' THEN actor.kind='agent' AND EXISTS(
             SELECT 1 FROM public.channel_principal_grants AS permission
@@ -19185,7 +19310,8 @@ RETURNS TABLE(sender_principal_id uuid) LANGUAGE sql STABLE AS $$
                     OR (author.kind='agent' AND address.principal_id=author.id)))
         AND split_part(split_part(claim_from,'@',2),'.',1)=company.slug::text
         AND (source_channel IS NULL OR EXISTS(SELECT 1 FROM public.channels AS desk
-            WHERE desk.company_id=tenant AND desk.id=source_channel AND desk.enabled))
+            WHERE desk.company_id=tenant AND desk.id=source_channel AND desk.enabled
+                AND NOT public.department_is_archived(tenant, desk.department_id)))
         AND (source_principal IS NULL OR EXISTS(SELECT 1 FROM public.principals AS principal
             WHERE principal.company_id=tenant AND principal.id=source_principal AND principal.kind='agent'
                 AND EXISTS(SELECT 1 FROM public.addresses AS address
@@ -20491,6 +20617,7 @@ CREATE FUNCTION public.workflow_creating_department(checked_user uuid, checked_c
             ON department.company_id=placed.company_id AND department.id=placed.department_id
         WHERE principal.company_id=checked_company AND principal.user_id=checked_user
             AND principal.kind='person' AND NOT department.is_root
+            AND department.archived_at IS NULL
         GROUP BY placed.department_id LIMIT 2
     )
     SELECT CASE WHEN (SELECT count(*) FROM placements)=1
@@ -20507,10 +20634,16 @@ CREATE FUNCTION public.agent_management_role(
         SELECT id FROM public.principals
         WHERE company_id=checked_company AND agent_id=checked_agent AND kind='agent'
     ), placements AS (
-        SELECT member.department_id FROM public.department_members AS member
-        JOIN target ON target.id=member.principal_id WHERE member.company_id=checked_company
-        UNION SELECT holder.department_id FROM public.department_roles AS holder
-        JOIN target ON target.id=holder.principal_id WHERE holder.company_id=checked_company
+        -- 02D.4: placements in archived units do not count, so an agent whose every department
+        -- is archived is managed by root managers, as an agent in no department is.
+        SELECT placed.department_id FROM (
+            SELECT member.department_id FROM public.department_members AS member
+            JOIN target ON target.id=member.principal_id WHERE member.company_id=checked_company
+            UNION SELECT holder.department_id FROM public.department_roles AS holder
+            JOIN target ON target.id=holder.principal_id WHERE holder.company_id=checked_company
+        ) AS placed JOIN public.departments AS unit
+            ON unit.company_id=checked_company AND unit.id=placed.department_id
+        WHERE unit.archived_at IS NULL
     ), units AS (
         SELECT department_id FROM placements
         UNION ALL SELECT NULL::uuid WHERE EXISTS(SELECT 1 FROM target)

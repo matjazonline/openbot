@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, put},
+    routing::{get, post, put},
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
@@ -35,6 +35,14 @@ pub fn router() -> Router<AppState> {
             get(get_department_json)
                 .patch(update_department_json)
                 .delete(delete_department_json),
+        )
+        .route(
+            "/api/companies/{company_id}/departments/{department_id}/archive",
+            post(archive_department_json),
+        )
+        .route(
+            "/api/companies/{company_id}/departments/{department_id}/restore",
+            post(restore_department_json),
         )
         .route(
             "/api/companies/{company_id}/departments/{department_id}/members/{principal_id}",
@@ -98,12 +106,28 @@ fn role_from_path(role: &str) -> AppResult<DepartmentRole> {
     )
 }
 
+/// `?include_archived=true` lists archived departments too (Plan08 02A.5).
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ListQuery {
+    #[serde(default)]
+    include_archived: bool,
+}
+
 async fn list_departments_json(
     State(departments): State<Arc<DepartmentUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
+    Query(query): Query<ListQuery>,
 ) -> AppResult<impl IntoResponse> {
-    let list = departments.visible_departments(user.id, company_id).await?;
+    use crate::entities::department::ArchivedUnits;
+    let archived = match query.include_archived {
+        true => ArchivedUnits::Include,
+        false => ArchivedUnits::Exclude,
+    };
+    let list = departments
+        .visible_departments(user.id, company_id, archived)
+        .await?;
     Ok((StatusCode::OK, Json(list)))
 }
 
@@ -196,6 +220,56 @@ async fn delete_department_json(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// `cancel_open_runs` asks to cancel the subtree's unfinished runs and archive in one write;
+/// without it, open work refuses with `unit.archive_open_work` and its count.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArchivePayload {
+    #[serde(default)]
+    cancel_open_runs: bool,
+}
+
+async fn archive_department_json(
+    State(departments): State<Arc<DepartmentUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    payload: Option<Json<ArchivePayload>>,
+) -> AppResult<impl IntoResponse> {
+    use crate::application::ports::department::OpenWork;
+    let open = if payload.unwrap_or_default().cancel_open_runs {
+        OpenWork::Cancel
+    } else {
+        OpenWork::Refuse
+    };
+    let department = departments
+        .archive_department(user.id, company_id, DepartmentId::new(department_id), open)
+        .await?;
+    Ok((
+        StatusCode::OK,
+        Json(DepartmentResponse {
+            success: true,
+            department,
+        }),
+    ))
+}
+
+async fn restore_department_json(
+    State(departments): State<Arc<DepartmentUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<impl IntoResponse> {
+    let department = departments
+        .restore_department(user.id, company_id, DepartmentId::new(department_id))
+        .await?;
+    Ok((
+        StatusCode::OK,
+        Json(DepartmentResponse {
+            success: true,
+            department,
+        }),
+    ))
+}
+
 async fn add_member_json(
     State(departments): State<Arc<DepartmentUseCases>>,
     user: AuthenticatedUser,
@@ -280,6 +354,21 @@ async fn clear_role_json(
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// The archive and restore routes alone, over just the use case, for tests that drive them with a
+/// verified session and a database fixture of their own.
+#[cfg(test)]
+pub(crate) fn lifecycle_router() -> Router<Arc<DepartmentUseCases>> {
+    Router::new()
+        .route(
+            "/api/companies/{company_id}/departments/{department_id}/archive",
+            post(archive_department_json),
+        )
+        .route(
+            "/api/companies/{company_id}/departments/{department_id}/restore",
+            post(restore_department_json),
+        )
 }
 
 #[cfg(test)]

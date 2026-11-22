@@ -1,6 +1,8 @@
 //! p08 D1.9 against PostgreSQL: schedules on bindings. Who may manage a schedule, which binding
 //! may drive it, how a captured occurrence becomes exactly one run under competing materializers
 //! and failures, and what the schema refuses outright.
+#[path = "schedule_archive_tests.rs"]
+mod archive;
 #[path = "schedule_configuration_authority_tests.rs"]
 mod configuration_authority;
 

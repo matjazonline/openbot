@@ -15,17 +15,25 @@ pub(super) async fn move_on(
         &permissions,
     )
     .await?;
-    for unit in [anchor.unit_id, command.target] {
-        permissions
-            .require_write(
-                tx,
-                KnowledgeUploadTarget {
-                    scope: command.scope,
-                    unit,
-                },
-            )
-            .await?;
-    }
+    // Moving out of an archived unit is allowed; moving into one is not (Plan08 02C.1).
+    permissions
+        .require_write(
+            tx,
+            KnowledgeUploadTarget {
+                scope: command.scope,
+                unit: anchor.unit_id,
+            },
+        )
+        .await?;
+    permissions
+        .require_write_into(
+            tx,
+            KnowledgeUploadTarget {
+                scope: command.scope,
+                unit: command.target,
+            },
+        )
+        .await?;
     if anchor.revision != command.expected_revision {
         return Err(AppError::Conflict(
             "The file changed; refresh before moving it".into(),

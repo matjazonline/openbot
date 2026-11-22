@@ -1,0 +1,45 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 59.56s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 32 tests
+test adapters::persistence::department::tests::archive_tests::unit_archive_root_is_refused ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_refuses_responder_configuration ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_refuses_relay_to_an_archived_units_desk ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_authority_agent_in_only_archived_units_is_managed_by_root ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_refuses_trigger_writes_and_allows_deletes ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_refuses_configuration_of_an_archived_unit ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_allows_desk_delete_desk_move_out_and_unit_delete ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_guard_refuses_active_units_under_an_archived_parent ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_authority_sponsor_decider_manages_unit_and_descendants ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_authority_parent_manager_archives_and_archived_roles_do_not_manage ... ok
+test adapters::persistence::integration::tests::unit_archive_refuses_transport_binding_link_and_reactivation ... ok
+test adapters::persistence::thread::inbound_tests::unit_archive_competing_archive_queued_behind_a_mail_commit_applies_after_it ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_round_trip_keeps_earlier_timestamps_and_restores_one_unit ... ok
+test adapters::persistence::thread::inbound_tests::unit_archive_competing_mail_commit_queued_behind_an_archive_is_refused ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_competing_overlapping_archives_agree ... ok
+test adapters::persistence::department::tests::archive_tests::unit_archive_competing_trigger_write_waits_for_the_archive ... ok
+test adapters::persistence::local_agents::management::tests::unit_archive_runs_local_session_refuses_on_an_archived_units_conversation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::unit_archive_runs_native_mcp_refuses_on_an_archived_units_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_cancel_by_the_parent_manager_ends_open_runs_and_records_who ... ok
+test application::use_cases::thread::tests::unit_archive_refuses_mail_to_an_archived_units_desk ... ok
+test application::workflow::message_admission::tests::message_admission_classifies_by_producing_condition ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_competing_admission_and_archive_agree ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_competing_cancel_and_a_running_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_http_routes_refuse_open_work_cancel_on_request_and_restore ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_cancel_refuses_past_its_bound_and_cancels_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_refuses_binding_configuration_and_allows_deactivate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_refuses_open_work_and_changes_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_runs_admission_refuses_on_an_archived_desk_and_resumes_after_restore ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::unit_archive_runs_retry_and_the_run_trigger_refuse_on_an_archived_desk ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::unit_archive_ingress::unit_archive_runs_message_to_an_archived_units_desk_admits_nothing ... ok
+test adapters::persistence::workflow::tests::schedule_tests::archive::unit_archive_runs_schedule_claimed_before_the_archive_is_dropped_not_failed ... ok
+test adapters::persistence::workflow::tests::schedule_tests::archive::unit_archive_runs_schedule_is_untouched_while_archived_and_fires_once_after_restore ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 5010 filtered out; finished in 10.44s
+

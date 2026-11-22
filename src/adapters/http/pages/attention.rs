@@ -32,15 +32,17 @@ fn department_param(department: Option<DepartmentId>) -> String {
 }
 
 /// A `<select name="department_id">` over the company's departments in tree order, with "All
-/// departments" first; empty when the company has none.
+/// departments" first; empty when the company has none. Archived departments are left out unless
+/// already selected (Plan08 02E.2).
 pub(crate) fn department_filter(
     departments: &DeskDepartments,
     selected: Option<DepartmentId>,
 ) -> String {
-    if departments.departments.is_empty() {
+    let choices = departments.choices(selected);
+    if choices.is_empty() {
         return String::new();
     }
-    let options: String = department_tree(&departments.departments)
+    let options: String = department_tree(&choices)
         .into_iter()
         .map(|(depth, department)| {
             format!(
@@ -52,7 +54,7 @@ pub(crate) fn department_filter(
                     ""
                 },
                 indent = "&nbsp;&nbsp;".repeat(depth),
-                name = escape_html_text(&department.name),
+                name = escape_html_text(&department.label()),
             )
         })
         .collect();
@@ -459,6 +461,7 @@ mod tests {
         let sales = Department {
             is_root: false,
             escalation: None,
+            archived: None,
             id: DepartmentId::new(Uuid::new_v4()),
             company_id: Uuid::nil(),
             name: "Sales <team>".into(),

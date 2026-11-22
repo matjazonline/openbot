@@ -49,6 +49,8 @@ pub enum RecallState {
 pub struct RecalledMemory {
     pub namespace: NamespaceExternalId,
     pub scope: String,
+    /// The unit is archived (Plan08 02C.1).
+    pub archived: bool,
     pub observation_id: Uuid,
     pub kind: String,
     pub title: String,
@@ -157,10 +159,13 @@ impl PreparedAgent {
             .items
             .iter()
             .map(|item| {
-                json!({"id": item.observation_id, "scope": item.scope,"namespace":item.namespace, "kind": item.kind,
-                    "title": item.title, "text": item.text,
-                    "occurred_at": item.occurred_at.to_rfc3339(),
-                    "access_level": item.access_level.as_i16(), "revision": item.revision})
+                crate::application::workflow::memory_tools::mark_archived(
+                    json!({"id": item.observation_id, "scope": item.scope,"namespace":item.namespace, "kind": item.kind,
+                        "title": item.title, "text": item.text,
+                        "occurred_at": item.occurred_at.to_rfc3339(),
+                        "access_level": item.access_level.as_i16(), "revision": item.revision}),
+                    item.archived,
+                )
             })
             .collect();
         untrusted_context_prompt(&json!({"recalled_memories": items})).map(Some)

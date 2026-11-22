@@ -44,7 +44,8 @@ async fn authorize_on(
     )
     .await?
     .ok_or_else(|| AppError::NotFound("Department not found".into()))?;
-    Ok(())
+    // Plan08 02C.3: an archived unit keeps its caps and usage; changing a cap is configuration.
+    super::department::require_active_unit_on(db, company, unit).await
 }
 
 /// Set (or replace) one period's cap of a unit, in micro-USD.

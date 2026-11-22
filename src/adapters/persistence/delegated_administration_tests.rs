@@ -514,7 +514,11 @@ async fn delegated_admin_lists_departments_visible_managed_and_picker_scopes() {
     let managed = std::collections::BTreeSet::from([d.unit.id, d.child.id, remote.id]);
 
     let visible = ids(&cases
-        .visible_departments(d.f.member, d.f.company)
+        .visible_departments(
+            d.f.member,
+            d.f.company,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap());
     assert!(managed.is_subset(&visible), "{visible:?}");
@@ -536,7 +540,11 @@ async fn delegated_admin_lists_departments_visible_managed_and_picker_scopes() {
 
     assert_eq!(
         ids(&cases
-            .list_departments(d.f.member, d.f.company)
+            .list_departments(
+                d.f.member,
+                d.f.company,
+                crate::entities::department::ArchivedUnits::Include
+            )
             .await
             .unwrap()),
         managed
@@ -552,13 +560,21 @@ async fn delegated_admin_lists_departments_visible_managed_and_picker_scopes() {
     );
     assert_eq!(
         ids(&cases
-            .list_departments(d.sibling_lead, d.f.company)
+            .list_departments(
+                d.sibling_lead,
+                d.f.company,
+                crate::entities::department::ArchivedUnits::Include
+            )
             .await
             .unwrap()),
         std::collections::BTreeSet::from([d.sibling.id])
     );
     let all = ids(&cases
-        .list_departments(d.f.owner, d.f.company)
+        .list_departments(
+            d.f.owner,
+            d.f.company,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await
         .unwrap());
     assert!(
@@ -570,7 +586,15 @@ async fn delegated_admin_lists_departments_visible_managed_and_picker_scopes() {
             .await
             .is_ok()
     );
-    hidden(cases.list_departments(plain, d.f.company).await);
+    hidden(
+        cases
+            .list_departments(
+                plain,
+                d.f.company,
+                crate::entities::department::ArchivedUnits::Include,
+            )
+            .await,
+    );
     hidden(cases.principal_choices(plain, d.f.company).await);
     assert!(
         cases
@@ -580,7 +604,15 @@ async fn delegated_admin_lists_departments_visible_managed_and_picker_scopes() {
             .is_empty()
     );
     assert!(
-        !ids(&cases.visible_departments(plain, d.f.company).await.unwrap()).contains(&d.unit.id)
+        !ids(&cases
+            .visible_departments(
+                plain,
+                d.f.company,
+                crate::entities::department::ArchivedUnits::Include
+            )
+            .await
+            .unwrap())
+        .contains(&d.unit.id)
     );
 }
 
@@ -669,13 +701,21 @@ async fn delegated_admin_lists_unit_entry_gate_and_hint_follow_the_predicate() {
         ids(&d
             .f
             .use_cases
-            .list_departments(root_lead, d.f.company)
+            .list_departments(
+                root_lead,
+                d.f.company,
+                crate::entities::department::ArchivedUnits::Include
+            )
             .await
             .unwrap()),
         ids(&d
             .f
             .use_cases
-            .list_departments(d.f.owner, d.f.company)
+            .list_departments(
+                d.f.owner,
+                d.f.company,
+                crate::entities::department::ArchivedUnits::Include
+            )
             .await
             .unwrap())
     );

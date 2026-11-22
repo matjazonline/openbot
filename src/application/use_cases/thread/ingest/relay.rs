@@ -189,7 +189,7 @@ impl ThreadUseCases {
                 .channel_persistence
                 .get_by_id(id)
                 .await?
-                .filter(|desk| desk.company_id == company.id && desk.enabled)
+                .filter(|desk| desk.company_id == company.id && desk.takes_traffic())
                 .ok_or_else(|| AppError::Forbidden("Internal target desk is unavailable".into()))?;
             let _ = target;
         }

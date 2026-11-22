@@ -562,7 +562,12 @@ impl CompanyUseCases {
     ) -> AppResult<Vec<CompanyModelConnection>> {
         let choices = self
             .persistence
-            .managed_unit_choices(user_id, crate::domain::workflow::CompanyId::new(company_id))
+            .managed_unit_choices(
+                user_id,
+                crate::domain::workflow::CompanyId::new(company_id),
+                // A unit's own form reads it archived or not; nothing is written there then.
+                crate::entities::department::ArchivedUnits::Include,
+            )
             .await?;
         let unit = choices
             .iter()
@@ -676,7 +681,12 @@ impl CompanyUseCases {
         // default); the company therefore always keeps a connection (G1 r2 D1).
         let root = self
             .persistence
-            .managed_unit_choices(user_id, crate::domain::workflow::CompanyId::new(company_id))
+            .managed_unit_choices(
+                user_id,
+                crate::domain::workflow::CompanyId::new(company_id),
+                // A unit's own form reads it archived or not; nothing is written there then.
+                crate::entities::department::ArchivedUnits::Include,
+            )
             .await?
             .iter()
             .any(|choice| choice.is_root && choice.id.as_uuid() == unit_id);

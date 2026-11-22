@@ -139,11 +139,13 @@ pub(crate) struct AgentDepartment {
     pub roles: Vec<DepartmentRole>,
 }
 
-/// Each agent's departments by slug, at most [`MAX_AGENT_DEPARTMENTS`], and whether it has more.
+/// Each agent's departments by slug, at most [`MAX_AGENT_DEPARTMENTS`], and whether it has more;
+/// archived ones only when asked.
 pub(crate) async fn agent_departments_on(
     db: &mut PgConnection,
     company: CompanyId,
     agents: &[Uuid],
+    archived: crate::entities::department::ArchivedUnits,
 ) -> AppResult<HashMap<Uuid, (Vec<AgentDepartment>, bool)>> {
     let rows: Vec<PlacedRow> = sqlx::query_as(
         "WITH placed AS ( \
@@ -164,10 +166,12 @@ pub(crate) async fn agent_departments_on(
                AND principal.agent_id = placed.agent_id ORDER BY role.role) \
          FROM placed JOIN departments AS department ON department.company_id = $1 \
            AND department.id = placed.department_id \
+           AND ($3 OR department.archived_at IS NULL) \
          ORDER BY placed.agent_id, department.slug",
     )
     .bind(company.as_uuid())
     .bind(agents)
+    .bind(archived.included())
     .fetch_all(&mut *db)
     .await?;
     let mut departments: HashMap<Uuid, (Vec<AgentDepartment>, bool)> = HashMap::new();
@@ -210,17 +214,20 @@ async fn departments_on(
     filter: &str,
     key: Uuid,
     limit: usize,
+    archived: crate::entities::department::ArchivedUnits,
 ) -> AppResult<Vec<(Uuid, RosterDepartment)>> {
     let rows: Vec<DepartmentRow> = sqlx::query_as(&format!(
         "SELECT department.id, department.name, department.slug::text AS slug, \
            desk.id AS desk_id, desk_slug.slug::text AS desk_slug \
          FROM departments AS department {DEPARTMENT_DESK} \
          WHERE department.company_id = $1 AND department.{filter} = $2 \
+           AND ($4 OR department.archived_at IS NULL) \
          ORDER BY department.slug LIMIT $3"
     ))
     .bind(addresses.company.as_uuid())
     .bind(key)
     .bind(limit as i64)
+    .bind(archived.included())
     .fetch_all(&mut *db)
     .await?;
     let mut departments = Vec::with_capacity(rows.len());
@@ -299,15 +306,31 @@ async fn roster_on(
     addresses: &mut CompanyAddresses<'_>,
     owner: &OwnerRow,
 ) -> AppResult<DepartmentRoster> {
-    let desk = departments_on(db, addresses, "id", owner.id, 1)
+    // The owner and its parent are named whatever their state; an archived child unit is no
+    // place to hand work to, so the roster leaves it out (Plan08 02A.5).
+    let desk = departments_on(
+        db,
+        addresses,
+        "id",
+        owner.id,
+        1,
+        crate::entities::department::ArchivedUnits::Include,
+    )
+    .await?
+    .pop()
+    .and_then(|(_, own)| own.desk);
+    let parent = match owner.parent_id {
+        Some(parent) => departments_on(
+            db,
+            addresses,
+            "id",
+            parent,
+            1,
+            crate::entities::department::ArchivedUnits::Include,
+        )
         .await?
         .pop()
-        .and_then(|(_, own)| own.desk);
-    let parent = match owner.parent_id {
-        Some(parent) => departments_on(db, addresses, "id", parent, 1)
-            .await?
-            .pop()
-            .map(|(_, parent)| parent),
+        .map(|(_, parent)| parent),
         None => None,
     };
     let mut children: Vec<RosterDepartment> = departments_on(
@@ -316,6 +339,7 @@ async fn roster_on(
         "parent_id",
         owner.id,
         MAX_ROSTER_CHILDREN + 1,
+        crate::entities::department::ArchivedUnits::Exclude,
     )
     .await?
     .into_iter()

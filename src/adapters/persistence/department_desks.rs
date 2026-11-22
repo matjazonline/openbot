@@ -59,14 +59,20 @@ pub(crate) async fn prelock_ownership_on(
         None => super::company::root_on(tx, company).await?,
     };
     let target = requested.unwrap_or(current);
-    sqlx::query_scalar::<_, Uuid>(
-        "SELECT id FROM departments WHERE company_id=$1 AND id=$2 FOR SHARE",
+    // Plan08 02B.4 and decision U4: a desk may be created in, moved into or edited in an active
+    // unit only. Moving a desk out of an archived unit names an active target, so it passes;
+    // every other write on an archived unit's desk keeps the archived unit as its target.
+    let archived = sqlx::query_scalar::<_, bool>(
+        "SELECT archived_at IS NOT NULL FROM departments WHERE company_id=$1 AND id=$2 FOR SHARE",
     )
     .bind(company.as_uuid())
     .bind(target.as_uuid())
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(department_not_found)?;
+    if archived {
+        return Err(AppError::UnitArchived);
+    }
     let eligible = eligible_on(
         tx,
         company,

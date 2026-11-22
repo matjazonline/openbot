@@ -67,6 +67,13 @@ pub(super) async fn save_binding_on(
     // All workflow lifecycle mutations serialize on company before their heads.
     let current = read_binding(tx, company, configuration.id()).await?;
     let change = validate_change(command, current.as_ref())?;
+    // Plan08 02B.4: deactivating stops work and stays allowed on an archived unit's desk;
+    // configuring or activating there is refused.
+    if !matches!(change, Change::Deactivate)
+        && let Some(AddressTarget::Desk(desk)) = state.association.target()
+    {
+        crate::adapters::persistence::department::require_active_desk_on(tx, company, desk).await?;
+    }
     if state.active {
         super::role_binding::check_on(tx, configuration, state.association).await?;
     }

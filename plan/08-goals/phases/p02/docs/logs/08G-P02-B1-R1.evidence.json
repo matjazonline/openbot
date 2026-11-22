@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "round": "08G-P02-B1-R1",
+  "artifact": "98cbdbc7f5ecd0ba310fbed0770954e7fe66a04f4ed48594942a92b8403ae887",
+  "checks": [
+    {
+      "criteria": [
+        "02A.1",
+        "02A.2",
+        "02A.3",
+        "02A.4",
+        "02B.1",
+        "02B.2",
+        "02B.3",
+        "02B.4",
+        "02B.5",
+        "02D.1",
+        "02D.2",
+        "02D.3",
+        "02D.4",
+        "competing"
+      ],
+      "command": "cargo test --lib -- unit_archive message_admission_classifies",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost, recreated after the last migration edit), SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-focused.txt",
+          "sha256": "1179953e9227fdb5599ed64785ea48a60f7b64e2a20ddc11483383a8fc4bcf41"
+        },
+        {
+          "path": "logs/08G-P02-B1-focused-list.txt",
+          "sha256": "4da9e66c1072debc8db6016ac6d1b813f4da0ba4cc69cdca48fb435b5ddf4815"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "formatting"
+      ],
+      "command": "cargo fmt --check",
+      "fixture": "worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-fmt.txt",
+          "sha256": "6af00a72c76eb2d8e5f1526c0f7b3458309814810a296b10f2375b67a67a97c1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline-compilation"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "dev DB openbot_merge08_mac02",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-sqlx-check.txt",
+          "sha256": "42525d74408d49e5ce110fd284dd083c318ca6eaf795b1030cf592b9efd3af85"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-sweep"
+      ],
+      "command": "cargo test --lib (pre-inventory-fix tree; 4998 passed, 12 failed, dispositions in TASK B1 verification)",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost, recreated after the last migration edit), SQLX_OFFLINE=true",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-lib-suite.txt",
+          "sha256": "21fae0b7c74d0b1e7fc2c3467e7dd72dd5247b3d5f1c374cb27893f305761e3e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "regression-sweep"
+      ],
+      "command": "cargo test --lib -- <the 6 non-cloudroom failures> (after the trigger-inventory fix; remaining failure is pre-existing PREPARED_AGENT_VERSION drift)",
+      "fixture": "dev DB openbot_merge08_mac02, test DB openbot_merge08_mac02_test (localhost, recreated after the last migration edit), SQLX_OFFLINE=true",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/08G-P02-B1-lib-rerun.txt",
+          "sha256": "e52778ba5478f000041f10d2f8963f7d1122d40f17155d99133c4d04f7fb7e9f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "02B.3 channel.call"
+      ],
+      "command": "none",
+      "fixture": "n/a",
+      "status": "NOT EXERCISED",
+      "reason": "no channel.call producer targets a desk in this build; the refusal sits in the shared desk-admission path covered by admission tests"
+    }
+  ]
+}

@@ -89,6 +89,7 @@ impl ChannelPersistence for MockChannelPersistence {
     async fn list_departments(
         &self,
         _company_id: Uuid,
+        _archived: crate::entities::department::ArchivedUnits,
     ) -> AppResult<Vec<crate::entities::department::Department>> {
         Ok(self.departments.lock().unwrap().clone())
     }
@@ -169,6 +170,7 @@ async fn test_inter_channel_hop_limit_rejection() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_id,
@@ -186,6 +188,7 @@ async fn test_inter_channel_hop_limit_rejection() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: source_channel_id,
@@ -262,6 +265,7 @@ async fn test_spf_authentication_failure_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -332,6 +336,7 @@ async fn test_high_spam_score_rejection() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -400,6 +405,7 @@ async fn access_level_dmarc_failure_rejects_a_known_member_address() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -479,6 +485,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -548,6 +555,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -618,6 +626,7 @@ async fn test_channel_in_cc_resolves_properly() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -693,6 +702,7 @@ async fn test_multi_channel_to_and_cc_execution() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf1_id,
@@ -713,6 +723,7 @@ async fn test_multi_channel_to_and_cc_execution() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf2_id,
@@ -819,6 +830,7 @@ async fn test_pipeline_address_chaining_execution() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf1_id,
@@ -839,6 +851,7 @@ async fn test_pipeline_address_chaining_execution() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf2_id,
@@ -859,6 +872,7 @@ async fn test_pipeline_address_chaining_execution() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf3_id,
@@ -942,6 +956,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -959,6 +974,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1082,6 +1098,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1208,6 +1225,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_team_only,
@@ -1228,6 +1246,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_public,
@@ -1248,6 +1267,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_explicit,
@@ -1367,6 +1387,7 @@ async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1475,6 +1496,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -1492,6 +1514,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -1564,6 +1587,7 @@ async fn a_pure_workflow_hop_to_a_public_channel_is_relayed() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -1581,6 +1605,7 @@ async fn a_pure_workflow_hop_to_a_public_channel_is_relayed() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -1644,6 +1669,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -1661,6 +1687,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 department_id: crate::entities::department::DepartmentId::random(),
             },
             Channel {
+                unit_archived: false,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -1731,6 +1758,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1912,6 +1940,7 @@ async fn test_context_only_quiet_mode_ingestion() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1998,6 +2027,7 @@ async fn test_context_only_quiet_mode_ingestion() {
 /// switches that a positional call could silently transpose.
 struct TestChannel {
     enabled: bool,
+    unit_archived: bool,
     add_3rd_party: bool,
     alias_slugs: Vec<ChannelSlug>,
     participant_emails: Option<Vec<EmailAddress>>,
@@ -2009,6 +2039,7 @@ impl Default for TestChannel {
     fn default() -> Self {
         Self {
             enabled: true,
+            unit_archived: false,
             add_3rd_party: true,
             alias_slugs: Vec::new(),
             participant_emails: None,
@@ -2061,6 +2092,7 @@ fn channel_fixture(spec: TestChannel) -> ChannelFixture {
 fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>) -> ChannelFixture {
     let TestChannel {
         enabled,
+        unit_archived,
         add_3rd_party,
         alias_slugs,
         participant_emails,
@@ -2092,6 +2124,7 @@ fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>)
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived,
             enabled,
             add_3rd_party,
             id: channel_id,
@@ -2734,6 +2767,26 @@ async fn disabled_channel_bounces_inbound_mail() {
     assert!(!body.to_lowercase().contains("channel"));
 }
 
+/// Plan08 02B.3: an archived unit's desk keeps its own switch on but bounces mail as a disabled
+/// desk does.
+#[tokio::test]
+async fn unit_archive_refuses_mail_to_an_archived_units_desk() {
+    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
+        unit_archived: true,
+        ..TestChannel::default()
+    });
+    let result = thread_use_cases
+        .ingest_test_email(message_to_support())
+        .await
+        .unwrap();
+    assert!(!result.accepted);
+    let bounce = result
+        .bounce_info()
+        .expect("an archived unit's desk bounces");
+    assert_eq!(bounce.disabled_slugs, vec![ChannelSlug::from("support")]);
+    assert!(bounce.invalid_slugs.is_empty());
+}
+
 #[tokio::test]
 async fn enabled_channel_still_accepts_the_same_message() {
     let (thread_use_cases, channel_id) = use_cases_with_channel_enabled(true);
@@ -2875,6 +2928,7 @@ fn use_cases_with_departments(
             |(index, (name, parent))| crate::entities::department::Department {
                 is_root: false,
                 escalation: None,
+                archived: None,
                 id: ids[index],
                 company_id,
                 name: (*name).to_string(),
@@ -2917,6 +2971,7 @@ fn use_cases_with_departments(
                     .extend(department_membership_grants(company_id, &["team@acme.com"]));
             }
             Channel {
+                unit_archived: false,
                 id: Uuid::new_v4(),
                 company_id,
                 name: spec.name.to_string(),
@@ -3450,6 +3505,7 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -3550,6 +3606,7 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -3630,6 +3687,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         departments: Default::default(),
         channels: Mutex::new(vec![Channel {
+            unit_archived: false,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,

@@ -208,3 +208,69 @@ async fn memory_scope_tools_explicit_unit_save_without_a_local_unit_creates_no_i
     assert_eq!(error_code(&result), "memory.scope_unavailable", "{result}");
     assert!(t.committed().await.deliveries.is_empty());
 }
+
+/// Plan08 02C.1: the lead still reads an archived child's memory through the report rule, the
+/// hit keeps its label and is marked archived, and the archive retires no namespace.
+#[tokio::test]
+async fn unit_archive_scopes_lead_reads_an_archived_childs_memory_marked_archived() {
+    let d = Box::pin(DeskTools::new()).await;
+    let t = &d.tools;
+    let report = sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM departments WHERE company_id=$1 AND slug='report-a'",
+    )
+    .bind(t.company().as_uuid())
+    .fetch_one(t.p().pool())
+    .await
+    .unwrap();
+    crate::adapters::persistence::test_support::department_use_cases(t.p())
+        .archive_department(
+            t.actor().await,
+            t.company().as_uuid(),
+            DepartmentId::new(report),
+            crate::application::ports::department::OpenWork::Refuse,
+        )
+        .await
+        .unwrap();
+    let (_, state) = t
+        .namespace(NamespaceOwner::Unit(DepartmentId::new(report)))
+        .await
+        .unwrap();
+    assert_ne!(state, "removing", "the archive retires no namespace");
+
+    let call = t
+        .prepare(
+            MemoryTool::Search,
+            json!({"query":"selector","scopes":["reports"],"limit":10}),
+        )
+        .await;
+    let result = t.call(call).await;
+    let items = result["items"].as_array().expect("successful scope search");
+    let scope = |namespace: Uuid| {
+        items
+            .iter()
+            .find(|item| item["namespace"] == json!(namespace))
+            .map(|item| (item["scope"].clone(), item["archived"].clone()))
+    };
+    assert_eq!(
+        scope(d.namespaces["report-a"]),
+        Some((json!("reports:report-a"), json!(true))),
+        "{result}"
+    );
+    assert_eq!(
+        scope(d.namespaces["report-b"]),
+        Some((json!("reports:report-b"), Value::Null)),
+        "an active unit carries no flag"
+    );
+
+    let id = d.observations["report-a"];
+    let details = t
+        .prepare(
+            MemoryTool::Details,
+            json!({"items":[{"namespace":d.namespaces["report-a"],"id":id}]}),
+        )
+        .await;
+    let result = t.call(details).await;
+    assert_eq!(result["items"][0]["scope"], "reports:report-a");
+    assert_eq!(result["items"][0]["archived"], true);
+    assert_eq!(result["items"][0]["text"], "Selector fact");
+}

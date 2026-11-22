@@ -65,6 +65,9 @@ pub enum Materialized {
     Failed,
     /// The claim was lost before its outcome was written; a later claim decides again.
     LeaseLost,
+    /// The desk's unit was archived after the claim: the occurrence is dropped, not failed
+    /// (Plan08 02B.2), exactly as if the sweeper had skipped it.
+    Skipped,
 }
 
 /// What a fenced transient-error write did to the occurrence.
@@ -125,6 +128,9 @@ pub trait ScheduleOccurrences: Send + Sync {
     /// Pending again after backoff, or failed after the last attempt; either way the schedule's
     /// `last_error` names it.
     async fn record_error(&self, claim: OccurrenceClaim, error: &str) -> AppResult<ErrorRecorded>;
+    /// Delete a claimed occurrence whose desk's unit is archived, leaving no failure behind.
+    /// `false` when the claim was lost first.
+    async fn discard_skipped(&self, claim: OccurrenceClaim) -> AppResult<bool>;
 }
 
 /// Run-now materializes the occurrence it captured inline, through the same path.
@@ -217,6 +223,13 @@ where
                         admitted.notify_waiters();
                     }
                     return Ok(Materialized::Admitted(run));
+                }
+                Classified::Settled(BindingOutcome::Refused(AppError::UNIT_ARCHIVED)) => {
+                    return Ok(if self.queue.discard_skipped(claim).await? {
+                        Materialized::Skipped
+                    } else {
+                        self.lost(claim)
+                    });
                 }
                 Classified::Settled(
                     BindingOutcome::Refused(reason) | BindingOutcome::Failed(reason),
