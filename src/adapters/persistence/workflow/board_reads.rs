@@ -35,6 +35,7 @@ fn scoped(scope: &RunBoardScope) -> bool {
         || scope.workflow.is_some()
         || scope.agent.is_some()
         || scope.department.is_some()
+        || scope.goal.is_some()
 }
 
 /// The scope's filters on the materialized working set, the first after `WHERE`. The agent is
@@ -88,6 +89,13 @@ fn push_scope(
             .push(" AND desk.department_id = ")
             .push_bind(department.as_uuid())
             .push(")");
+        keyword = " AND ";
+    }
+    if let Some(goal) = scope.goal {
+        query
+            .push(keyword)
+            .push("goal_unit_id = ")
+            .push_bind(goal.as_uuid());
     }
 }
 
@@ -97,7 +105,7 @@ pub(super) fn board_counts_query(
     scope: &RunBoardScope,
     cutoff: DateTime<Utc>,
 ) -> QueryBuilder<'static, Postgres> {
-    let working = "SELECT id, state, channel_id, principal_id, binding_id, workflow_id, version_id FROM workflow_runs";
+    let working = "SELECT id, state, channel_id, principal_id, binding_id, workflow_id, version_id, goal_unit_id FROM workflow_runs";
     let mut query = QueryBuilder::new(format!(
         "WITH working AS MATERIALIZED ({working} WHERE company_id = "
     ));
@@ -133,7 +141,7 @@ pub(super) fn board_cards_query(
         for (index, state) in RunStateName::ALL.into_iter().enumerate() {
             query.push(if index == 0 { "WITH " } else { ", " });
             query.push(format!(
-                "{} AS MATERIALIZED (SELECT {RUN_COLUMNS} FROM ",
+                "{} AS MATERIALIZED (SELECT {RUN_COLUMNS}, goal_unit_id FROM ",
                 state.as_str()
             ));
             push_column(&mut query, company, state, cutoff, visible);

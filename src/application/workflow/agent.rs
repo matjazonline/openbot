@@ -82,6 +82,9 @@ pub enum AgentToolTarget {
     ChannelCall {
         desks: super::channel_call_listing::DeskListing,
     },
+    /// `goal.status` (Plan08 03D.4): a read of the run's own goal; dispatched without
+    /// ActionService.
+    GoalStatus,
 }
 
 impl AgentToolTarget {
@@ -119,6 +122,7 @@ impl AgentToolTarget {
             AgentBuiltinTool::ChannelCall => Self::ChannelCall {
                 desks: Default::default(),
             },
+            AgentBuiltinTool::GoalStatus => Self::GoalStatus,
         })
     }
 }
@@ -535,6 +539,10 @@ fn prepared_tool(
         (AgentToolTarget::ChannelCall { .. }, AgentBindingSource::Builtin { tool }) => {
             *tool == crate::entities::agent_capability::AgentBuiltinTool::ChannelCall
                 && snapshot.contract.name.as_str() == super::channel_call::CHANNEL_CALL
+        }
+        (AgentToolTarget::GoalStatus, AgentBindingSource::Builtin { tool }) => {
+            *tool == crate::entities::agent_capability::AgentBuiltinTool::GoalStatus
+                && snapshot.contract.name.as_str() == super::goal_status::GOAL_STATUS
         }
         (AgentToolTarget::Memory { tool: memory }, AgentBindingSource::Builtin { tool }) => {
             memory.builtin() == *tool && memory.name() == snapshot.contract.name.as_str()

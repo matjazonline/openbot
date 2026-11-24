@@ -63,6 +63,9 @@ pub struct WorkspaceQuery {
     /// A department of the company: runs on its desks; "" is none.
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub department_id: Option<Uuid>,
+    /// A goal the viewer may see: runs recorded for it; "" is none.
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub goal_id: Option<Uuid>,
     pub state: Option<String>,
     /// `board` for the board, `waiting` for what waits on a person; anything else, or nothing,
     /// is the list.
@@ -86,6 +89,8 @@ pub struct ListQuery {
     pub agent_id: Option<Uuid>,
     #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
     pub department_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub goal_id: Option<Uuid>,
     pub state: Option<String>,
     pub after: Option<Uuid>,
     /// The run open in the pane, highlighted in the entries.
@@ -128,6 +133,7 @@ pub struct ScopeIds {
     pub workflow: Option<Uuid>,
     pub agent: Option<Uuid>,
     pub department: Option<Uuid>,
+    pub goal: Option<Uuid>,
 }
 
 impl ScopeIds {
@@ -137,6 +143,7 @@ impl ScopeIds {
             workflow: query.workflow_id,
             agent: query.agent_id,
             department: query.department_id,
+            goal: query.goal_id,
         }
     }
 
@@ -146,6 +153,7 @@ impl ScopeIds {
             workflow: query.workflow_id,
             agent: query.agent_id,
             department: query.department_id,
+            goal: query.goal_id,
         }
     }
 
@@ -155,6 +163,7 @@ impl ScopeIds {
             workflow: self.workflow,
             agent: self.agent,
             department: self.department,
+            goal: self.goal,
             state,
         }
     }
@@ -185,6 +194,7 @@ struct Scope {
     workflow: Option<WorkflowId>,
     agent: Option<Uuid>,
     department: Option<crate::entities::department::DepartmentId>,
+    goal: Option<crate::entities::department::DepartmentId>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -423,6 +433,22 @@ impl Ui {
                 )?,
                 None => None,
             },
+            // Plan08 03D.2 (gate D2 r2 F3): only a goal the viewer may see; any other is not
+            // found, so the board never names a goal its viewer could not open.
+            goal: match ids.goal {
+                Some(goal) => {
+                    let goal = crate::entities::department::DepartmentId::new(goal);
+                    if !self
+                        .departments
+                        .goal_visible(self.user, company, goal)
+                        .await?
+                    {
+                        return Err(AppError::NotFound("Goal not found".into()));
+                    }
+                    Some(goal)
+                }
+                None => None,
+            },
         })
     }
 
@@ -486,12 +512,19 @@ impl Ui {
                 label: format!("{}{}", "\u{a0}\u{a0}".repeat(depth), department.name),
             })
             .collect();
+        let (goals, goals_cut) = self.departments.goal_choices(self.user, company).await?;
+        let goals = goals
+            .into_iter()
+            .map(|(id, label)| pages::ScopeOption { id, label })
+            .collect();
         Ok(pages::ScopeOptions {
             workflows,
             workflows_cut: definitions.more,
             agents,
             agents_cut,
             departments,
+            goals,
+            goals_cut,
         })
     }
 
@@ -528,6 +561,7 @@ impl Ui {
             workflow: resolved.workflow,
             agent: resolved.agent,
             department: resolved.department,
+            goal: resolved.goal,
         };
         let board = visible_board(&self.engine, company_id, actor, &scope, window, as_of).await?;
         let workflows: Vec<Uuid> = board
@@ -807,6 +841,7 @@ fn run_filter(scope: Scope, state: Option<String>) -> RunFilter {
         // The list is the forensic feed: children stay in it, labelled with their parent.
         lineage: RunLineage::Any,
         department: scope.department,
+        goal: scope.goal,
     }
 }
 

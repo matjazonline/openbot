@@ -229,4 +229,143 @@ pub trait DepartmentPersistence:
         company: CompanyId,
         department: DepartmentId,
     ) -> AppResult<Vec<DepartmentDesk>>;
+    /// A goal's status for `user_id` (Plan08 03D): whoever may view one of the goal's desks or
+    /// manages the goal; anyone else, and any unit that is not a goal, gets `NotFound`.
+    async fn goal_rollup(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+        goal: DepartmentId,
+    ) -> AppResult<GoalRollup>;
+    /// The goals `user_id` may see, active or archived, newest first, at most
+    /// `GOALS_LIST_LIMIT`, saying when there were more.
+    async fn visible_goals(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+        archived: bool,
+    ) -> AppResult<GoalList>;
+    /// Whether `user_id` may see `goal`, active or archived: one row, for the board's `goal_id`.
+    async fn goal_visible(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+        goal: DepartmentId,
+    ) -> AppResult<bool>;
+    /// The active goals `user_id` may see, by name, at most `GOALS_LIST_LIMIT`, for a select:
+    /// (id, name) pairs and whether there were more. No counts.
+    async fn goal_choices(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+    ) -> AppResult<(Vec<(Uuid, String)>, bool)>;
+}
+
+/// How many of a goal's newest runs its rollup counts (Plan08 03D.1, gate 08G-P03-D2 D2.4).
+pub const GOAL_ROLLUP_RUN_LIMIT: i64 = 10_000;
+/// How many goals the goals list shows, and how many of each goal's newest runs it counts.
+pub const GOALS_LIST_LIMIT: i64 = 200;
+pub const GOALS_LIST_RUN_LIMIT: i64 = 500;
+/// How many of the oldest open person decisions the rollup lists.
+pub const GOAL_ROLLUP_WAITING_LIMIT: i64 = 50;
+
+/// A goal's status (Plan08 03D.1): counts, states, closures, spend, names and times; never a
+/// message, input, output, proposal or desk name (03D.5).
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct GoalRollup {
+    pub goal: Uuid,
+    pub name: String,
+    pub archived: bool,
+    pub target_date: Option<chrono::NaiveDate>,
+    /// The newest `runs_counted` runs are counted; `truncated` when the goal has more.
+    pub runs_counted: i64,
+    pub truncated: bool,
+    /// One row per unit that did work for the goal or was charged for it.
+    pub units: Vec<GoalUnitRollup>,
+    pub waiting: Vec<GoalWait>,
+    pub waiting_total: i64,
+    pub escalations_open: i64,
+    pub calls: GoalCalls,
+    pub spend: GoalSpend,
+    pub first_run_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_finished_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_activity_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Summed time decisions with a person reviewer have waited: to their answer, to the end of a
+    /// wait that ended unanswered (expired or cancelled), and to now for one still open.
+    pub waiting_on_people_seconds: i64,
+}
+
+/// Runs and spend for one working unit; `name` is `None` for a unit since deleted.
+/// The Goals tab's list: at most `GOALS_LIST_LIMIT` goals and whether more were cut.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GoalList {
+    pub goals: Vec<GoalSummary>,
+    pub cut: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct GoalUnitRollup {
+    pub unit: Uuid,
+    pub name: Option<String>,
+    pub queued: i64,
+    pub running: i64,
+    pub waiting: i64,
+    pub succeeded: i64,
+    pub failed: i64,
+    pub cancelled: i64,
+    pub spent_micros: i64,
+    pub unpriced_tokens: i64,
+}
+
+impl GoalUnitRollup {
+    pub fn open(&self) -> i64 {
+        self.queued + self.running + self.waiting
+    }
+}
+
+/// An open decision waiting on a person.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct GoalWait {
+    pub run_id: Uuid,
+    pub unit: Uuid,
+    pub unit_name: Option<String>,
+    pub reviewers: Vec<String>,
+    pub since: chrono::DateTime<chrono::Utc>,
+}
+
+/// Calls made by the goal's counted runs, by how they ended. `denied` includes calls refused
+/// before launch, as the caller was told; `open` is a launched call with no result yet.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct GoalCalls {
+    pub done: i64,
+    pub denied: i64,
+    pub handed_off: i64,
+    pub no_reply: i64,
+    pub error: i64,
+    pub open: i64,
+}
+
+/// The goal's counted spend in every unit, against its `total` cap.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct GoalSpend {
+    pub cap_micros: Option<i64>,
+    pub spent_micros: i64,
+    pub unpriced_tokens: i64,
+}
+
+/// One row of the goals list (Plan08 03D.2).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct GoalSummary {
+    pub goal: Uuid,
+    pub name: String,
+    pub archived: bool,
+    pub target_date: Option<chrono::NaiveDate>,
+    pub lead: Option<String>,
+    pub decider: Option<String>,
+    pub open: i64,
+    pub waiting: i64,
+    pub failed: i64,
+    /// The counts cover the newest `GOALS_LIST_RUN_LIMIT` runs; `truncated` when there are more.
+    pub truncated: bool,
+    pub spend: GoalSpend,
 }

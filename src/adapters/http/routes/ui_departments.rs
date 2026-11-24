@@ -185,6 +185,22 @@ pub(super) async fn department_section(
         ),
         _ => None,
     };
+    // Plan08 03D.2: a goal's status, for whoever may see it; anyone else sees no card.
+    let goal = match &view {
+        Some(view)
+            if view.detail.department.kind == crate::entities::department::DepartmentKind::Goal =>
+        {
+            match departments
+                .goal_rollup(user_id, company_id, view.detail.department.id)
+                .await
+            {
+                Ok(rollup) => Some(rollup),
+                Err(AppError::NotFound(_)) => None,
+                Err(error) => return Err(error),
+            }
+        }
+        _ => None,
+    };
     let history = match &view {
         Some(view) if managed.contains(&view.detail.department.id) => {
             departments
@@ -238,6 +254,7 @@ pub(super) async fn department_section(
             ),
             models: models.as_deref(),
             budgets: budgets.as_deref(),
+            goal: goal.as_ref(),
         },
     ))
 }
@@ -725,7 +742,7 @@ fn open_work_refusal(count: i64, elsewhere: i64, cancellable: bool) -> (Departme
         (
             DepartmentForm::Archive,
             format!(
-                "{count} {runs} still open for this goal, {elsewhere} in other departments that its own work did not start. Only those departments can end {them}; archive once they finish."
+                "{count} {runs} still open for this department or a goal in it, {elsewhere} in other departments that its own work did not start. Only those departments can end {them}; archive once they finish."
             ),
         )
     } else if cancellable {
@@ -1143,6 +1160,9 @@ struct DepartmentBudgetsForm {
     day_cap: String,
     #[serde(default)]
     month_cap: String,
+    /// A goal's lifetime cap; the form shows it on goals only (Plan08 03C.1).
+    #[serde(default)]
+    total_cap: Option<String>,
 }
 
 /// A USD amount with at most six decimals as micro-USD; blank is `None` (no cap).
@@ -1179,9 +1199,17 @@ async fn save_budgets(
     // Both amounts are checked before anything is written, then applied together (B3-F1).
     let saved = async {
         let (day, month) = (cap_micros(&form.day_cap)?, cap_micros(&form.month_cap)?);
+        let total = form.total_cap.as_deref().map(cap_micros).transpose()?;
         workspace
             .company_use_cases
-            .replace_unit_budgets(workspace.user_id, company_id, department_id, day, month)
+            .replace_unit_budgets(
+                workspace.user_id,
+                company_id,
+                department_id,
+                day,
+                month,
+                total,
+            )
             .await
     }
     .await;

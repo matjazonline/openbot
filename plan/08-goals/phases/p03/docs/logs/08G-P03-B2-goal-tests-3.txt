@@ -1,0 +1,29 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 42s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows' (50949700) panicked at src/adapters/persistence/workflow/goal_budget_tests.rs:700:5:
+assertion `left == right` failed
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5216 filtered out; finished in 4.72s
+
+error: test failed, to rerun pass `--lib`

@@ -57,6 +57,8 @@ pub struct RunBoardScope {
     pub agent: Option<Uuid>,
     /// Runs on the desks this department owns now, resolved company-scoped.
     pub department: Option<crate::entities::department::DepartmentId>,
+    /// Runs recorded for this goal (Plan08 03D.2), resolved against the goals the viewer sees.
+    pub goal: Option<crate::entities::department::DepartmentId>,
 }
 
 /// Top-level runs of one state in one inbox (`None`: company scope) inside the board's

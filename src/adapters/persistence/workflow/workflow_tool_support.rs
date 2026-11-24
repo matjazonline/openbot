@@ -412,6 +412,7 @@ impl ToolSetup {
                 Arc::new(runtime(&p)),
             )
             .with_workflow_tools(Arc::new(p.clone()))
+            .with_goal_status(Arc::new(p.clone()))
             .with_channel_calls(Arc::new(p.clone())),
             Some(notices(&p)),
             lease(),

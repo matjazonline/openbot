@@ -142,6 +142,7 @@ impl Session {
             | ToolKind::Escalation
             | ToolKind::Provisioning
             | ToolKind::Knowledge
+            | ToolKind::GoalStatus
             | ToolKind::Memory
             | ToolKind::Slot(_)
             | ToolKind::Http => {

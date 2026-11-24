@@ -354,3 +354,119 @@ record [TASK.md](TASK.md) section "Gate 08G-P03-D2 r1". All originate in the gat
     a per-step call bound, would keep an agent loop cheap.
 - **Resolution history:** 2026-11-24 open (optional).
   - 2026-11-24 (08G-P03-D2-R2-N1): the database check, the Plan07 citation and the docs note are adopted. The smaller tool limit is declined with a recorded reason (03D.4 asks for the page's numbers); accepted.
+
+---
+
+Common context for the entries below, dated 2026-11-24: batch B2 (03C + 03D), stage batch review, round note
+08G-P03-B2-R1-N1, reviewer `claude-fable-5-2` (effort as assigned by root: medium), review base `481b14cd`
+(the B1 commit; the batch is the working tree and seven untracked source files), digest
+`40c9f1a8f5bab714fe062b39952e3f4b5d34f8ee2dbdabe70c1df375ca7f7763`, task record [TASK.md](TASK.md) sections
+"B2 implementation progress", "B2 verification mapping" and "B2 checks". These are implementation findings
+unless marked otherwise.
+
+## 08G-P03-B2-F1 — A schedule refused for a goal's cap cannot be recorded
+
+- **Classification:** actionable defect, severity high, category correctness / contract impact (03C.2). It
+  originates in the gate as much as in the code: D2.3 added a refusal code and neither the gate nor my gate
+  review listed where refusal codes are stored.
+- **Evidence:**
+  - `schedule_runs_refusal_check` (`init_schema.sql:16904-16908`, confirmed on the migrated scratch database)
+    allows `refusal` only in `'unavailable','input_rejected','key_conflict',
+    'admission.resource_outside_unit','budget.unit_exhausted'`, or a role refusal.
+  - A schedule occurrence goes through the same admission. `message_admission.rs:473` turns
+    `AppError::BudgetExhausted` into `BindingOutcome::Refused(refusal.code())`, which is now
+    `budget.goal_exhausted` for a goal cap. `schedule_admission.rs:234-236` passes it to
+    `record_refusal`, and `schedules.rs:852-872` writes it to `schedule_runs.refusal`.
+  - So every scheduled occurrence on a desk whose run would serve a goal at its cap (the goal's own desk, a
+    desk below it) fails the CHECK when its refusal is recorded. The occurrence is neither admitted nor
+    recorded as refused. Plan07 added `budget.unit_exhausted` to this list for the same path.
+  - Messages are not affected: `workflow_message_intent_bindings.reason` is bounded by length only.
+  - No B2 test drives a schedule; `goal_budget_total_cap_refuses_admission_and_names_the_goal` admits
+    directly.
+- **Required:** add the code to the constraint (and to whatever renders a schedule's refusal), and add a
+  test that materializes a schedule occurrence on a goal's desk at the cap and reads back the recorded
+  refusal. Search once for every place that enumerates admission refusal codes and record the result.
+- **Instruction lesson:** the third instance in this phase of a changed stored value whose readers and
+  writers were not enumerated (08G-P03-B1-F1, 08G-P03-D2-F1). Candidate: a new refusal or closure code is
+  searched for by its sibling's literal (`budget.unit_exhausted`) in the schema and source before the gate
+  is requested.
+- **Resolution history:** 2026-11-24 open.
+  - 2026-11-24 recheck (08G-P03-B2-R2-N1, digest `a50dab5d…243d`): fixed. `schedule_runs_refusal_check` lists `budget.goal_exhausted`. `goal_budget_refusal_of_a_scheduled_run_settles_its_occurrence` drives the production materializer on a goal desk at its cap and reads back `failed`, the code and no run; it passes in `logs/08G-P03-B2-R2-focused.txt`. The author's sweep of the sibling literal matches mine from R1: the other consumers take `refusal.code()` and store it unconstrained.
+
+## 08G-P03-B2-F2 — A desk viewer cannot open the goal's page
+
+- **Classification:** actionable defect, severity medium, category authorization / requirements (03D.2, 03D.5).
+- **Evidence:**
+  - 03D.5: the rollup is for "whoever may view the goal's desk, and whoever manages the goal". 03D.2: "A
+    goal's page shows the rollup".
+  - The card is rendered inside the department detail. `ui_departments.rs::department_section` first calls
+    `department_view`, which is `visible_department`: owners and admins, and otherwise only departments the
+    person belongs to, holds a role in, or manages (`use_cases/department.rs::visible_set`).
+  - A person who may view the goal's desk without being in the unit (a public desk, or a view grant) passes
+    `goal_visible_on`. The Goals tab lists the goal for them and links to
+    `…&tab=departments&department_id=…`, which answers as a department they may not see. They can read the
+    rollup through the JSON route only.
+  - The tests cover this viewer on the JSON route (`goal_authorization_member_sees_counts_not_runs`) and the
+    card as a manager (`goal_rollup_goal_card_renders`), not the page as a desk viewer.
+- **Required:** give the status a page a desk viewer can open (the card on its own route or pane, without the
+  department's members, roles and settings), point the Goals tab at it, and test the page as a desk-only
+  viewer and as a stranger.
+- **Resolution history:** 2026-11-24 open.
+  - 2026-11-24 recheck (08G-P03-B2-R2-N1, digest `a50dab5d…243d`): fixed. The Goals tab opens a goal by `goal_id` with the shared `goal_card`, loaded through `goal_rollup` (the D2.5 rule; `NotFound` otherwise), and the list links there. `goal_rollup_goals_page_lists_visible_goals` covers a member without desk view (404) and with a public desk (listed, card opens, `visible_department` still refuses); passes in the R2 log.
+
+## 08G-P03-B2-F3 — Time waiting on people grows for decisions that will never be taken
+
+- **Classification:** actionable defect, severity low, category correctness (03D.1).
+- **Evidence:** `goal_rollup.rs` sums `COALESCE(submitted_at, clock_timestamp()) - created_at` over every
+  decision with a person reviewer. A decision whose wait settled without a submission (expired, or cancelled
+  with its run; `workflow_waits.state` and `settled_at`) keeps adding time on every read, for good. The
+  waiting list is right, because it requires `wait.state = 'waiting'`. The test covers a submitted decision
+  only.
+- **Required:** end an unsubmitted decision's time at its wait's `settled_at`; count to now only while the
+  wait is waiting. Add the expired or cancelled case to the test.
+- **Resolution history:** 2026-11-24 open.
+  - 2026-11-24 recheck (08G-P03-B2-R2-N1, digest `a50dab5d…243d`): fixed. A decision's time ends at `submitted_at`, else the wait's `settled_at`, else now. The test adds a cancelled unanswered decision and compares two reads; passes in the R2 log.
+
+## 08G-P03-B2-F4 — The board pays for the goals list on every load, and checks an id against a cut list
+
+- **Classification:** actionable defect, severity low, category architecture / correctness (D2.6, F3 of the gate).
+- **Evidence:**
+  - `runs/mod.rs:529-537` fills the goal dropdown from `visible_goals`, the Goals tab's read: per goal the
+    lead, the decider, counts over up to 500 runs and spend, for up to 200 goals. It runs on every board and
+    list load, with or without a goal filter. The dropdown uses the id and name only.
+  - `visible_goal_ids` (`runs/mod.rs:452-466`) runs the same read twice (active, archived) to check one id.
+    `goal_rollup::goal_visible_on` answers that with one row.
+  - Both are cut at `GOALS_LIST_LIMIT` (200, newest first). A visible goal past the cut is refused as
+    `NotFound` on the board although its page opens, and the Goals tab drops it without saying the list is
+    cut.
+- **Required:** check the id with `goal_visible_on`; fill the dropdown from an id-and-name read; say on the
+  Goals tab when the list is cut.
+- **Resolution history:** 2026-11-24 open.
+  - 2026-11-24 recheck (08G-P03-B2-R2-N1, digest `a50dab5d…243d`): fixed. The board checks the id with `goal_visible` and fills the select from `goal_choices` (id and name, cut flag); `visible_goals` returns the cut and the Goals tab states it.
+
+## 08G-P03-B2-S1 — Smaller points (optional)
+
+- **Classification:** optional suggestions.
+- **Evidence:**
+  - Evidence freshness: `logs/08G-P03-B2-fmt.txt` (16:59) predates the last Rust edits (17:10–17:11:
+    `goal_rollup.rs`, `storage_retention.rs`, two test files). I reran `cargo fmt --check` on the frozen
+    tree: clean (`logs/08G-P03-B2-R1-reviewer-fmt.txt`). The manifest's entry should name a run on the frozen
+    tree.
+  - A refusal row whose call is later answered with an input error stays and counts as `denied` (carried
+    from 08G-P03-D2-R2-N1). TASK does not say whether that is accepted.
+  - `goal.status` trusts `call.origin.agent` and takes no fence. It is a read and the origin comes from the
+    runtime's resolved tool, not from the model, but `channel.call` proves its origin against the run's
+    manifest first. The recorded departure covers the lock, not the origin.
+  - `exactness.rs` accounts the tool's result as `Configuration` (exact at level 0). The result carries
+    reviewer names, department names and spend from other departments. That matches D2.4's "never content",
+    and it is a classification the user may want to see stated in the docs.
+  - `VISIBLE` uses `notification_principal_can_view`, which has no `is_team()` condition, where
+    `Channel::viewer_access` has one. If a company has members that are not team members, a public goal desk
+    shows them the rollup.
+  - The board's Waiting view keeps the department filter only (recorded departure, documented). The goal
+    select is still drawn from the shared filter bar; if it appears on that view it does nothing there.
+  - `goal.status` through the agent runtime is NOT EXERCISED, as declared: `ToolInvocation::GoalStatus` and
+    `with_goal_status` are covered by compilation only. `infra/workflow.rs:272` wires it. I accept the
+    stand-in for the batch; p04's final verification should name it.
+- **Resolution history:** 2026-11-24 open (optional).
+  - 2026-11-24 recheck (08G-P03-B2-R2-N1, digest `a50dab5d…243d`): dispositions recorded in TASK and accepted: fmt rerun after the last edit; a refusal followed by an input error stays `denied`; origin trust as for the other read tools; the docs name what the tool result carries; the visibility SQL stays the gated rule; the Waiting view draws no goal select; the runtime stand-in goes to p04.

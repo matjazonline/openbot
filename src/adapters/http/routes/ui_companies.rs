@@ -91,6 +91,10 @@ pub struct WorkspaceQuery {
     pub invite_id: Option<Uuid>,
     /// The Departments tab's selected department.
     pub department_id: Option<Uuid>,
+    /// The Goals tab: `?archived=true` lists archived goals instead of active ones.
+    pub archived: Option<String>,
+    /// The Goals tab's selected goal, shown with its status card.
+    pub goal_id: Option<Uuid>,
 }
 
 /// A submitted company, before it is a [`Company`].
@@ -358,6 +362,52 @@ impl Workspace {
         }))
     }
 
+    /// The Goals tab (Plan08 03D.2): the goals this person may see, with their status counts.
+    /// A selected goal the viewer may not see is not found, like its JSON route.
+    async fn goals_pane(
+        &self,
+        access: &CompanyAccess,
+        archived: bool,
+        selected: Option<Uuid>,
+    ) -> AppResult<String> {
+        let editable = access.membership.is_owner();
+        let counts = self.counts(access.company.id, editable).await?;
+        let goals = self
+            .department_use_cases
+            .visible_goals(self.user_id, access.company.id, archived)
+            .await?;
+        let rollup = match selected {
+            Some(goal) => Some(
+                self.department_use_cases
+                    .goal_rollup(
+                        self.user_id,
+                        access.company.id,
+                        crate::entities::department::DepartmentId::new(goal),
+                    )
+                    .await?,
+            ),
+            None => None,
+        };
+        let body = pages::goals_list(
+            access.company.id,
+            &goals.goals,
+            goals.cut,
+            archived,
+            rollup.as_ref(),
+        );
+        Ok(pages::company_edit_pane(&pages::CompanyEditPane {
+            company: &access.company,
+            model_connections: &[],
+            app_domain_name: &self.config.app_domain_name,
+            counts,
+            draft: None,
+            error: None,
+            editable,
+            resend_api_section: "",
+            body: pages::CompanyPaneBody::Goals(&body),
+        }))
+    }
+
     /// The Departments tab: the department tree beside the selected department or the create
     /// form, which only an owner or admin is offered.
     async fn departments_pane(
@@ -510,6 +560,15 @@ async fn companies_page(
         Some(selected) if tab == CompanyTab::Departments => {
             workspace
                 .departments_pane(selected, query.department_id, creating)
+                .await?
+        }
+        Some(selected) if tab == CompanyTab::Goals => {
+            workspace
+                .goals_pane(
+                    selected,
+                    query.archived.as_deref() == Some("true"),
+                    query.goal_id,
+                )
                 .await?
         }
         Some(selected) if tab == CompanyTab::Skills => {
@@ -1006,6 +1065,10 @@ impl Workspace {
 #[cfg(test)]
 #[path = "ui_company_skills_tests.rs"]
 mod skills_tests;
+
+#[cfg(test)]
+#[path = "ui_company_goals_tests.rs"]
+mod goals_tests;
 
 #[cfg(test)]
 mod tests {

@@ -10,15 +10,32 @@ use crate::{
     entities::department::DepartmentId,
 };
 
-/// `day` or `month` (UTC, decision i).
+/// `day` or `month` (UTC, decision i), or a goal's `total` (Plan08 03C.1).
 pub(crate) fn period(value: &str) -> AppResult<&'static str> {
     match value {
         "day" => Ok("day"),
         "month" => Ok("month"),
+        "total" => Ok("total"),
         _ => Err(AppError::BadRequest(
-            "A budget period is either day or month.".into(),
+            "A budget period is day, month, or total for a goal.".into(),
         )),
     }
+}
+
+/// Whether the unit is a goal, under the share lock its `total` cap needs.
+async fn is_goal_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    unit: DepartmentId,
+) -> AppResult<bool> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        "SELECT kind = 'goal' FROM departments WHERE company_id = $1 AND id = $2 FOR SHARE",
+    )
+    .bind(company.as_uuid())
+    .bind(unit.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    .unwrap_or(false))
 }
 
 /// The unit's manager may set its cap (decision c: its lead or anyone above), under the person
@@ -63,6 +80,11 @@ pub(crate) async fn set_on(
         ));
     }
     authorize_on(db, actor, company, unit).await?;
+    if period == "total" && !is_goal_on(db, company, unit).await? {
+        return Err(AppError::BadRequest(
+            "budget.total_goal_only: only a goal has a total budget.".into(),
+        ));
+    }
     let provenance = serde_json::to_value(crate::entities::creation::CreationProvenance::user(
         actor.user_id(),
     ))
@@ -132,7 +154,8 @@ pub(crate) async fn states_on(
     .bind(unit.as_uuid())
     .fetch_all(&mut *db)
     .await?;
-    rows.into_iter()
+    let mut states = rows
+        .into_iter()
         .map(|(name, cap, spent, unpriced)| {
             Ok(crate::application::ports::unit_resources::UnitBudgetState {
                 period: period(&name)?,
@@ -141,7 +164,30 @@ pub(crate) async fn states_on(
                 unpriced_tokens: unpriced,
             })
         })
-        .collect()
+        .collect::<AppResult<Vec<_>>>()?;
+    // A goal's `total`: its cap and the work counted for it in every unit (Plan08 03C.1).
+    let goal: Option<(Option<i64>, i64, i64)> = sqlx::query_as(
+        "SELECT (SELECT cap_micros FROM unit_budgets WHERE company_id = $1 AND unit_id = $2
+                   AND period = 'total'),
+                COALESCE((SELECT LEAST(COALESCE(sum(spent_micros), 0), 9223372036854775807)::bigint
+                            FROM goal_spend WHERE company_id = $1 AND goal_unit_id = $2), 0),
+                COALESCE((SELECT LEAST(COALESCE(sum(unpriced_tokens), 0), 9223372036854775807)::bigint
+                            FROM goal_spend WHERE company_id = $1 AND goal_unit_id = $2), 0)
+           FROM departments WHERE company_id = $1 AND id = $2 AND kind = 'goal'",
+    )
+    .bind(company.as_uuid())
+    .bind(unit.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some((cap, spent, unpriced)) = goal {
+        states.push(crate::application::ports::unit_resources::UnitBudgetState {
+            period: "total",
+            cap_micros: cap,
+            spent_micros: spent,
+            unpriced_tokens: unpriced,
+        });
+    }
+    Ok(states)
 }
 
 #[derive(sqlx::FromRow)]
@@ -180,6 +226,7 @@ pub(crate) async fn check_admission_on(
            FROM chain
            JOIN departments AS unit ON unit.company_id = $1 AND unit.id = chain.id
            JOIN unit_budgets AS budget ON budget.company_id = $1 AND budget.unit_id = chain.id
+            AND budget.period IN ('day', 'month')
            LEFT JOIN unit_spend AS spend ON spend.company_id = $1 AND spend.unit_id = chain.id
             AND spend.period = budget.period
             AND spend.period_start = date_trunc(budget.period, clock_timestamp() AT TIME ZONE 'UTC')
@@ -192,11 +239,35 @@ pub(crate) async fn check_admission_on(
     .bind(run.as_uuid())
     .fetch_optional(&mut *db)
     .await?;
-    match exhausted {
-        Some(row) => Err(AppError::BudgetExhausted(BudgetExhausted {
+    if let Some(row) = exhausted {
+        return Err(AppError::BudgetExhausted(BudgetExhausted {
             unit: row.unit,
             name: row.name,
             period: period(&row.period)?,
+        }));
+    }
+    // Plan08 03C.2: then the goal the run serves, against its `total` cap, counting the work
+    // done for it in every unit (one counter row per unit).
+    let goal: Option<(Uuid, String)> = sqlx::query_as(
+        "SELECT goal.id, goal.name
+           FROM workflow_runs AS run
+           JOIN departments AS goal ON goal.company_id = run.company_id AND goal.id = run.goal_unit_id
+           JOIN unit_budgets AS budget ON budget.company_id = goal.company_id
+            AND budget.unit_id = goal.id AND budget.period = 'total'
+          WHERE run.company_id = $1 AND run.id = $2
+            AND (SELECT COALESCE(sum(spend.spent_micros), 0) FROM goal_spend AS spend
+                  WHERE spend.company_id = goal.company_id AND spend.goal_unit_id = goal.id)
+                >= budget.cap_micros",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?;
+    match goal {
+        Some((unit, name)) => Err(AppError::BudgetExhausted(BudgetExhausted {
+            unit,
+            name,
+            period: "total",
         })),
         None => Ok(()),
     }

@@ -15,7 +15,7 @@ use serde_json::json;
 const SYSTEM: &str = r#"{"actor_type":"system","actor_id":null,"actor_name":"Fixture"}"#;
 
 /// A goal unit under the root with an enabled public desk of its own.
-async fn goal_with_desk(s: &CallSetup, name: &str) -> (Uuid, Uuid) {
+pub(super) async fn goal_with_desk(s: &CallSetup, name: &str) -> (Uuid, Uuid) {
     let goal = s.p().test_unit(s.company().as_uuid(), name).await;
     sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
         .bind(goal)
@@ -34,7 +34,7 @@ async fn goal_with_desk(s: &CallSetup, name: &str) -> (Uuid, Uuid) {
     (goal, desk)
 }
 
-async fn run_goal(s: &CallSetup, run: Uuid) -> Option<Uuid> {
+pub(super) async fn run_goal(s: &CallSetup, run: Uuid) -> Option<Uuid> {
     sqlx::query_scalar("SELECT goal_unit_id FROM workflow_runs WHERE id = $1")
         .bind(run)
         .fetch_one(s.pool())
@@ -51,7 +51,7 @@ async fn thread_goal(s: &CallSetup, thread: Uuid) -> Option<Uuid> {
 }
 
 /// Mark a unit archived directly, to test what resolution does with it.
-async fn archive_raw(s: &CallSetup, unit: Uuid) {
+pub(super) async fn archive_raw(s: &CallSetup, unit: Uuid) {
     sqlx::query(
         "UPDATE departments SET archived_at = now(), archived_by = $2::jsonb WHERE id = $1",
     )
@@ -69,6 +69,19 @@ async fn admit(
     key: &str,
     rerun_of: Option<RunId>,
 ) -> RunId {
+    match try_admit(s, association, key, rerun_of).await.unwrap() {
+        AdmissionResult::Created(run) => run,
+        other => panic!("{other:?}"),
+    }
+}
+
+/// The same admission, returning its refusal.
+pub(super) async fn try_admit(
+    s: &CallSetup,
+    association: RelatedAssociation,
+    key: &str,
+    rerun_of: Option<RunId>,
+) -> AppResult<AdmissionResult> {
     let p = s.p();
     let company = s.company();
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
@@ -92,15 +105,11 @@ async fn admit(
             expected_binding_revision: None,
             admission_claim: None,
         })
-        .await
-        .unwrap();
-    match admission {
-        AdmissionResult::Created(run) => run,
-        other => panic!("{other:?}"),
-    }
+        .await?;
+    Ok(admission)
 }
 
-fn on_thread(desk: Uuid, thread: Uuid) -> RelatedAssociation {
+pub(super) fn on_thread(desk: Uuid, thread: Uuid) -> RelatedAssociation {
     RelatedAssociation::Thread {
         target: crate::entities::address::AddressTarget::Desk(desk),
         thread_id: RelatedThreadId::new(thread),

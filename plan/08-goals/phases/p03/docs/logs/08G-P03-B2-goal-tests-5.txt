@@ -1,0 +1,29 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 43s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 3 tests
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_reports_truncation ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_status_tool_returns_the_rollup_and_refuses_without_a_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows' (50972336) panicked at src/adapters/persistence/workflow/channel_call_support.rs:256:14:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 5214 filtered out; finished in 4.78s
+
+error: test failed, to rerun pass `--lib`

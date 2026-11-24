@@ -67,6 +67,7 @@ fn shapes() -> Vec<Shape> {
     let shape = |name, binding, state: Option<&str>, agent, lineage, cursor| Shape {
         name,
         filter: RunFilter {
+            goal: None,
             binding,
             workflow: None,
             state: state.map(str::to_owned),

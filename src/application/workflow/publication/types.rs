@@ -104,6 +104,8 @@ pub enum ToolKind<'a> {
     Memory,
     /// The name-only, exactly verified `channel.call` built-in (agent-workflow-call).
     ChannelCall,
+    /// The name-only, exactly verified read-only `goal.status` built-in (Plan08 03D.4).
+    GoalStatus,
     /// A tool reached through one of the workflow's resource slots (MCP or slot-bound HTTP).
     Slot(&'a ResourceName),
     /// A company HTTP operation registered by name.
@@ -162,6 +164,13 @@ impl ToolSnapshot {
             )
         {
             return ToolKind::ChannelCall;
+        }
+        if self.contract.connection.is_none()
+            && crate::application::workflow::goal_status::is_builtin_goal_status_tool(
+                self.contract.name.as_str(),
+            )
+        {
+            return ToolKind::GoalStatus;
         }
         match &self.contract.connection {
             Some(slot) => ToolKind::Slot(slot),

@@ -307,6 +307,9 @@ fn push_run_page(
             .push_bind(department.as_uuid())
             .push(")");
     }
+    if let Some(goal) = filter.goal {
+        query.push(" AND goal_unit_id = ").push_bind(goal.as_uuid());
+    }
     if let Some((created, id)) = cursor {
         query
             .push(" AND (created_at, id) < (")

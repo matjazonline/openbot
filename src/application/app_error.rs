@@ -238,15 +238,24 @@ pub struct BudgetExhausted {
     pub unit: uuid::Uuid,
     /// The department's name, for the refusal message.
     pub name: String,
-    /// `day` or `month` (UTC, decision i).
+    /// `day` or `month` (UTC, decision i), or `total` for a goal (Plan08 03C.2).
     pub period: &'static str,
 }
 
 impl BudgetExhausted {
     pub const CODE: &'static str = "budget.unit_exhausted";
+    pub const GOAL_CODE: &'static str = "budget.goal_exhausted";
+
+    pub fn is_goal(&self) -> bool {
+        self.period == "total"
+    }
 
     pub fn code(&self) -> &'static str {
-        Self::CODE
+        if self.is_goal() {
+            Self::GOAL_CODE
+        } else {
+            Self::CODE
+        }
     }
 }
 
@@ -257,6 +266,13 @@ impl AppError {
 
 impl std::fmt::Display for BudgetExhausted {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_goal() {
+            return write!(
+                f,
+                "The goal {} has spent its budget; new work for it starts once its cap is raised",
+                self.name
+            );
+        }
         let period = if self.period == "day" {
             "today's"
         } else {

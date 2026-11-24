@@ -200,6 +200,23 @@ pub(crate) async fn update_department_on(
     let kind = edit.kind.unwrap_or(current.kind);
     let target_date = edit.target_date.unwrap_or(current.target_date);
     unit_kind_shape(current.is_root, kind, target_date)?;
+    // Plan08 03C.1 (gate 08G-P03-D2 D2.1): a `total` cap belongs to a goal; the trigger
+    // `departments_goal_budget` refuses the same under this row's lock.
+    if current.kind == DepartmentKind::Goal && kind == DepartmentKind::Standing {
+        let capped: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM unit_budgets \
+                             WHERE company_id = $1 AND unit_id = $2 AND period = 'total')",
+        )
+        .bind(company.as_uuid())
+        .bind(department.as_uuid())
+        .fetch_one(&mut **tx)
+        .await?;
+        if capped {
+            return Err(AppError::BadRequest(
+                "department.goal_budget_on_standing: clear the goal's total cap first.".into(),
+            ));
+        }
+    }
     if parent_id != current.parent_id
         && let Some(parent) = parent_id
     {

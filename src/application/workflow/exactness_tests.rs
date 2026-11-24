@@ -21,6 +21,7 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
         AgentBuiltinTool::ReadEscalation,
         AgentBuiltinTool::RespondToEscalation,
         AgentBuiltinTool::ChannelCall,
+        AgentBuiltinTool::GoalStatus,
     ];
     for tool in all {
         match tool {
@@ -36,7 +37,8 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
             | AgentBuiltinTool::SaveMemory
             | AgentBuiltinTool::ReadEscalation
             | AgentBuiltinTool::RespondToEscalation
-            | AgentBuiltinTool::ChannelCall => (),
+            | AgentBuiltinTool::ChannelCall
+            | AgentBuiltinTool::GoalStatus => (),
         }
     }
     all.to_vec()
@@ -100,6 +102,7 @@ fn every_target() -> Vec<(AgentToolTarget, ToolAccounting)> {
         },
         ToolAccounting::ChildControl,
     ));
+    targets.push((AgentToolTarget::GoalStatus, ToolAccounting::Configuration));
     if let Ok(pin) = pin {
         targets.push((
             AgentToolTarget::Workflow { pin },
@@ -116,7 +119,8 @@ fn every_target() -> Vec<(AgentToolTarget, ToolAccounting)> {
             | AgentToolTarget::Knowledge
             | AgentToolTarget::Memory { .. }
             | AgentToolTarget::Workflow { .. }
-            | AgentToolTarget::ChannelCall { .. } => (),
+            | AgentToolTarget::ChannelCall { .. }
+            | AgentToolTarget::GoalStatus => (),
         }
     }
     targets
@@ -168,10 +172,10 @@ fn memory_access_level_every_step_kind_and_tool_target_is_classified() {
     assert!(!step_output_exact("future.kind", &json!({})));
 
     let targets = every_target();
-    // Seven single-sample variants, four memory tools, and both escalation operations.
+    // Eight single-sample variants, four memory tools, and both escalation operations.
     assert_eq!(
         targets.len(),
-        13,
+        14,
         "every AgentToolTarget variant has a sample"
     );
     for (target, accounting) in &targets {

@@ -14,13 +14,21 @@ r7 (2026-11-24): the user confirmed README proposals 4 (a goal's budget counts t
 
 r8 (2026-11-24): p03 started (root `1e84a7af`, workflow implement-opus-reviewed-2_4). Batches: B1 = 03A+03B, B2 = 03C+03D. 08G-C001 is satisfied and 08G-C002 acknowledged for p03.
 
+r9 (2026-11-24): p03 B1 (03A+03B) accepted in phase at `6caa7f19…4e2b`, not committed. Gate 08G-P03-D2 r2 (B2 = 03C+03D) passed. p03 responds to 08G-C001 r2 (b): p03 records refused calls before launch in `workflow_channel_call_refusals`, so the goal rollup counts them as `denied`.
+
+r10 (2026-11-24): p03 B1 committed as `481b14cd`. p03 B2 (03C+03D) is accepted in phase at `a50dab5d…243d` (B PASS
+08G-P03-B2-R2-N1) and committed with this revision. New shared contracts: `unit_budgets.period` `total` (goals
+only), `goal_spend`, `model_usage_calls`/`model_usage_history.goal_unit_id`, `workflow_channel_call_refusals`,
+`schedule_runs` refusal `budget.goal_exhausted`, and the `goal.status` built-in. 08G-C002 is satisfied for p03: its
+checks are in the B2 focused run. Open for p04: `goal.status` through the agent runtime is not yet exercised.
+
 ## Phase directory
 
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
 | p01 | /root; resumed on integrated prerequisite (complete) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p01/docs/TASK.md; phases/p01/docs/HANDOFF.md |
 | p02 | Claude Code `plan08-ph1-51` | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p02/docs/TASK.md; phases/p02/docs/HANDOFF.md |
-| p03 | Claude Code `1e84a7af` (started 2026-11-24; gate 08G-P03-D1 r1 under review) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p03/docs/TASK.md; phases/p03/docs/HANDOFF.md |
+| p03 | Claude Code `1e84a7af` (started 2026-11-24; B1 and B2 accepted in phase and committed; p03 complete in phase) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p03/docs/TASK.md; phases/p03/docs/HANDOFF.md |
 
 ## Cross-phase notices
 
@@ -32,7 +40,7 @@ r8 (2026-11-24): p03 started (root `1e84a7af`, workflow implement-opus-reviewed-
 - Dependencies/order: blocks p03 entirely.
 - Evidence/review: none yet
 - Verification: p03 startup records agent-workflow-call's p06 acceptance identity.
-- Responses: p03 -> satisfied r8 (agent-workflow-call p06 accepted in phase at `bc8b9841…764f`, committed `358e662a`)
+- Responses: p03 -> satisfied r8 (agent-workflow-call p06 accepted in phase at `bc8b9841…764f`, committed `358e662a`); p03 -> (b) addressed r9: refused calls before launch are recorded (`workflow_channel_call_refusals`) and counted as `denied` in the goal rollup (gate 08G-P03-D2 r2 F2)
 
 ### 08G-C002 / r1
 - State: active (r6 2026-11-23)
@@ -42,6 +50,6 @@ r8 (2026-11-24): p03 started (root `1e84a7af`, workflow implement-opus-reviewed-
 - Dependencies/order: in effect on branch `plan08_ph1` (uncommitted with agent-workflow-call p01–p03).
 - Evidence/review: `channel_call_resume_archive_cancels_call_child`; `unit_archive_` suite passing (agent-workflow-call `phases/p03/docs/logs/AWC-P03-B1-affected.txt`).
 - Verification: p03 keeps `channel_call_resume_archive_cancels_call_child` and the `unit_archive_` suite green.
-- Responses: p03 -> acknowledged r8 (gate 08G-P03-D1 D1.5 builds the goal open-work count on it)
+- Responses: p03 -> acknowledged r8 (gate 08G-P03-D1 D1.5 builds the goal open-work count on it); p03 -> satisfied r10 (`unit_archive_` and `channel_call_` in `phases/p03/docs/logs/08G-P03-B2-R2-focused.txt`)
 
 Earlier entries: No other phase is being implemented or assigned. Plan 02 is now present in integrated baseline `8fdb892b6e279ed0c09150e2336bbdc7462f877d`; previous prerequisite blocker resolved by externally updated task branch. No source integration performed by this phase.

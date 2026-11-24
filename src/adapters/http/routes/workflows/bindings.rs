@@ -544,6 +544,7 @@ pub async fn runs(
         None => None,
     };
     let filter = RunFilter {
+        goal: None,
         binding: query.binding_id.map(WorkflowBindingId::new),
         workflow,
         state: query.state,

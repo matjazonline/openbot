@@ -22,6 +22,7 @@ pub enum CompanyTab {
     Team,
     Skills,
     Departments,
+    Goals,
 }
 
 impl CompanyTab {
@@ -31,6 +32,7 @@ impl CompanyTab {
             Some("team") => CompanyTab::Team,
             Some("skills") => CompanyTab::Skills,
             Some("departments") => CompanyTab::Departments,
+            Some("goals") => CompanyTab::Goals,
             _ => CompanyTab::Settings,
         }
     }
@@ -47,6 +49,7 @@ pub enum CompanyPaneBody<'a> {
     Team(&'a str),
     Skills(&'a str),
     Departments(&'a str),
+    Goals(&'a str),
 }
 
 impl CompanyPaneBody<'_> {
@@ -56,6 +59,7 @@ impl CompanyPaneBody<'_> {
             CompanyPaneBody::Team(_) => CompanyTab::Team,
             CompanyPaneBody::Skills(_) => CompanyTab::Skills,
             CompanyPaneBody::Departments(_) => CompanyTab::Departments,
+            CompanyPaneBody::Goals(_) => CompanyTab::Goals,
         }
     }
 }
@@ -273,6 +277,7 @@ pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
             CompanyPaneBody::Team(html) => html.to_string(),
             CompanyPaneBody::Skills(html) => html.to_string(),
             CompanyPaneBody::Departments(html) => html.to_string(),
+            CompanyPaneBody::Goals(html) => html.to_string(),
         },
     )
 }
@@ -291,6 +296,7 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
                     <a role="tab" class="tab {team_active}" href="{team_url}">Team</a>
                     <a role="tab" class="tab {skills_active}" href="/ui/companies?company_id={company_id}&amp;tab=skills">Skills</a>
                     <a role="tab" class="tab {departments_active}" href="/ui/companies?company_id={company_id}&amp;tab=departments">Departments</a>
+                    <a role="tab" class="tab {goals_active}" href="/ui/companies?company_id={company_id}&amp;tab=goals">Goals</a>
                 </div>
         "##,
         settings_active = if tab == CompanyTab::Settings {
@@ -309,6 +315,11 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
             ""
         },
         departments_active = if tab == CompanyTab::Departments {
+            "tab-active"
+        } else {
+            ""
+        },
+        goals_active = if tab == CompanyTab::Goals {
             "tab-active"
         } else {
             ""

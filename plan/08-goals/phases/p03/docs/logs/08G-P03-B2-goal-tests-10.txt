@@ -1,0 +1,31 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 55s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 5 tests
+test adapters::http::routes::department::tests::goal_authorization_member_sees_counts_not_runs ... ok
+test adapters::http::routes::department::tests::goal_authorization_stranger_and_manager ... ok
+test adapters::http::routes::ui_departments::tests::goal_rollup_goal_card_renders ... ok
+test adapters::http::routes::ui_companies::goals_tests::goal_rollup_goals_page_lists_visible_goals ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal ... FAILED
+
+failures:
+
+---- adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal stdout ----
+
+thread 'adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal' (51053037) panicked at src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs:1018:10:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: column \"goal_unit_id\" does not exist")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 5219 filtered out; finished in 2.03s
+
+error: test failed, to rerun pass `--lib`

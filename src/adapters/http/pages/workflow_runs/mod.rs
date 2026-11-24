@@ -210,6 +210,8 @@ pub struct RunFilterView<'a> {
     pub agent: Option<Uuid>,
     /// Runs on the desks of this department.
     pub department: Option<Uuid>,
+    /// Runs recorded for this goal (Plan08 03D.2).
+    pub goal: Option<Uuid>,
     pub state: Option<&'a str>,
 }
 
@@ -230,6 +232,7 @@ impl RunFilterView<'_> {
             ("workflow_id", self.workflow),
             ("agent_id", self.agent),
             ("department_id", self.department),
+            ("goal_id", self.goal),
         ] {
             if let Some(id) = id {
                 query.push_str(&format!("&amp;{name}={id}"));
@@ -259,6 +262,10 @@ pub struct ScopeOptions {
     pub agents_cut: bool,
     /// The company's departments in tree order (labels indented by depth).
     pub departments: Vec<ScopeOption>,
+    /// The active goals the viewer may see (Plan08 03D.2), by name.
+    pub goals: Vec<ScopeOption>,
+    /// More goals than the select shows.
+    pub goals_cut: bool,
 }
 
 /// The workflow and agent selects of either view, each with its "any" choice, the chosen one
@@ -355,6 +362,17 @@ pub fn scope_controls(
             filter.department,
             &options.departments,
             false,
+        )
+    } + &if options.goals.is_empty() && filter.goal.is_none() {
+        String::new()
+    } else {
+        select(
+            "goal_id",
+            "goal",
+            "Any goal",
+            filter.goal,
+            &options.goals,
+            options.goals_cut,
         )
     }
 }

@@ -1,0 +1,1 @@
+2026-11-24 reviewer B: cargo fmt --check on digest 40c9f1a8f5bab714fe062b39952e3f4b5d34f8ee2dbdabe70c1df375ca7f7763: no output, clean

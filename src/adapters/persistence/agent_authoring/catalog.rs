@@ -277,6 +277,9 @@ pub(super) fn builtins(memory_enabled: bool) -> AppResult<AgentToolPage> {
         AgentBuiltinTool::RespondToEscalation,
         // Opt-in for every agent; never granted automatically (gate AWC-P05-D1 D1).
         AgentBuiltinTool::ChannelCall,
+        // Opt-in; useful to a goal's lead or sponsor, and refused at call time for anyone else
+        // (Plan08 03D.4).
+        AgentBuiltinTool::GoalStatus,
     ]
     .into_iter()
     .chain(memory.into_iter().filter(|_| memory_enabled))

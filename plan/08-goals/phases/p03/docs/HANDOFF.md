@@ -13,19 +13,20 @@
 
 - Gate 08G-P03-D1 PASSED at r2.
 - **B1 (03A+03B) accepted in phase** at `6caa7f19…4e2b` (B PASS 08G-P03-B1-R2-N1). The accepted diff is saved
-  under `logs/08G-P03-B1-accepted*.txt`. Not committed.
-- Optional S2 (open-work wording for a standing ancestor) is deferred to B2.
-- Recreate the test DB after any schema edit, otherwise you get `VersionMismatch(20260817000000)`.
+  under `logs/08G-P03-B1-accepted*.txt`. **Committed as `481b14cd`** (user authorized 2026-11-24).
+- Gate 08G-P03-D2 PASSED at r2.
+- **B2 (03C+03D) accepted in phase** at `a50dab5d…243d` (B PASS 08G-P03-B2-R2-N1) and committed with p03's
+  records. R1 findings F1–F4 are fixed; see TASK.md.
+- p03 is complete in phase. Not yet verified: `goal.status` through the agent runtime, the full suite, browser
+  checks, and rollup cost at 10,000 runs. They are handed to p04.
 
 ## Next
 
-1. Gate 08G-P03-D2 r1 is drafted in TASK.md and under review by B. Then implement B2 (03C budget with goal spend counters; 03D rollup, pages, API, `goal.status`,
-   authorization). Have B review it, then implement, review and accept.
-2. Then Plan08 p04 (integration and final verification).
+1. Plan08 p04 (integration and final verification): start with its plan file, COORDINATION r10 and the items
+   above.
 
 ## Pending with the user
 
-- Commit authorization for the p03 work (nothing in p03 is committed yet).
-- Open product question: whether cancel-and-archive of a goal should also cancel a goal run elsewhere that
-  started outside the goal's own trees (for example a later reply on a call thread). B1 says no: the archive is
-  refused as not cancellable and that department ends the run. `docs/departments.md` documents this.
+- Nothing blocking. Open question: does the user want a later reply on a goal's call thread to count as
+  started by the goal (and so be cancellable when the goal is archived)? B1 does not count it as started by
+  the goal.

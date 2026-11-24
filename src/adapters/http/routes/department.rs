@@ -37,6 +37,10 @@ pub fn router() -> Router<AppState> {
                 .delete(delete_department_json),
         )
         .route(
+            "/api/companies/{company_id}/departments/{department_id}/rollup",
+            get(goal_rollup_json),
+        )
+        .route(
             "/api/companies/{company_id}/departments/{department_id}/archive",
             post(archive_department_json),
         )
@@ -212,6 +216,18 @@ async fn get_department_json(
         .visible_department(user.id, company_id, DepartmentId::new(department_id))
         .await?;
     Ok((StatusCode::OK, Json(detail)))
+}
+
+/// A goal's status (Plan08 03D.3): the same rollup the goal's page shows.
+async fn goal_rollup_json(
+    State(departments): State<Arc<DepartmentUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<impl IntoResponse> {
+    let rollup = departments
+        .goal_rollup(user.id, company_id, DepartmentId::new(department_id))
+        .await?;
+    Ok((StatusCode::OK, Json(rollup)))
 }
 
 async fn update_department_json(

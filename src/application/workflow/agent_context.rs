@@ -91,6 +91,7 @@ impl PreparedTool {
                     super::super::channel_call::CHANNEL_CALL_DESCRIPTION,
                     desks.render()
                 ),
+                AgentToolTarget::GoalStatus => super::super::goal_status::DESCRIPTION.into(),
                 _ => format!("Workflow tool {}", self.name),
             },
             parameters: self.input_schema.clone(),

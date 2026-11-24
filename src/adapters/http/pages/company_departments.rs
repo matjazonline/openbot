@@ -106,6 +106,8 @@ pub struct DepartmentSection<'a> {
     pub models: Option<&'a [crate::entities::company::CompanyModelConnection]>,
     /// The selected department's spend caps and counted spend, loaded only for its managers.
     pub budgets: Option<&'a [crate::application::ports::unit_resources::UnitBudgetState]>,
+    /// The selected goal's status, for those who may see it (Plan08 03D.2).
+    pub goal: Option<&'a crate::application::ports::department::GoalRollup>,
 }
 
 impl DepartmentSection<'_> {
@@ -623,6 +625,7 @@ fn department_detail(
             {sponsors}
             {escalation}
             {roles_cut}
+            {goal}
             {members}
             {desks}
             {knowledge}
@@ -648,11 +651,117 @@ fn department_detail(
         } else {
             ""
         },
+        goal = section.goal.map_or(String::new(), |rollup| goal_card(
+            section.company.id,
+            rollup
+        )),
         members = members_card(section, view),
         desks = desks_card(section, view.detail.department.id, &view.desks),
         knowledge = knowledge_card(section, department),
         models = models_card(section, department),
         budgets = budgets_card(section, department),
+    )
+}
+
+/// A goal's status (Plan08 03D.2): runs by department, calls, waits, spend and time. Counts only;
+/// each run link keeps the run page's own check.
+/// A goal's status card (Plan08 03D.2): on the goal's department page for its members and
+/// managers, and on the Goals tab for anyone who may see the goal.
+pub fn goal_card(
+    company: Uuid,
+    rollup: &crate::application::ports::department::GoalRollup,
+) -> String {
+    let usd = crate::services::model_usage::usd;
+    let time = |at: Option<chrono::DateTime<chrono::Utc>>| {
+        at.map_or("—".to_owned(), |at| {
+            at.format("%Y-%m-%d %H:%M UTC").to_string()
+        })
+    };
+    let rows: String = rollup
+        .units
+        .iter()
+        .map(|unit| {
+            format!(
+                "<tr><th scope=\"row\">{name}</th><td>{open}</td><td>{waiting}</td><td>{succeeded}</td><td>{failed}</td><td>{cancelled}</td><td>{spent}</td></tr>",
+                name = unit
+                    .name
+                    .as_deref()
+                    .map_or("A deleted department".to_owned(), escape_html_text),
+                open = unit.open(),
+                waiting = unit.waiting,
+                succeeded = unit.succeeded,
+                failed = unit.failed,
+                cancelled = unit.cancelled,
+                spent = usd(unit.spent_micros),
+            )
+        })
+        .collect();
+    let waits: String = rollup
+        .waiting
+        .iter()
+        .map(|wait| {
+            format!(
+                r#"<li><a class="link" href="/ui/workflow-runs?company_id={company}&amp;run_id={run}">Run {short}</a> in {unit}, waiting on {who} since {since}</li>"#,
+                run = wait.run_id,
+                short = &wait.run_id.to_string()[..8],
+                unit = wait
+                    .unit_name
+                    .as_deref()
+                    .map_or("a deleted department".to_owned(), escape_html_text),
+                who = escape_html_text(&wait.reviewers.join(", ")),
+                since = wait.since.format("%Y-%m-%d %H:%M UTC"),
+            )
+        })
+        .collect();
+    let waits = if rollup.waiting.is_empty() {
+        "<p class=\"text-sm opacity-70\">Nothing is waiting on a person.</p>".to_owned()
+    } else {
+        format!(
+            r#"<p class="text-sm">{total} decision(s) waiting on people{shown}:</p><ul class="list-disc pl-5 text-sm space-y-1">{waits}</ul>"#,
+            total = rollup.waiting_total,
+            shown = if rollup.waiting_total > rollup.waiting.len() as i64 {
+                format!(", the oldest {} shown", rollup.waiting.len())
+            } else {
+                String::new()
+            },
+        )
+    };
+    let calls = &rollup.calls;
+    format!(
+        r##"<section id="goal-status" class="card bg-base-200 p-4 space-y-3">
+            <h3 class="font-semibold">Goal status</h3>
+            <p class="text-xs opacity-70">Work done for this goal in every department: counts, states and spend only. Opening a run still needs access to its desk.{cut}</p>
+            <p class="text-sm">Spend {spent}{cap}. Calls: {done} done, {denied} denied, {handed_off} handed off, {no_reply} without reply, {error} failed, {open} open. Open escalations: {escalations}.</p>
+            <p class="text-sm">First run {first}; last finished {last}; last activity {activity}; time waiting on people {waited} h.</p>
+            <table class="table table-sm"><thead><tr><th scope="col">Department</th><th scope="col">Open</th><th scope="col">Waiting</th><th scope="col">Succeeded</th><th scope="col">Failed</th><th scope="col">Cancelled</th><th scope="col">Spend (USD)</th></tr></thead><tbody>{rows}</tbody></table>
+            {waits}
+            <a class="link text-sm" href="/ui/workflow-runs?company_id={company}&amp;goal_id={goal}">Runs for this goal</a>
+        </section>"##,
+        cut = if rollup.truncated {
+            format!(" Counts cover the newest {} runs.", rollup.runs_counted)
+        } else {
+            String::new()
+        },
+        spent = usd(rollup.spend.spent_micros),
+        cap = rollup
+            .spend
+            .cap_micros
+            .map_or(" (no total cap)".to_owned(), |cap| format!(
+                " of a {} total cap",
+                usd(cap)
+            )),
+        done = calls.done,
+        denied = calls.denied,
+        handed_off = calls.handed_off,
+        no_reply = calls.no_reply,
+        error = calls.error,
+        open = calls.open,
+        escalations = rollup.escalations_open,
+        first = time(rollup.first_run_at),
+        last = time(rollup.last_finished_at),
+        activity = time(rollup.last_activity_at),
+        waited = rollup.waiting_on_people_seconds / 3600,
+        goal = rollup.goal,
     )
 }
 
@@ -669,13 +778,22 @@ fn budgets_card(section: &DepartmentSection<'_>, department: &Department) -> Str
         format!(
             r##"<form class="flex flex-wrap gap-3 items-end" hx-post="/ui/companies/{company}/departments/{unit}/budgets" hx-target="#department-section" hx-swap="outerHTML">
                 <label class="form-control"><span class="text-xs opacity-70">Daily cap (USD)</span><input name="day_cap" value="{day}" inputmode="decimal" class="input input-sm"></label>
-                <label class="form-control"><span class="text-xs opacity-70">Monthly cap (USD)</span><input name="month_cap" value="{month}" inputmode="decimal" class="input input-sm"></label>
+                <label class="form-control"><span class="text-xs opacity-70">Monthly cap (USD)</span><input name="month_cap" value="{month}" inputmode="decimal" class="input input-sm"></label>{total}
                 <button type="submit" class="btn btn-sm btn-primary">Save spend caps</button>
             </form>"##,
             company = section.company.id,
             unit = department.id,
             day = escape_html_attr(&cap(states, "day")),
             month = escape_html_attr(&cap(states, "month")),
+            total = if department.kind == crate::entities::department::DepartmentKind::Goal {
+                format!(
+                    r#"
+                <label class="form-control"><span class="text-xs opacity-70">Goal total cap (USD)</span><input name="total_cap" value="{}" inputmode="decimal" class="input input-sm"></label>"#,
+                    escape_html_attr(&cap(states, "total"))
+                )
+            } else {
+                String::new()
+            },
         )
     };
     let usd = crate::services::model_usage::usd;
@@ -684,10 +802,10 @@ fn budgets_card(section: &DepartmentSection<'_>, department: &Department) -> Str
         .map(|state| {
             format!(
                 "<tr><th scope=\"row\">{}</th><td>{}</td><td>{}</td><td>{}</td></tr>",
-                if state.period == "day" {
-                    "Today (UTC)"
-                } else {
-                    "This month (UTC)"
+                match state.period {
+                    "day" => "Today (UTC)",
+                    "month" => "This month (UTC)",
+                    _ => "Goal total, every department",
                 },
                 state.cap_micros.map_or("No cap".to_owned(), usd),
                 usd(state.spent_micros),
@@ -702,10 +820,15 @@ fn budgets_card(section: &DepartmentSection<'_>, department: &Department) -> Str
     format!(
         r##"<section id="department-budgets" class="card bg-base-200 p-4 space-y-3">
             <h3 class="font-semibold">Spend caps</h3>
-            <p class="text-xs opacity-70">Counted spend is each settled model call's priced cost, for this department and every one below it. Once a cap is reached, new runs here and below are refused until the next UTC day or month; runs already started finish.</p>
+            <p class="text-xs opacity-70">Counted spend is each settled model call's priced cost, for this department and every one below it. Once a cap is reached, new runs here and below are refused until the next UTC day or month; runs already started finish.{goal_note}</p>
             <table class="table table-sm"><thead><tr><th scope="col">Period</th><th scope="col">Cap (USD)</th><th scope="col">Counted (USD)</th><th scope="col"></th></tr></thead><tbody>{rows}</tbody></table>
             {form}
         </section>"##,
+        goal_note = if department.kind == crate::entities::department::DepartmentKind::Goal {
+            " A goal's total cap counts the work done for it in every department, for as long as it runs; once reached, new work for the goal is refused until the cap is raised."
+        } else {
+            ""
+        },
     )
 }
 
@@ -1191,5 +1314,89 @@ fn edit_form(
         error = section.error_for(DepartmentForm::Edit),
         fields = department_fields(section, &draft, Some(department)),
         submit = busy_submit_button("Save department"),
+    )
+}
+
+/// The Goals tab (Plan08 03D.2): the goals the viewer may see, each with its lead, deciding
+/// sponsor, target date, open, waiting and failed runs and spend against its total cap. A goal
+/// opens here with its status card (`goal_id`), for anyone who may see it, including a viewer of
+/// one of its desks who could not open its department page (08G-P03-B2-F2).
+pub fn goals_list(
+    company_id: Uuid,
+    goals: &[crate::application::ports::department::GoalSummary],
+    cut: bool,
+    archived: bool,
+    selected: Option<&crate::application::ports::department::GoalRollup>,
+) -> String {
+    let usd = crate::services::model_usage::usd;
+    let rows: String = goals
+        .iter()
+        .map(|goal| {
+            let cut = if goal.truncated { "+" } else { "" };
+            format!(
+                r#"<tr><th scope="row"><a class="link" href="/ui/companies?company_id={company_id}&amp;tab=goals&amp;goal_id={id}{archived_query}">{name}</a></th><td>{lead}</td><td>{decider}</td><td>{target}</td><td>{open}{cut}</td><td>{waiting}{cut}</td><td>{failed}{cut}</td><td>{spend}</td></tr>"#,
+                id = goal.goal,
+                archived_query = if archived { "&amp;archived=true" } else { "" },
+                name = escape_html_text(&goal.name),
+                lead = goal.lead.as_deref().map_or("—".to_owned(), escape_html_text),
+                decider = goal.decider.as_deref().map_or("—".to_owned(), escape_html_text),
+                target = goal
+                    .target_date
+                    .map_or("—".to_owned(), |date| date.format("%Y-%m-%d").to_string()),
+                open = goal.open,
+                waiting = goal.waiting,
+                failed = goal.failed,
+                spend = match goal.spend.cap_micros {
+                    Some(cap) => format!("{} of {}", usd(goal.spend.spent_micros), usd(cap)),
+                    None => usd(goal.spend.spent_micros),
+                },
+            )
+        })
+        .collect();
+    let table = if goals.is_empty() {
+        format!(
+            r#"<p class="text-sm opacity-70">{}</p>"#,
+            if archived {
+                "No archived goals you can see."
+            } else {
+                "No active goals you can see. A goal is a department of the Goal kind; create one on the Departments tab."
+            }
+        )
+    } else {
+        format!(
+            r#"<table class="table table-sm" id="goals-table"><thead><tr><th scope="col">Goal</th><th scope="col">Lead</th><th scope="col">Deciding sponsor</th><th scope="col">Target date</th><th scope="col">Open</th><th scope="col">Waiting</th><th scope="col">Failed</th><th scope="col">Spend (USD)</th></tr></thead><tbody>{rows}</tbody></table>
+            <p class="text-xs opacity-60">Counts cover each goal's newest {limit} runs; "+" marks a goal with more.</p>{more}"#,
+            limit = crate::application::ports::department::GOALS_LIST_RUN_LIMIT,
+            more = if cut {
+                format!(
+                    r#"<p class="text-xs opacity-60" id="goals-cut">Showing the newest {} goals; more exist. Open an older goal from its department.</p>"#,
+                    crate::application::ports::department::GOALS_LIST_LIMIT
+                )
+            } else {
+                String::new()
+            },
+        )
+    };
+    format!(
+        r##"<div id="goals-section" class="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4">
+            <div class="flex items-center gap-3">
+                <h3 class="font-semibold">{heading}</h3>
+                <a class="link text-sm" href="/ui/companies?company_id={company_id}&amp;tab=goals{toggle}">{toggle_label}</a>
+            </div>
+            {selected}
+            {table}
+        </div>"##,
+        selected = selected.map_or(String::new(), |rollup| goal_card(company_id, rollup)),
+        heading = if archived {
+            "Archived goals"
+        } else {
+            "Active goals"
+        },
+        toggle = if archived { "" } else { "&amp;archived=true" },
+        toggle_label = if archived {
+            "Show active goals"
+        } else {
+            "Show archived goals"
+        },
     )
 }

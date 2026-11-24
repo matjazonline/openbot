@@ -256,3 +256,95 @@ verification plan, not the planned tests. No new findings. Points for the batch 
   accepts that.
 
 **Process and instruction feedback:** one round closed all four. No new instruction candidate.
+
+## 08G-P03-B2-R1-N1 — batch review, B2 (2026-11-24)
+
+**Identity**
+- Workflow `implement-opus-reviewed-2_4`; batch B2 (03C + 03D); stage: whole-batch review, round
+  08G-P03-B2-R1. Task record: [TASK.md](TASK.md), "B2 implementation progress", "B2 verification mapping",
+  "B2 checks". Gated decisions: 08G-P03-D2 r1 with the r2 corrections (passed in 08G-P03-D2-R2-N1).
+- Reviewer `claude-fable-5-2`; effort as assigned by root (medium).
+- Worktree `/Users/mac02/orca/workspaces/openbot/plan08_ph1`, branch `plan08_ph1`. Review base = HEAD =
+  `481b14cd` (B1 committed); phase start `c7fbbbbe`. The batch is the working tree plus seven untracked
+  source files; `logs/08G-P03-B2-R1.diff.txt` is the author's copy, and I read the files themselves.
+- Digest `40c9f1a8f5bab714fe062b39952e3f4b5d34f8ee2dbdabe70c1df375ca7f7763`, exclusions
+  `plan/08-goals/phases/p03/docs` and `.trail/learnings`; recomputed at the start and before returning.
+- Coordination revision 9 (the mutable file; no pinned copy of r9 was named to me). 08G-C001 r2 (b) has a p03
+  response: refused calls are recorded. 08G-C002 r1 acknowledged.
+- Evidence manifest `logs/08G-P03-B2-R1.evidence.json`: valid for this digest (5 PASS, 1 NOT EXERCISED).
+
+**Coverage and evidence**
+- Read in full: the schema diff; `unit_budgets.rs`; `channel_call_target.rs` refusal writes; `children.rs`;
+  `app_error.rs`; `channel_call.rs`; `department/lifecycle.rs`; `storage_retention.rs`; `company.rs`
+  (`replace_unit_budgets`); `department/goal_rollup.rs`; both `goal_status.rs` files; the board, list and
+  use-case diffs; the JSON route; the goal card and goals list page code; the tool wiring diffs
+  (`agent_capability.rs`, `publication/types.rs`, `agent.rs`, `agent_contract.rs`, `exactness.rs`,
+  `workflow_agent/mod.rs`, `authority.rs`, `resources.rs`, catalog, `infra/workflow.rs`).
+- Consumers traced: readers and writers of `unit_budgets` (the chain query is limited to day and month;
+  `model_usage/report.rs` is unaffected), `model_usage_history` (one writer; the archive guard compares whole
+  rows, and both tables gained the column), `goal_spend` and `workflow_channel_call_refusals` (three source
+  files), `BudgetExhausted` and its code (HTTP, run controls, message and schedule admission: F1),
+  `UnitBudgetState.period`, the `with_goal_status` builder sites, and the page's visibility path (F2).
+- Checks I ran, both read-only: `cargo fmt --check` on the frozen tree (clean,
+  `logs/08G-P03-B2-R1-reviewer-fmt.txt`), and `pg_get_constraintdef` for `schedule_runs_refusal_check` on
+  `openbot_p08p03_mac02`. No database-backed test was run by me.
+- Logs inspected: `08G-P03-B2-focused-2.txt` (975 passed, written after the last source edit),
+  `08G-P03-B2-stack-budget.txt` (44 `goal_` tests at 2 MiB), clippy rerun, SQLx prepare. The fmt log is older
+  than the last edits (S1).
+- Confirmed as designed: the counter and its charge; the goal check after the chain check; the four refusal
+  writes outside the child's savepoint; the rollup's bound, truncation and first-run read; the D2.5 rule in
+  SQL for the JSON route, the list and the board's id check; `goal.status` refusals; the database guards for
+  `total`.
+- Reviewed lightly: the test files themselves (the mapping's assertions were checked against the code they
+  target, not line by line), `docs/departments.md` and `docs/workflow-operations.md`, the Budgets form.
+  Not examined: rollup cost at 10,000 runs; the tool-result size bound for a goal with many departments.
+- Recorded departures and my reading: the Waiting view without a goal filter and the escalation rule are
+  acceptable as documented; `goal.status` without a lock is fine for a read (see S1 for the origin).
+
+**Outcome:** changes required; no pass at this digest. Actionable: 08G-P03-B2-F1 (high), F2 (medium), F3 (low),
+F4 (low). Optional: 08G-P03-B2-S1.
+
+**Follow-up to earlier notes:** 08G-P03-B2-F1 exposes a gap in my gate reviews 08G-P03-D2-R1-N1 and
+08G-P03-D2-R2-N1. I traced `BudgetExhausted` to the call child and the HTTP error, and did not follow the new
+code into the schedule's stored refusal. The passes stand as recorded; the miss is linked here.
+
+**Process and instruction feedback**
+- The batch was large but reviewable; the saved diff and the consumer list in the request helped.
+- Three findings in this phase share one cause (a new stored value, readers not enumerated). Candidate
+  instruction, scope `implement-opus-reviewed-2_4` gates and batch accounts: for each new or changed stored
+  discriminator, code or period, record the literal search for its nearest existing sibling in the schema
+  and source, with a disposition per hit. Evidence: 08G-P03-B1-F1, 08G-P03-D2-F1, 08G-P03-B2-F1.
+- The same applies to the reviewer: my gate checklist should have included that search.
+
+## 08G-P03-B2-R2-N1 — correction recheck, B2 (2026-11-24)
+
+**Identity**
+- Workflow `implement-opus-reviewed-2_4`; batch B2; stage: correction recheck, round 08G-P03-B2-R2, after
+  08G-P03-B2-R1-N1. Task record: [TASK.md](TASK.md), "B2 corrections after 08G-P03-B2-R1-N1".
+- Reviewer `claude-fable-5-2`; effort as assigned by root (medium).
+- Worktree `/Users/mac02/orca/workspaces/openbot/plan08_ph1`, branch `plan08_ph1`, base = HEAD = `481b14cd`.
+- Digest `a50dab5d154a943b352acd765a07576e258f5918f778295a8b1d2b9cf359243d`, same exclusions; recomputed at
+  the start and before returning.
+- Coordination revision 9, as in R1. Evidence manifest `logs/08G-P03-B2-R2.evidence.json`: valid for this
+  digest (5 PASS, 1 NOT EXERCISED).
+
+**Coverage and evidence**
+- The correction delta was taken by comparing the two saved batch diffs per file (15 files differ) and read
+  in the tree: the schema constraint, the new schedule test, the `decisions` CTE, `goal_choices_on`, the
+  board's id check and select, and the Goals tab's single-goal pane and links.
+- Rechecked by finding ID: F1–F4 and the S1 dispositions; see the findings log.
+- Logs inspected, not rerun by me: the focused run (1034 passed, 1 ignored) with the four correction tests
+  and both `goal_authorization_` tests ok; 45 `goal_` tests at 2 MiB; clippy 1.95, fmt and SQLx prepare. All
+  five logs are newer than the last source edit (18:43; logs from 18:48).
+- Reused from R1 without re-reading: the counter, the cap check, refusal writes, the rollup's other queries,
+  `goal.status`, the tool wiring and the consumer traces.
+- Still outside the pass: `goal.status` through the agent runtime (declared NOT EXERCISED, accepted as a
+  stand-in for p04 to name); browser checks; the full suite; rollup cost at the run limit.
+
+**Outcome:** PASS for batch B2 (03C + 03D) at digest
+`a50dab5d154a943b352acd765a07576e258f5918f778295a8b1d2b9cf359243d`. 08G-P03-B2-F1 to F4 fixed; S1 dispositions
+accepted. No new findings.
+
+**Process and instruction feedback:** the saved per-round diffs made this recheck exact, which the B1 recheck
+lacked. The sibling-literal sweep is now recorded in TASK for F1; the candidate instruction from
+08G-P03-B2-R1-N1 stands.

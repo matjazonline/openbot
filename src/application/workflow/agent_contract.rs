@@ -86,6 +86,11 @@ pub fn agent_action_target(
                         "Channel calls use the child runtime".into(),
                     ));
                 }
+                crate::entities::agent_capability::AgentBuiltinTool::GoalStatus => {
+                    return Err(AppError::BadRequest(
+                        "goal.status is a direct read, not an action".into(),
+                    ));
+                }
             })?,
         },
         AgentBindingSource::Workflow { .. } => {

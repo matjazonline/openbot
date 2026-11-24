@@ -232,6 +232,7 @@ impl Fixture {
         list(
             self.ui(user),
             Query(ListQuery {
+                goal_id: None,
                 department_id: None,
                 company_id: self.company,
                 binding_id: None,
@@ -254,6 +255,7 @@ impl Fixture {
         list(
             self.ui(user),
             Query(ListQuery {
+                goal_id: None,
                 department_id: None,
                 company_id: self.company,
                 binding_id: None,
@@ -754,6 +756,7 @@ async fn other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_esc
         let listed = list(
             f.ui(user),
             Query(ListQuery {
+                goal_id: None,
                 department_id: None,
                 company_id: company,
                 binding_id: None,
@@ -887,6 +890,7 @@ async fn department_views_runs_department_scope_is_company_scoped() {
     let html = waiting_workspace(
         f.ui(f.owner),
         WorkspaceQuery {
+            goal_id: None,
             company_id: Some(f.company),
             run_id: None,
             binding_id: None,

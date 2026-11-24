@@ -362,6 +362,9 @@ async fn write_call_on(
         .await
     {
         Ok(()) => Ok(Ok((child, parked))),
+        Err(AppError::BudgetExhausted(refusal)) if refusal.is_goal() => {
+            Ok(Err(DeniedCode::GoalBudgetExhausted))
+        }
         Err(AppError::BudgetExhausted(_)) => Ok(Err(DeniedCode::UnitBudgetExhausted)),
         Err(error) => Err(error),
     }

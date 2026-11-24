@@ -171,6 +171,7 @@ pub(super) async fn supported_publication(
                 ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
                 ToolKind::Memory => builtin_memory_tool(tx, tool, check).await?,
                 ToolKind::ChannelCall => builtin_channel_call_tool(tool)?,
+                ToolKind::GoalStatus => builtin_goal_status_tool(tool)?,
                 ToolKind::Http => {
                     http::registered_on(
                         tx,
@@ -233,6 +234,14 @@ pub(super) async fn builtin_memory_tool(
 
 pub(super) fn builtin_channel_call_tool(tool: &ToolSnapshot) -> AppResult<()> {
     if crate::application::workflow::channel_call::is_trusted_channel_call_snapshot(tool)? {
+        Ok(())
+    } else {
+        Err(missing())
+    }
+}
+
+pub(super) fn builtin_goal_status_tool(tool: &ToolSnapshot) -> AppResult<()> {
+    if crate::application::workflow::goal_status::is_trusted_goal_status_snapshot(tool)? {
         Ok(())
     } else {
         Err(missing())

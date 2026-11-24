@@ -1,0 +1,33 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 09s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 7 tests
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_reports_a_cut_option_list ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::run_board_view_filter_workflow_pages_link_to_the_board ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_refuses_another_tenants_ids ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal ... FAILED
+test adapters::http::routes::workflows::tests::run_filter_tests::run_board_view_filter_json_routes_take_a_workflow_of_the_company ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined ... ok
+
+failures:
+
+---- adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal stdout ----
+
+thread 'adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal' (51071464) panicked at src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs:1041:5:
+assertion failed: !unscoped.contains(&format!(r#"<option value="{standing}""#))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 5217 filtered out; finished in 6.98s
+
+error: test failed, to rerun pass `--lib`

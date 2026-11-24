@@ -114,6 +114,7 @@ async fn autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder
         names,
         [
             "channel.call",
+            "goal.status",
             "message.reply",
             "message.send",
             "read_escalation",

@@ -114,9 +114,11 @@ pub fn tool_accounting(target: &AgentToolTarget) -> ToolAccounting {
             _ => ToolAccounting::RaisingRead,
         },
         AgentToolTarget::Message { .. } => ToolAccounting::Receipt,
-        AgentToolTarget::Provisioning { .. } | AgentToolTarget::Escalation { .. } => {
-            ToolAccounting::Configuration
-        }
+        // A goal's status is company work metadata (counts, states, names), exact at 0 like
+        // company configuration (gate 08G-P03-D2 D2.4: no content).
+        AgentToolTarget::Provisioning { .. }
+        | AgentToolTarget::Escalation { .. }
+        | AgentToolTarget::GoalStatus => ToolAccounting::Configuration,
         AgentToolTarget::Workflow { .. } | AgentToolTarget::ChannelCall { .. } => {
             ToolAccounting::ChildControl
         }

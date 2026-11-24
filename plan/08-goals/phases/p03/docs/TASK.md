@@ -776,3 +776,172 @@ Status (checkpoint, 2026-11-24). Done and compiling:
   - `DepartmentPersistence::goal_rollup` and `visible_goals`.
 
 Next: use cases, the JSON route, the Goals tab and goal card, the board filter, `goal.status`, docs and tests.
+
+### User answers (2026-11-24)
+
+- **Archive scope:** "archiving goal should stop only its own runs or runs started as consequence of the goal
+  run in any department." This confirms B1's rule.
+  - Cancel-and-archive ends the goal's own trees: roots on its desks and every run they started, including
+    call children in other departments.
+  - It does not end a run elsewhere that those trees did not start.
+  - Such a run still blocks the archive (refused, `elsewhere > 0`) until its department ends it.
+  - Open question for the user: a later reply on a call thread the goal opened is admitted as a new root
+    in the destination department, not as a child of a goal run. It is treated as not started by the goal's
+    trees.
+- **Commit:** authorized.
+  - B1 is committed as `481b14cd` from the saved accepted diff; the committed tracked changes equal
+    `logs/08G-P03-B1-accepted.diff.txt`, plus the six B1 files and the phase records.
+  - B2 work in progress stays uncommitted.
+  - The trail check flagged 7 lexical matches on schema lines outside the commit; the commit message
+    explains this.
+
+Status (checkpoint 2, 2026-11-24): all B2 code is in and compiles; tests are not yet written.
+- **03D, the rest:**
+  - `DepartmentUseCases::goal_rollup`/`visible_goals`;
+  - `GET /api/companies/{c}/departments/{d}/rollup`;
+  - the goal status card (`goal_card`, loaded in `department_section` when the unit is a goal and visible);
+  - the Goals tab (`CompanyTab::Goals`, `goals_pane`, `pages::goals_list`, `?archived=true`);
+  - the board and list `goal_id` filter (`RunFilter.goal`, `RunBoardScope.goal`, `ScopeIds`/`Scope`/
+    `RunFilterView`/`ScopeOptions.goals`), checked against the viewer's visible goals (active and
+    archived).
+- **`goal.status`:**
+  - `application/workflow/goal_status.rs` (snapshot, trust check, `GoalStatusDispatch`);
+  - `AgentBuiltinTool::GoalStatus`, `ToolKind::GoalStatus`, `AgentToolTarget::GoalStatus` (accounting
+    Configuration);
+  - authority, resources, preview, publication, contract (direct read, not an action), sample (fixture),
+    context description, exactness coverage, catalog (opt-in) and reserved name;
+  - dispatch via `with_goal_status`, wired in `infra/workflow.rs` and the test support;
+  - `persistence/workflow/goal_status.rs`.
+- **S2 wording:** "still open for this department or a goal in it".
+- **Departure from D2.6, for the batch review:** the board's Waiting view keeps the department filter only.
+  Its read is the attention queue, which has no goal. The goal's status card lists its own waiting
+  decisions.
+- **Next:** the D2 tests, docs, checks, freeze and batch review.
+
+Status (checkpoint 3, 2026-11-24): `goal_budget_tests.rs` (mounted in `message_tests`): 10 tests pass, plus
+B1's `goal_competing_archive_and_thread_admission`. Log: `logs/08G-P03-B2-goal-tests-7.txt`.
+- **Defects the tests found, fixed:**
+  - **`LEAST` with NULL:** `LEAST(sum(..), MAX)` returns MAX over no rows, because `LEAST` ignores NULL. An
+    empty goal showed `spent_micros` = 9.2e18 (`states_on` total row, goals list) and
+    `waiting_on_people_seconds` = 9.2e18. Fixed with `LEAST(COALESCE(sum(..), 0), MAX)`.
+  - **Usage goal attribution:** `attribute_model_usage` only set `goal_unit_id` when it was NULL, so a writer
+    could name a goal. It is now always the run's goal; the test writes a forged one.
+  - **Rollup `open` calls:** a call with no result counts as `open` only while its caller is unfinished. A
+    caller that ended without taking an answer leaves no closure.
+- **Test notes:**
+  - The `done` closure uses the real path: scripted agent call, child finished, caller resumed and consumed.
+  - Callers whose claim is no longer needed are cancelled to stay within the company's claim capacity; the
+    result and refusal rows outlive them.
+  - `goal.status` is tested through the persistence port (`GoalStatusDispatch`). The agent-runtime wiring
+    (`with_goal_status`, `ToolInvocation::GoalStatus`) is covered by compilation and exactness tests only:
+    a stand-in.
+- **Next:** waits and escalations (`DecisionFixture`/`GuardFixture`), authorization, the page, card and board
+  tests, then docs.
+
+### B2 verification mapping (actual tests, 2026-11-24)
+
+| Requirement | Test | Decisive assertions |
+| --- | --- | --- |
+| 03C.1 | `goal_budget_total_cap_only_on_a_goal` | `total` on standing: `budget.total_goal_only` (set and replace), raw insert hits `unit_budgets_total_goal_only`; goal→standing with a cap: `department.goal_budget_on_standing` and raw `departments_goal_budget`; after clearing, the change succeeds; day/month caps unchanged; a goal's `states_on` total row is (0, 0) with no spend |
+| 03C.1 counter | `goal_budget_spend_counts_work_in_every_department` | goal desk 100, finance call child 30 (+10 unpriced), ops call child 7: one `goal_spend` row per working unit, equal to an aggregate over the settled calls; `goal_unit_id` is the run's even when the writer forges one; a plain run charges no goal; `unit_spend` unchanged |
+| 03C.2 | `goal_budget_total_cap_refuses_admission_and_names_the_goal` | at 99/100 admits; at 100 a root run on the desk and a reply on the call's thread in finance are refused with `budget.goal_exhausted` naming the goal; no-goal runs admit; a goal day cap is named first (`budget.unit_exhausted`, day) |
+| D2 r2 F1 | `goal_budget_total_cap_leaves_desks_in_the_goal_admitting` | with total and day caps not reached: the goal desk, a desk of a unit below the goal and a call into the goal desk all admit; at the cap the goal desk refuses with the goal code |
+| 03C.3 | `goal_budget_refused_call_child_is_a_denied_closure` | exact `{"closure":"denied","code":"budget.goal_exhausted","reason":…}`; refusal row (desk, code); no call rows |
+| 03C race | `goal_competing_admission_waits_and_sees_the_crossing_goal_charge` | admission blocked on the company lock; settlement commits within 5 s without that lock; the admission is then refused with the goal code |
+| 03C race | `goal_competing_concurrent_goal_settlements` | 16 concurrent settlements across 4 units, 4 per goal row, within 30 s: each row 40, equal to the call aggregate |
+| 03D.1 | `goal_rollup_counts_waits_calls_and_spend_match_the_rows` | three departments: states by unit equal a `GROUP BY` over the rows; open 1, done 1 (real agent consumption), denied 2 (goal cap and archived desk), none for a plain run's refusal; spend per unit equals the call aggregate (60/40), cap 100; first/last times equal row min/max |
+| 03D.1 waits | `goal_rollup_lists_decisions_waiting_on_people` | a real parked decision with 2 person reviewers: listed once with run, unit, name, since and both labels; the fixture's no-goal decision is not listed; after submission the list is empty and the seconds equal submitted − created (±1 s) |
+| 03D.1 escalations | `goal_rollup_counts_open_escalations` | a real guard failure escalation: 0 while pending (the attention queue's rule), 1 once waiting; the failed run counted |
+| 03D.1 limit | `goal_rollup_reports_truncation` | limit 2 of 3: truncated, counts the 2 newest (running), first run is the oldest; limit 3 is whole |
+| 03D.4 | `goal_rollup_status_tool_returns_the_rollup_and_refuses_without_a_goal` | no role: `goal.not_authorized`; as sponsor and as lead: `{"status": <goal_rollup_on JSON>}`; arguments: `invalid_input`; plain run: `goal.none` "serves no goal"; goal now standing: `goal.none` "no longer a goal" |
+| 03D.5 | `goal_authorization_member_sees_counts_not_runs` | desk `members`: member 404 "Goal not found"; desk public: 200 with exactly the rollup keys (no content fields), listed; back to `members`: 404 and not listed |
+| 03D.5 | `goal_authorization_stranger_and_manager` | owner 200; stranger, foreign company and plain member 404 (foreign name never shown); a standing unit is "Goal not found"; the parent's lead 200 |
+| 03D.2 | `goal_rollup_goal_card_renders` | goal page: `goal-status` card, escaped name, runs link with `goal_id`, `total_cap` field; saving 40 stores `total` 40,000,000; standing page has neither, and its form refuses `total` with `budget.total_goal_only` |
+| 03D.2 | `goal_rollup_goals_page_lists_visible_goals` | Goals tab: active goal with target date and link, not archived or standing; archived toggle lists only the archived goal; member sees none; stranger refused |
+| 03D.2 / F3 | `goal_rollup_board_filters_by_goal` | the run on the goal's desk records the goal; board and list with `goal_id` keep it and drop the plain run; the goal select offers only goals; foreign goal, standing unit and random id are `NotFound` on board and list; a plain member gets no board or run |
+
+**Defect the board test found, fixed:** `board_reads::scoped()` did not count `goal`, so a goal-only scope
+took the unscoped path and showed every run. The scoped working set and the per-state CTEs also lacked
+`goal_unit_id`.
+
+**Stand-ins:**
+- `goal.status` is tested through `GoalStatusDispatch` on the persistence, not through an agent step.
+- "member gets `NotFound` on the Sales run" relies on the existing board rule: a plain member reaches no
+  run (`run_board_view_refuses_plain_members_and_other_tenants`,
+  `other_tenants_and_plain_members_reach_no_run…`), and the board test shows it again with `goal_id`.
+- Docs: `docs/departments.md` (Goals: budget, status, visibility, Goals tab, `goal.status`; spend caps
+  pointer; JSON `GET …/rollup`; refusal `department.goal_budget_on_standing`) and
+  `docs/workflow-operations.md` (`budget.goal_exhausted` at admission and as a call refusal; refusals are
+  recorded).
+
+### B2 checks (2026-11-24)
+
+| Check | Result | Log |
+| --- | --- | --- |
+| `cargo fmt --check` | PASS | `logs/08G-P03-B2-fmt.txt` (empty) |
+| clippy 1.95 `--all-targets -D warnings` | FAIL (one `type_complexity` in `goal_rollup.rs`), fixed with `WaitRow`; rerun PASS | `logs/08G-P03-B2-clippy.txt`, `logs/08G-P03-B2-clippy-2.txt` |
+| focused set, first run | 874 pass, 8 FAIL. All 8 were B2 regressions, now fixed: `model_usage_history` lacked `goal_unit_id`, so 6 retention tests hit "usage archive must exactly match its live owner" (the column was added and retention's archive insert carries it); the catalog built-in list now includes `goal.status`; the exactness target count is 13→14 | `logs/08G-P03-B2-focused.txt` |
+| the 8 failures and `goal_` after the fixes | PASS (53) | `logs/08G-P03-B2-refix.txt` |
+| focused set rerun (adds `run_retention storage`) | PASS (975 pass, 1 ignored) | `logs/08G-P03-B2-focused-2.txt` |
+| stack budget at 2 MiB, `goal_` | PASS (44) | `logs/08G-P03-B2-stack-budget.txt` |
+| `cargo sqlx prepare --check -- --all-targets`, fresh DB | PASS | `logs/08G-P03-B2-sqlx-prepare.txt` |
+| `trail check` | exit 1: the same 7 lexical matches in the migration as B1, on lines outside B2's schema hunks (12665, 16220, 17994, 20985, 21061, 21157); docs matches are advisory | `logs/08G-P03-B2-trail-check.txt` |
+
+Artifact 08G-P03-B2-R1: base `481b14cd`, digest `40c9f1a8…7763`; exclusions `plan/08-goals/phases/p03/docs`
+and `.trail/learnings`. Diff saved in `logs/08G-P03-B2-R1.diff.txt`.
+
+Status (2026-11-24): B2 frozen at digest `40c9f1a8…7763`. The manifest validates (5 PASS, 1 NOT EXERCISED).
+Batch review 08G-P03-B2-R1 is requested from B (`a6ec66ca8201b8d62`).
+
+### B2 corrections after 08G-P03-B2-R1-N1 (no pass: F1 high, F2 medium, F3 and F4 low, S1)
+
+- **F1, fixed.**
+  - `schedule_runs_refusal_check` now allows `budget.goal_exhausted`.
+  - New test `goal_budget_refusal_of_a_scheduled_run_settles_its_occurrence`: the schedule's channel sits in
+    a goal at its cap, so the occurrence settles `failed` with that code and starts no run.
+  - Every other use of the sibling literal `budget.unit_exhausted` was checked with `trail grep`: the HTTP
+    response, message admission and children use `refusal.code()`, so the new code needs nothing else.
+- **F2, fixed.**
+  - A goal opens on the Goals tab (`tab=goals&goal_id=…`) with its status card (`pages::goal_card(company,
+    rollup)`, now shared with the department page). It is loaded through `goal_rollup`, the D2.5 rule, so it
+    is 404 for anyone else.
+  - The goals-list links point there.
+  - `goal_rollup_goals_page_lists_visible_goals` adds: the owner opens the card; a member with no desk view
+    gets 404; once a desk is public, the member sees the goal listed and opens its card, while
+    `visible_department` still refuses them.
+- **F3, fixed.**
+  - The waiting time runs to the answer, else to the wait's `settled_at`, else to now.
+  - `goal_rollup_lists_decisions_waiting_on_people` adds a decision whose run is cancelled unanswered: its
+    wait is settled, it is not listed, and two reads 1.1 s apart give the same seconds.
+- **F4, fixed.**
+  - The board checks `goal_id` with `goal_visible` (one row, active or archived), not the list.
+  - Its select comes from `goal_choices` (id and name of active visible goals, by name, at most 200 plus a
+    cut flag, shown as the select's cut note).
+  - `visible_goals` returns `GoalList { goals, cut }`, and the Goals tab says when it cut the list.
+- **S1 dispositions:**
+  - **fmt log:** rerun after the last edit (`logs/08G-P03-B2-R2-fmt.txt`).
+  - **Refusal, then input error:** accepted. A refusal row stays counted as `denied` if the same call id
+    later gets an input error, because the caller was refused at least once. A launch on that id replaces
+    it.
+  - **`goal.status` origin:** accepted as gated. It is a read whose origin comes from the runtime, like the
+    other read tools.
+  - **Tool result:** the docs now say it names departments and their spend and carries no run content.
+  - **Team-member condition in VISIBLE:** `notification_principal_can_view` is the gated rule (D2.5); no
+    change.
+  - **Waiting view:** it renders its own department-only form, so no goal select appears there.
+  - **Runtime wiring stand-in:** to be named in p04.
+
+### B2 accepted in phase (2026-11-24)
+
+- **Pass:** B PASS 08G-P03-B2-R2-N1 at digest `a50dab5d154a943b352acd765a07576e258f5918f778295a8b1d2b9cf359243d`
+  (base `481b14cd`, exclusions `plan/08-goals/phases/p03/docs` and `.trail/learnings`). Root recomputed the
+  same digest.
+- **Evidence:** `logs/08G-P03-B2-R2.evidence.json` validates (5 PASS, 1 NOT EXERCISED). The accepted diff is
+  `logs/08G-P03-B2-accepted.diff.txt`.
+- **Coordination r10:** 08G-C001 (b) is answered; 08G-C002 is satisfied.
+- **Left for p04:**
+  - `goal.status` through the agent runtime;
+  - the full suite;
+  - browser checks;
+  - rollup cost at the 10,000-run limit.
+- **Commit:** authorized by the user's "yes" to committing the p03 work.

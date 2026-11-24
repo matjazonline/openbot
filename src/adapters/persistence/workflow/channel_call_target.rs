@@ -223,7 +223,7 @@ pub(super) async fn start_on(
         TargetDecision::Error(code) => {
             return Ok(answered_error(code, "This desk is unavailable"));
         }
-        TargetDecision::Denied(code) => return denied(code),
+        TargetDecision::Denied(code) => return refused_on(tx, dispatch, desk, code).await,
     }
     let target = target.ok_or_else(invalid)?;
     let (Some(settings), Some(state)) = (target.settings, target.responder) else {
@@ -242,7 +242,7 @@ pub(super) async fn start_on(
         return if account_live_on(tx, run_as).await? {
             Ok(CallStart::Stale)
         } else {
-            denied(DeniedCode::DestinationUnavailable)
+            refused_on(tx, dispatch, desk, DeniedCode::DestinationUnavailable).await
         };
     }
     // 6. Intake against the pinned revision.
@@ -267,7 +267,7 @@ pub(super) async fn start_on(
     //    reviewed desk answers under its captured policy (AWC-P04-D1 D4).
     let inbox = RelatedAssociation::inbox(AddressTarget::Desk(desk));
     if !destination_admits_on(tx, scope.company, &configuration, inbox, responder).await? {
-        return denied(DeniedCode::DestinationUnavailable);
+        return refused_on(tx, dispatch, desk, DeniedCode::DestinationUnavailable).await;
     }
     if run.continuation_count >= super::WORKFLOW_JOB_CONTINUATION_LIMIT {
         return Ok(answered_error(
@@ -316,7 +316,8 @@ pub(super) async fn start_on(
     };
     match children::create_call_on(tx, scope, &start, &call).await? {
         Ok((child, parked)) => Ok(CallStart::Started { child, parked }),
-        Err(code) => denied(code),
+        // The child's savepoint has rolled back; the refusal is kept in the caller's transaction.
+        Err(code) => refused_on(tx, dispatch, desk, code).await,
     }
 }
 
@@ -360,6 +361,34 @@ pub(super) async fn caller_binding_on(
 
 fn answered_error(code: &'static str, message: &str) -> CallStart {
     CallStart::Answered(ChannelCallError::new(code, message).to_value())
+}
+
+/// A refusal before launch, recorded in the transaction that answers the caller (08G-C001 r2 b,
+/// gate 08G-P03-D2 r2 F2), so a goal's rollup counts it. Until a call launches, its id is judged
+/// again and the latest refusal is kept.
+async fn refused_on(
+    db: &mut PgConnection,
+    dispatch: &CallDispatch<'_>,
+    desk: Uuid,
+    code: DeniedCode,
+) -> AppResult<CallStart> {
+    let scope = dispatch.fence.scope;
+    sqlx::query(
+        "INSERT INTO workflow_channel_call_refusals \
+             (company_id, run_id, execution_id, call_id, channel_id, code) \
+         VALUES ($1, $2, $3, $4, $5, $6) \
+         ON CONFLICT (company_id, run_id, execution_id, call_id) DO UPDATE \
+         SET channel_id = EXCLUDED.channel_id, code = EXCLUDED.code, created_at = clock_timestamp()",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(dispatch.call.as_uuid())
+    .bind(desk)
+    .bind(code.as_str())
+    .execute(&mut *db)
+    .await?;
+    denied(code)
 }
 
 fn denied(code: DeniedCode) -> AppResult<CallStart> {

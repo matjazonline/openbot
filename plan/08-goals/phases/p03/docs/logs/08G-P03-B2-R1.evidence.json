@@ -1,0 +1,101 @@
+{
+ "version": 1,
+ "round": "08G-P03-B2-R1",
+ "artifact": "40c9f1a8f5bab714fe062b39952e3f4b5d34f8ee2dbdabe70c1df375ca7f7763",
+ "checks": [
+  {
+   "criteria": [
+    "03C.1",
+    "03C.2",
+    "03C.3",
+    "03C-race",
+    "03D.1",
+    "03D.2",
+    "03D.4",
+    "03D.5",
+    "D2-r2-F1",
+    "D2-r2-F2",
+    "D2-r2-F3",
+    "S2",
+    "retention-archive",
+    "catalog",
+    "exactness"
+   ],
+   "command": "cargo test --offline --locked --lib -- goal_ unit_budget department channel_call_ board attention legacy_runtime_schema schema claim_sql_multiple_applicable model_usage exactness agent_publication builtin catalog run_filter budget unit_archive run_retention storage",
+   "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P03-B2-focused-2.txt",
+     "sha256": "932ffcfa170c2d16a90cc52ef453f45c14a913e72a5dd1f03bb727f34b545dc8"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget"
+   ],
+   "command": "bash scripts/stack-budget.sh --offline -- goal_",
+   "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P03-B2-stack-budget.txt",
+     "sha256": "0409eecf9fcef103c2a189a33504422c0c7bf114ae52aec27e3c9b1895f44717"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "clippy"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool",
+   "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P03-B2-clippy-2.txt",
+     "sha256": "19ec81c1fc033c7e498f6e787892d6e039637e3649b3e0f6df2a1ad47e4b7527"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt"
+   ],
+   "command": "cargo fmt --check",
+   "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P03-B2-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-offline"
+   ],
+   "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets (fresh DB)",
+   "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P03-B2-sqlx-prepare.txt",
+     "sha256": "872aa733593e0c932893ac15e63df846c06dd17c8099ea00833830f97e2e263f"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "goal.status-agent-runtime-wiring"
+   ],
+   "command": "none: goal.status is tested through GoalStatusDispatch only",
+   "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+   "status": "NOT EXERCISED",
+   "files": [],
+   "reason": "No agent-step test drives goal.status through the workflow agent runtime (ToolInvocation::GoalStatus, with_goal_status); covered by compilation, exactness and catalog tests only."
+  }
+ ]
+}

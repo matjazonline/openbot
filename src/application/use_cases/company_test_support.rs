@@ -350,6 +350,7 @@ impl CompanyPersistence for MockCompanyPersistence {
         _unit_id: Uuid,
         _day_micros: Option<i64>,
         _month_micros: Option<i64>,
+        _total_micros: Option<Option<i64>>,
     ) -> AppResult<()> {
         Err(company_not_found())
     }

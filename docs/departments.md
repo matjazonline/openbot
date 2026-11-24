@@ -371,7 +371,7 @@ a new run on that department or below is refused with `budget.unit_exhausted`, n
 exhausted department; runs already started finish and may go past it. A cap is set by whoever
 manages that department, on its page or with `PUT` / `DELETE
 /api/companies/{company_id}/departments/{department_id}/budgets/{day|month}` (`{"cap_micros": …}`,
-micro-USD). Deleting a department deletes its caps and keeps what it counted in the departments
+micro-USD). A goal also has a `total` cap; see "Goals". Deleting a department deletes its caps and keeps what it counted in the departments
 above it.
 
 The usage page groups spend by the department each call was attributed to and drills down to its
@@ -421,6 +421,45 @@ runs there are in other departments.
 **A goal with recorded work cannot be deleted**, even after it becomes standing again. The refusal
 says to archive it instead. Deleting
 the company removes everything as before.
+
+**A goal's budget.** A goal may have a total spend cap, for its whole life, beside the day and month
+caps any department may have. Its Budgets card offers "Goal total cap (USD)", and the JSON route is
+`PUT` / `DELETE …/departments/{goal_id}/budgets/total`. The total counts every settled model call
+of a run that serves the goal, in whichever department did the work; the day and month caps keep
+counting the department's own desks and those below. Once the counted total reaches the cap, new
+work for the goal is refused with `budget.goal_exhausted`, naming the goal: a root run on its desks
+or on a thread it opened, and a `channel.call` child it would start in another department, which
+the caller gets as a `denied` closure. When a department cap and the goal's cap are both reached,
+the department is named. Work already admitted finishes. Only a goal has a total cap
+(`budget.total_goal_only`), and a goal keeps it until it is cleared: changing such a goal to
+standing is refused with `department.goal_budget_on_standing`.
+
+**A goal's status.** A goal's page opens with its status: runs per department and state, decisions
+waiting on a person (oldest first, with the reviewers' names, at most 50 listed), open escalations,
+channel calls by closure (calls refused before launch count as `denied`), spend per department
+against the total cap, and when work started, last finished and last moved. It counts the goal's
+newest 10,000 runs and says so when there are more. It shows counts, states, department and
+reviewer names and times, never run content. "Runs for this goal" opens the runs board filtered to
+it (`goal_id`); the board's Waiting view filters by department only, so use the status's waiting
+list for a goal's decisions.
+
+**Who sees a goal.** Its managers (its lead and deciding sponsors, the leads and deciding sponsors
+above it, company owners and admins) and anyone who may view one of its desks. A member who sees
+the goal through a desk sees its counts and the names of the departments working on it, but opens
+only the runs they could open anyway. Anyone else is told the goal is not found.
+
+**The Goals tab** on the company page lists the goals you may see, with lead, deciding sponsor,
+target date, open, waiting and failed runs, and spend against the cap; "Archived goals" lists the
+archived ones. Choosing a goal opens its status there, so someone who sees the goal only through
+one of its desks can read it without opening the department. Counts per goal cover its newest 500
+runs ("500+" when there are more); the list shows the newest 200 goals and says when there are
+more.
+
+**`goal.status`** is an opt-in built-in tool for a goal's planning agent. It takes no arguments and
+answers the status of the goal the calling run serves, the same JSON as the API. The agent must hold
+the goal's lead or sponsor role; otherwise it answers `goal.not_authorized`. A run that serves no
+goal, or whose goal is no longer one, gets `goal.none`. It reads, and never acts. Its answer names
+the departments working on the goal and their spend; it carries no run content.
 
 ## Archive
 
@@ -491,6 +530,7 @@ for someone outside the company.
 | `POST /departments/{department_id}/archive` | Archives it and every department below it (see "Archive"). Optional JSON `{ "cancel_open_runs": true }` cancels their unfinished runs first. |
 | `POST /departments/{department_id}/restore` | Restores that department alone; its parent must be active. |
 | `PUT` / `DELETE /departments/{department_id}/members/{principal_id}` | Adds or removes a member. |
+| `GET /departments/{department_id}/rollup` | A goal's status (see "Goals"), for those who may see it; a department that is not a goal, or one the caller may not see, is `404` "Goal not found". |
 | `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role. PUT requires JSON `{ "decider": false }` (`true` selects a sponsor decider); DELETE accepts `?successor={principal_id}` for sponsor handover. Reads include `decider` for every role holder. |
 
 Refusals: `409 Conflict` with `code` `unit.archived` for a write to an archived department, and
@@ -499,7 +539,7 @@ Refusals: `409 Conflict` with `code` `unit.archived` for a write to an archived 
 `409 Conflict` for a taken slug or a department that still owns desks, knowledge documents, skills or connections, or has children;
 `400 Bad Request` for a cycle, too deep a tree, one of the company's principals that is neither
 a person nor an agent, `department.target_date_goal_only`, `department.root_is_standing` or
-`department.sponsor_duplicate`; `409 Conflict` for deleting a department with work recorded for it as a goal; `404 Not Found` for a principal or parent department that is not the
+`department.sponsor_duplicate`, `department.goal_budget_on_standing`; `409 Conflict` for deleting a department with work recorded for it as a goal; `404 Not Found` for a principal or parent department that is not the
 company's.
 
 

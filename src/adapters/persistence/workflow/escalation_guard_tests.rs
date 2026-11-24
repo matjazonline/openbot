@@ -11,6 +11,8 @@ mod commands;
 mod deadlines;
 #[path = "escalation_decision_deadline_tests.rs"]
 mod decision_deadlines;
+#[path = "goal_rollup_escalation_tests.rs"]
+mod goal_rollup_escalations;
 #[path = "escalation_recovery_tests.rs"]
 mod recovery_triggers;
 #[path = "escalation_source_guard_tests.rs"]

@@ -15981,6 +15981,9 @@ BEGIN
                AND scope.acting_principal_id IS NULL AND scope.access = 'write' LIMIT 1),
             (SELECT id FROM public.departments WHERE company_id = NEW.company_id AND is_root));
     END IF;
+    -- Plan08 03C.1: the goal the call's run serves, fixed with the run; never the writer's.
+    NEW.goal_unit_id := (SELECT run.goal_unit_id FROM public.workflow_runs AS run
+                          WHERE run.company_id = NEW.company_id AND run.id = NEW.run_id);
     RETURN NEW;
 END $$;
 CREATE TRIGGER model_usage_attributed BEFORE INSERT ON public.model_usage_calls
@@ -15991,7 +15994,7 @@ CREATE TRIGGER model_usage_attributed BEFORE INSERT ON public.model_usage_calls
 CREATE TABLE public.unit_budgets (
     company_id uuid NOT NULL,
     unit_id uuid NOT NULL,
-    period text NOT NULL CHECK (period IN ('day', 'month')),
+    period text NOT NULL CHECK (period IN ('day', 'month', 'total')),
     cap_micros bigint NOT NULL CHECK (cap_micros > 0),
     created_by jsonb NOT NULL,
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -16066,6 +16069,22 @@ BEGIN
            unpriced_tokens = LEAST(spend.unpriced_tokens::numeric + EXCLUDED.unpriced_tokens,
                                    9223372036854775807)::bigint,
            updated_at = EXCLUDED.updated_at;
+    -- Plan08 03C.1 (gate 08G-P03-D2 D2.2): the goal's own counter, per working unit, taken after
+    -- the unit rows.
+    IF NEW.goal_unit_id IS NOT NULL THEN
+        INSERT INTO public.goal_spend AS spend
+            (company_id, goal_unit_id, unit_id, spent_micros, unpriced_tokens, updated_at)
+        VALUES (NEW.company_id, NEW.goal_unit_id, NEW.unit_id,
+                CASE WHEN priced THEN LEAST(cost, 9223372036854775807)::bigint ELSE 0 END,
+                CASE WHEN priced THEN 0 ELSE NEW.input_tokens + NEW.output_tokens END,
+                clock_timestamp())
+        ON CONFLICT (company_id, goal_unit_id, unit_id) DO UPDATE
+           SET spent_micros = LEAST(spend.spent_micros::numeric + EXCLUDED.spent_micros,
+                                    9223372036854775807)::bigint,
+               unpriced_tokens = LEAST(spend.unpriced_tokens::numeric + EXCLUDED.unpriced_tokens,
+                                       9223372036854775807)::bigint,
+               updated_at = EXCLUDED.updated_at;
+    END IF;
     RETURN NULL;
 END $$;
 CREATE CONSTRAINT TRIGGER model_usage_charges_unit_spend
@@ -16884,7 +16903,7 @@ ALTER TABLE public.schedule_runs ADD COLUMN role_refusal jsonb,
 ALTER TABLE public.schedule_runs DROP CONSTRAINT schedule_runs_refusal_check,
     ADD CONSTRAINT schedule_runs_refusal_check CHECK ((refusal IS NULL
         OR refusal IN ('unavailable','input_rejected','key_conflict',
-            'admission.resource_outside_unit','budget.unit_exhausted')
+            'admission.resource_outside_unit','budget.unit_exhausted','budget.goal_exhausted')
         OR (role_refusal IS NOT NULL AND public.valid_workflow_role_refusal(role_refusal)
             AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
 
@@ -21230,7 +21249,8 @@ CREATE CONSTRAINT TRIGGER run_dependency_scope AFTER INSERT ON public.run_depend
 ALTER TABLE public.workflow_runs ADD COLUMN goal_unit_id uuid;
 ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_goal_fk FOREIGN KEY (company_id, goal_unit_id)
     REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
-CREATE INDEX workflow_runs_goal_idx ON public.workflow_runs(company_id, goal_unit_id)
+CREATE INDEX workflow_runs_goal_idx
+    ON public.workflow_runs(company_id, goal_unit_id, created_at DESC, id DESC)
     WHERE goal_unit_id IS NOT NULL;
 ALTER TABLE public.threads ADD COLUMN goal_unit_id uuid;
 ALTER TABLE public.threads ADD CONSTRAINT threads_goal_fk FOREIGN KEY (company_id, goal_unit_id)
@@ -21270,3 +21290,63 @@ CREATE TRIGGER workflow_runs_goal_fixed BEFORE UPDATE OF goal_unit_id ON public.
     FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_fixed();
 CREATE TRIGGER threads_goal_fixed BEFORE UPDATE OF goal_unit_id ON public.threads
     FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_fixed();
+
+-- Plan08 03C (gate 08G-P03-D2 r2): a goal's budget counts the work done for it anywhere. A model
+-- call records its run's goal; settlement adds the call's cost to the goal's counter for the unit
+-- that did the work. No key to departments: charging never locks them (Plan07 decision j).
+ALTER TABLE public.model_usage_calls ADD COLUMN goal_unit_id uuid;
+-- Kept when retention archives the call, so the archive still matches its live owner.
+ALTER TABLE public.model_usage_history ADD COLUMN goal_unit_id uuid;
+CREATE TABLE public.goal_spend (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    goal_unit_id uuid NOT NULL,
+    unit_id uuid NOT NULL,
+    spent_micros bigint NOT NULL DEFAULT 0 CHECK (spent_micros >= 0),
+    unpriced_tokens bigint NOT NULL DEFAULT 0 CHECK (unpriced_tokens >= 0),
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (company_id, goal_unit_id, unit_id)
+);
+
+-- A `total` cap belongs to a goal (03C.1). The unit is share-locked, so a kind change waits for
+-- the writer or the writer sees it.
+CREATE FUNCTION public.guard_goal_budget() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.period = 'total' AND NOT EXISTS (
+        SELECT 1 FROM public.departments
+         WHERE company_id = NEW.company_id AND id = NEW.unit_id AND kind = 'goal' FOR SHARE) THEN
+        RAISE EXCEPTION 'a total budget belongs to a goal unit' USING ERRCODE = '23514',
+            CONSTRAINT = 'unit_budgets_total_goal_only';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER unit_budgets_total_goal_only BEFORE INSERT OR UPDATE ON public.unit_budgets
+    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_budget();
+
+-- A goal keeps its `total` cap only while it is a goal: clear the cap first (D2 r2 S1).
+CREATE FUNCTION public.guard_goal_budget_kind() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.kind = 'standing' AND OLD.kind = 'goal' AND EXISTS (
+        SELECT 1 FROM public.unit_budgets
+         WHERE company_id = NEW.company_id AND unit_id = NEW.id AND period = 'total') THEN
+        RAISE EXCEPTION 'a goal with a total budget stays a goal' USING ERRCODE = '23514',
+            CONSTRAINT = 'departments_goal_budget';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER departments_goal_budget BEFORE UPDATE OF kind ON public.departments
+    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_budget_kind();
+
+-- A channel call refused before launch (08G-C001 r2 b, gate 08G-P03-D2 r2 F2): written in the
+-- transaction that answers the caller, so it exists when the caller was told `denied`. A call id
+-- is judged again until it launches; the latest refusal is kept.
+CREATE TABLE public.workflow_channel_call_refusals (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    call_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    code text NOT NULL CHECK (char_length(code) BETWEEN 1 AND 64),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id, run_id, execution_id, call_id),
+    FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE
+);

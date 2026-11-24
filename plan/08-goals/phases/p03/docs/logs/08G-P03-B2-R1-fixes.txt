@@ -1,0 +1,127 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 41s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 114 tests
+test adapters::http::routes::schedule::tests::run_now_keys_default_to_a_fresh_one ... ok
+test adapters::http::routes::schedule::tests::ui_schedule_form_parses_interval_correctly ... ok
+test adapters::http::routes::schedule::tests::ui_schedule_form_parses_one_off_and_requires_a_binding ... ok
+test adapters::http::routes::ui_departments::tests::goal_unit_archive_refusal_names_runs_in_other_departments ... ok
+test adapters::http::routes::schedule::schedule_channel_tests::schedule_json_body_cannot_request_a_channel_reassignment ... ok
+test adapters::http::routes::schedule::tests::schedule_request_deserializes_json_and_refuses_removed_fields ... ok
+test adapters::http::routes::ui_schedules::tests::create_schedule_form_deserializes_browser_submission ... ok
+test adapters::http::routes::ui_schedules::tests::create_schedule_form_deserializes_one_off_submission ... ok
+test adapters::http::pages::tests::department_ui::goal_unit_create_form_offers_kind_target_date_and_sponsor ... ok
+test adapters::http::routes::ui_schedules::tests::schedule_editor_keeps_channel_fixed_and_creation_keeps_selector ... ok
+test adapters::http::routes::ui_schedules::tests::schedule_runs_column_renders_occurrences_with_their_runs ... ok
+test adapters::http::routes::ui_schedules::tests::the_schedule_form_picks_a_binding_and_nothing_it_replaced ... ok
+test adapters::http::routes::ui_schedules::tests::schedules_page_renders_3_columns_and_sidebar_items ... ok
+test adapters::http::routes::ui_schedules::tests::schedule_pages_only_target_routed_paths ... ok
+test adapters::http::routes::department::tests::goal_unit_json_create_and_edit_carry_kind_target_date_and_sponsors ... ok
+test adapters::http::routes::department::tests::goal_authorization_member_sees_counts_not_runs ... ok
+test adapters::http::routes::department::tests::goal_authorization_stranger_and_manager ... ok
+test adapters::http::routes::ui_departments::tests::goal_unit_form_creates_a_goal_and_edits_it_back_to_standing ... ok
+test adapters::http::routes::channel::authorization_tests::delegated::delegated_admin_schedule_json_routes_scope_configuration_to_the_desk_unit ... ok
+test adapters::http::routes::ui_departments::tests::goal_rollup_goal_card_renders ... ok
+test adapters::http::routes::ui_companies::goals_tests::goal_rollup_goals_page_lists_visible_goals ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_create_assigns_sponsors_in_one_transaction ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_refuses_sibling_and_foreign_writers ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_kind_and_target_date_round_trip ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_persistence_hides_foreign_ids_in_the_local_scope ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_configuration_and_lists_follow_managed_units_without_view ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_root_cannot_be_goal ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_target_date_on_standing_is_refused ... ok
+test adapters::http::routes::schedule::schedule_channel_tests::schedule_api_creation_selects_channel_and_update_cannot_reassign_it ... ok
+test adapters::http::routes::schedule::schedule_channel_tests::nested_schedule_routes_refuse_another_channels_or_companys_schedule ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::goal_rollup_board_filters_by_goal ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::account_locks::delegated_admin_competing_schedule_writes_lock_the_actor_before_the_company ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_competing_role_removal_precedes_schedule_configuration ... ok
+test adapters::persistence::department::tests::delegated_administration::schedules::delegated_admin_schedule_run_inspection_and_initiation_require_current_human_view ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::delegated_schedule::delegated_admin_schedule_claim_requires_human_view_before_both_admission_boundaries ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::knowledge_run_level_schedule_uses_configured_run_as_ceiling ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_checks_occurrence_owner_and_association ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_control_head_restores_real_message_and_schedule_causality ... ok
+test adapters::persistence::workflow::tests::admission_tests::goal_rollup_people_tests::goal_rollup_lists_decisions_waiting_on_people ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_lifecycle_tests::workflow_action_reconciliation_episode_lifecycle_later_schedule_is_distinct ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::workflow_action_reconciliation_eligibility_root_model_budget_blocks_schedule ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::goal_trail_native_call_carries_the_thread_goal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::goal_trail_archive_counts_goal_runs_elsewhere ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::goal_rollup_escalations::goal_rollup_counts_open_escalations ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_fairness_tests::child_policy_tests::workflow_action_reconciliation_claim_fairness_child_policy_records_proof_without_schedule ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::goal_trail_native_workflow_session_call_carries_the_source_run_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_refused_call_child_is_a_denied_closure ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::owner_lifecycle_tests::workflow_action_reconciliation_owner_lifecycle_scheduled_and_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_spend_counts_work_in_every_department ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_total_cap_only_on_a_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_total_cap_leaves_desks_in_the_goal_admitting ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_revocation_blocks_new_replay_and_alias ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_competing_admission_waits_and_sees_the_crossing_goal_charge ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_total_cap_refuses_admission_and_names_the_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_competing_concurrent_goal_settlements ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_reports_truncation ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_status_tool_returns_the_rollup_and_refuses_without_a_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_archive_cancels_goal_tree_with_call_child_elsewhere ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_call_child_thread_reply_and_rerun_carry_the_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_column_is_immutable_and_goal_only ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_inherited_child_carries_the_parent_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::autonomous_agent_entrypoints_schedule_post_commit_crash_keeps_recorded_revision_and_next_occurrence_selects_new ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_kind_change_keeps_history_and_admits_new_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::goal_competing_archive_and_thread_admission ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::autonomous_entrypoints::history::agent_history_callers_schedule_uses_current_configured_actor_and_manual_starter_keeps_own_level ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_schedule_refusal_keeps_typed_step_role_and_does_not_retry ... ok
+test adapters::persistence::workflow::tests::schedule_tests::a_captured_one_off_schedule_is_disabled ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::schedule_runtime_tests::schedule_end_to_end_a_due_slot_runs_its_workflow_once ... ok
+test adapters::persistence::workflow::tests::schedule_tests::a_lapsed_but_unreclaimed_claim_still_records_its_outcome ... ok
+test adapters::persistence::workflow::tests::schedule_tests::an_expired_occurrence_is_reported_when_its_schedule_cannot_name_it ... ok
+test adapters::persistence::workflow::tests::schedule_tests::archive::unit_archive_runs_schedule_claimed_before_the_archive_is_dropped_not_failed ... ok
+test adapters::persistence::workflow::tests::schedule_tests::archive::unit_archive_runs_schedule_is_untouched_while_archived_and_fires_once_after_restore ... ok
+test adapters::persistence::workflow::tests::schedule_tests::binding_reconfiguration_is_refused_by_an_incompatible_schedule ... ok
+test adapters::persistence::workflow::tests::schedule_tests::channel_path_fk_schedule_binding_names_the_schedule_channel ... ok
+test adapters::persistence::workflow::tests::schedule_tests::claiming_anchors_the_next_run_on_the_slot_not_the_clock ... ok
+test adapters::persistence::workflow::tests::schedule_tests::goal_budget_refusal_of_a_scheduled_run_settles_its_occurrence ... ok
+test adapters::persistence::workflow::tests::schedule_tests::configuration_authority::schedule_management_separates_configuration_from_human_view ... ok
+test adapters::persistence::workflow::tests::schedule_tests::manual_start_returns_its_run_replays_its_key_and_links_a_rerun ... ok
+test adapters::persistence::workflow::tests::schedule_tests::retargeting_a_schedule_after_capture_keeps_the_captured_binding ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_binding_must_fit_the_schedule_channel ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_capture_serializes_with_a_rejected_channel_move ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_claim_page_of_n_occurrences_returns_n ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_claim_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_edit_keeps_its_next_run_and_pause_unless_the_cadence_changes ... ok
+test adapters::persistence::workflow::tests::schedule_tests::channel_path_fk_schedules_of_both_binding_kinds_leave_with_channel_and_company ... ok
+test application::integrations::tests::authority_tests::vault_authority_deterministic_and_scheduled_steps_require_explicit_grant ... ok
+test application::use_cases::schedule::tests::validate_write_checks_bad_inputs ... ok
+test application::workflow::goals::tests::goal_of_archived_candidate_falls_through ... ok
+test application::workflow::goals::tests::goal_of_depth_bound_ignores_units_past_the_tree_limit ... ok
+test application::workflow::goals::tests::goal_of_nested_goals_pick_the_nearest ... ok
+test application::workflow::goals::tests::goal_of_non_goal_candidate_falls_through ... ok
+test application::workflow::goals::tests::goal_of_none_without_sources ... ok
+test application::workflow::goals::tests::goal_of_parent_wins_over_thread_and_desk ... ok
+test application::workflow::goals::tests::goal_of_rerun_comes_first ... ok
+test application::workflow::goals::tests::goal_of_rerun_falls_through_when_original_goal_closed ... ok
+test application::workflow::goals::tests::goal_of_thread_wins_over_desk ... ok
+test application::workflow::publication::tests::role_tests::goal_unit_sample_procedure_compiles ... ok
+test application::workflow::triggers::tests::schedule_trigger_input_renders_utc_seconds ... ok
+test domain::entities::schedule::tests::cadence_labels_are_human_readable ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_occurrence_admitted_before_a_crash_replays_its_run ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_occurrence_schema_keeps_scope_identity_and_run ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_outcome_writes_are_fenced_by_the_claim ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_refusal_fails_the_occurrence_and_names_it_on_the_schedule ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_run_now_replays_its_command_key ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_slot_is_admitted_once_under_competing_materializers ... ok
+test adapters::persistence::workflow::tests::schedule_tests::schedule_terminal_failures_and_lost_claims_are_observable ... ok
+test adapters::persistence::workflow::tests::schedule_tests::unit_budget_refusal_of_a_scheduled_run_settles_its_occurrence ... ok
+test adapters::persistence::workflow::tests::schedule_tests::unit_resource_selection_refusal_of_a_scheduled_run_settles_its_occurrence ... ok
+test adapters::persistence::workflow::tests::schedule_tests::unit_resource_selection_refusal_settles_a_schedule_occurrence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_command_tests::workflow_action_reconciliation_native_command_scheduled_check ... ok
+
+test result: ok. 114 passed; 0 failed; 0 ignored; 0 measured; 5111 filtered out; finished in 52.61s
+

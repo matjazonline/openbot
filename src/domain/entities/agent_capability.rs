@@ -90,6 +90,8 @@ pub enum AgentBuiltinTool {
     RespondToEscalation,
     /// Ask another desk and wait for its answer (agent-workflow-call).
     ChannelCall,
+    /// Read the status of the goal the run serves (Plan08 03D.4).
+    GoalStatus,
 }
 impl AgentBuiltinTool {
     pub const fn name(self) -> &'static str {
@@ -107,6 +109,7 @@ impl AgentBuiltinTool {
             Self::ReadEscalation => "read_escalation",
             Self::RespondToEscalation => "respond_to_escalation",
             Self::ChannelCall => "channel.call",
+            Self::GoalStatus => "goal.status",
         }
     }
     pub fn parse(name: &str) -> Option<Self> {
@@ -124,6 +127,7 @@ impl AgentBuiltinTool {
             "read_escalation" => Some(Self::ReadEscalation),
             "respond_to_escalation" => Some(Self::RespondToEscalation),
             "channel.call" => Some(Self::ChannelCall),
+            "goal.status" => Some(Self::GoalStatus),
             _ => None,
         }
     }

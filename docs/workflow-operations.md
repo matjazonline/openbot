@@ -40,8 +40,10 @@ repetitions and tokens and is enforced during the run: exhausting it fails the r
 reviewer's approval. A department's spend caps (per UTC day and month, see
 [Departments](departments.md#spend-caps)) are checked when a run is admitted: from the run's
 department upward, the first department whose counted spend reached a cap refuses the run with
-`budget.unit_exhausted`, and a refused schedule occurrence or message records that code. Admitted
-runs are not stopped by a cap.
+`budget.unit_exhausted`, and a refused schedule occurrence or message records that code. A run
+that serves a goal is then checked against the goal's total cap, which counts the goal's work in
+every department: at or over it, the run is refused with `budget.goal_exhausted` (see
+[Goals](departments.md#goals)). Admitted runs are not stopped by a cap.
 
 Use the company Workflows/Runs page to filter failures/waits and open the exact run, execution,
 action and decision. The authenticated read API is
@@ -276,7 +278,9 @@ it with its own configuration. Launch admits a call only when all of these hold:
 
 Otherwise the call answers a typed error (`channel_call.target_unavailable`, `channel_call.cycle`,
 the intake errors) or a `denied` closure (`channel_call.desk_disabled`, `channel_call.no_responder`,
-`channel_call.destination_unavailable`). A principal's direct inbox is never a call target.
+`channel_call.destination_unavailable`, `budget.unit_exhausted` for the destination's department
+and `budget.goal_exhausted` for the calling run's goal). Each `denied` refusal before launch is
+recorded, so a goal's status counts it. A principal's direct inbox is never a call target.
 
 **What the agent sees.** The tool's description lists the public desks launch would admit when the
 agent step is prepared: id, name and declared intake fields, at most 20 desks and 6 KiB. The list

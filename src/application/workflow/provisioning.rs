@@ -106,6 +106,7 @@ pub fn is_reserved_tool_name(name: &str) -> bool {
         || crate::application::workflow::knowledge::is_builtin_knowledge_tool(name)
         || crate::application::workflow::memory_tools::is_builtin_memory_tool(name)
         || crate::application::workflow::channel_call::is_builtin_channel_call_tool(name)
+        || crate::application::workflow::goal_status::is_builtin_goal_status_tool(name)
         || crate::application::workflow::escalation::tools::EscalationTool::parse(name).is_some()
         || name == crate::application::local_agents::workflow::KIND
 }

@@ -1,0 +1,111 @@
+⬆ trail 0.29.0 → 0.30.5 available: run `trail upgrade` (restart your agent after).
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 500 changed files against 51 learnings and 4 skills
+
+✗ migrations/20260817000000_init_schema.sql:12665
+  brings back root agent workflow, which Mac02's learning ruled out
+  Mac02 · Nov 17: Checking only the root PublishedBundle and its
+  children missed agent-tool workflow edges.
+✗ migrations/20260817000000_init_schema.sql:12665
+  brings back channel root tree, which Mac02's learning ruled out
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+✗ migrations/20260817000000_init_schema.sql:16220
+  brings back document department deleted, which Mac02's learning ruled out
+  Mac02 · Nov 17: After a report document was moved and its empty
+  department deleted, the actual resumed runtime sent cached protected
+  facts to the scripted provider.
+✗ migrations/20260817000000_init_schema.sql:17994
+  brings back department chosen bind, which Mac02's learning ruled out
+  Mac02 · Nov 17: Always using the recorded department contradicts the
+  user's chosen binding rule.
+✗ migrations/20260817000000_init_schema.sql:20985
+  brings back input valid every, which Mac02's learning ruled out
+  Mac02 · Nov 17: Inputs therefore still looked valid while every
+  selected option vanished from its select.
+✗ migrations/20260817000000_init_schema.sql:21061
+  brings back live read insert, which Mac02's learning ruled out
+  Mac02 · Nov 17: The separate live sample caught BuffileRead during the
+  original insert.
+✗ migrations/20260817000000_init_schema.sql:21157
+  brings back model view cannot, which Mac02's learning ruled out
+  Mac02 · Nov 17: Model tests that revoke View only after admitting the
+  schedule cannot catch this boundary error.
+● docs/departments.md:37
+  brings back published agent workflow, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Checking only the root PublishedBundle and its
+  children missed agent-tool workflow edges.
+● docs/departments.md:134
+  brings back operation desk agent, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 22: Gating on the actor's operations authority or desk
+  view instead of the agent's write right.
+● docs/departments.md:384
+  brings back alway recorded department, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Always using the recorded department contradicts the
+  user's chosen binding rule.
+● docs/departments.md:384
+  brings back document moved department, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: After a report document was moved and its empty
+  department deleted, the actual resumed runtime sent cached protected
+  facts to the scripted provider.
+● docs/departments.md:384
+  brings back channel department root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● docs/departments.md:389
+  brings back sponsor built human, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The sponsor feature's scripted Deployment built its
+  human step from the registry example, so it inherited the required
+  literal data_schema.
+● docs/departments.md:392
+  brings back per connection pause, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: A synchronous per-connection pause with a held real
+  HTTP call and actual SDK deletion entry now forces that interval;
+  removing only the registration lock makes the real wire-order
+  assertion fail.
+● docs/departments.md:402
+  brings back model view schedule, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 17: Model tests that revoke View only after admitting the
+  schedule cannot catch this boundary error.
+● docs/departments.md:404
+  brings back stop restore rerun, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Stop only the identified task-owned regeneration,
+  restore the previously unchanged entries, and rerun generation after
+  the other compiler is done.
+● docs/departments.md:423
+  brings back found caller already, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Independent architecture review found that these
+  callers already own the company: composing then would acquire
+  accounts in the opposite order to account retirement.
+● docs/departments.md:423
+  brings back native earlier wait, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● docs/inter_channel_agent_communication.md:43
+  brings back operation desk agent, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 22: Gating on the actor's operations authority or desk
+  view instead of the agent's write right.
+● docs/workflow-language-v1.md:498
+  brings back decision followed role, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The initial Phase 01 design reused synchronous
+  decision-email composition during followed-role updates.
+
+· 7 conflicts · fix them, or say why in the commit message or PR description
+
+🔀 trail · Matjazonline's branch anthropic-latest-models also changes src/main.rs (pushed Nov 6)

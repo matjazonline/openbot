@@ -1698,6 +1698,56 @@ async fn unit_resource_selection_refusal_of_a_scheduled_run_settles_its_occurren
     assert!(s.runs_for(occurrence).await.is_empty());
 }
 
+/// Plan08 03C.2 through production (08G-P03-B2-F1): a scheduled run on a goal's desk, once the
+/// goal has spent its total cap, settles its occurrence with `budget.goal_exhausted`.
+#[tokio::test]
+async fn goal_budget_refusal_of_a_scheduled_run_settles_its_occurrence() {
+    let s = Schedules::new().await;
+    let goal = s.p().test_unit(s.company(), "launch").await;
+    sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
+        .bind(goal)
+        .execute(s.pool())
+        .await
+        .unwrap();
+    sqlx::query("UPDATE channels SET department_id = $2 WHERE id = $1")
+        .bind(s.channel)
+        .bind(goal)
+        .execute(s.pool())
+        .await
+        .unwrap();
+    let schedule = s.schedule("Hourly").await;
+    crate::application::use_cases::company::CompanyPersistence::set_unit_budget(
+        s.p(),
+        s.owner(),
+        s.company(),
+        goal,
+        "total",
+        1,
+    )
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO goal_spend (company_id, goal_unit_id, unit_id, spent_micros) VALUES ($1, $2, $2, 5)",
+    )
+    .bind(s.company())
+    .bind(goal)
+    .execute(s.pool())
+    .await
+    .unwrap();
+    s.due(schedule.id).await;
+    let materializer = s.materializer(admission(s.p()));
+    assert_eq!(
+        s.drain(&materializer).await,
+        vec![Materialized::Refused("budget.goal_exhausted")]
+    );
+    let (occurrence, status, run, refusal, _) = s.occurrences(schedule.id).await[0].clone();
+    assert_eq!(
+        (status.as_str(), run, refusal.as_deref()),
+        ("failed", None, Some("budget.goal_exhausted"))
+    );
+    assert!(s.runs_for(occurrence).await.is_empty());
+}
+
 /// Plan07 02B.2 through production: a scheduled run refused because the root has spent its day
 /// cap settles its occurrence with `budget.unit_exhausted` and starts no run.
 #[tokio::test]

@@ -256,6 +256,9 @@ fn builtin(company: CompanyId, tool: AgentBuiltinTool) -> AppResult<ToolSnapshot
         AgentBuiltinTool::ChannelCall => {
             crate::application::workflow::channel_call::builtin_channel_call_snapshot(company)
         }
+        AgentBuiltinTool::GoalStatus => {
+            crate::application::workflow::goal_status::builtin_goal_status_snapshot(company)
+        }
     }
 }
 

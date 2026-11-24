@@ -1,0 +1,28 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 54s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::goal_rollup_people_tests::goal_rollup_lists_decisions_waiting_on_people ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::goal_rollup_escalations::goal_rollup_counts_open_escalations ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::goal_rollup_people_tests::goal_rollup_lists_decisions_waiting_on_people stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::goal_rollup_people_tests::goal_rollup_lists_decisions_waiting_on_people' (51013315) panicked at src/adapters/persistence/workflow/goal_rollup_people_tests.rs:50:55:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::goal_rollup_people_tests::goal_rollup_lists_decisions_waiting_on_people
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 5217 filtered out; finished in 2.51s
+
+error: test failed, to rerun pass `--lib`

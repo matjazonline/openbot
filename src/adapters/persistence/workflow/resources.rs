@@ -231,6 +231,10 @@ pub(super) async fn check_readiness(
                 authority::builtin_channel_call_tool(tool)?;
                 continue;
             }
+            ToolKind::GoalStatus => {
+                authority::builtin_goal_status_tool(tool)?;
+                continue;
+            }
             ToolKind::Memory => {
                 authority::builtin_memory_tool(tx, tool, super::workflow_tools::ToolCheck::Run)
                     .await?;

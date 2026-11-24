@@ -1,0 +1,37 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 45s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 11 tests
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_total_cap_refuses_admission_and_names_the_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_status_tool_returns_the_rollup_and_refuses_without_a_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_reports_truncation ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_refused_call_child_is_a_denied_closure ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows ... FAILED
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_competing_admission_waits_and_sees_the_crossing_goal_charge ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_competing_concurrent_goal_settlements ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_total_cap_only_on_a_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_total_cap_leaves_desks_in_the_goal_admitting ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_budget_spend_counts_work_in_every_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::goal_competing_archive_and_thread_admission ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows' (50936548) panicked at src/adapters/persistence/workflow/channel_call_support.rs:256:14:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::goal_budget_tests::goal_rollup_counts_waits_calls_and_spend_match_the_rows
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 5206 filtered out; finished in 15.87s
+
+error: test failed, to rerun pass `--lib`

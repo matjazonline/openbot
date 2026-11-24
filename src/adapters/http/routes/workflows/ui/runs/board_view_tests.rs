@@ -8,6 +8,7 @@ use crate::application::workflow::reads::RunStateName;
 
 fn board_query(company: Uuid) -> WorkspaceQuery {
     WorkspaceQuery {
+        goal_id: None,
         department_id: None,
         company_id: Some(company),
         run_id: None,
@@ -471,7 +472,8 @@ impl Fixture {
         list(
             self.ui(user),
             Query(ListQuery {
-                department_id: None,
+                goal_id: ids.goal,
+                department_id: ids.department,
                 company_id: self.company,
                 binding_id: ids.binding,
                 workflow_id: ids.workflow,
@@ -490,6 +492,8 @@ impl Fixture {
 
 fn scoped(company: Uuid, ids: ScopeIds) -> WorkspaceQuery {
     WorkspaceQuery {
+        goal_id: ids.goal,
+        department_id: ids.department,
         binding_id: ids.binding,
         workflow_id: ids.workflow,
         agent_id: ids.agent,
@@ -537,6 +541,7 @@ async fn run_board_view_filter_scopes_both_views_alone_and_combined() {
     );
     assert!(first < second, "by name");
     let ids = |binding, workflow, agent| ScopeIds {
+        goal: None,
         department: None,
         binding,
         workflow,
@@ -658,6 +663,7 @@ async fn run_board_view_filter_switch_and_links_keep_the_scope() {
     let binding = f.agent_binding(workflow, "assistant").await;
     let run = f.start(binding, json!({})).await;
     let ids = ScopeIds {
+        goal: None,
         department: None,
         binding: Some(binding),
         workflow: Some(workflow),
@@ -748,6 +754,8 @@ fn run_board_view_filter_reports_a_cut_option_list() {
     };
     let hostile = format!("<{}>x", "script");
     let options = pages::ScopeOptions {
+        goals: Vec::new(),
+        goals_cut: false,
         departments: Vec::new(),
         workflows: vec![option("First"), option(&hostile)],
         workflows_cut: true,
@@ -944,4 +952,119 @@ async fn run_board_view_live_moves_a_finished_run_out_of_the_window_on_a_later_r
     let month = at(later, BoardWindow::Month).await;
     assert_eq!(column_of(&month, run).as_deref(), Some("succeeded"));
     assert!(month.contains("finished 8d ago"), "{month}");
+}
+
+/// 03D.2 with D2 r2 F3: `goal_id` keeps the runs recorded for the goal, on the board and in the
+/// list; the toolbar offers the viewer's goals; another company's goal, a standing unit or an
+/// unknown id is not found, never ignored; a plain member reaches no run, goal or not.
+#[tokio::test]
+async fn goal_rollup_board_filters_by_goal() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let unit = |company: Uuid, name: &'static str, kind: &'static str| {
+        let pool = f.persistence.pool().clone();
+        async move {
+            sqlx::query_scalar::<_, Uuid>(
+                "INSERT INTO departments (id, company_id, parent_id, name, slug, kind, created_by) \
+                 VALUES (gen_random_uuid(), $1, (SELECT id FROM departments WHERE company_id=$1 \
+                 AND is_root), $2, $2, $3, \
+                 '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}') \
+                 RETURNING id",
+            )
+            .bind(company)
+            .bind(name)
+            .bind(kind)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let goal = unit(f.company, "launch", "goal").await;
+    let standing = unit(f.company, "sales", "standing").await;
+    let theirs = unit(f.other, "theirs", "goal").await;
+    let desk = f.channel("Launch desk", "launch-desk", false).await;
+    sqlx::query("UPDATE channels SET department_id=$2, enabled=true WHERE id=$1")
+        .bind(desk)
+        .bind(goal)
+        .execute(f.persistence.pool())
+        .await
+        .unwrap();
+    let workflow = Uuid::new_v4();
+    let version = f
+        .published(workflow, "Goal work", &example("data.map", workflow))
+        .await;
+    let goal_binding = f
+        .bound(
+            version,
+            RelatedAssociation::Channel(RelatedChannelId::new(desk)),
+        )
+        .await;
+    let goal_run = f.start(goal_binding, json!({})).await;
+    let plain_run = f.start(f.data_map_binding("Plain").await, json!({})).await;
+    let recorded: Option<Uuid> =
+        sqlx::query_scalar("SELECT goal_unit_id FROM workflow_runs WHERE id=$1")
+            .bind(goal_run)
+            .fetch_one(f.persistence.pool())
+            .await
+            .unwrap();
+    assert_eq!(recorded, Some(goal));
+    let ids = ScopeIds {
+        goal: Some(goal),
+        ..ScopeIds::default()
+    };
+    let board = f
+        .workspace_html(f.owner, scoped(f.company, ids))
+        .await
+        .unwrap();
+    let list = f.list_region(f.owner, ids).await.unwrap();
+    for (html, name) in [(&board, "board"), (&list, "list")] {
+        assert!(
+            html.contains(&goal_run.to_string()),
+            "{name} keeps the goal's run: {html}"
+        );
+        assert!(
+            !html.contains(&plain_run.to_string()),
+            "{name} drops the rest: {html}"
+        );
+    }
+    assert!(
+        board.contains(&format!(
+            r#"<option value="{goal}" selected>launch</option>"#
+        )),
+        "{board}"
+    );
+    let unscoped = f
+        .workspace_html(f.owner, board_query(f.company))
+        .await
+        .unwrap();
+    let goals = {
+        let start = unscoped.find(r#"name="goal_id""#).expect("the goal select");
+        let end = start + unscoped[start..].find("</select>").unwrap();
+        &unscoped[start..end]
+    };
+    assert!(goals.contains(&format!(r#"<option value="{goal}">launch</option>"#)));
+    assert!(
+        !goals.contains(&standing.to_string()),
+        "only goals: {goals}"
+    );
+    for unknown in [theirs, standing, Uuid::new_v4()] {
+        let ids = ScopeIds {
+            goal: Some(unknown),
+            ..ScopeIds::default()
+        };
+        let answer = f.workspace_html(f.owner, scoped(f.company, ids)).await;
+        assert!(matches!(answer, Err(AppError::NotFound(_))), "{answer:?}");
+        let listed = f.list_region(f.owner, ids).await;
+        assert!(matches!(listed, Err(AppError::NotFound(_))), "{listed:?}");
+    }
+    // A plain member gets the page without the board or the goal's run, as unscoped.
+    let member = f
+        .workspace_html(f.member, scoped(f.company, ids))
+        .await
+        .unwrap_or_default();
+    assert!(
+        !member.contains(r#"id="run-board""#) && !member.contains(&goal_run.to_string()),
+        "{member}"
+    );
 }

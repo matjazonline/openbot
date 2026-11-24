@@ -3,7 +3,7 @@
 use super::super::authorization_test_support::Fixture;
 use super::*;
 
-fn workspace(f: &Fixture, user: &crate::entities::user::User) -> Workspace {
+pub(super) fn workspace(f: &Fixture, user: &crate::entities::user::User) -> Workspace {
     let p = f.persistence.clone();
     Workspace {
         company_use_cases: f.companies.clone(),

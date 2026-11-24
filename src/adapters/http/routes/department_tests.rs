@@ -505,3 +505,229 @@ async fn goal_unit_json_create_and_edit_carry_kind_target_date_and_sponsors() {
         "a standing create refuses goal fields"
     );
 }
+
+/// A goal unit under `parent`, sponsored by the owner, with one desk (`members` access).
+async fn goal_with_desk(
+    f: &Fixture,
+    departments: &DepartmentUseCases,
+    name: &str,
+    parent: Option<DepartmentId>,
+) -> (DepartmentId, Uuid) {
+    let owner: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(f.company.id)
+    .bind(f.owner.id)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    let goal = departments
+        .create_department(
+            f.owner.id,
+            f.company.id,
+            DepartmentWrite {
+                name: name.into(),
+                slug: name.to_lowercase(),
+                parent_id: parent,
+                goal: Some(crate::application::ports::department::GoalWrite {
+                    target_date: None,
+                    sponsors: vec![crate::entities::transport::PrincipalId::new(owner)],
+                }),
+                ..DepartmentWrite::default()
+            },
+            None,
+        )
+        .await
+        .unwrap()
+        .id;
+    let desk = crate::adapters::persistence::test_support::create_channel(
+        f.persistence.as_ref(),
+        f.company.id,
+        crate::application::ports::channel::ChannelWrite {
+            name: format!("{name} desk"),
+            slug: format!("{}-desk", name.to_lowercase()),
+            department_id: Some(goal),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    (goal, desk)
+}
+
+async fn rollup_status(
+    departments: &Arc<DepartmentUseCases>,
+    user: &crate::entities::user::User,
+    company: Uuid,
+    goal: DepartmentId,
+) -> AppResult<serde_json::Value> {
+    let response = goal_rollup_json(
+        State(departments.clone()),
+        Fixture::auth(user),
+        Path((company, goal.as_uuid())),
+    )
+    .await?
+    .into_response();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    Ok(serde_json::from_slice(&bytes).unwrap())
+}
+
+fn goal_not_found(answer: &AppResult<serde_json::Value>) -> bool {
+    matches!(answer, Err(AppError::NotFound(message)) if message == "Goal not found")
+}
+
+/// 03D.5: a member who may view one of the goal's desks reads its rollup — counts, states, unit
+/// names and spend, no run content — and the goals list names it; once the desk is no longer
+/// visible to them, the goal is not found and not listed. Runs themselves stay behind the run
+/// board's own rule (`other_tenants_and_plain_members_reach_no_run…`).
+#[tokio::test]
+async fn goal_authorization_member_sees_counts_not_runs() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let departments = use_cases(&f);
+    let (goal, desk) = goal_with_desk(&f, &departments, "Launch", None).await;
+    assert!(goal_not_found(
+        &rollup_status(&departments, &f.member, f.company.id, goal).await
+    ));
+    sqlx::query("UPDATE channels SET access_mode='public' WHERE id=$1")
+        .bind(desk)
+        .execute(f.persistence.pool())
+        .await
+        .unwrap();
+    let body = rollup_status(&departments, &f.member, f.company.id, goal)
+        .await
+        .unwrap();
+    assert_eq!(body["name"], "Launch");
+    let mut keys: Vec<&str> = body
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        [
+            "archived",
+            "calls",
+            "escalations_open",
+            "first_run_at",
+            "goal",
+            "last_activity_at",
+            "last_finished_at",
+            "name",
+            "runs_counted",
+            "spend",
+            "target_date",
+            "truncated",
+            "units",
+            "waiting",
+            "waiting_on_people_seconds",
+            "waiting_total",
+        ],
+        "counts, states, names and times only"
+    );
+    let listed = departments
+        .visible_goals(f.member.id, f.company.id, false)
+        .await
+        .unwrap();
+    assert!(!listed.cut);
+    assert_eq!(
+        listed
+            .goals
+            .iter()
+            .map(|goal| goal.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Launch"]
+    );
+    sqlx::query("UPDATE channels SET access_mode='members' WHERE id=$1")
+        .bind(desk)
+        .execute(f.persistence.pool())
+        .await
+        .unwrap();
+    assert!(goal_not_found(
+        &rollup_status(&departments, &f.member, f.company.id, goal).await
+    ));
+    assert!(
+        departments
+            .visible_goals(f.member.id, f.company.id, false)
+            .await
+            .unwrap()
+            .goals
+            .is_empty()
+    );
+}
+
+/// 03D.5: a stranger, another company's owner and a member who neither sees a desk nor manages
+/// the goal get "not found" alike; a standing unit is no goal; the lead of the goal's parent sees
+/// it as its manager.
+#[tokio::test]
+async fn goal_authorization_stranger_and_manager() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let departments = use_cases(&f);
+    let parent = departments
+        .create_department(
+            f.owner.id,
+            f.company.id,
+            DepartmentWrite {
+                name: "Programs".into(),
+                slug: "programs".into(),
+                ..DepartmentWrite::default()
+            },
+            None,
+        )
+        .await
+        .unwrap()
+        .id;
+    let (goal, _) = goal_with_desk(&f, &departments, "Launch", Some(parent)).await;
+    rollup_status(&departments, &f.owner, f.company.id, goal)
+        .await
+        .expect("the owner manages every unit");
+    for (user, company) in [
+        (&f.stranger, f.company.id),
+        (&f.owner, f.foreign.id),
+        (&f.member, f.company.id),
+    ] {
+        let answer = rollup_status(&departments, user, company, goal).await;
+        assert!(
+            matches!(&answer, Err(AppError::NotFound(_))),
+            "{}: {answer:?}",
+            user.username
+        );
+        if let Err(AppError::NotFound(message)) = &answer {
+            assert!(!message.contains(&f.foreign.name));
+        }
+    }
+    assert!(goal_not_found(
+        &rollup_status(&departments, &f.owner, f.company.id, parent).await
+    ));
+    let member: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(f.company.id)
+    .bind(f.member.id)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
+         VALUES ($1, $2, 'lead', $3)",
+    )
+    .bind(f.company.id)
+    .bind(parent.as_uuid())
+    .bind(member)
+    .execute(f.persistence.pool())
+    .await
+    .unwrap();
+    let body = rollup_status(&departments, &f.member, f.company.id, goal)
+        .await
+        .expect("the parent's lead manages the goal");
+    assert_eq!(body["goal"], goal.as_uuid().to_string());
+}

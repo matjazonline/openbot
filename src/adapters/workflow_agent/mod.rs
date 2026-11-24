@@ -50,6 +50,7 @@ pub struct AgentActionTools {
     /// `channel.call` (agent-workflow-call 03); every production composition includes it, and
     /// without it a frozen `channel.call` fails closed.
     channel_call: Option<Arc<dyn ChannelCallDispatch>>,
+    goal_status: Option<Arc<dyn crate::application::workflow::goal_status::GoalStatusDispatch>>,
 }
 impl AgentActionTools {
     pub fn new(http: Arc<HttpRuntime>, mcp: Arc<McpRuntime>, message: Arc<MessageRuntime>) -> Self {
@@ -63,7 +64,15 @@ impl AgentActionTools {
             knowledge: None,
             memory: None,
             channel_call: None,
+            goal_status: None,
         }
+    }
+    pub fn with_goal_status(
+        mut self,
+        goal_status: Arc<dyn crate::application::workflow::goal_status::GoalStatusDispatch>,
+    ) -> Self {
+        self.goal_status = Some(goal_status);
+        self
     }
     pub fn with_channel_calls(mut self, channel_call: Arc<dyn ChannelCallDispatch>) -> Self {
         self.channel_call = Some(channel_call);
@@ -110,6 +119,7 @@ enum ToolInvocation {
     Knowledge(Box<KnowledgeToolCall>),
     Memory(Box<MemoryToolCall>),
     ChannelCall(Box<ChannelCallToolCall>),
+    GoalStatus(Box<crate::application::workflow::goal_status::GoalStatusToolCall>),
 }
 fn invocation(
     tool: &PreparedTool,
@@ -184,6 +194,12 @@ fn invocation(
                 arguments,
             }))
         }
+        AgentToolTarget::GoalStatus => ToolInvocation::GoalStatus(Box::new(
+            crate::application::workflow::goal_status::GoalStatusToolCall {
+                origin: tool.origin,
+                arguments,
+            },
+        )),
         AgentToolTarget::Memory { tool: memory } => {
             ToolInvocation::Memory(Box::new(MemoryToolCall {
                 origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
@@ -258,6 +274,14 @@ impl AgentToolDispatch for AgentActionTools {
                         )
                     })?;
                     Box::pin(channel_call.call_channel(fence, *call)).await
+                }
+                ToolInvocation::GoalStatus(call) => {
+                    let goal_status = self.goal_status.as_ref().ok_or_else(|| {
+                        AppError::ServiceUnavailable(
+                            "goal.status is unavailable to this worker".into(),
+                        )
+                    })?;
+                    Box::pin(goal_status.goal_status(fence, *call)).await
                 }
             }
         }

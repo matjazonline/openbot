@@ -237,6 +237,7 @@ pub async fn board(
         None => None,
     };
     let scope = RunBoardScope {
+        goal: None,
         binding,
         workflow,
         agent,

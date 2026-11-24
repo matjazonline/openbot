@@ -55,6 +55,7 @@ pub(crate) use audit::{
 mod placement;
 pub(crate) use placement::{place_in_department_on, prepare_new_agent_placement_on};
 mod archive;
+pub(crate) mod goal_rollup;
 mod lifecycle;
 mod roles;
 mod root;
@@ -1110,6 +1111,63 @@ impl DepartmentPersistence for PostgresDepartments {
                 own,
             })
             .collect())
+    }
+
+    async fn goal_rollup(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+        goal: DepartmentId,
+    ) -> AppResult<crate::application::ports::department::GoalRollup> {
+        let mut tx = self.persistence.pool.begin().await?;
+        // The snapshot is set before any read, so visibility and the rollup agree.
+        let rollup = async {
+            sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+                .execute(&mut *tx)
+                .await?;
+            if !goal_rollup::goal_visible_on(&mut tx, user_id, company, goal).await? {
+                return Err(AppError::NotFound("Goal not found".into()));
+            }
+            goal_rollup::goal_rollup_on(
+                &mut tx,
+                company,
+                goal,
+                crate::application::ports::department::GOAL_ROLLUP_RUN_LIMIT,
+            )
+            .await
+        }
+        .await;
+        tx.rollback().await?;
+        rollup
+    }
+
+    async fn visible_goals(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+        archived: bool,
+    ) -> AppResult<crate::application::ports::department::GoalList> {
+        let mut connection = self.persistence.pool.acquire().await?;
+        goal_rollup::visible_goals_on(&mut connection, user_id, company, archived).await
+    }
+
+    async fn goal_visible(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+        goal: DepartmentId,
+    ) -> AppResult<bool> {
+        let mut connection = self.persistence.pool.acquire().await?;
+        goal_rollup::goal_visible_on(&mut connection, user_id, company, goal).await
+    }
+
+    async fn goal_choices(
+        &self,
+        user_id: Uuid,
+        company: CompanyId,
+    ) -> AppResult<(Vec<(Uuid, String)>, bool)> {
+        let mut connection = self.persistence.pool.acquire().await?;
+        goal_rollup::goal_choices_on(&mut connection, user_id, company).await
     }
 }
 

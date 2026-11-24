@@ -854,6 +854,7 @@ async fn unit_budget_usage_page_department_caps_card_for_managers_only() {
     let caps = |day: &str, month: &str| DepartmentBudgetsForm {
         day_cap: day.into(),
         month_cap: month.into(),
+        total_cap: None,
     };
     let (status, _, html) = body(
         save_budgets(
@@ -1192,12 +1193,14 @@ fn goal_unit_archive_refusal_names_runs_in_other_departments() {
     assert!(matches!(form, DepartmentForm::Archive));
     assert_eq!(
         message,
-        "1 run is still open for this goal, 1 in other departments that its own work did not start. Only those departments can end it; archive once they finish."
+        "1 run is still open for this department or a goal in it, 1 in other departments that its own work did not start. Only those departments can end it; archive once they finish."
     );
     assert!(!message.contains("here or below"));
     let (form, message) = open_work_refusal(3, 2, false);
     assert!(matches!(form, DepartmentForm::Archive));
-    assert!(message.starts_with("3 runs are still open for this goal, 2 in other departments"));
+    assert!(message.starts_with(
+        "3 runs are still open for this department or a goal in it, 2 in other departments"
+    ));
     assert!(message.contains("can end them"));
     let (form, message) = open_work_refusal(2, 0, true);
     assert!(matches!(form, DepartmentForm::ArchiveOpenWork));
@@ -1208,4 +1211,103 @@ fn goal_unit_archive_refusal_names_runs_in_other_departments() {
     let (form, message) = open_work_refusal(65, 0, false);
     assert!(matches!(form, DepartmentForm::Archive));
     assert!(message.contains("more than can be cancelled at once"));
+}
+
+/// 03D.2: a goal's page carries its status card (the rollup by department, a link to its runs)
+/// and its budgets card offers the goal's total cap; a standing department has neither, and its
+/// form refuses a total cap.
+#[tokio::test]
+async fn goal_rollup_goal_card_renders() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let owner = person(&f, &f.owner).await;
+    let goal = f
+        .departments()
+        .create_department(
+            f.owner.id,
+            f.company.id,
+            DepartmentWrite {
+                name: "Launch <X>".into(),
+                slug: "launch".into(),
+                goal: Some(crate::application::ports::department::GoalWrite {
+                    target_date: None,
+                    sponsors: vec![PrincipalId::new(owner)],
+                }),
+                ..DepartmentWrite::default()
+            },
+            None,
+        )
+        .await
+        .unwrap()
+        .id;
+    let sales = create(&f, "Sales", "sales").await;
+    let shown = show_department(
+        workspace(&f, &f.owner),
+        Path((f.company.id, goal.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(shown.contains("id=\"goal-status\""), "{shown}");
+    assert!(shown.contains("Launch &lt;X&gt;"), "escaped");
+    assert!(!shown.contains("Launch <X>"));
+    assert!(
+        shown.contains(&format!(
+            "/ui/workflow-runs?company_id={}&amp;goal_id={}",
+            f.company.id, goal
+        )),
+        "{shown}"
+    );
+    assert!(shown.contains("name=\"total_cap\""), "{shown}");
+    let (status, _, html) = body(
+        save_budgets(
+            workspace(&f, &f.owner),
+            Path((f.company.id, goal.as_uuid())),
+            Form(DepartmentBudgetsForm {
+                day_cap: String::new(),
+                month_cap: String::new(),
+                total_cap: Some("40".into()),
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Saved spend caps."), "{html}");
+    let stored: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT period, cap_micros FROM unit_budgets WHERE company_id=$1 AND unit_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(goal.as_uuid())
+    .fetch_all(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(stored, vec![("total".to_owned(), 40_000_000)]);
+    let standing = show_department(
+        workspace(&f, &f.owner),
+        Path((f.company.id, sales.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!standing.contains("id=\"goal-status\""));
+    assert!(!standing.contains("name=\"total_cap\""));
+    let (_, _, refused) = body(
+        save_budgets(
+            workspace(&f, &f.owner),
+            Path((f.company.id, sales.as_uuid())),
+            Form(DepartmentBudgetsForm {
+                day_cap: String::new(),
+                month_cap: String::new(),
+                total_cap: Some("40".into()),
+            }),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(refused.contains("Spend caps not saved:"), "{refused}");
+    assert!(refused.contains("budget.total_goal_only"), "{refused}");
 }

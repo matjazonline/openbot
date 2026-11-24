@@ -285,6 +285,8 @@ pub enum DeniedCode {
     NoResponder,
     DestinationUnavailable,
     UnitBudgetExhausted,
+    /// The goal the call serves has used its `total` cap (Plan08 03C.3).
+    GoalBudgetExhausted,
 }
 
 impl DeniedCode {
@@ -296,6 +298,7 @@ impl DeniedCode {
             Self::NoResponder => NO_RESPONDER,
             Self::DestinationUnavailable => DESTINATION_UNAVAILABLE,
             Self::UnitBudgetExhausted => crate::app_error::BudgetExhausted::CODE,
+            Self::GoalBudgetExhausted => crate::app_error::BudgetExhausted::GOAL_CODE,
         }
     }
 
@@ -308,6 +311,7 @@ impl DeniedCode {
             Self::NoResponder => "The desk has no responder for requests",
             Self::DestinationUnavailable => "The desk cannot take requests right now",
             Self::UnitBudgetExhausted => "The desk's unit has used its spend cap",
+            Self::GoalBudgetExhausted => "The goal this work serves has used its spend cap",
         }
     }
 }

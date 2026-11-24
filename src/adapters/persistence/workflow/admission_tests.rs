@@ -17,6 +17,8 @@ mod batch_tests;
 mod child_support;
 #[path = "decision_tests.rs"]
 mod decision_tests;
+#[path = "goal_rollup_people_tests.rs"]
+mod goal_rollup_people_tests;
 #[path = "history_reader_tests.rs"]
 mod history_reader_tests;
 #[path = "lease_tests.rs"]

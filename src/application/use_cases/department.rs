@@ -461,6 +461,58 @@ impl DepartmentUseCases {
         })
     }
 
+    /// A goal's status (Plan08 03D): the company's members who may view one of the goal's desks
+    /// or manage it; anyone else gets `NotFound`.
+    pub async fn goal_rollup(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        goal: DepartmentId,
+    ) -> AppResult<crate::application::ports::department::GoalRollup> {
+        readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        self.departments
+            .goal_rollup(user_id, CompanyId::new(company_id), goal)
+            .await
+    }
+
+    /// The goals `user_id` may see (Plan08 03D.2), active or archived.
+    pub async fn visible_goals(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        archived: bool,
+    ) -> AppResult<crate::application::ports::department::GoalList> {
+        readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        self.departments
+            .visible_goals(user_id, CompanyId::new(company_id), archived)
+            .await
+    }
+
+    /// Whether `user_id` may see `goal` (Plan08 03D.5), active or archived.
+    pub async fn goal_visible(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        goal: DepartmentId,
+    ) -> AppResult<bool> {
+        readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        self.departments
+            .goal_visible(user_id, CompanyId::new(company_id), goal)
+            .await
+    }
+
+    /// The active goals `user_id` may see, by name, for a select, and whether there were more.
+    pub async fn goal_choices(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<(Vec<(Uuid, String)>, bool)> {
+        readable_company(self.companies.as_ref(), user_id, company_id).await?;
+        self.departments
+            .goal_choices(user_id, CompanyId::new(company_id))
+            .await
+    }
+
     /// One visible department with its members and role holders.
     #[instrument(skip_all)]
     pub async fn visible_department(

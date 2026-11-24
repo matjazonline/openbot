@@ -376,13 +376,18 @@ impl CompanyPersistence for PostgresPersistence {
         unit_id: Uuid,
         day_micros: Option<i64>,
         month_micros: Option<i64>,
+        total_micros: Option<Option<i64>>,
     ) -> AppResult<()> {
         let actor = crate::application::workflow::WorkflowActor::authenticated(user_id)?;
         let company = crate::domain::workflow::CompanyId::new(company_id);
         let unit = crate::entities::department::DepartmentId::new(unit_id);
         // Both periods in one transaction: a refused amount leaves both caps as they were.
         let mut tx = self.pool.begin().await?;
-        for (period, cap) in [("day", day_micros), ("month", month_micros)] {
+        let total = total_micros.map(|cap| ("total", cap));
+        for (period, cap) in [("day", day_micros), ("month", month_micros)]
+            .into_iter()
+            .chain(total)
+        {
             match cap {
                 Some(cap) => {
                     super::unit_budgets::set_on(&mut tx, actor, company, unit, period, cap).await?

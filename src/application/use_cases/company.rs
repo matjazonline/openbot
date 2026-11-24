@@ -212,6 +212,7 @@ pub trait CompanyPersistence:
         unit_id: Uuid,
         day_micros: Option<i64>,
         month_micros: Option<i64>,
+        total_micros: Option<Option<i64>>,
     ) -> AppResult<()>;
 
     /// A unit's caps and counted spend for the current UTC day and month, for its managers.
@@ -602,6 +603,7 @@ impl CompanyUseCases {
     }
 
     /// Replace a unit's day and month caps together, in one transaction (`None` clears one).
+    /// `total_micros` is a goal's lifetime cap: `None` leaves it as it is, `Some(None)` clears it.
     pub async fn replace_unit_budgets(
         &self,
         user_id: Uuid,
@@ -609,9 +611,17 @@ impl CompanyUseCases {
         unit_id: Uuid,
         day_micros: Option<i64>,
         month_micros: Option<i64>,
+        total_micros: Option<Option<i64>>,
     ) -> AppResult<()> {
         self.persistence
-            .replace_unit_budgets(user_id, company_id, unit_id, day_micros, month_micros)
+            .replace_unit_budgets(
+                user_id,
+                company_id,
+                unit_id,
+                day_micros,
+                month_micros,
+                total_micros,
+            )
             .await
     }
 
