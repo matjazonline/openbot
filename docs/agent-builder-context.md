@@ -14,10 +14,11 @@ No active binding means messages are stored without starting that workflow. A dr
 
 ## What Agent Builder can create today
 
-The built-in `agent-builder` has `list_company_agents` and `create_agent_channel`. Both answer only an owner or admin writing in the app; any other requester gets a refusal.
+The built-in `agent-builder` has `list_company_agents`, `create_agent` and `create_desk_for_agent`. All three answer only an owner or admin writing in the app; any other requester gets a refusal.
 
-- `list_company_agents` lists the company's agents and enabled models. Each agent names the departments it belongs to, with the roles it holds there (`departments: [{slug, name, roles}]`), and its own desk (`desk: {id, address}`, `null` once that desk was deleted). Pass `department` (a slug) to list only that department's members and role holders; an unknown slug is refused. Entries carry no intake schema: an agent granted the `channel.call` built-in sees the public desks it can call, with their intake, in that tool's description. See [departments](departments.md).
-- `create_agent_channel` creates **one agent with its own desk**: a team desk at the agent's slug, answered through the shipped autonomous reply workflow. Name another address in `channel_slug` for a reviewed desk or one with custom steps; that desk is created beside the default one, never instead of it. `department` (a slug) places the agent there as a member, and `role: "lead"` makes it that department's lead; without `department`, the agent joins the requester's department when the requester belongs to exactly one.
+- `list_company_agents` lists the company's agents and enabled models. Each agent names the departments it belongs to, with the roles it holds there (`departments: [{slug, name, roles}]`), and its direct address (`address: {principal_id, address}`, `null` when it has none). Pass `department` (a slug) to list only that department's members and role holders; an unknown slug is refused. Entries carry no intake schema: an agent granted the `channel.call` built-in sees the public desks it can call, with their intake, in that tool's description. See [departments](departments.md).
+- `create_agent` creates **one agent with its direct address**: a principal address at the agent's slug, answered through the shipped autonomous reply workflow, which starts private to team writers. It creates no desk. It takes `name`, `slug`, `system_prompt`, `provider` and `model`, and optionally `description`, `tools` and `skills`. `department` (a slug) places the agent there as a member, and `role: "lead"` makes it that department's lead; without `department`, the agent joins the requester's department when the requester belongs to exactly one. See [agents' direct addresses](departments.md#agents-direct-addresses).
+- `create_desk_for_agent` creates **a shared desk staffed by an existing agent**: `agent_slug` names the agent, and `channel_slug` and `channel_name` name the desk, at an address other than the agent's slug. `reply_mode` is `autonomous` or `reviewed`, and `steps` adds custom steps. The new desk is team-only; its public access and the agent's direct-address setting are independent.
 
 A goal is a department of the Goal kind, so `department` may name a goal's slug and `role: "lead"`
 makes the agent the goal's lead. The Builder has no department-creation tool: a person creates a
@@ -26,15 +27,15 @@ goal on the Departments tab or with `POST /api/companies/{company_id}/department
 a goal for work with an end. A goal's planning agent needs the opt-in `goal.status` built-in, granted
 in **Agents**, to read the goal's status.
 
-Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation needs explicit confirmation of the full specification. A library copy of Agent Builder, like every company agent, gets its own autonomous desk at its slug, where you converse with it.
+Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation needs explicit confirmation of the full specification. A library copy of Agent Builder, like every company agent, gets its own direct address at its slug, where you converse with it.
 
-Agent Builder has no workflow-draft, publication, or arbitrary desk-creation tool. It can propose workflow steps or YAML for the **Workflows** editor. Use that editor to save, validate, publish, bind, and activate a custom workflow. Report those actions as completed only after they succeed.
+Agent Builder has no workflow-draft or publication tool, and creates desks only through `create_desk_for_agent`. It can propose workflow steps or YAML for the **Workflows** editor. Use that editor to save, validate, publish, bind, and activate a custom workflow. Report those actions as completed only after they succeed.
 
 ## Design an agent and its desk
 
 1. Look for an existing agent that already owns the job. Define the outcome, users, example requests, responsibilities, non-goals, escalation conditions, needed facts, output format, and tone.
 2. Choose a distinct name and lowercase hyphenated slug, a short description, a complete operational system prompt, and an explicit enabled provider/model. Request only needed workflow tools. Attach only existing skills identified by exact company skill slug.
-3. Decide who may use the desk, what messages should trigger work, and whether sending needs review. The Builder's creation tool supports the agent's own autonomous desk, a second team desk at another address for the reviewed mode or the custom steps below, and a department and role; other desk access or workflow designs need separate authoring.
+3. Decide who may use the desk, what messages should trigger work, and whether sending needs review. The Builder's tools support the agent's direct address with a department and role (`create_agent`), and a shared team desk at another address, autonomous or reviewed, with the custom steps below (`create_desk_for_agent`); other desk access or workflow designs need separate authoring.
 4. Show the final agent, desk, reply-mode and custom-step specification before asking for creation confirmation. Never imply a design is live merely because it was drafted.
 
 ## The agent base and custom steps
@@ -47,7 +48,7 @@ Every agent desk's workflow is composed from one base of three steps: `context` 
 | `before_reply` | after the agent, before any review and the reply | `decision.rule`, `decision.agent` |
 | `after_reply` | after the reply | `data.map` |
 
-A custom step's routes name only `$next` (whichever step follows it) or `$end`, and default to `{success: $next}`, so a gate can stop a reply but cannot reorder the base. `create_agent_channel` accepts up to six such steps in `steps`, of the types `ai.classify`, `decision.agent`, `decision.rule` and `data.map`; every other step type is added afterwards in the workflow editor. To use another history implementation, change the base's `context` step in the autonomous template; the agent reads its output as `untrusted_history` either way.
+A custom step's routes name only `$next` (whichever step follows it) or `$end`, and default to `{success: $next}`, so a gate can stop a reply but cannot reorder the base. `create_desk_for_agent` accepts up to six such steps in `steps`, of the types `ai.classify`, `decision.agent`, `decision.rule` and `data.map`, plus the terminal response steps `channel.no_reply`, `channel.deny` and `channel.hand_off`, which the compiler accepts only where the workflow owns the desk's response; every other step type is added afterwards in the workflow editor. To use another history implementation, change the base's `context` step in the autonomous template; the agent reads its output as `untrusted_history` either way.
 
 ## Design workflow steps
 
