@@ -1,0 +1,158 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 02s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 36 tests
+test adapters::persistence::agent_publication::tests::publication::channel_call_contract_built_in_binding_is_stored_and_published_exactly ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_call_scope_requires_invocation ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_destination_refusals_are_classified ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_audience_refused_above_ceiling ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_intake_refused_before_write ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_reconfiguration_selects_one_whole_revision ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows ... FAILED
+test application::workflow::binding::tests::channel_call_intake_activation_refuses_required_or_unbounded_fields ... ok
+test application::workflow::channel_call::tests::channel_call_authority_child_ceiling_is_the_lowest_of_three ... ok
+test application::workflow::channel_call::tests::channel_call_authority_request_above_the_ceiling_is_refused ... ok
+test application::workflow::channel_call::tests::channel_call_authority_target_checks_run_in_order_behind_the_write_rule ... ok
+test application::workflow::channel_call::tests::channel_call_contract_accepts_exactly_the_documented_fields ... ok
+test application::workflow::channel_call::tests::channel_call_contract_bounds_content_in_bytes_at_char_boundaries ... ok
+test application::workflow::channel_call::tests::channel_call_contract_built_in_snapshot_is_exact_and_its_name_reserved ... ok
+test application::workflow::channel_call::tests::channel_call_contract_deadline_must_fall_before_the_runs ... ok
+test application::workflow::channel_call::tests::channel_call_contract_denied_reason_is_cut_and_oversized_results_are_refused ... ok
+test application::workflow::channel_call::tests::channel_call_contract_every_result_matches_the_trusted_output_schema ... ok
+test application::workflow::channel_call::tests::channel_call_contract_refuses_identity_spoofing_and_unknown_fields ... ok
+test application::workflow::channel_call::tests::channel_call_intake_call_becomes_the_childs_message_input ... ok
+test application::workflow::channel_call::tests::channel_call_intake_call_fields_are_checked_against_the_captured_intake ... ok
+test application::workflow::channel_call::tests::channel_call_intake_declared_fields_and_required_rule ... ok
+test application::workflow::channel_call::tests::channel_call_intake_mail_input_has_no_fields_and_a_call_input_reaches_input_fields ... ok
+test application::workflow::channel_call::tests::channel_call_intake_schema_bound_accepts_the_documented_types ... ok
+test application::workflow::channel_call::tests::channel_call_intake_schema_bound_names_the_failing_path ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_decide_before_any_row ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope' (45189733) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_call_scope_requires_invocation stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_call_scope_requires_invocation' (45189731) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope' (45189732) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication' (45190125) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_audience_refused_above_ceiling stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_audience_refused_above_ceiling' (45190263) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write' (45190266) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges' (45190442) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_intake_refused_before_write stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_intake_refused_before_write' (45190462) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits' (45190484) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_reconfiguration_selects_one_whole_revision stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_reconfiguration_selects_one_whole_revision' (45190502) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays' (45190520) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied' (45190548) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied' (45190582) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "registry.role", message: "Choose person principals or literal department roles as reviewers", field_path: "/steps/start/with/reviewers", span: SourceSpan { start: 511, end: 512, line: 1, column: 512 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows' (45190601) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied' (45190619) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls' (45190635) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_decide_before_any_row stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_decide_before_any_row' (45190657) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "syntax.required", message: "Missing required field parameter_schema", field_path: "", span: SourceSpan { start: 0, end: 1, line: 1, column: 1 }, instance_path: None, schema_path: None })
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_call_scope_requires_invocation
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_audience_refused_above_ceiling
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_intake_refused_before_write
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_reconfiguration_selects_one_whole_revision
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_decide_before_any_row
+
+test result: FAILED. 19 passed; 17 failed; 0 ignored; 0 measured; 5057 filtered out; finished in 10.07s
+
+error: test failed, to rerun pass `--lib`

@@ -89,6 +89,12 @@ fn notes(name: &str) -> &'static str {
         "channel.no_reply" => {
             "Finish this run successfully without an automatic channel reply. Return the explicit value unchanged, validated against output_schema and the workflow output schema. Success must route to $end. Earlier explicit messages remain published; children cannot suppress their parent's reply."
         }
+        "channel.deny" => {
+            "Decline the request this run answers: reason (at most a subject's length) becomes the response body under the subject Re: <source subject>, with optional fields that follow the workflow's output_schema.properties.fields. Mail publishes it like a reply under the same review; a channel call receives a denied closure. Only a run that answers a channel message or call may finish here. Success must route to $end."
+        }
+        "channel.hand_off" => {
+            "Answer with the reply of a nested channel call this run made: run_id names that call's child run, and the call must have been consumed as done. Mail publishes that reply; a channel call receives a handed_off closure naming the run. Only a run that answers a channel message or call may finish here. Success must route to $end."
+        }
         "http.request" => {
             "Declared http slot, relative path (2048 characters), at most 64 headers. HTTP verbs never establish replay safety. Shared action receipts/reconciliation required."
         }

@@ -1,0 +1,6 @@
+≈ tailwindcss v4.1.12
+
+(node:84311) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+/*! 🌼 daisyUI 5.0.50 */
+Done in 285ms

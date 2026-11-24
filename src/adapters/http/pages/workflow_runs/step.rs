@@ -6,14 +6,19 @@ use crate::application::workflow::run_views::StepView;
 
 pub struct StepBodyView<'a> {
     pub company_id: Uuid,
+    pub run: Uuid,
     pub step: &'a StepView,
+    /// What the viewer may follow from the step's channel calls.
+    pub calls: &'a super::CallAccess,
 }
 
 pub fn run_step_body(view: &StepBodyView<'_>) -> String {
     let step = view.step;
+    let calls =
+        super::calls::channel_calls(view.company_id, view.run, &step.channel_calls, view.calls);
     if step.payload_restricted {
         return format!(
-            "<p>Restricted run content</p><p>Step {} · created {}{}{} </p>",
+            "<p>Restricted run content</p><p>Step {} · created {}{}{} </p>{calls}",
             escape_html_text(&step.step),
             format_date_time(step.created_at),
             step.activated_at
@@ -194,5 +199,11 @@ fn unrestricted_step_body(view: &StepBodyView<'_>) -> String {
                 .to_owned(),
         );
     }
+    parts.push(super::calls::channel_calls(
+        company_id,
+        view.run,
+        &step.channel_calls,
+        view.calls,
+    ));
     format!(r#"<div class="space-y-3">{}</div>"#, parts.join(""))
 }

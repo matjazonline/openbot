@@ -31,6 +31,7 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
         graph_html: "",
         people: &HashMap::new(),
         banner: None,
+        calls: &Default::default(),
     });
     assert!(
         html.contains("Record what happened (an annotation, not a resume)"),
@@ -60,6 +61,7 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
             },
         ),
         calls: Default::default(),
+        channel_calls: Default::default(),
         payload_restricted: false,
         execution: Uuid::new_v4(),
         step: "lookup".into(),
@@ -102,6 +104,8 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
         truncated: false,
     };
     let body = pages::run_step_body(&pages::StepBodyView {
+        run: Uuid::new_v4(),
+        calls: &Default::default(),
         company_id: Uuid::new_v4(),
         step: &step_view,
     });
@@ -132,6 +136,8 @@ fn sample_view(
         response: None,
         dependencies: None,
         calls: Default::default(),
+        channel_calls: Default::default(),
+        called_by: None,
         detail: RunDetail {
             summary: RunSummary {
                 role_holders: Vec::new(),
@@ -219,6 +225,7 @@ fn an_unfinished_step_of_an_ended_run_reads_as_stopped() {
         graph_html: "",
         people: &HashMap::new(),
         banner: None,
+        calls: &Default::default(),
     });
     assert!(
         html.contains("hold</span> · activation 2 · stopped, run cancelled"),
@@ -246,6 +253,7 @@ fn knowledge_view_run_pane_drops_input_parameter_and_action_payloads() {
         graph_html: "",
         people: &HashMap::new(),
         banner: None,
+        calls: &Default::default(),
     });
     assert!(html.contains("Restricted run content"));
     assert!(!html.contains("private-input-canary") && !html.contains("private-param-canary"));

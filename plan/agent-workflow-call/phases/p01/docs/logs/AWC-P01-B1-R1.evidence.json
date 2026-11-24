@@ -1,0 +1,123 @@
+{
+ "version": 1,
+ "round": "AWC-P01-B1-R1",
+ "artifact": "66d3e78f2c4f551fba5c44894cd8cc2d3c9e9d09d937e861557d98a38413e17e",
+ "checks": [
+  {
+   "criteria": [
+    "01A.1",
+    "01A.2-3",
+    "01A.5",
+    "01B-D1.1",
+    "01B-D1.4",
+    "01C.1-2"
+   ],
+   "command": "cargo test --locked --offline --lib channel_call_ (17 listed, 17 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 (dev) and openbot_awc_mac02_test (test) on localhost:5432, fresh init migration; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-focused-list.txt",
+     "sha256": "709e77d22c4af33d8f41cd81d20a0e571e8a62485d1d79c5335d0dbe150e9717"
+    },
+    {
+     "path": "logs/AWC-P01-B1-focused.txt",
+     "sha256": "b8a95008fa48a72f55f826904213c3768065aed4d9afc4a9476323e3d482c8a6"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "affected-consumers"
+   ],
+   "command": "cargo test --locked --offline --lib -- application::workflow:: adapters::persistence::agent_publication adapters::persistence::agent_authoring workflow_tool_ agent_preparation autonomous_agent_storage_manifest_ adapters::http::pages::workflow_authoring channel_reply_ message_reply --test-threads 4 (attempt 1, before the schema() correction)",
+   "fixture": "scratch DBs openbot_awc_mac02 (dev) and openbot_awc_mac02_test (test) on localhost:5432, fresh init migration; SQLX_OFFLINE=true",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-affected-attempt1-failed.txt",
+     "sha256": "6c2bc08155de6df12b1a0ccbb0dc4c50a4ddc2c39fc166df5e39be52cf000283"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "affected-consumers"
+   ],
+   "command": "same filters after the correction: 796 passed, 0 failed",
+   "fixture": "scratch DBs openbot_awc_mac02 (dev) and openbot_awc_mac02_test (test) on localhost:5432, fresh init migration; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-affected.txt",
+     "sha256": "5637ef730217b5b464f7fa80a68b4bbfc08c641b21682d10e6125e48d61218fb"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "reachability"
+   ],
+   "command": "cargo test --locked --offline --test source_modules",
+   "fixture": "scratch DBs openbot_awc_mac02 (dev) and openbot_awc_mac02_test (test) on localhost:5432, fresh init migration; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-source-modules.txt",
+     "sha256": "a0bf912eab37dc5659f8993574f5f1ee79e41f5d4927088aed6d37f6157ccc33"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-metadata"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets",
+   "fixture": "scratch DBs openbot_awc_mac02 (dev) and openbot_awc_mac02_test (test) on localhost:5432, fresh init migration; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-sqlx-check.txt",
+     "sha256": "618d33987d6dec7845605651bb1785eed8401e6f1d33584f4576c1640ccaaa7a"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "format"
+   ],
+   "command": "cargo fmt --all -- --check && git diff --check",
+   "fixture": "worktree",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-fmt.txt",
+     "sha256": "dd6ae0ee0cbdf3e81e653be52726c6cff8549eec5d4be3de6fd1eae6d1caa65a"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "clippy"
+   ],
+   "command": "cargo clippy --locked --offline --all-targets -- -D warnings: fails on 9 pre-existing redundant_field_names lints, none in this diff",
+   "fixture": "scratch DBs openbot_awc_mac02 (dev) and openbot_awc_mac02_test (test) on localhost:5432, fresh init migration; SQLX_OFFLINE=true",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-clippy.txt",
+     "sha256": "1edf3c1b575fdc9a2a84f16f99db097f76c948eda1aa7c4eac5d41529458baa4"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "01B-DB-controls"
+   ],
+   "command": "DB-backed authority controls (D1 verification table)",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "need the target read (p02) and launch (p03); scheduled there"
+  }
+ ]
+}

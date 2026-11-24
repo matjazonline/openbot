@@ -193,6 +193,12 @@ fn message_inputs(name: &str) -> Option<(Value, &'static [&'static str])> {
     }
 }
 
+/// The canonical message content (`subject`, `body`) every messaging contract shares; the
+/// `channel.call` built-in uses it too.
+pub(crate) fn message_content_schema() -> Value {
+    content()
+}
+
 /// The (input, output) schemas of a built-in messaging tool, as its step contract states them.
 pub(crate) fn message_tool_schemas(name: &str) -> Option<(Value, Value)> {
     let (properties, required) = message_inputs(name)?;

@@ -253,6 +253,9 @@ fn builtin(company: CompanyId, tool: AgentBuiltinTool) -> AppResult<ToolSnapshot
                 .ok_or_else(|| AppError::Internal("Invalid built-in memory tool".into()))?;
             crate::application::workflow::memory_tools::builtin_memory_snapshot(company, memory)
         }
+        AgentBuiltinTool::ChannelCall => {
+            crate::application::workflow::channel_call::builtin_channel_call_snapshot(company)
+        }
     }
 }
 

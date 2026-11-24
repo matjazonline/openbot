@@ -227,6 +227,10 @@ pub(super) async fn check_readiness(
                 authority::builtin_knowledge_tool(tool)?;
                 continue;
             }
+            ToolKind::ChannelCall => {
+                authority::builtin_channel_call_tool(tool)?;
+                continue;
+            }
             ToolKind::Memory => {
                 authority::builtin_memory_tool(tx, tool, super::workflow_tools::ToolCheck::Run)
                     .await?;

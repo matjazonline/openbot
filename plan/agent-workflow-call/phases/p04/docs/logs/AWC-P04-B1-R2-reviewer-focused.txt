@@ -1,0 +1,47 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 34 tests
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_ask_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_hand_off_names_the_nested_run ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_agent_destination_prepares ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_privacy_no_raw_leak ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_automatic_done ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_no_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_ask_refused_in_static_child ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_consumed_once ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_independent_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_owner_is_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_privacy_retention ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_reply_note_published ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_reply_to_source ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_deny_and_hand_off ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_steps_require_owner_in_static_child ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_approve_releases ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_hand_off_needs_a_done_call ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_rejected_then_routed ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_archive_cancels_call_child ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_cancel_races ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_competing_resumers ... ok
+test application::workflow::channel_reply::closure::tests::channel_reply_closure_denial_prefixes_once_and_bounds_the_subject ... ok
+test application::workflow::channel_reply::closure::tests::channel_reply_closure_follows_the_terminal_step ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_destination_audience ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_steps_require_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_restart_at_each_boundary ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_replay_never_reselects ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_reject_and_expire ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_scripted_agent_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_projection_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_races ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_revocation_races_consumption ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_revoked ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_outcomes ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 5109 filtered out; finished in 34.70s
+
+exit=0

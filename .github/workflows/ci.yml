@@ -271,6 +271,12 @@ jobs:
           cargo test --locked --offline --lib decision_browser_markup_and_closed_draft_recovery
           cargo test --locked --offline --lib source_message_outside_window_is_exact_and_authorized
           node --test scripts/tests/workflow-decisions.mjs
+      - name: Run call section in a browser
+        env:
+          WORKFLOW_CALLS_BROWSER_FIXTURES: /tmp/workflow-calls-browser
+        run: |
+          cargo test --locked --offline --lib channel_call_views_section_draws_only_authorized_references
+          node --test scripts/tests/workflow-run-calls.mjs
       # .cargo/config.toml gives every test thread 16 MiB, which is what keeps the
       # task-worker -> dispatch -> agent-runner chain off the guard page -- and which would also
       # let that chain grow twelvefold before anything complained. Re-run the suite at the stack a

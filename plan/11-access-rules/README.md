@@ -79,6 +79,15 @@ another plan and blocks the cross-unit part of [03](03-requests-between-units.md
    giving them some is the reach that was ruled out. Proposed: the asked desk's binding runs as it
    is configured, as for a message arriving on that desk, and the caller is recorded as the
    requester. The request rule is the only way in; no actor is exempt, the owner included.
+
+   **Confirmed by the user on 2026-11-22 and adopted in agent-workflow-call before the request
+   rules exist.** Until 03 lands, a call is admitted when the calling agent may write to the
+   destination desk under the existing internal-relay rule for an agent sender, and the asked
+   run's ceiling is the lowest of the caller's ceiling, the allowance and the `run_as` person's
+   level. Until 03C supplies the allowance from a rule it is level 0, so calls carry public data
+   only; the user accepted that calls are of limited use until then. 03B item 3 replaces the write
+   rule with the request rule. Authoritative text:
+   `plan/agent-workflow-call/phases/p01/docs/logs/AWC-P01-D1-r3-decision.md`.
 2. **An agent has one home unit.** Adding an agent to a unit, as member or role holder, needs a
    person who manages the agent as well as the destination. Today the destination's manager alone
    can add any agent of the company, and then edit, publish and equip it.

@@ -403,6 +403,15 @@ pub struct WorkflowUsage {
     pub truncated: bool,
 }
 
+/// What decides whether agents can reach a desk through `channel.call`, besides its responder
+/// selection: the facts the desk card's "Calls from agents" block shows (AWC p05 D3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeskCallFacts {
+    pub access_mode: crate::entities::channel::ChannelAccessMode,
+    pub enabled: bool,
+    pub unit_archived: bool,
+}
+
 /// An approved operation a publication selection may name: the frozen snapshot publication
 /// would capture, from a connection the company owns. Connection labels are the MCP name or
 /// the HTTP origin; never an endpoint path, header or credential.
@@ -533,6 +542,12 @@ pub trait AuthoringReads: Send + Sync {
     -> AppResult<Option<BindingUse>>;
     /// Every binding on `channel` (and on its threads), at most [`MAX_LISTED`], oldest first.
     async fn channel_usage(&self, company: CompanyId, channel: Uuid) -> AppResult<WorkflowUsage>;
+    /// The company desk `channel`'s call facts; `None` when it is not one of the company's desks.
+    async fn desk_call_facts(
+        &self,
+        company: CompanyId,
+        channel: Uuid,
+    ) -> AppResult<Option<DeskCallFacts>>;
     /// The bindings whose bound version froze `agent`, directly or through a pinned child, at
     /// most [`MAX_AGENT_USES`] by binding id (`truncated` says more exist). Reads the version's
     /// `agent_ids` display index (p09 gate P09-B1b-D1), as the run list's agent filter

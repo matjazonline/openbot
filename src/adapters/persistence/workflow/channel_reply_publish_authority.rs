@@ -21,8 +21,12 @@ pub(super) async fn lock_run_on(
 ) -> AppResult<RunAuthority> {
     let actor = action_authority::prelock_reply_on(db, row.scope(), None).await?;
     let succeeded: Option<bool> = sqlx::query_scalar(
-        "SELECT state='succeeded' AND terminal_execution_id=$3 AND parent_run_id IS NULL \
-         FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE",
+        // The response owner is a root run for ingress and the call's child for a call
+        // (AWC-P04-D1 D1); the guard on `channel_reply_runs` holds the call arm's shape.
+        "SELECT run.state='succeeded' AND run.terminal_execution_id=$3 \
+           AND (run.parent_run_id IS NULL)=(owner.owner_kind='ingress') \
+         FROM workflow_runs AS run JOIN channel_reply_runs AS owner ON owner.company_id=run.company_id AND owner.run_id=run.id \
+         WHERE run.company_id=$1 AND run.id=$2 FOR SHARE OF run",
     )
     .bind(row.company_id)
     .bind(row.run_id)
@@ -49,7 +53,7 @@ pub(super) async fn validate_on(
         Ok(artifact) => artifact,
         Err(_) => return Ok(FinalAuthority::Refused(Failure::InvalidProposal)),
     };
-    if root.intent_id != row.intent_id
+    if root.owner_id != row.owner_id
         || root.message_id != artifact.draft.source.as_uuid()
         || root.actor_id != artifact.action.request().context.actor
         || root.approval_policy != row.approval_policy

@@ -204,6 +204,7 @@ fn frozen_tools(bundle: &PublishedBundle) -> String {
                 ToolKind::Escalation => "escalation decision tool".to_owned(),
                 ToolKind::Knowledge => "knowledge search".to_owned(),
                 ToolKind::Memory => "memory tool".to_owned(),
+                ToolKind::ChannelCall => "desk call".to_owned(),
                 ToolKind::Slot(slot) => format!("through slot {}", slot.as_str()),
                 ToolKind::Http => "company HTTP operation".to_owned(),
                 ToolKind::Workflow(pin) => format!(

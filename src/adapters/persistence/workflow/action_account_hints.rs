@@ -34,6 +34,19 @@ enum Purpose<'a> {
         plan: &'a MessagePlan,
         notices: Option<&'a DecisionNotices>,
     },
+    /// A `channel.call` to `desk`: the destination's `run_as` joins the union (AWC-P02-D1 D3).
+    ChannelCall {
+        desk: Uuid,
+    },
+}
+
+/// The destination settings a channel call's account union was built from, read unlocked and
+/// confirmed after company ownership. The `run_as` account may be absent from the locked set:
+/// a missing destination account answers the call, it never refuses the caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::adapters::persistence::workflow) struct CallAccountHint {
+    pub(in crate::adapters::persistence::workflow) settings_revision: i64,
+    pub(in crate::adapters::persistence::workflow) run_as: Uuid,
 }
 
 #[derive(PartialEq, Eq)]
@@ -69,6 +82,7 @@ enum Source {
         recipients: MessageSource,
         approval: ActionApprovalAccounts,
     },
+    ChannelCall(Option<CallAccountHint>),
 }
 
 #[derive(PartialEq, Eq)]
@@ -80,7 +94,7 @@ enum MessageSource {
 impl Source {
     fn users(&self) -> impl Iterator<Item = Uuid> + '_ {
         let (recipients, approval) = match self {
-            Self::NotApplicable | Self::Reply(_) => (&[][..], None),
+            Self::NotApplicable | Self::Reply(_) | Self::ChannelCall(_) => (&[][..], None),
             Self::Dispatch { approval, .. } => (&[][..], Some(approval)),
             Self::Message {
                 recipients,
@@ -104,12 +118,22 @@ impl Source {
             } => Some(target.account),
             _ => None,
         };
+        let destination = match self {
+            Self::ChannelCall(hint) => hint.map(|hint| hint.run_as),
+            _ => None,
+        };
         recipients
             .iter()
             .copied()
             .chain(approval.into_iter().flat_map(|hint| hint.users()))
             .chain(reply.into_iter().flat_map(|hint| hint.users()))
             .chain(escalation)
+            .chain(destination)
+    }
+
+    /// Accounts this source may lose without refusing the caller.
+    fn optional(&self) -> bool {
+        matches!(self, Self::ChannelCall(_))
     }
 
     fn recorded(&self) -> bool {
@@ -251,7 +275,8 @@ async fn current_prefix(
         native,
     ))
     .await
-    .map_err(|error| prefix.error(error))?;
+    .map_err(|error| prefix.error(error))?
+    .map(|prelocked| prelocked.actor);
     if matches!(prefix.locks, RowLocks::NoWait) {
         actor.ok_or_else(missing)?;
         // Shared fence readers take this run before job/attempt ownership. Pin it NOWAIT
@@ -310,6 +335,9 @@ async fn source_on(
                 escalation,
             })
         }
+        Purpose::ChannelCall { desk } => Ok(Source::ChannelCall(
+            call_hint_on(db, scope.company, desk).await?,
+        )),
         Purpose::Message {
             request,
             plan,
@@ -352,14 +380,80 @@ async fn message_source_on(
     Ok(MessageSource::FreshMessage(users))
 }
 
-fn prelock<'a>(
-    db: &'a mut PgConnection,
+async fn prelock(
+    db: &mut PgConnection,
     scope: ActionScope,
     reviewer: Option<WorkflowActor>,
-    purpose: Purpose<'a>,
+    purpose: Purpose<'_>,
     locks: RowLocks,
-) -> impl std::future::Future<Output = AppResult<Option<WorkflowActor>>> + 'a {
-    prelock_with_native(db, scope, reviewer, purpose, locks, None)
+) -> AppResult<Option<WorkflowActor>> {
+    Ok(
+        prelock_with_native(db, scope, reviewer, purpose, locks, None)
+            .await?
+            .map(|prelocked| prelocked.actor),
+    )
+}
+
+/// The caller's prelock for a `channel.call` to `desk`, with the destination hint confirmed after
+/// company ownership. A hint is returned only when its `run_as` account is in the locked set;
+/// `Some(None)` then means the desk named no lockable destination account.
+pub(in crate::adapters::persistence::workflow) async fn prelock_channel_call_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    desk: Uuid,
+) -> AppResult<Option<(WorkflowActor, Option<CallAccountHint>)>> {
+    match prelock_with_native(
+        db,
+        scope,
+        None,
+        Purpose::ChannelCall { desk },
+        RowLocks::Wait,
+        None,
+    )
+    .await?
+    {
+        None => Ok(None),
+        Some(Prelocked {
+            actor,
+            source: Source::ChannelCall(hint),
+            locked,
+        }) => Ok(Some((
+            actor,
+            hint.filter(|hint| locked.binary_search(&hint.run_as).is_ok()),
+        ))),
+        Some(_) => Err(invalid()),
+    }
+}
+
+/// Company-scoped, so a foreign or missing desk names no account.
+async fn call_hint_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    desk: Uuid,
+) -> AppResult<Option<CallAccountHint>> {
+    let hint: Option<(i64, Uuid)> = sqlx::query_as(
+        "SELECT settings.revision, configuration.run_as_user_id FROM channel_reply_settings AS settings \
+         JOIN channels AS desk ON desk.company_id=settings.company_id AND desk.id=settings.channel_id \
+         JOIN workflow_binding_revisions AS configuration ON configuration.company_id=settings.company_id \
+           AND configuration.binding_id=settings.binding_id AND configuration.revision=settings.binding_revision \
+         WHERE settings.company_id=$1 AND settings.channel_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(desk)
+    .fetch_optional(db)
+    .await?;
+    Ok(hint.map(|(settings_revision, run_as)| CallAccountHint {
+        settings_revision,
+        run_as,
+    }))
+}
+
+/// What the account prefix holds once company ownership is taken: the run's actor, the source
+/// read under those locks, and the sorted accounts actually locked.
+struct Prelocked {
+    actor: WorkflowActor,
+    source: Source,
+    locked: Vec<Uuid>,
 }
 
 async fn prelock_with_native(
@@ -369,7 +463,7 @@ async fn prelock_with_native(
     purpose: Purpose<'_>,
     locks: RowLocks,
     native: Option<super::super::native_mcp::NativeAccounts>,
-) -> AppResult<Option<WorkflowActor>> {
+) -> AppResult<Option<Prelocked>> {
     let Some(hints) = actor_hints_on(db, scope, reviewer).await? else {
         return Ok(None);
     };
@@ -386,7 +480,7 @@ async fn prelock_with_native(
         // retires. Observation needs no historical recipient; every live base account must
         // already be locked. Never acquire a replacement account after company ownership.
         source = source_on(db, scope, purpose).await?;
-        if !source.recorded()
+        if !(source.recorded() || source.optional())
             || !hints
                 .users()
                 .all(|user| locked.binary_search(&user).is_ok())
@@ -421,7 +515,11 @@ async fn prelock_with_native(
             if source != current && !current.recorded() {
                 return Err(conflict());
             }
-            Ok(Some(actor))
+            Ok(Some(Prelocked {
+                actor,
+                source: current,
+                locked,
+            }))
         }
         Err(AppError::NotFound(_)) => Ok(None),
         Err(error) => Err(error),

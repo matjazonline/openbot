@@ -1,0 +1,28 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 13 tests
+test application::workflow::channel_call_views::tests::channel_call_views_outcome_labels ... ok
+test application::workflow::channel_call_views::tests::channel_call_views_phase_named_cases ... ok
+test application::workflow::channel_call_views::tests::channel_call_views_phase ... ok
+test adapters::http::pages::workflow_runs::calls::tests::channel_call_views_section_draws_only_authorized_references ... ok
+test application::workflow::sample::tests::channel_call_sample_tests::channel_call_sample_incomplete ... ok
+test application::workflow::sample::tests::channel_call_sample_tests::channel_call_sample_simulated_result ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_sample_capture ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_caller_and_child ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_dependency_scope ... ok
+test adapters::persistence::workflow::tests::http_tests::metrics_tests::workflow_metrics_real_owners_and_bounded_lock_failure ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_metrics ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_foreign_scope ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_review_vs_stalled ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 5158 filtered out; finished in 11.95s
+
+exit=0
+workflow sample capability boundary passed
+boundary_exit=0

@@ -3,7 +3,7 @@ use crate::application::workflow::run_views::{
     CallProvenancePage, CallRecordKind, RunView, SelectedAgentSummary,
 };
 
-pub(super) fn dependencies(run: &RunView) -> String {
+pub(super) fn dependencies(run: &RunView, company_id: Uuid, access: &super::CallAccess) -> String {
     if run.payload_restricted {
         return String::new();
     }
@@ -30,13 +30,32 @@ pub(super) fn dependencies(run: &RunView) -> String {
         &run.detail.summary.role_holders,
         run.detail.summary.role_holders_truncated,
     );
+    // A call child selects its own scope when the call launches (AWC-C005); an ordinary run
+    // keeps its root's selection.
+    let scope = match &run.called_by {
+        Some(origin) => format!(
+            r#"<p class="break-all text-xs" data-scope="call">Manifest {} · this run's own dependency scope</p>{roles}
+        <p class="text-xs opacity-70">Selected when the call from {} launched; the caller's selection is manifest <span class="font-mono">{}</span>. The agents below are this run's, not the caller's.</p>"#,
+            selected.manifest.as_uuid(),
+            run_chip(
+                company_id,
+                origin.caller.as_uuid(),
+                RunLinkAccess::Authorized(&access.runs)
+            ),
+            origin.caller_manifest,
+        ),
+        None => format!(
+            r#"<p class="break-all text-xs" data-scope="root">Manifest {} · root run {}</p>{roles}
+        <p class="text-xs opacity-70">Selected at root admission; kept by retries and ordinary children.</p>"#,
+            selected.manifest.as_uuid(),
+            selected.root.as_uuid(),
+        ),
+    };
     format!(
         r#"<section class="space-y-2"><h3 class="font-semibold">Captured dependencies</h3>
-        <p class="break-all text-xs">Manifest {} · root run {}</p>{roles}
-        <p class="text-xs opacity-70">Selected at root admission and retained by retries and children. Published definitions describe available capabilities; model-only steps use no tools or skills.</p>
+        {scope}
+        <p class="text-xs opacity-70">Published definitions describe available capabilities; model-only steps use no tools or skills.</p>
         <details><summary class="cursor-pointer">Agent revisions and workflow versions</summary>{agents}<ul>{workflows}</ul>{cut}</details></section>{calls}"#,
-        selected.manifest.as_uuid(),
-        selected.root.as_uuid(),
         cut = truncation(
             selected.agents_truncated || selected.workflows_truncated,
             "Dependency lists show at most 50 agents and 50 workflow versions; additional selections are omitted."

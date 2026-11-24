@@ -38,7 +38,19 @@ async fn workflow_metrics_failure_retains_last_success_and_empty_success_clears(
         100.0
     );
     assert_eq!(gauges["workflow_metrics_collection_ok"], 1.0);
-    assert_eq!(gauges.as_object().unwrap().len(), 24);
+    // 24 before agent-workflow-call p05, plus the seven channel-call gauges.
+    assert_eq!(gauges.as_object().unwrap().len(), 31);
+    for name in [
+        "workflow_channel_calls_open",
+        "workflow_channel_calls_review_waiting",
+        "workflow_channel_calls_response_ready",
+        "workflow_channel_calls_child_stalled",
+        "workflow_channel_calls_caller_stalled",
+        "workflow_channel_calls_past_deadline",
+        "workflow_channel_call_oldest_seconds",
+    ] {
+        assert_eq!(gauges[name], 0.0, "{name}");
+    }
     assert!(
         gauges
             .as_object()

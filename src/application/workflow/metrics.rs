@@ -32,6 +32,13 @@ pub struct WorkflowMetrics {
     pub reserved_estimated_usd: f64,
     pub charged_estimated_usd_last24h: f64,
     pub unpriced_model_calls: f64,
+    pub channel_calls_open: f64,
+    pub channel_calls_review_waiting: f64,
+    pub channel_calls_response_ready: f64,
+    pub channel_calls_child_stalled: f64,
+    pub channel_calls_caller_stalled: f64,
+    pub channel_calls_past_deadline: f64,
+    pub channel_call_oldest_seconds: f64,
 }
 
 impl WorkflowMetrics {
@@ -83,6 +90,31 @@ impl WorkflowMetrics {
                 self.charged_estimated_usd_last24h,
             ),
             ("workflow_unpriced_model_calls", self.unpriced_model_calls),
+            ("workflow_channel_calls_open", self.channel_calls_open),
+            (
+                "workflow_channel_calls_review_waiting",
+                self.channel_calls_review_waiting,
+            ),
+            (
+                "workflow_channel_calls_response_ready",
+                self.channel_calls_response_ready,
+            ),
+            (
+                "workflow_channel_calls_child_stalled",
+                self.channel_calls_child_stalled,
+            ),
+            (
+                "workflow_channel_calls_caller_stalled",
+                self.channel_calls_caller_stalled,
+            ),
+            (
+                "workflow_channel_calls_past_deadline",
+                self.channel_calls_past_deadline,
+            ),
+            (
+                "workflow_channel_call_oldest_seconds",
+                self.channel_call_oldest_seconds,
+            ),
             (
                 "workflow_metrics_last_success_timestamp_seconds",
                 self.sampled_at,

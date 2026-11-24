@@ -1,0 +1,238 @@
+{
+ "version": 1,
+ "round": "AWC-P03-B1-R1",
+ "artifact": "b9271b7d9295ac2d77e8ecad0c69424a834eea3261b2ef936c66829c3baf6dbb",
+ "checks": [
+  {
+   "criteria": [
+    "L1",
+    "L2",
+    "L3",
+    "L4",
+    "L5",
+    "L6",
+    "L7",
+    "L8",
+    "L9",
+    "L10",
+    "L11",
+    "L12"
+   ],
+   "command": "cargo test --offline --lib channel_call_launch -- --test-threads 4 (12 tests; L9 corrected after try1, rerun alone passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-launch-try1.txt",
+     "sha256": "81bfbe3bde69f1cacb91a09f9b13bc2a823faab4cdbcd99d059eedf62a66e94b"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "R8",
+    "R9"
+   ],
+   "command": "cargo test --offline --lib channel_call_resume -- --test-threads 4 (10 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B2-resume-try1.txt",
+     "sha256": "a34545750db7d5f0a108392a528e734b890d6a7af4f678ca472e0c3c381538eb"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "p02-regression",
+    "V11-split"
+   ],
+   "command": "cargo test --offline --lib channel_call_ -- --test-threads 4 (39 passed, before the launch/resume files existed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-try4.txt",
+     "sha256": "2394bf975042a8862ad4369f6a31442153175370bba4ab4f74afb971688e5bb3"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "affected-consumers",
+    "L1",
+    "L2",
+    "L3",
+    "L4",
+    "L5",
+    "L6",
+    "L7",
+    "L8",
+    "L9",
+    "L10",
+    "L11",
+    "L12",
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "R8",
+    "R9"
+   ],
+   "command": "cargo test --offline --lib -- channel_call_ workflow_tool_ workflow_child message_thread_ channel_reply_ unit_archive_ knowledge_ producer --test-threads 4 (710 passed, 1 ignored; includes all L and R tests after the L9 correction)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-affected.txt",
+     "sha256": "bc39bf8ac928224d0b2f7a201741d8678eb0d0dab6d7fb40902723deeec60f9c"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D2-capture-callers",
+    "D5-callers",
+    "D6-callers"
+   ],
+   "command": "cargo test --offline --lib -- admission_ workflow_context_history agent_history memory_ department_ --test-threads 4 (1604 passed, 1 failed: doop_agent_current_preparation_reaches_ready_before_model_io, unrelated: expects format 7, PREPARED_AGENT_VERSION 8 since 2edd0a73, recorded by p02)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-callers.txt",
+     "sha256": "1c1ca335294998f7ac28871abf01f23f286a2991a175586eca4812f518097553"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D7"
+   ],
+   "command": "scripts/stack-budget.sh --offline -- channel_call_ workflow_tool_ --test-threads 4 (2048 KiB; 93 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-stack-budget.txt",
+     "sha256": "8492b7d43ef3c9e2d942ac20bd3d2847b3849621670ecae050771ed3e05f9772"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D7"
+   ],
+   "command": "scripts/stack-frames.sh target/debug/open_bots 32 (start_on 38 KiB is the chain's only frame >= 32 KiB)",
+   "fixture": "cargo build --offline debug binary of the frozen tree",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-stack-frames.txt",
+     "sha256": "be13765db7b48a2160b7e3b7a3a6470213bc54032a08a38b6d670a2d04474d4a"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D7-before"
+   ],
+   "command": "scripts/stack-frames.sh on the pre-p03 tree",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "the pre-p03 state is uncommitted (p01/p02 in the working tree) and a second worktree build needs ~100 GB of target with 76 GB free; the after-measurement and the 2 MiB budget run are the guard",
+   "files": []
+  },
+  {
+   "criteria": [
+    "L6-resources"
+   ],
+   "command": "two destinations declaring different resources",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "neither test destination declares a resource; resource capture is p02's binding capture path (V0, V7-V10), unchanged by p03",
+   "files": []
+  },
+  {
+   "criteria": [
+    "schema-offline-data"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-sqlx-check.txt",
+     "sha256": "dca2b1e9c284fe65152cd0093eec1d50a7144ef5c0af80ecf41a2da5fc4cdcb0"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo clippy --offline --locked --all-targets -- -D warnings (exit 101: the same 9 pre-existing redundant_field_names in files unmodified by p03)",
+   "fixture": "offline",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-clippy.txt",
+     "sha256": "1edf3c1b575fdc9a2a84f16f99db097f76c948eda1aa7c4eac5d41529458baa4"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "format"
+   ],
+   "command": "cargo fmt --all -- --check && git diff --check",
+   "fixture": "offline",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "modules"
+   ],
+   "command": "cargo test --locked --offline --test source_modules (8 passed)",
+   "fixture": "offline",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-source-modules.txt",
+     "sha256": "d3bdc242709d0b369c74898a0697248c1a6d822647d8f8ea9e88a296e1f2cd79"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "artifact"
+   ],
+   "command": "bash .claude/skills/implement-opus-reviewed-2_4/scripts/snapshot.sh plan/agent-workflow-call/phases/p03/docs .trail/learnings",
+   "fixture": "worktree",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P03-B1-R1-snapshot.txt",
+     "sha256": "1fdd74accb8bed67488ee528de3b93c6ad532cb079fc1129a9d674d382f26e32"
+    }
+   ]
+  }
+ ]
+}

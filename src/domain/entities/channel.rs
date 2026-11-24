@@ -131,15 +131,28 @@ pub struct ParticipantAccess {
     pub trusted: bool,
 }
 
+/// Whether a sender may enter a desk: public intake, a `participate` grant, or the owner. The
+/// one rule for mail admission and for an agent's `channel.call` write right, which reads the
+/// same facts inside its own transaction.
+pub const fn participant_authorized(
+    access_mode: ChannelAccessMode,
+    listed: bool,
+    is_owner: bool,
+) -> bool {
+    matches!(access_mode, ChannelAccessMode::Public) || listed || is_owner
+}
+
 impl Channel {
     /// Mail admission reads the owning department's materialized grants and explicit grants.
     /// Public intake accepts outsiders without trusting them; the owner always has access.
     pub fn participant_access(&self, context: PrincipalAccessContext) -> ParticipantAccess {
         let listed = self.has_capability(context, PrincipalCapability::Participate);
         ParticipantAccess {
-            authorized: self.access_mode == ChannelAccessMode::Public
-                || listed
-                || context.membership.is_owner(),
+            authorized: participant_authorized(
+                self.access_mode,
+                listed,
+                context.membership.is_owner(),
+            ),
             trusted: listed || context.membership.is_team(),
         }
     }

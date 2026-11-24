@@ -1,0 +1,20 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 6 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history_human_cc::agent_history_e2e_real_search_human_wait_and_customer_cc_refuse_resume_without_provider ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history::agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 5174 filtered out; finished in 28.72s
+
+exit 0

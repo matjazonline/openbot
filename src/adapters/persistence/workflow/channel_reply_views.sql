@@ -8,8 +8,7 @@ SELECT run.id AS run_id, run.state, review.run_id AS review_run,
        prompt.awaiting_viewer, prompt.delivery_id AS prompt_delivery,
        prompt.delivery_state AS prompt_delivery_state
 FROM workflow_runs AS run
-JOIN channel_reply_runs AS owner ON owner.company_id=run.company_id AND owner.run_id=run.id
-JOIN channel_reply_contexts AS context ON context.company_id=owner.company_id AND context.intent_id=owner.intent_id
+JOIN channel_reply_owners AS context ON context.company_id=run.company_id AND context.run_id=run.id
 JOIN workflow_run_budgets AS budget ON budget.company_id=run.company_id AND budget.run_id=run.id
 LEFT JOIN channel_reply_decisions AS decision ON decision.company_id=run.company_id AND decision.run_id=run.id
 LEFT JOIN message_deliveries AS delivery ON delivery.company_id=decision.company_id AND delivery.id=decision.delivery_id

@@ -333,7 +333,7 @@ async fn channel_reply_completion_competing_finalizers_create_one_obligation() {
     ));
     assert_eq!(f.state().await["proposals"], 1);
     let count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM channel_reply_decisions WHERE company_id=$1 AND intent_id=$2",
+        "SELECT count(*) FROM channel_reply_decisions WHERE company_id=$1 AND owner_id=$2",
     )
     .bind(f.scope.company.as_uuid())
     .bind(f.intent)

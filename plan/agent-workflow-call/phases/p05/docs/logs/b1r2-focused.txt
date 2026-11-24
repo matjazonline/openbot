@@ -1,0 +1,77 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 46.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 47 tests
+test adapters::persistence::agent_authoring::catalog::memory_tests::channel_call_authoring_catalogue_offers_opt_in ... ok
+test adapters::http::pages::workflow_authoring::graph::tests::channel_call_authoring_response_step_labels ... ok
+test adapters::harness::rig::workflow::guard_tests::doop_agent_strict_mcp_error_maps_to_a_terminal_failure ... ok
+test adapters::http::pages::workflow_authoring::channel_response::tests::channel_call_authoring_desk_card ... ok
+test adapters::harness::rig::protocol::tests::logical_seed::agent_history_preparation_seed_boundaries_preserve_existing_checkpoint_ceiling ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::guide_tests::doop_agent_pinned_guide_skills_preserve_the_full_capture_with_existing_bounds ... ok
+test adapters::persistence::agent_publication::tests::authoring::channel_call_authoring_catalogue_save_and_publish ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::guide_tests::doop_agent_actual_guide_text_bound_preserves_unknown_without_reissue ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_external_sources ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_frozen ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_omitted_for_external ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_ungranted_never_sees ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_lists_callable_public_desks ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_preparation_mandatory_current_budget_refusal_has_no_provider_snapshot_or_order ... ok
+test application::workflow::agent::mcp_policy::tests::doop_agent_mcp_policy_parsing_is_typed_and_serialization_is_required ... ok
+test application::workflow::agent::mcp_policy::tests::doop_agent_strict_mcp_policy_does_not_classify_business_fields_or_text ... ok
+test application::workflow::agent_history::tests::agent_history_contract_accepted_null_is_distinct_from_failure_and_cancellation ... ok
+test application::workflow::agent_history::tests::agent_history_contract_exact_structured_values_roundtrip_without_prompt_expansion ... ok
+test application::workflow::agent_history::tests::agent_history_contract_only_agent_run_is_eligible ... ok
+test application::workflow::agent_history::tests::agent_history_contract_order_is_positive_bounded_and_survives_decode ... ok
+test application::workflow::agent_history::tests::agent_history_contract_schema_and_revision_remain_original_provenance ... ok
+test application::workflow::agent_history::tests::agent_history_contract_terminal_states_do_not_follow_workflow_or_delivery_state ... ok
+test application::workflow::agent_history::tests::agent_history_contract_value_budget_is_enforced_at_construction_and_decode ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_discovery_bounds ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_help_examples ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_intake_summary ... ok
+test application::workflow::provisioning::tests::channel_call_authoring_builder_offers_response_steps ... ok
+test application::workflow::publication::tests::agent_tests::doop_agent_mcp_error_policy_is_frozen_in_preparation_and_checkpoint_identity ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_preparation_current_content_and_reserved_output_precede_history ... ok
+test application::workflow::registry::tests::doop_agent_mcp_error_policy_requires_an_explicit_literal_enum ... ok
+test application::workflow::templates::agent_workflow::tests::channel_call_authoring_template_accepts_response_ends ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_database_first_freeze_binds_current_version_and_trusted_mcp_policy ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io' (47471089) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:435:5:
+assertion `left == right` failed
+  left: Number(9)
+ right: 7
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io
+
+test result: FAILED. 46 passed; 1 failed; 0 ignored; 0 measured; 5112 filtered out; finished in 66.60s
+
+error: test failed, to rerun pass `--lib`

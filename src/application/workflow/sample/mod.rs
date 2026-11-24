@@ -12,7 +12,7 @@ use crate::domain::workflow::{
     TransitionTarget, WorkflowId,
 };
 use serde_json::Value;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -43,6 +43,7 @@ struct Session {
     >,
     workflows: BTreeMap<crate::domain::workflow::VersionId, Arc<PublishedBundle>>,
     scripts: BTreeMap<ScriptKey, VecDeque<ScriptedResponse>>,
+    call_targets: BTreeMap<Uuid, FrozenCallTarget>,
     budget: RootBudgetLimits,
     report: SampleReport,
     report_bytes: usize,
@@ -95,6 +96,7 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
         configuration_hash,
         agent_selections,
         workflow_selections,
+        call_targets,
     } = sample;
     let scripts = script_queues(request.scripts)?;
     let mut session = Session {
@@ -104,6 +106,7 @@ pub fn execute(sample: PreparedSample) -> AppResult<SampleReport> {
         agents,
         workflows,
         scripts,
+        call_targets,
         budget: bundle
             .compiled()
             .graph()

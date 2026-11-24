@@ -26,7 +26,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-pub const PREPARED_AGENT_VERSION: u8 = 8;
+pub const PREPARED_AGENT_VERSION: u8 = 9;
 
 #[path = "agent_mcp_policy.rs"]
 mod mcp_policy;
@@ -76,6 +76,12 @@ pub enum AgentToolTarget {
     Workflow {
         pin: WorkflowToolPin,
     },
+    /// `channel.call` (agent-workflow-call): the destination is chosen per call and its
+    /// selected responder runs as a child; dispatched without ActionService. `desks` is the
+    /// help's desk list, frozen at preparation (gate AWC-P05-D1 r2 D2).
+    ChannelCall {
+        desks: super::channel_call_listing::DeskListing,
+    },
 }
 
 impl AgentToolTarget {
@@ -109,6 +115,9 @@ impl AgentToolTarget {
             | AgentBuiltinTool::SaveMemory => Self::Memory {
                 tool: crate::application::workflow::memory_tools::MemoryTool::from_builtin(tool)
                     .ok_or_else(|| AppError::Internal("Invalid built-in memory tool".into()))?,
+            },
+            AgentBuiltinTool::ChannelCall => Self::ChannelCall {
+                desks: Default::default(),
             },
         })
     }
@@ -316,6 +325,30 @@ impl PreparedAgent {
         Ok(self)
     }
 
+    /// The `channel.call` desk list, frozen at preparation (gate AWC-P05-D1 r2 D2). A frozen
+    /// restore passes the saved list back before its history, so a resume never re-reads it.
+    pub fn with_desk_listing(
+        mut self,
+        listing: super::channel_call_listing::DeskListing,
+    ) -> AppResult<Self> {
+        if self.history.is_some() {
+            return Err(invalid("Desk listing differs from the frozen preparation"));
+        }
+        for tool in &mut self.tools {
+            if let AgentToolTarget::ChannelCall { desks } = &mut tool.target {
+                *desks = listing.clone();
+            }
+        }
+        Ok(self)
+    }
+
+    /// Whether the prepared agent may call desks.
+    pub fn calls_desks(&self) -> bool {
+        self.tools
+            .iter()
+            .any(|tool| matches!(tool.target, AgentToolTarget::ChannelCall { .. }))
+    }
+
     pub fn department(&self) -> Option<&DepartmentContext> {
         self.department.as_ref()
     }
@@ -498,6 +531,10 @@ fn prepared_tool(
         }
         (AgentToolTarget::Knowledge, AgentBindingSource::Builtin { tool }) => {
             *tool == crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge
+        }
+        (AgentToolTarget::ChannelCall { .. }, AgentBindingSource::Builtin { tool }) => {
+            *tool == crate::entities::agent_capability::AgentBuiltinTool::ChannelCall
+                && snapshot.contract.name.as_str() == super::channel_call::CHANNEL_CALL
         }
         (AgentToolTarget::Memory { tool: memory }, AgentBindingSource::Builtin { tool }) => {
             memory.builtin() == *tool && memory.name() == snapshot.contract.name.as_str()

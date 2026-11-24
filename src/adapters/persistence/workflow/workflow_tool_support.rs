@@ -184,7 +184,37 @@ impl ToolSetup {
         Box::pin(Self::bind_child(fixture, reviewer, child)).await
     }
 
+    /// As `new`, with the built-in `channel.call` granted to the agent too.
+    pub(super) async fn with_channel_call(child: Value) -> Self {
+        let fixture = Fixture::new().await;
+        let reviewer = member(&fixture, "admin").await;
+        let child = fixture
+            .publish_workflow(WorkflowId::new(Uuid::from_u128(CHILD)), child)
+            .await;
+        let binding = crate::entities::agent_capability::AgentToolBinding::builtin(
+            crate::entities::agent_capability::AgentBuiltinTool::ChannelCall,
+        );
+        Box::pin(Self::bind_child_with(
+            fixture,
+            reviewer,
+            child,
+            vec![binding],
+        ))
+        .await
+    }
+
     pub(super) async fn bind_child(fixture: Fixture, reviewer: Uuid, child: VersionId) -> Self {
+        Box::pin(Self::bind_child_with(fixture, reviewer, child, Vec::new())).await
+    }
+
+    /// As `bind_child`, with `extra` bindings granted to the agent beside the workflow tool
+    /// (the built-in `channel.call`, agent-workflow-call 03).
+    pub(super) async fn bind_child_with(
+        fixture: Fixture,
+        reviewer: Uuid,
+        child: VersionId,
+        extra: Vec<crate::entities::agent_capability::AgentToolBinding>,
+    ) -> Self {
         let p = fixture.persistence.clone();
         let company = fixture.target.company;
         p.register_workflow_tool(
@@ -209,16 +239,19 @@ impl ToolSetup {
                 provider: Some(SCRIPTED_PROVIDER.into()),
                 model: Some(SCRIPTED_MODEL.into()),
                 system_prompt: Some("Ask the refund review, then answer.".into()),
-                tool_bindings: Some(
-                    crate::adapters::persistence::agent_binding_selection::resolve_bindings_on(
-                        &mut p.pool().acquire().await.unwrap(),
-                        company.as_uuid(),
-                        None,
-                        &[TypeName::parse(TOOL).unwrap()],
-                    )
-                    .await
-                    .unwrap(),
-                ),
+                tool_bindings: Some({
+                    let mut bindings =
+                        crate::adapters::persistence::agent_binding_selection::resolve_bindings_on(
+                            &mut p.pool().acquire().await.unwrap(),
+                            company.as_uuid(),
+                            None,
+                            &[TypeName::parse(TOOL).unwrap()],
+                        )
+                        .await
+                        .unwrap();
+                    bindings.extend(extra);
+                    bindings
+                }),
                 ..Default::default()
             },
         )
@@ -358,7 +391,8 @@ impl ToolSetup {
         child
     }
 
-    /// The `agent.run` handler with the workflow tool runtime composed in (WF-C001 r2).
+    /// The `agent.run` handler with the workflow tool and channel-call runtimes composed in, as
+    /// `infra::workflow` composes them (WF-C001 r2).
     pub(super) fn runtime(&self) -> impl WorkflowHandler + use<> {
         let p = self.persistence().clone();
         WorkflowAgentRuntime::new(
@@ -377,7 +411,8 @@ impl ToolSetup {
                 )),
                 Arc::new(runtime(&p)),
             )
-            .with_workflow_tools(Arc::new(p.clone())),
+            .with_workflow_tools(Arc::new(p.clone()))
+            .with_channel_calls(Arc::new(p.clone())),
             Some(notices(&p)),
             lease(),
         )
@@ -503,6 +538,17 @@ pub(super) async fn publish_parent_with<D: PublicationDirectory>(
     source: String,
     inner: D,
 ) -> LifecycleResult<VersionId> {
+    publish_agent_workflow(fixture, fixture.target.workflow, key, source, inner).await
+}
+
+/// As `publish_parent_with`, publishing `workflow` rather than the fixture's own.
+pub(super) async fn publish_agent_workflow<D: PublicationDirectory>(
+    fixture: &Fixture,
+    workflow: WorkflowId,
+    key: &str,
+    source: String,
+    inner: D,
+) -> LifecycleResult<VersionId> {
     let p = fixture.persistence.clone();
     let directory = ChildPublicationDirectory {
         persistence: p.clone(),
@@ -511,7 +557,7 @@ pub(super) async fn publish_parent_with<D: PublicationDirectory>(
             inner,
         },
     };
-    publish_through(fixture, fixture.target.workflow, key, source, directory).await
+    publish_through(fixture, workflow, key, source, directory).await
 }
 
 /// Publish `source` as the next version of `workflow` through exactly `directory`.

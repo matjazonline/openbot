@@ -1,0 +1,23 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 05s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 10 tests
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_destination_audience ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_archive_cancels_call_child ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_competing_resumers ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_cancel_races ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_restart_at_each_boundary ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_replay_never_reselects ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_scripted_agent_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_revocation_races_consumption ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_revoked ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_outcomes ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 5108 filtered out; finished in 15.52s
+

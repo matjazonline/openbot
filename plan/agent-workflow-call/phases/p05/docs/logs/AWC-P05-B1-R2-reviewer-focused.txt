@@ -1,0 +1,36 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 23 tests
+test adapters::http::pages::workflow_authoring::graph::tests::channel_call_authoring_response_step_labels ... ok
+test adapters::persistence::agent_authoring::catalog::memory_tests::channel_call_authoring_catalogue_offers_opt_in ... ok
+test adapters::http::pages::workflow_authoring::channel_response::tests::channel_call_authoring_desk_card ... ok
+test application::workflow::agent::mcp_policy::tests::doop_agent_mcp_policy_parsing_is_typed_and_serialization_is_required ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_discovery_bounds ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_help_examples ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_intake_summary ... ok
+test application::workflow::provisioning::tests::channel_call_authoring_builder_offers_response_steps ... ok
+test application::workflow::publication::tests::agent_tests::doop_agent_mcp_error_policy_is_frozen_in_preparation_and_checkpoint_identity ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_preparation_current_content_and_reserved_output_precede_history ... ok
+test adapters::harness::rig::protocol::tests::logical_seed::agent_history_preparation_seed_boundaries_preserve_existing_checkpoint_ceiling ... ok
+test application::workflow::registry::tests::doop_agent_mcp_error_policy_requires_an_explicit_literal_enum ... ok
+test application::workflow::templates::agent_workflow::tests::channel_call_authoring_template_accepts_response_ends ... ok
+test adapters::persistence::agent_publication::tests::authoring::channel_call_authoring_catalogue_save_and_publish ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_preparation_mandatory_current_budget_refusal_has_no_provider_snapshot_or_order ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_frozen ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_external_sources ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_omitted_for_external ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_ungranted_never_sees ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_lists_callable_public_desks ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 5136 filtered out; finished in 8.50s
+
+exit=0

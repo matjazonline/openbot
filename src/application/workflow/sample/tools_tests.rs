@@ -51,11 +51,13 @@ fn direct_agent_tools_and_pinned_workflow_tools_stay_in_sample() {
     ]);
     req.scripts[0].responses[0].tools = vec![
         ScriptedToolCall {
+            approval: None,
             name: name("knowledge.search"),
             input: json!({"query":"test"}),
             output: Some(json!(["fact"])),
         },
         ScriptedToolCall {
+            approval: None,
             name: name("memory.child"),
             input: json!({}),
             output: None,
@@ -107,6 +109,7 @@ fn direct_tool_inputs_and_outputs_are_validated() {
     ] {
         let mut req = request(vec![script(1, "start", vec![json!("done")])]);
         req.scripts[0].responses[0].tools = vec![ScriptedToolCall {
+            approval: None,
             name: name("knowledge.search"),
             input,
             output,
@@ -176,6 +179,7 @@ fn direct_mcp_tool_uses_the_production_result_envelope() {
     let input = json!({"limit":2,"include_closed":false,"labels":[],"filter":{"owner":null}});
     let mut req = request(vec![script(1, "start", vec![json!("done")])]);
     req.scripts[0].responses[0].tools = vec![ScriptedToolCall {
+        approval: None,
         name: name("lookup_tickets"),
         input,
         output: Some(

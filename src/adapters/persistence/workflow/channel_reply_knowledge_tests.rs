@@ -333,6 +333,7 @@ async fn assert_run_view_code(f: &FinalFixture) {
         graph_html: "",
         people: &Default::default(),
         banner: None,
+        calls: &Default::default(),
     });
     assert!(html.contains("knowledge.audience_below_content"));
     assert!(!html.contains("knowledge.audience below content"));

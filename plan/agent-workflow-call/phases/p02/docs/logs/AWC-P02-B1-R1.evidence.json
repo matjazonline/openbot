@@ -1,0 +1,199 @@
+{
+ "version": 1,
+ "round": "AWC-P02-B1-R1",
+ "artifact": "543ef9e9e262f537971b9bc5fd6abcb6038825c712893c811a7036ae97181777",
+ "checks": [
+  {
+   "criteria": [
+    "V0",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "V10",
+    "V11",
+    "V12",
+    "V13",
+    "V14",
+    "V15",
+    "F8",
+    "02A",
+    "02B"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --offline --lib channel_call_ -- --test-threads 4 (36 passed: 19 channel_call_snapshot/manifest/target tests plus p01's channel_call_ tests)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, recreated and freshly migrated before the passing focused run; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-focused.txt",
+     "sha256": "65fb5e9cd41b12626f387c58299694cdf32a080a167d761fe2b17ef27deda0a5"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "affected-consumers"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --offline --lib -- adapters::persistence::workflow:: adapters::persistence::agent_publication adapters::persistence::agent_authoring adapters::persistence::department adapters::persistence::unit_budgets application::workflow:: --test-threads 6 (2869 passed, 2 failed; both failures unrelated, see the unrelated-failures check)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, recreated and freshly migrated before the passing focused run; SQLX_OFFLINE=true",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-affected.txt",
+     "sha256": "65639502876b29c5397767bd620ff2d1af92d4f26bb3c30eba8f008751bb67d0"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "unrelated-failures"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --offline --lib -- cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry doop_agent_current_preparation_reaches_ready_before_model_io --test-threads 2 (cloudroom passes alone; doop fails alone: it expects preparation format 7, PREPARED_AGENT_VERSION is 8 since 2edd0a73, untouched by p02)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, recreated and freshly migrated before the passing focused run; SQLX_OFFLINE=true",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-affected-rerun.txt",
+     "sha256": "fe1b83ecdd8e4bf77f95850d1152eff6b76171f66bb60137b10082d66cde80c5"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "child-writer-consumers",
+    "02A",
+    "02B"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --offline --lib -- channel_call_ workflow_child workflow_tool_ autonomous_agent_children_ autonomous_agent_storage_manifest_ run_scope --test-threads 6 (84 passed, 1 failed: agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock statement timeout under load), run after the NewChild/ChildRow clippy fixes",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, recreated and freshly migrated before the passing focused run; SQLX_OFFLINE=true",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-final-focused.txt",
+     "sha256": "c952c54f51063cf3cf313dec5e8137c6f3eee4642385a0f1d110a8b99658d02e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "child-writer-consumers",
+    "flake"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --offline --lib -- agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock, three times alone (3/3 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, recreated and freshly migrated before the passing focused run; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-deadlock-rerun.txt",
+     "sha256": "8804bb9e68a6d62b631fd9ee7d049f9cf0b25bede93709583a45b6bfb14debc6"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-metadata"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 cargo sqlx prepare --check -- --all-targets (exit 0)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, recreated and freshly migrated before the passing focused run; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-sqlx-check.txt",
+     "sha256": "a4aeb38daccd4f3cb2bb1732ffc8b11b40975062d79e2fc55de7bb4f0dead421"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "SQLX_OFFLINE=true cargo clippy --offline --locked --all-targets -- -D warnings (exit 101: 9 redundant_field_names errors, all in 8 test files unmodified since fe7791d3; none in p02 files)",
+   "fixture": "worktree",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-clippy.txt",
+     "sha256": "1edf3c1b575fdc9a2a84f16f99db097f76c948eda1aa7c4eac5d41529458baa4"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "format"
+   ],
+   "command": "cargo fmt --all -- --check && git diff --check (exit 0)",
+   "fixture": "worktree",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-fmt.txt",
+     "sha256": "e38302aef01b329ec6de7dbdcd03361300700f9cae380d6b90b871d975b748bf"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "reachability"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --locked --offline --test source_modules (8 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, recreated and freshly migrated before the passing focused run; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-source-modules.txt",
+     "sha256": "2292d71faf27b6b2f4ae69c1f0cfea0c65443527a3c045e0f198ee5155564edd"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "V3-fence"
+   ],
+   "command": "two claimants through the call_channel dispatch converge under the fence",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "the call_channel port is p03's (AWC-C003 r2); V3 proves the primary key only"
+  },
+  {
+   "criteria": [
+    "replay-dispatch"
+   ],
+   "command": "replay through the dispatch port",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "p03 (AWC-C003 r2); V1 proves replay at start_on"
+  },
+  {
+   "criteria": [
+    "changed-arguments-saved-call"
+   ],
+   "command": "changed arguments on a real saved tool call",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "p03 (AWC-C003 r2); V1 proves it with start_on in one transaction"
+  },
+  {
+   "criteria": [
+    "F8-db"
+   ],
+   "command": "a DB-backed graph-unavailable capture refusal under the savepoint",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "F8 is covered by the classification test channel_call_snapshot_destination_refusals_are_classified; the savepoint path itself is exercised by V14 and V15"
+  },
+  {
+   "criteria": [
+    "01B-DB-controls"
+   ],
+   "command": "DB-backed authority controls through launch",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "need launch (p03); notice AWC-C002"
+  }
+ ]
+}

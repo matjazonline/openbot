@@ -292,11 +292,108 @@ impl Ui {
             None => String::new(),
         };
         let people = self.people(company).await?;
+        let calls = self
+            .call_access(company, &view.channel_calls, view.called_by.as_ref())
+            .await?;
         Ok(PaneParts {
             view,
             graph_html,
             people,
+            calls,
         })
+    }
+
+    /// What the viewer may follow from these calls (gate AWC-P05-D2 r2, D1): a run they may
+    /// open (its knowledge level read and its association visible, as `visible_run` judges), a
+    /// desk they may see, and a desk whose response settings they may read (its responder).
+    async fn call_access(
+        &self,
+        company: Uuid,
+        calls: &crate::application::workflow::channel_call_views::ChannelCallPage,
+        origin: Option<&crate::application::workflow::channel_call_views::ChannelCallOrigin>,
+    ) -> AppResult<pages::CallAccess> {
+        use crate::application::workflow::RelatedChannelId;
+        let company_id = super::company(company);
+        let actor = self.actor()?;
+        let mut visibility = Visibility::new(&self.engine, company_id, actor);
+        let mut access = pages::CallAccess::default();
+        let runs = calls
+            .items
+            .iter()
+            .map(|call| (call.child, call.child_association, call.child_readable))
+            .chain(origin.map(|origin| {
+                (
+                    origin.caller,
+                    origin.caller_association,
+                    origin.caller_readable,
+                )
+            }));
+        for (run, association, readable) in runs {
+            if readable && visibility.allows(association).await? {
+                access.runs.insert(run.as_uuid());
+            }
+        }
+        let desks: std::collections::BTreeSet<Uuid> = calls
+            .items
+            .iter()
+            .map(|call| call.desk)
+            .chain(origin.map(|origin| origin.desk))
+            .collect();
+        for desk in desks {
+            if visibility
+                .allows(RelatedAssociation::Channel(RelatedChannelId::new(desk)))
+                .await?
+            {
+                access.desks.insert(desk);
+            }
+            // Only the call list names a responder; the origin line never does.
+            if !calls.items.iter().any(|call| call.desk == desk) {
+                continue;
+            }
+            match self
+                .engine
+                .channel_replies()
+                .channel_reply_settings(
+                    company_id,
+                    crate::entities::address::AddressTarget::Desk(desk),
+                    actor,
+                )
+                .await
+            {
+                Ok(_) => {
+                    access.responders.insert(desk);
+                }
+                Err(AppError::NotFound(_) | AppError::Forbidden(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        // A final review is linked only when the viewer may open that decision, judged by the
+        // decision page's own authority (gate D1; AWC-P05-B2-F1). At most one per listed call.
+        for call in &calls.items {
+            let crate::application::workflow::channel_call_views::CallPhase::AwaitingFinalReview {
+                decision,
+            } = call.phase
+            else {
+                continue;
+            };
+            match self
+                .engine
+                .decisions()
+                .read_decision(
+                    company_id,
+                    actor,
+                    crate::application::workflow::decisions::DecisionId(decision),
+                )
+                .await
+            {
+                Ok(_) => {
+                    access.decisions.insert(decision);
+                }
+                Err(AppError::NotFound(_) | AppError::Forbidden(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(access)
     }
 
     /// `ids` resolved company-scoped (see [`Scope`]).
@@ -718,6 +815,7 @@ struct PaneParts {
     view: RunView,
     graph_html: String,
     people: HashMap<Uuid, String>,
+    calls: pages::CallAccess,
 }
 
 impl PaneParts {
@@ -736,6 +834,7 @@ impl PaneParts {
             graph_html: &self.graph_html,
             people: &self.people,
             banner,
+            calls: &self.calls,
         }
     }
 }
@@ -814,9 +913,12 @@ async fn step(
         )
         .await?
         .ok_or_else(|| AppError::NotFound("Workflow step not found".into()))?;
+    let calls = ui.call_access(company, &step.channel_calls, None).await?;
     let mut body = pages::run_step_body(&pages::StepBodyView {
         company_id: company,
+        run,
         step: &step,
+        calls: &calls,
     });
     if step.agent.is_some() || step.payload_restricted {
         body.push_str(&pages::agent_history_loader(pages::HistoryAnchor {
@@ -826,6 +928,32 @@ async fn step(
         }));
     }
     Ok(Html(body))
+}
+
+/// A run's pane, or one step's body, as `user` sees it through the production handlers over
+/// `persistence`: for persistence tests that build call state the route tests cannot reach.
+#[cfg(test)]
+pub(crate) async fn page_for_tests(
+    persistence: &crate::adapters::persistence::PostgresPersistence,
+    user: Uuid,
+    company: Uuid,
+    run: Uuid,
+    execution: Option<Uuid>,
+) -> AppResult<String> {
+    let workers = crate::infra::workflow::WorkflowEngine::for_tests(persistence.clone());
+    let ui = tests::ui_over(persistence, &workers.services(), user);
+    match execution {
+        None => tests::text(pane(ui, Path(run), tests::pane_query(company, None)).await).await,
+        Some(execution) => Ok(step(
+            ui,
+            Path((run, execution)),
+            Query(CompanyQuery {
+                company_id: company,
+            }),
+        )
+        .await?
+        .0),
+    }
 }
 
 #[cfg(test)]

@@ -33,14 +33,17 @@ pub const PROVISIONING_CONFLICT: &str = "workflow.provisioning_conflict";
 pub const PROVISIONING_INVALID: &str = "workflow.invalid_input";
 
 /// The step types the Agent Builder may add to a new agent's workflow: model-only or pure steps,
-/// which need no connection, parameter or outbound destination. Any other step is added in the
-/// workflow editor.
-pub const BUILDER_STEP_TYPES: [&str; 5] = [
+/// which need no connection, parameter or outbound destination, and the terminal response steps.
+/// The compiler still refuses a response step outside a response owner (AWC-P04 D2a). Any other
+/// step is added in the workflow editor.
+pub const BUILDER_STEP_TYPES: [&str; 7] = [
     "ai.classify",
     "decision.agent",
     "decision.rule",
     "data.map",
     "channel.no_reply",
+    "channel.deny",
+    "channel.hand_off",
 ];
 
 /// The most agents `list_company_agents` returns, by slug.
@@ -102,6 +105,7 @@ pub fn is_reserved_tool_name(name: &str) -> bool {
         || is_builtin_provisioning_tool(name)
         || crate::application::workflow::knowledge::is_builtin_knowledge_tool(name)
         || crate::application::workflow::memory_tools::is_builtin_memory_tool(name)
+        || crate::application::workflow::channel_call::is_builtin_channel_call_tool(name)
         || crate::application::workflow::escalation::tools::EscalationTool::parse(name).is_some()
         || name == crate::application::local_agents::workflow::KIND
 }

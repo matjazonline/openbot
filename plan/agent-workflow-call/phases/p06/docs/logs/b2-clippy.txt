@@ -1,0 +1,8 @@
+## rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 35s
+exit 0
+## 1.95.0
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 57.74s
+exit 0

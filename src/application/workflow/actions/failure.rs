@@ -164,6 +164,20 @@ pub fn action_step_failure(
             safety: RetrySafety::SafeToRetry,
         };
     }
+    if let Preparation(AppError::InteractiveUnsupported) = outcome {
+        return WorkflowFailure {
+            failure: StepFailure::new(
+                Terminal,
+                FailureCode::parse(
+                    crate::application::workflow::channel_call::INTERACTIVE_UNSUPPORTED,
+                )
+                .expect("static failure code"),
+                None,
+            )
+            .expect("bounded static failure"),
+            safety: RetrySafety::SafeToRetry,
+        };
+    }
     let (class, suffix) = match outcome {
         Preparation(AppError::McpAuthentication) if matches!(family, ActionFamily::Mcp) => {
             (Terminal, "authentication_rejected")

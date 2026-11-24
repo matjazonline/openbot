@@ -194,3 +194,75 @@ async fn workflow_binding_rechecks_revocation_and_propagates_directory_outages()
         Err(AppError::Database(_))
     ));
 }
+
+fn responder(input: Value, output_fields: Option<Value>) -> ConfiguredBinding {
+    let mut source: Value =
+        serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
+    source["input_schema"] = input;
+    if let Some(fields) = output_fields {
+        source["output_schema"] = json!({"type":"object","properties":{"fields":fields}});
+    }
+    let bundle = Arc::new(
+        publication::freeze(
+            decode(&source.to_string()).unwrap(),
+            company(),
+            VersionId::new(Uuid::from_u128(3)),
+            publication::DependencySnapshots::default(),
+            vec![],
+        )
+        .unwrap(),
+    );
+    let mut configuration = configuration();
+    configuration.params = json!({});
+    configuration.resources = BTreeMap::new();
+    configuration.message_trigger = Some(crate::domain::workflow::MessageTrigger::Direct);
+    ConfiguredBinding::new(configuration, bundle).unwrap()
+}
+
+fn desk() -> RelatedAssociation {
+    RelatedAssociation::inbox(crate::entities::address::AddressTarget::Desk(
+        Uuid::from_u128(8),
+    ))
+}
+
+fn intake() -> Value {
+    json!({"type":"object","properties":{
+        "order_id":{"type":"string","description":"The order"}}})
+}
+
+#[test]
+fn channel_call_intake_activation_refuses_required_or_unbounded_fields() {
+    let optional = json!({"type":"object","properties":{"fields":intake()}});
+    assert!(
+        responder(optional.clone(), Some(intake()))
+            .check_message_trigger(desk())
+            .is_ok()
+    );
+
+    let required = json!({"type":"object","required":["fields"],"properties":{"fields":intake()}});
+    let error = responder(required, None)
+        .check_message_trigger(desk())
+        .unwrap_err();
+    assert_eq!(error.code, "binding.intake_fields_must_be_optional");
+
+    let nested = json!({"type":"object","properties":{"fields":{"type":"object","properties":{
+        "deep":{"type":"object","description":"Nested"}}}}});
+    let error = responder(nested, None)
+        .check_message_trigger(desk())
+        .unwrap_err();
+    assert_eq!(error.code, "binding.intake_fields_invalid");
+    assert_eq!(
+        error.field_path.as_ref(),
+        "/input_schema/properties/fields/properties/deep/type"
+    );
+
+    let undescribed = json!({"type":"object","properties":{"answer":{"type":"string"}}});
+    let error = responder(optional, Some(undescribed))
+        .check_message_trigger(desk())
+        .unwrap_err();
+    assert_eq!(error.code, "binding.result_fields_invalid");
+    assert_eq!(
+        error.field_path.as_ref(),
+        "/output_schema/properties/fields/properties/answer/description"
+    );
+}

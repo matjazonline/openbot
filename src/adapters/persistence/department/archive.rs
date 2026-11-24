@@ -151,12 +151,25 @@ pub(crate) async fn archive_department_on(
     supersede_routing_on(tx, company, &desks).await?;
     let work = open_work_on(tx, company, &units).await?;
     if work.open > 0 {
-        let roots: Vec<Uuid> = sqlx::query_scalar(
-            "SELECT run.id FROM workflow_runs AS run JOIN channels AS desk \
-               ON desk.company_id = run.company_id AND desk.id = run.channel_id \
-              WHERE run.company_id = $1 AND desk.department_id = ANY($2) \
-                AND run.finished_at IS NULL AND run.parent_run_id IS NULL \
-              ORDER BY run.id LIMIT $3",
+        // The roots on the subtree's desks, then the recorded channel-call children on them whose
+        // caller is elsewhere (agent-workflow-call p03 D6): a caller on the subtree is cancelled
+        // with its own tree. Roots go first, so a cascade locks a parent before its child.
+        let cancellable_runs: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM ( \
+               SELECT run.id, 0 AS kind FROM workflow_runs AS run JOIN channels AS desk \
+                 ON desk.company_id = run.company_id AND desk.id = run.channel_id \
+                WHERE run.company_id = $1 AND desk.department_id = ANY($2) \
+                  AND run.finished_at IS NULL AND run.parent_run_id IS NULL \
+               UNION ALL \
+               SELECT child.id, 1 FROM workflow_channel_calls AS call \
+                 JOIN workflow_runs AS child ON child.company_id = call.company_id AND child.id = call.child_run_id \
+                 JOIN channels AS desk ON desk.company_id = child.company_id AND desk.id = child.channel_id \
+                 JOIN workflow_runs AS caller ON caller.company_id = call.company_id AND caller.id = call.run_id \
+                 LEFT JOIN channels AS caller_desk \
+                   ON caller_desk.company_id = caller.company_id AND caller_desk.id = caller.channel_id \
+                WHERE call.company_id = $1 AND desk.department_id = ANY($2) AND child.finished_at IS NULL \
+                  AND NOT COALESCE(caller_desk.department_id = ANY($2), false) \
+             ) AS cancellable ORDER BY kind, id LIMIT $3",
         )
         .bind(company.as_uuid())
         .bind(&units)
@@ -164,11 +177,12 @@ pub(crate) async fn archive_department_on(
         .fetch_all(&mut **tx)
         .await?;
         // A native MCP call is ended by its local agent, never by a department write.
-        let cancellable = work.native == 0 && roots.len() as i64 <= MAX_ARCHIVE_CANCELLATIONS;
+        let cancellable =
+            work.native == 0 && cancellable_runs.len() as i64 <= MAX_ARCHIVE_CANCELLATIONS;
         if open == OpenWork::Refuse || !cancellable {
             return Err(open_work(work.open, cancellable));
         }
-        for run in roots {
+        for run in cancellable_runs {
             crate::adapters::persistence::workflow::cancel_for_archive_on(
                 tx,
                 company,

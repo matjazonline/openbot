@@ -231,3 +231,12 @@ fn http_operations_cannot_take_a_built_in_name() {
         assert!(refused.to_string().contains("reserved"), "{refused}");
     }
 }
+
+/// C8: the Agent Builder may author the terminal response steps; the compiler's owner rule
+/// still refuses them outside a response owner.
+#[test]
+fn channel_call_authoring_builder_offers_response_steps() {
+    for kind in crate::application::workflow::registry::RESPONSE_STEPS {
+        assert!(BUILDER_STEP_TYPES.contains(&kind), "{kind}");
+    }
+}

@@ -171,9 +171,35 @@ pub(super) async fn view_proposal(
     decision: DecisionId,
 ) -> AppResult<Value> {
     let (invocation, operation): (Uuid, Value) = sqlx::query_as("SELECT intent.id,intent.operation FROM workflow_decisions AS decision JOIN workflow_action_intents AS intent ON intent.company_id=decision.company_id AND intent.id=decision.action_invocation_id WHERE decision.company_id=$1 AND decision.id=$2")
-        .bind(company.as_uuid()).bind(decision.0).fetch_one(db).await?;
-    Ok(proposal(invocation, &FrozenAction::restore(operation)?))
+        .bind(company.as_uuid()).bind(decision.0).fetch_one(&mut *db).await?;
+    let mut view = proposal(invocation, &FrozenAction::restore(operation)?);
+    // A call's final response returns to the calling agent rather than being mailed, so its
+    // reviewer is told where approval sends it (AWC-P04-D1 D4).
+    let call: Option<(Uuid, String, Option<Value>)> = sqlx::query_as(
+        "SELECT call.run_id, proposal.closure, proposal.fields FROM workflow_action_intents AS intent \
+         JOIN channel_reply_proposals AS proposal ON proposal.company_id=intent.company_id AND proposal.id=intent.reply_proposal_id \
+         JOIN channel_reply_runs AS owner ON owner.company_id=proposal.company_id AND owner.run_id=proposal.run_id \
+         JOIN workflow_channel_calls AS call ON call.company_id=owner.company_id AND call.source_message_id=owner.call_source_message_id \
+         WHERE intent.company_id=$1 AND intent.id=$2 AND owner.owner_kind='call'",
+    )
+    .bind(company.as_uuid())
+    .bind(invocation)
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some((caller, closure, fields)) = call {
+        view["response"] = json!({
+            "returns_to": "calling_agent",
+            "caller_run_id": caller,
+            "closure": closure,
+            "fields": fields,
+            "note": CALL_REVIEW_NOTE,
+        });
+    }
+    Ok(view)
 }
+
+/// What approving a call's final response does, shown to its reviewer (AWC-P04-D1 D4).
+pub(in crate::adapters::persistence::workflow) const CALL_REVIEW_NOTE: &str = "Approving returns this answer to the agent that called this desk. It is recorded in the desk's thread and is not mailed.";
 
 pub(super) async fn submit(
     db: &mut PgConnection,

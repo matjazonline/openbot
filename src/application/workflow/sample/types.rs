@@ -20,6 +20,35 @@ pub struct SampleRequest {
     pub params: Value,
     #[serde(default)]
     pub scripts: Vec<StepScript>,
+    /// The desks a scripted `channel.call` may reach, at most [`MAX_CALL_TARGETS`]; capture
+    /// freezes each one (gate AWC-P05-D2 r2, D3).
+    #[serde(default)]
+    pub call_targets: Vec<Uuid>,
+}
+
+/// The most desks one sample may declare as call targets.
+pub const MAX_CALL_TARGETS: usize = 10;
+
+/// What capture froze of a declared call target: the launch facts the simulation judges with,
+/// the declared intake and result fields, and whether final review applies. The responder
+/// binding is part of the identity only; the report never prints a target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FrozenCallTarget {
+    pub desk: Uuid,
+    pub enabled: bool,
+    pub unit_archived: bool,
+    pub responder: Option<FrozenResponder>,
+    /// The sample's agents that may write to the desk (check 3).
+    pub writable_agents: BTreeSet<crate::entities::agent_capability::AgentId>,
+    pub review_required: bool,
+    pub intake: Option<Value>,
+    pub result_fields: Option<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FrozenResponder {
+    pub binding: Uuid,
+    pub revision: u64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,6 +78,9 @@ pub struct ScriptedToolCall {
     pub input: Value,
     /// Required for intercepted external tools; forbidden for a workflow tool, whose child runs.
     pub output: Option<Value>,
+    /// `channel.call` only: the simulated final review of a desk that requires one.
+    #[serde(default)]
+    pub approval: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -92,6 +124,8 @@ pub enum SampleEffectKind {
     FixtureRead,
     InterceptedWrite,
     WorkflowChild,
+    /// A `channel.call` answered from the author's fixture, not by any desk (gate D4).
+    SimulatedCall,
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct SampleEffect {
@@ -100,6 +134,9 @@ pub struct SampleEffect {
     pub kind: SampleEffectKind,
     pub input: Value,
     pub output: Value,
+    /// Set for a simulated call: the output is untrusted author data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<&'static str>,
 }
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SampleUsage {

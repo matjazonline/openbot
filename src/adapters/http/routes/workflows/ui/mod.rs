@@ -19,6 +19,8 @@ use axum::{
 mod authoring;
 mod memory;
 mod runs;
+#[cfg(test)]
+pub(crate) use runs::page_for_tests as run_page_for_tests;
 mod typesafe;
 
 pub fn router() -> Router<AppState> {

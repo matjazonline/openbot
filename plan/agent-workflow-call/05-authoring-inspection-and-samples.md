@@ -20,8 +20,12 @@ them without extra workflow-tool registrations or hidden production effects.
    reveal params, resource secrets, prompts, or inaccessible channel metadata. Reuse existing
    channel lookup; this feature does not require a new global discovery service or tool registry.
 4. Keep the public request contract fixed. There is no per-channel tool-schema registration and no
-   schema discovery round trip because channel calls use the canonical message contract. Explain
-   that direct arbitrary workflow input is a different invocation contract.
+   schema discovery round trip. Amended by user decisions U6 and U8 (2026-11-23; gate AWC-P05-D1
+   r2): the `channel.call` description itself lists callable desks with their intake, built once
+   when the agent step is prepared and frozen with it. Only public desks that launch would admit
+   are listed, and nothing is listed while the run can answer an external correspondent.
+   `list_company_agents` stays builder-only and carries no intake. Explain that direct arbitrary
+   workflow input is a different invocation contract.
 5. Update operations documentation with actual revocation, retry, cancellation, approval, limits,
    and retention behavior. Do not promise startup validation that runtime alone performs.
 

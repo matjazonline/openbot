@@ -65,3 +65,67 @@ test('response form supports keyboard navigation and submit and shows request pr
         await new Promise(resolve => server.close(resolve));
     }
 });
+
+const callsSource = read('src/adapters/http/pages/workflow_authoring/channel_response.rs');
+const callsBlock = callsSource.match(/<section class="space-y-2 border-t border-base-300 pt-4" aria-labelledby="channel-calls-heading">[\s\S]*?<\/section>/)?.[0];
+assert.ok(callsBlock, 'use the actual production "Calls from agents" block');
+const copyScript = read('src/adapters/http/pages/layout.rs').match(/ {8}function copyTextFrom\(button\) \{[\s\S]*?\n {8}\}\n/)?.[0];
+assert.ok(copyScript, 'use the actual production copy handler');
+const deskId = '6f1c2d3e-0000-4000-8000-00000000c411';
+const calls = callsBlock.replace('{key}', 'public').replace('{status}', 'Any agent in the company can call this desk.')
+    .replace('{channel}', deskId).replace('{responder}', 'Support').replace('{review}', 'No');
+
+test('calls-from-agents block offers the desk id read-only, reachable by keyboard, and copyable with or without the clipboard API', async () => {
+    const server = createServer((request, response) => {
+        if (request.url === '/app.css') return response.writeHead(200, { 'Content-Type': 'text/css' }).end(read('assets/app.css'));
+        response.end(`<!doctype html><html><head><link rel="stylesheet" href="/app.css"></head><body>${calls}
+            <script>${copyScript}
+            document.addEventListener('click', event => {
+                const control = event.target.closest('[data-action]');
+                if (control && control.dataset.action === 'copy-text') copyTextFrom(control);
+            });</script></body></html>`);
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${server.address().port}`;
+    let browser;
+    try {
+        browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
+        const context = await browser.newContext();
+        await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+        const page = await context.newPage();
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.goto(`${origin}/`);
+        const id = page.getByLabel('Desk id for the call tool');
+        await expect(id).toHaveValue(deskId);
+        await expect(id).toHaveAttribute('readonly', '');
+        await id.focus();
+        await page.keyboard.press('Tab');
+        // The accessible name changes to "Copied", so hold the button by its stable attribute.
+        const copy = page.locator('[data-copy-from="channel-call-id"]');
+        await expect(copy).toHaveAccessibleName('Copy');
+        await expect(copy).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(copy).toHaveText('Copied');
+        assert.equal(await page.evaluate(() => navigator.clipboard.readText()), deskId);
+
+        // Without the clipboard API the id is selected for copying by hand.
+        const bare = await browser.newPage();
+        await bare.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { value: undefined }));
+        bare.on('pageerror', error => errors.push(error.message));
+        await bare.goto(`${origin}/`);
+        await bare.getByRole('button', { name: 'Copy' }).click();
+        const fallback = bare.getByLabel('Desk id for the call tool');
+        await expect(fallback).toBeFocused();
+        assert.deepEqual(
+            await fallback.evaluate(input => [input.selectionStart, input.selectionEnd]),
+            [0, deskId.length],
+        );
+        await expect(bare.getByRole('button', { name: 'Copy' })).toHaveText('Copy');
+        assert.deepEqual(errors, []);
+    } finally {
+        await browser?.close();
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
+    }
+});

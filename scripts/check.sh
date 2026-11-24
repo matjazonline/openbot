@@ -66,6 +66,7 @@ export WORKFLOW_AGENT_BROWSER_FIXTURES="$check_work/workflow-agent"
 export SESSION_REVOCATION_BROWSER_FIXTURES="$check_work/session"
 export VAULT_AUTHORING_BROWSER_FIXTURES="$check_work/vault"
 export WORKFLOW_DECISION_BROWSER_FIXTURES="$check_work/decision"
+export WORKFLOW_CALLS_BROWSER_FIXTURES="$check_work/calls"
 export AGENT_HISTORY_BROWSER_FIXTURES="$check_work/history"
 check_knowledge_image="openbot-check-knowledge:$check_suffix"
 check_memory_image="openbot-check-memory:$check_suffix"
@@ -192,7 +193,8 @@ gate "Browser protocols using native markup" node --test \
   scripts/tests/agent-authoring-browser.mjs scripts/tests/local-agents-browser.mjs \
   scripts/tests/skill-bundle-browser.mjs scripts/tests/workflow-agent-picker-browser.mjs \
   scripts/tests/session-revocation-browser.mjs scripts/tests/vault-authoring-browser.mjs \
-  scripts/tests/workflow-decisions.mjs scripts/tests/agent-history-browser.mjs
+  scripts/tests/workflow-decisions.mjs scripts/tests/agent-history-browser.mjs \
+  scripts/tests/workflow-run-calls.mjs
 gate "Stack budget" scripts/test-network-isolation.sh scripts/stack-budget.sh --offline
 gate "Lease budget" scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
 gate "Knowledge production image" check_knowledge_image

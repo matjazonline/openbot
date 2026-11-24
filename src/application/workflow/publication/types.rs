@@ -102,6 +102,8 @@ pub enum ToolKind<'a> {
     Knowledge,
     /// A name-only, exactly verified memory service built-in (phase 05 E5).
     Memory,
+    /// The name-only, exactly verified `channel.call` built-in (agent-workflow-call).
+    ChannelCall,
     /// A tool reached through one of the workflow's resource slots (MCP or slot-bound HTTP).
     Slot(&'a ResourceName),
     /// A company HTTP operation registered by name.
@@ -153,6 +155,13 @@ impl ToolSnapshot {
             )
         {
             return ToolKind::Memory;
+        }
+        if self.contract.connection.is_none()
+            && crate::application::workflow::channel_call::is_builtin_channel_call_tool(
+                self.contract.name.as_str(),
+            )
+        {
+            return ToolKind::ChannelCall;
         }
         match &self.contract.connection {
             Some(slot) => ToolKind::Slot(slot),

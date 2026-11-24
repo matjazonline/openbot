@@ -10,7 +10,9 @@ use serde_json::{Value, json};
 
 #[derive(sqlx::FromRow)]
 pub(super) struct RootReply {
-    pub intent_id: Uuid,
+    /// The response owner's key: the ingress intent, or the call's source message (AWC-P04-D1 D1).
+    pub owner_id: Uuid,
+    pub owner_kind: String,
     pub message_id: Uuid,
     pub channel_id: Option<Uuid>,
     pub principal_id: Option<Uuid>,
@@ -24,6 +26,11 @@ pub(super) struct RootReply {
 }
 
 impl RootReply {
+    /// A channel call owns this response, rather than ingress.
+    pub(super) fn is_call(&self) -> bool {
+        self.owner_kind == "call"
+    }
+
     fn target(&self) -> AppResult<AddressTarget> {
         AddressTarget::from_parts(
             self.channel_id,
@@ -38,11 +45,11 @@ pub(super) async fn root_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Option<RootReply>> {
-    Ok(sqlx::query_as("SELECT context.intent_id,context.message_id,context.channel_id,context.principal_id,context.thread_id,context.actor_id, \
-        context.contract,context.approval_policy,context.source,run.deadline,run.binding_id \
-        FROM channel_reply_runs AS owned JOIN channel_reply_contexts AS context USING(company_id,intent_id) \
-        JOIN workflow_runs AS run ON run.company_id=owned.company_id AND run.id=owned.run_id \
-        WHERE owned.company_id=$1 AND owned.run_id=$2")
+    Ok(sqlx::query_as("SELECT owner.owner_id,owner.owner_kind,owner.message_id,owner.channel_id,owner.principal_id,owner.thread_id,owner.actor_id, \
+        owner.contract,owner.approval_policy,owner.source,run.deadline,run.binding_id \
+        FROM channel_reply_owners AS owner \
+        JOIN workflow_runs AS run ON run.company_id=owner.company_id AND run.id=owner.run_id \
+        WHERE owner.company_id=$1 AND owner.run_id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(db).await?)
 }
 
@@ -111,6 +118,11 @@ pub(super) async fn policy_current_on(
     scope: ActivationRequest,
     root: &RootReply,
 ) -> AppResult<bool> {
+    // A call reviews under the policy its record captured; a later desk edit neither fails nor
+    // replaces it (AWC-P04-D1 r2 D8).
+    if root.is_call() {
+        return Ok(true);
+    }
     let current: Option<Option<Value>> = sqlx::query_scalar(
         "SELECT approval_policy FROM channel_reply_settings \
         WHERE company_id=$1 AND channel_id IS NOT DISTINCT FROM $2::uuid \
@@ -127,10 +139,10 @@ pub(super) async fn policy_current_on(
 pub(super) enum PreparedFinal {
     Unowned,
     Suppressed {
-        intent: Uuid,
+        owner: Uuid,
     },
     Automatic {
-        intent: Uuid,
+        owner: Uuid,
         proposal: Uuid,
         integrity: ReplyIntegrity,
     },
@@ -159,7 +171,7 @@ pub(super) async fn prepare_on(
     };
     if disposition == ResponseDisposition::Suppressed {
         return Ok(PreparedFinal::Suppressed {
-            intent: root.intent_id,
+            owner: root.owner_id,
         });
     }
     authorize_on(db, scope, &root).await?;
@@ -185,6 +197,8 @@ pub(super) async fn prepare_on(
 struct ReplyProjection {
     route_snapshot: Value,
     content: Value,
+    closure: ReplyClosure,
+    fields: Option<Value>,
     recipients: Vec<knowledge_release::MessageRecipient>,
 }
 
@@ -201,18 +215,69 @@ async fn project_on(
         scope.run.as_uuid(),
     )
     .await?;
-    let contract: ChannelReplyContract =
-        serde_json::from_value(root.contract.clone()).map_err(|_| invalid())?;
-    let schema = binding
-        .bundle()
-        .compiled()
-        .graph()
-        .definition()
-        .output_schema
-        .as_ref()
-        .unwrap_or(&Value::Bool(true));
-    let content = contract.project(schema, &completion.output)?;
-    let content = json!({"subject":content.subject(),"body":content.body_text()});
+    let definition = binding.bundle().compiled().graph().definition();
+    let step: String = sqlx::query_scalar(
+        "SELECT step_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .fetch_one(&mut *db)
+    .await?;
+    let kind = definition
+        .steps
+        .iter()
+        .find(|(id, _)| id.as_str() == step)
+        .map(|(_, step)| step.step_type.as_str())
+        .ok_or_else(invalid)?;
+    // The terminal step fixes the response kind (AWC-P04-D1 D2); `no_reply` never projects.
+    let closure = ReplyClosure::of_step(kind, &completion.output)?.ok_or_else(invalid)?;
+    let output_fields = || {
+        completion
+            .output
+            .get("fields")
+            .filter(|fields| fields.is_object())
+            .cloned()
+    };
+    let (content, fields) = match closure {
+        ReplyClosure::Done => {
+            let contract: ChannelReplyContract =
+                serde_json::from_value(root.contract.clone()).map_err(|_| invalid())?;
+            let schema = definition
+                .output_schema
+                .as_ref()
+                .unwrap_or(&Value::Bool(true));
+            let content = contract.project(schema, &completion.output)?;
+            (
+                json!({"subject":content.subject(),"body":content.body_text()}),
+                output_fields(),
+            )
+        }
+        ReplyClosure::Denied => {
+            let subject: String =
+                sqlx::query_scalar("SELECT subject FROM messages WHERE company_id=$1 AND id=$2")
+                    .bind(scope.company.as_uuid())
+                    .bind(root.message_id)
+                    .fetch_one(&mut *db)
+                    .await?;
+            let reason = completion.output.get("reason").and_then(Value::as_str);
+            let content = denial(&subject, reason.ok_or_else(invalid)?)?;
+            (
+                json!({"subject":content.subject(),"body":content.body_text()}),
+                output_fields(),
+            )
+        }
+        ReplyClosure::HandedOff(run) => {
+            // The nested call's disclosed `done` result, which the terminal already proved.
+            let result = super::channel_call_results::handed_off_on(db, scope, run)
+                .await?
+                .ok_or_else(invalid)?;
+            (
+                result.get("content").cloned().ok_or_else(invalid)?,
+                result.get("fields").cloned(),
+            )
+        }
+    };
     let route = message::final_reply_route_on(
         db,
         ActionScope {
@@ -233,8 +298,21 @@ async fn project_on(
         root.message_id,
         address,
     )];
+    // Result fields are a call's alone: mail never renders them. A call result carries at most a
+    // tool result, so larger fields fail the child's terminal rather than reach review.
+    let fields = if root.is_call() { fields } else { None };
+    if let Some(fields) = &fields
+        && serde_json::to_vec(fields).map_err(|_| invalid())?.len()
+            > crate::application::workflow::tools::MAX_TOOL_RESULT_BYTES
+    {
+        return Err(AppError::BadRequest(
+            "The answer's result fields are larger than a call result may carry".into(),
+        ));
+    }
     Ok(ReplyProjection {
         content,
+        closure,
+        fields,
         recipients,
         route_snapshot,
     })
@@ -250,6 +328,8 @@ async fn stage_on(
 ) -> AppResult<PreparedFinal> {
     let ReplyProjection {
         content,
+        closure,
+        fields,
         recipients,
         route_snapshot,
     } = project_on(db, scope, root, completion).await?;
@@ -269,9 +349,9 @@ async fn stage_on(
         super::channel_reply_approvals::prepare_on(db, scope, root, policy.as_ref(), notices)
             .await?;
     let document = json!({"company":scope.company.as_uuid(),"run":scope.run.as_uuid(),"execution":scope.execution.as_uuid(),
-        "proposal":proposal,"intent":root.intent_id,"source":root.source,"source_message":root.message_id,
+        "proposal":proposal,"owner":root.owner_id,"owner_kind":root.owner_kind,"source":root.source,"source_message":root.message_id,
         "actor":root.actor_id,"target":root.target()?,"thread":root.thread_id,"output":completion.output,
-        "content":content,"recipients":recipients,"route_snapshot":route_snapshot,"approval_policy":root.approval_policy,"approval_deadline":approval.as_ref().map(|a|a.deadline)});
+        "content":content,"closure":closure.as_str(),"handed_off_run_id":closure.handed_off_run().map(|run|run.as_uuid()),"fields":fields,"recipients":recipients,"route_snapshot":route_snapshot,"approval_policy":root.approval_policy,"approval_deadline":approval.as_ref().map(|a|a.deadline)});
     let integrity = integrity_on(db, &document).await?;
     let action = final_action(action_scope, root, proposal, integrity, content.clone())?;
     let levels =
@@ -292,6 +372,8 @@ async fn stage_on(
         document: &document,
         completion,
         content: &content,
+        closure,
+        fields: fields.as_ref(),
         route_snapshot: &route_snapshot,
         recipients: &recipients,
         action: &action,
@@ -311,7 +393,7 @@ async fn stage_on(
         return Ok(PreparedFinal::Parked);
     }
     Ok(PreparedFinal::Automatic {
-        intent: root.intent_id,
+        owner: root.owner_id,
         proposal,
         integrity,
     })
@@ -371,7 +453,7 @@ pub(super) async fn commit_on(
     prepared: PreparedFinal,
 ) -> AppResult<()> {
     struct Columns {
-        intent: Uuid,
+        owner: Uuid,
         disposition: ResponseDisposition,
         proposal: Option<Uuid>,
         integrity: Option<ReplyIntegrity>,
@@ -379,29 +461,29 @@ pub(super) async fn commit_on(
     let columns = match prepared {
         PreparedFinal::Unowned => return Ok(()),
         PreparedFinal::Parked => return Err(invalid()),
-        PreparedFinal::Suppressed { intent } => Columns {
-            intent,
+        PreparedFinal::Suppressed { owner } => Columns {
+            owner,
             disposition: ResponseDisposition::Suppressed,
             proposal: None,
             integrity: None,
         },
         PreparedFinal::Automatic {
-            intent,
+            owner,
             proposal,
             integrity,
         } => Columns {
-            intent,
+            owner,
             disposition: ResponseDisposition::Automatic,
             proposal: Some(proposal),
             integrity: Some(integrity),
         },
     };
-    sqlx::query("INSERT INTO channel_reply_decisions(company_id,run_id,execution_id,intent_id,disposition,proposal_id,integrity,state) \
+    sqlx::query("INSERT INTO channel_reply_decisions(company_id,run_id,execution_id,owner_id,disposition,proposal_id,integrity,state) \
         VALUES($1,$2,$3,$4,$5,$6,$7,CASE WHEN $5='suppressed' THEN 'suppressed' ELSE 'pending' END)")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(columns.intent)
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(columns.owner)
         .bind(columns.disposition.as_str()).bind(columns.proposal).bind(columns.integrity.map(|value| value.as_hex())).execute(db).await?;
     tracing::info!(company_id=%scope.company.as_uuid(), run_id=%scope.run.as_uuid(),
-        execution_id=%scope.execution.as_uuid(), intent_id=%columns.intent,
+        execution_id=%scope.execution.as_uuid(), owner_id=%columns.owner,
         disposition=columns.disposition.as_str(), proposal_id=?columns.proposal,
         "Final response disposition staged");
     Ok(())

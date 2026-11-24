@@ -1,0 +1,60 @@
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_invalid_mapping_is_refused_and_question_approval_is_distinct ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_missing_human_script_has_typed_wait_preview ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_seals_mapping_and_policy_and_previews_output ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_suppression_skips_projection_for_valid_empty_values ... ok
+test application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_actual_agent_identity_separates_streams ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_model_only_step_has_no_logical_seed ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_exact_pair_limit_reports_only_recent_complete_suffix ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_oversized_newest_pair_stops_before_older_pair ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_repeated_calls_keep_exact_local_pairs_and_current_input_separate ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_same_agent_child_has_its_own_ephemeral_branch ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test domain::entities::access_level::knowledge_tests::memory_access_level_human_input_exactness_follows_u2 ... ok
+test application::workflow::templates::agent_workflow::tests::channel_reply_authoring_custom_end_requires_terminal_no_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::history_cascade::agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock ... ok
+test application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_bounds_stuck_known_settlement ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::memory_access_level_workflow_tool_child_exactness_reaches_the_calling_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::doop_binary_mcp::doop_binary_mcp_child_actual_action_completion_error_and_parent_replay ... ok
+
+failures:
+
+---- adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots stdout ----
+
+thread 'adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots' (47375650) panicked at src/adapters/http/routes/ui_agents/authoring/catalog_tests.rs:113:5:
+assertion `left == right` failed
+  left: ["channel.call", "message.reply", "message.send", "read_escalation", "respond_to_escalation", "search_knowledge"]
+ right: ["message.reply", "message.send", "read_escalation", "respond_to_escalation", "search_knowledge"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io' (47385092) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:435:5:
+assertion `left == right` failed
+  left: Number(9)
+ right: 7
+
+---- application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt stdout ----
+
+thread 'application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt' (47392006) panicked at src/application/workflow/publication/../agent_history_preparation_tests.rs:21:9:
+assertion `left == right` failed
+  left: Number(9)
+ right: 8
+
+
+failures:
+    adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io
+    application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt
+
+test result: FAILED. 659 passed; 3 failed; 2 ignored; 0 measured; 4489 filtered out; finished in 350.10s
+
+error: test failed, to rerun pass `--lib`

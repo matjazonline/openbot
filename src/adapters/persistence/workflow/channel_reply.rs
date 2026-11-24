@@ -428,10 +428,10 @@ pub(super) async fn link_run(
         return Ok(());
     };
     let linked = sqlx::query_scalar::<_,Uuid>(
-        "INSERT INTO channel_reply_runs(company_id,intent_id,run_id,binding_id,binding_revision) \
-         SELECT company_id,intent_id,$3,binding_id,binding_revision FROM channel_reply_contexts \
+        "INSERT INTO channel_reply_runs(company_id,owner_kind,intent_id,run_id,binding_id,binding_revision) \
+         SELECT company_id,'ingress',intent_id,$3,binding_id,binding_revision FROM channel_reply_contexts \
          WHERE company_id=$1 AND intent_id=$2 AND binding_id=$4 AND binding_revision=$5 \
-         ON CONFLICT(company_id,intent_id) DO UPDATE SET run_id=channel_reply_runs.run_id RETURNING run_id",
+         ON CONFLICT(company_id,owner_id) DO UPDATE SET run_id=channel_reply_runs.run_id RETURNING run_id",
     )
     .bind(claim.company.as_uuid())
     .bind(claim.intent)

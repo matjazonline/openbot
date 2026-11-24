@@ -1,0 +1,27 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.64s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 14 tests
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_member_caller_and_unavailable_desks ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_no_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_nested_no_reply_keeps_parent_response ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_competing_consumptions ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_approve_releases ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_pinned_while_waiting_later_call_current ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_restart_after_review_settlement ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_cycles_and_nested_budget ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_retention_and_teardown ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_two_desks_in_one_execution ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_rejected_then_routed ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_integration_tests::channel_call_integration_launch_races_revocation ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_reject_and_expire ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_races ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 5166 filtered out; finished in 20.67s
+
+exit 0

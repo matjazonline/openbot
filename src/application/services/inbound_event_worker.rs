@@ -662,6 +662,7 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         | AppError::BudgetExhausted(_)
         | AppError::UnitArchived
         | AppError::UnitArchiveOpenWork { .. }
+        | AppError::InteractiveUnsupported
         | AppError::KnowledgeTrigger { .. }
         | AppError::KnowledgeRelease { .. }
         | AppError::Execution(_)

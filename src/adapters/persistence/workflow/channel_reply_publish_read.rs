@@ -68,7 +68,7 @@ pub(super) struct PublicationRow {
     pub run_id: Uuid,
     pub execution_id: Uuid,
     pub job_id: Uuid,
-    pub intent_id: Uuid,
+    pub owner_id: Uuid,
     pub invocation_id: Uuid,
     pub approval_decision_id: Option<Uuid>,
     pub approval_deadline: Option<DateTime<Utc>>,
@@ -92,7 +92,7 @@ pub(super) struct PublicationRow {
 }
 
 const SELECT: &str = "SELECT final_reply.company_id,final_reply.run_id,final_reply.execution_id,
-    proposal.job_id,proposal.intent_id,proposal.invocation_id,proposal.approval_decision_id,
+    proposal.job_id,proposal.owner_id,proposal.invocation_id,proposal.approval_decision_id,
     proposal.approval_deadline,proposal.approval_policy,proposal.recipients,proposal.content,
     proposal.route_snapshot,intent.operation,final_reply.integrity,final_reply.state,
     (final_reply.state='claimed' AND final_reply.lease_expires_at>clock_timestamp()) AS live,

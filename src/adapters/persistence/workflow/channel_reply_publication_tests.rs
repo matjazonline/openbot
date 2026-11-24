@@ -75,7 +75,7 @@ async fn channel_reply_publication_email_and_in_app_commit_exact_content_and_rep
         let exact:bool=sqlx::query_scalar("SELECT message.subject=proposal.content->>'subject' AND message.clean_text_body=proposal.content->>'body' \
             AND filed.thread_id=context.thread_id AND filed.channel_id=context.channel_id \
             FROM channel_reply_decisions AS final_reply JOIN channel_reply_proposals AS proposal ON proposal.company_id=final_reply.company_id AND proposal.id=final_reply.proposal_id \
-            JOIN channel_reply_contexts AS context ON context.company_id=final_reply.company_id AND context.intent_id=final_reply.intent_id \
+            JOIN channel_reply_contexts AS context ON context.company_id=final_reply.company_id AND context.intent_id=final_reply.owner_id \
             JOIN messages AS message ON message.company_id=final_reply.company_id AND message.id=final_reply.message_id \
             JOIN thread_messages AS filed ON filed.company_id=message.company_id AND filed.message_id=message.id \
             WHERE final_reply.company_id=$1 AND final_reply.run_id=$2 AND final_reply.state='published'")
@@ -93,6 +93,62 @@ async fn channel_reply_publication_email_and_in_app_commit_exact_content_and_rep
         );
         assert_eq!(f.state().await["run"], "succeeded");
     }
+}
+
+/// Over mail a procedure's `channel.deny` publishes its reason as the reply body under `Re:` the
+/// source subject, through the same final pipeline (AWC-P04-D1 D2); no result fields are kept.
+#[tokio::test]
+async fn channel_reply_publication_deny_publishes_its_reason() {
+    let mut source = final_source("data.map");
+    source["steps"]["start"] = json!({"type":"channel.deny",
+        "with":{"reason":{"literal":"This desk does not handle refunds"}},"routes":{"success":"$end"}});
+    let f = FinalFixture::from_case(
+        Intents::new().await,
+        FinalCase {
+            source,
+            contract: literal_contract("Done"),
+            policy: None,
+            run_as: None,
+            publication: FinalPublication::Standard,
+            delivery_policy: DeliveryPolicy::InAppOnly,
+        },
+    )
+    .await;
+    f.advance().await;
+    let (closure, fields): (String, Option<Value>) = sqlx::query_as(
+        "SELECT closure, fields FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(f.scope.run.as_uuid())
+    .fetch_one(f.p.pool())
+    .await
+    .unwrap();
+    assert_eq!((closure.as_str(), fields), ("denied", None));
+    let outcome = publisher(&f).publish_claim(claim(&f).await).await.unwrap();
+    assert!(
+        matches!(outcome, ReplyPublicationOutcome::Published(_)),
+        "{outcome:?}"
+    );
+    let (subject, body, source_subject): (String, String, String) = sqlx::query_as(
+        "SELECT message.subject, message.clean_text_body, source.subject FROM channel_reply_decisions AS final_reply \
+         JOIN messages AS message ON message.company_id=final_reply.company_id AND message.id=final_reply.message_id \
+         JOIN channel_reply_contexts AS context ON context.company_id=final_reply.company_id AND context.intent_id=final_reply.owner_id \
+         JOIN messages AS source ON source.company_id=context.company_id AND source.id=context.message_id \
+         WHERE final_reply.company_id=$1 AND final_reply.run_id=$2 AND final_reply.state='published'",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(f.scope.run.as_uuid())
+    .fetch_one(f.p.pool())
+    .await
+    .unwrap();
+    assert_eq!(body, "This desk does not handle refunds");
+    assert_eq!(
+        subject,
+        crate::application::workflow::channel_reply::denial(&source_subject, &body)
+            .unwrap()
+            .subject()
+    );
+    assert!(subject.to_lowercase().starts_with("re:"), "{subject}");
 }
 
 #[tokio::test]

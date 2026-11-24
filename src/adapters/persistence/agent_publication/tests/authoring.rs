@@ -220,3 +220,64 @@ async fn autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_an
     assert_eq!(request(&f).await.expected_revision, before);
     assert_eq!(bindings(&f).await, vec![f.binding]);
 }
+
+/// C1 (gate AWC-P05-D1 D1): `channel.call` is an ordinary offered built-in. A new agent has no
+/// binding; saving one changes only the draft until it is published; a stale save and a
+/// reserved alias are refused.
+#[tokio::test]
+async fn channel_call_authoring_catalogue_save_and_publish() {
+    let f = Fixture::new().await;
+    let calls = |tools: &[crate::application::agent::ResolvedAgentTool]| {
+        tools
+            .iter()
+            .any(|tool| tool.binding.alias.as_str() == "channel.call")
+    };
+    assert!(
+        !bindings(&f)
+            .await
+            .iter()
+            .any(|binding| binding.alias.as_str() == "channel.call"),
+        "never granted automatically"
+    );
+    let before =
+        f.p.publish_agent(f.request("before-call").await)
+            .await
+            .unwrap();
+    assert!(!calls(&before.definition.tools));
+    let stale = request(&f).await;
+    let mut save = request(&f).await;
+    save.tools = Some(vec![
+        tool("message.reply", AgentBuiltinTool::MessageReply),
+        tool("channel.call", AgentBuiltinTool::ChannelCall),
+    ]);
+    f.p.save_company_agent(save).await.unwrap();
+    assert!(
+        bindings(&f)
+            .await
+            .iter()
+            .any(|binding| binding.alias.as_str() == "channel.call")
+    );
+    let active = f.p.active_agent_revision(f.scope).await.unwrap().unwrap();
+    assert_eq!(active.id, before.id, "a draft binding is not live");
+    assert!(!calls(&active.definition.tools));
+    let mut late = stale;
+    late.tools = Some(vec![tool("message.reply", AgentBuiltinTool::MessageReply)]);
+    assert!(matches!(
+        f.p.save_company_agent(late).await,
+        Err(AppError::Conflict(_))
+    ));
+    let mut reserved = request(&f).await;
+    reserved.tools = Some(vec![tool(
+        "channel.call",
+        AgentBuiltinTool::SearchKnowledge,
+    )]);
+    assert!(matches!(
+        f.p.save_company_agent(reserved).await,
+        Err(AppError::BadRequest(_))
+    ));
+    let published =
+        f.p.publish_agent(f.request("with-call").await)
+            .await
+            .unwrap();
+    assert!(calls(&published.definition.tools));
+}

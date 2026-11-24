@@ -51,20 +51,46 @@ fn check_selection_bound(count: usize) -> AppResult<()> {
     Ok(())
 }
 
+/// What one dependency capture selects for: the run that will own the manifest, the actor
+/// whose grants the walk checks, and the binding and association it starts from. Admission and
+/// a channel-call child (agent-workflow-call AWC-P02-D1 D3) share it.
+#[derive(Clone, Copy)]
+pub(in crate::adapters::persistence::workflow) struct CaptureScope<'a> {
+    pub company: CompanyId,
+    pub actor: WorkflowActor,
+    pub binding: &'a crate::application::workflow::binding::ConfiguredBinding,
+    pub association: RelatedAssociation,
+    pub scope_root: RunId,
+}
+
+impl<'a> CaptureScope<'a> {
+    pub(in crate::adapters::persistence::workflow) fn admission(
+        command: &'a PreparedAdmission,
+    ) -> Self {
+        Self {
+            company: command.company_id(),
+            actor: command.actor(),
+            binding: command.binding(),
+            association: command.association(),
+            scope_root: command.proposed_run_id(),
+        }
+    }
+}
+
 /// The caller already owns the company serialization lock. No network work runs here.
-pub(super) async fn capture_on(
+pub(in crate::adapters::persistence::workflow) async fn capture_on(
     tx: &mut Transaction<'_, Postgres>,
-    command: &PreparedAdmission,
+    scope: CaptureScope<'_>,
 ) -> AppResult<DependencyManifest> {
-    let definition = command.binding().bundle().compiled().graph().definition();
+    let definition = scope.binding.bundle().compiled().graph().definition();
     let mut closure = Closure {
-        company: command.company_id(),
-        actor: command.actor(),
-        resources: command.binding().resources().clone(),
+        company: scope.company,
+        actor: scope.actor,
+        resources: scope.binding.resources().clone(),
         agents: BTreeMap::new(),
         workflows: BTreeMap::new(),
         deadline: Instant::now() + Duration::from_secs(5),
-        association: command.association(),
+        association: scope.association,
         context_department_id: None,
         role_facts: None,
         roles: BTreeMap::new(),
@@ -75,7 +101,7 @@ pub(super) async fn capture_on(
         Duration::from_secs(5),
         // Keep the bounded graph/capture query futures off the admission poll stack.
         Box::pin(async {
-            let context = context_department_on(tx, command).await?;
+            let context = context_department_on(tx, scope).await?;
             closure.context_department_id = context;
             closure
                 .walk(
@@ -92,7 +118,7 @@ pub(super) async fn capture_on(
     let manifest = DependencyManifest {
         role_context_department_id,
         company_id: closure.company,
-        root_run_id: command.proposed_run_id(),
+        root_run_id: scope.scope_root,
         agents: closure
             .agents
             .into_iter()
@@ -117,10 +143,10 @@ pub(super) async fn capture_on(
 
 async fn context_department_on(
     tx: &mut PgConnection,
-    command: &PreparedAdmission,
+    scope: CaptureScope<'_>,
 ) -> AppResult<Option<crate::entities::department::DepartmentId>> {
     Ok(
-        super::role_binding::context_on(tx, command.company_id(), command.association())
+        super::role_binding::context_on(tx, scope.company, scope.association)
             .await?
             .ok(),
     )

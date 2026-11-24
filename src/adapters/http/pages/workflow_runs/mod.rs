@@ -8,6 +8,7 @@ use crate::application::workflow::reads::{MAX_LISTED, RunStateName, RunSummary};
 use std::collections::HashMap;
 
 mod board;
+mod calls;
 mod detail;
 mod history;
 mod provenance;
@@ -17,6 +18,7 @@ pub use history::*;
 pub use responses::{channel_response_panel, thread_response_outcomes};
 
 pub use board::*;
+pub use calls::CallAccess;
 pub use detail::*;
 pub use step::*;
 

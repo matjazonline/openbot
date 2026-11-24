@@ -1,0 +1,112 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 18 tests
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_call_scope_requires_invocation ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_destination_refusals_are_classified ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_audience_refused_above_ceiling ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_reconfiguration_selects_one_whole_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_intake_refused_before_write ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_decide_before_any_row ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication' (45198715) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:975:82:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope' (45198713) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:952:97:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope' (45198714) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:998:94:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write' (45198793) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:612:18:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges' (45198810) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:550:5:
+assertion `left == right` failed: Err(WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })) Err(WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" }))
+  left: 0
+ right: 1
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits' (45198853) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:370:106:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays' (45199110) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:429:77:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied' (45199170) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:627:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "42P01", message: "relation \"company_members\" does not exist", detail: None, hint: None, position: Some(Original(8)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_relation.c"), line: Some(1501), routine: Some("parserOpenTable") })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied' (45199181) panicked at src/adapters/persistence/workflow/tests.rs:273:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "registry.role", message: "Choose person principals or literal department roles as reviewers", field_path: "/steps/start/with/reviewers", span: SourceSpan { start: 511, end: 512, line: 1, column: 512 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows' (45199194) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:464:95:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls' (45199234) panicked at src/adapters/persistence/workflow/channel_call_snapshot_tests.rs:689:81:
+called `Result::unwrap()` on an `Err` value: WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("guard_workflow_scope_seal"), message: "error returned from database: child scopes must exactly copy its sealed parent" })
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied' (45199232) panicked at src/adapters/persistence/workflow/message_test_support.rs:318:10:
+called `Result::unwrap()` on an `Err` value: BudgetExhausted(BudgetExhausted { unit: 83d69d7b-8c18-4a45-95d8-feceff31a212, name: "Workflow tests", period: "day" })
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_child_cannot_take_sibling_or_foreign_scope
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_descendant_inherits_call_scope
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_manifest_pins_survive_publication
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_competes_with_run_as_account_write
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_duplicate_key_converges
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_positive_control_commits
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_record_is_immutable_and_replays
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_revoked_or_unready_target_is_denied
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_role_refusal_is_denied
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_sql_refuses_forged_rows
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_snapshot_unit_cap_is_denied
+    adapters::persistence::workflow::tests::message_tests::channel_call_snapshot_tests::channel_call_target_facts_ancestry_includes_self_and_nested_calls
+
+test result: FAILED. 6 passed; 12 failed; 0 ignored; 0 measured; 5075 filtered out; finished in 11.74s
+
+error: test failed, to rerun pass `--lib`

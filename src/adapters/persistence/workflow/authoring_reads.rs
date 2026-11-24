@@ -322,6 +322,31 @@ impl AuthoringReads for PostgresPersistence {
         self.binding_uses(company, rows, MAX_LISTED).await
     }
 
+    async fn desk_call_facts(
+        &self,
+        company: CompanyId,
+        channel: Uuid,
+    ) -> AppResult<Option<DeskCallFacts>> {
+        let row: Option<(String, bool, bool)> = sqlx::query_as(
+            "SELECT desk.access_mode, desk.enabled, unit.archived_at IS NOT NULL \
+             FROM channels AS desk JOIN departments AS unit \
+               ON unit.company_id=desk.company_id AND unit.id=desk.department_id \
+             WHERE desk.company_id=$1 AND desk.id=$2",
+        )
+        .bind(company.as_uuid())
+        .bind(channel)
+        .fetch_optional(self.pool())
+        .await?;
+        row.map(|(access_mode, enabled, unit_archived)| {
+            Ok(DeskCallFacts {
+                access_mode: access_mode.parse().map_err(|_| invalid())?,
+                enabled,
+                unit_archived,
+            })
+        })
+        .transpose()
+    }
+
     async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage> {
         // `agent_ids` is a display index (gate P09-B1b-D1): this listing and the run list's agent
         // filter (`reads.rs`, `run_list_query`) read it; nothing decides or authorizes on it.

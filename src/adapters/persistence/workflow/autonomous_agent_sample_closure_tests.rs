@@ -28,6 +28,7 @@ fn sample_request(responses: Vec<Value>) -> SampleRequest {
     SampleRequest {
         response_contract: None,
         response_approval_policy: None,
+        call_targets: vec![],
         input: json!({}),
         params: json!({}),
         scripts: serde_json::from_value(Value::Array(responses)).unwrap(),

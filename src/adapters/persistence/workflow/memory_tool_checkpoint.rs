@@ -350,7 +350,9 @@ pub(in crate::adapters::persistence::workflow) async fn user_scope_owner_on(
            UNION ALL \
            SELECT run.id, run.parent_run_id, run.actor_id, chain.depth + 1 \
            FROM workflow_runs AS run JOIN chain ON run.company_id = $1 AND run.id = chain.parent \
-           WHERE chain.depth < 64) \
+           WHERE chain.depth < 64 \
+             AND NOT EXISTS (SELECT 1 FROM workflow_channel_calls AS call \
+               WHERE call.company_id = $1 AND call.child_run_id = chain.id)) \
          SELECT (SELECT run.actor_id FROM workflow_runs AS run \
                  WHERE run.company_id = $1 AND run.id = $2) AS run_actor, \
            chain.actor AS root_actor, session.creator_user_id AS creator, \
@@ -370,7 +372,9 @@ pub(in crate::adapters::persistence::workflow) async fn user_scope_owner_on(
     .bind(run.as_uuid())
     .fetch_all(db)
     .await?;
-    // No root (or an ambiguous one) omits the scope; it never widens to another.
+    // No root (or an ambiguous one) omits the scope; it never widens to another. The climb
+    // stops at a channel-call child, a fresh scope that takes nothing from its caller
+    // (AWC-P02-D1 D1.2), so no caller's private session reaches the destination.
     let [root] = roots.as_slice() else {
         return Ok(None);
     };

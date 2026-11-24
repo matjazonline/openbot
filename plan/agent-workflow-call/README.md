@@ -49,9 +49,16 @@ knowledge, and agent authority are checked on each invocation.
   review, then return approved subject/body content. Do not return unreviewed raw workflow output
   alongside it. `channel.no_reply` yields a typed `no_reply` result. Explicit unrelated effects
   inside the child retain their own existing authorization and delivery behavior.
-- **Preserve the caller's authority.** Use the parent run's actor. The destination binding's
-  `run_as` is configuration provenance, not permission to impersonate another user. Reauthorize
-  target resources and agent selections for the caller; narrower authority produces refusal.
+- **Run the destination as it is configured (user, 2026-11-22).** The child runs the selected
+  binding with its own `run_as`, params, resources and agent, as for a message arriving on that
+  desk; the caller is recorded as the requester and gains no access to the destination. A call is
+  admitted when the calling agent may write to the destination desk under the rule an internal
+  relay from that agent already obeys; no actor is exempt. The child reads no higher than the
+  lowest of the caller's ceiling, plan 11's allowance and the `run_as` person's level; until plan
+  11 supplies the allowance it is level 0, so calls carry public data only (user, 2026-11-22).
+  This settles proposal 1 of [11-access-rules](../11-access-rules/README.md), whose request rules
+  later replace the write rule as the gate. It replaces the earlier "preserve the caller's authority" decision; the
+  authoritative text is gate AWC-P01-D1 r3 in `phases/p01/docs/logs/`.
 - **Snapshot once per saved call.** Resolve the current selection on first dispatch and freeze
   binding/configuration revision, version, response policy, resources, and agent dependencies.
   Retries resume that invocation. A later distinct call can select a newer binding.
@@ -62,10 +69,13 @@ knowledge, and agent authority are checked on each invocation.
   message for the call. Do not reuse the caller's thread or read unrelated target-channel history.
   Channel visibility still governs the stored request; perform content/audience checks before
   storing it. Private agent history remains a child branch.
-- **Closure says why.** A `replied` result carries a closure: `done`, `denied` with a bounded
-  reason, or `handed_off` with the run id the destination delegated to. The destination's response
-  contract produces it; a child that declines completes successfully at the run level and closes
-  as `denied` at the work level. The caller never has to infer refusal from prose.
+- **Closure says why.** The result's kind is its closure: `done` or `handed_off` with the
+  approved response, `denied` with a stable code and bounded reason, or `no_reply`. The
+  destination's procedure produces `denied` with `channel.deny` and `handed_off` with
+  `channel.hand_off`; destination admission (archived unit, unit spend cap, no responder) produces
+  `denied` before any child exists. A child that declines completes successfully at the run level
+  and closes as `denied` at the work level. The caller never has to infer refusal from prose.
+  Authoritative shape: gate AWC-P01-D1 r3 (D2).
 - **A call may carry its own deadline.** Optional, and it must be earlier than the parent run's
   deadline; the child's deadline is the earlier of the two. Expiry is the existing typed deadline
   error. A lead can therefore give a member less time than its own run has left.

@@ -77,6 +77,10 @@ pub(super) async fn sample(
         scripts: form.text("scripts"),
         response_contract: sample_option_field(&form, "response_contract"),
         response_approval_policy: sample_option_field(&form, "response_approval_policy"),
+        call_targets: match form.text("call_targets") {
+            raw if raw.trim().is_empty() => "[]".into(),
+            raw => raw,
+        },
     };
     let result = run_sample(&ui, company, workflow, revision, &inputs, &selections).await;
     let mut state = SampleState {
@@ -127,6 +131,8 @@ async fn run_sample(
         params: parse(&inputs.params)?,
         scripts: serde_json::from_str(&inputs.scripts)
             .map_err(|error| AppError::BadRequest(format!("Invalid scripts: {error}")))?,
+        call_targets: serde_json::from_str(&inputs.call_targets)
+            .map_err(|error| AppError::BadRequest(format!("Invalid call targets: {error}")))?,
     };
     let (http, mcp) = selection_bodies(selections);
     let target = DefinitionTarget {

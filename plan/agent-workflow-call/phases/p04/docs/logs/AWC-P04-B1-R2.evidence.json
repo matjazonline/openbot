@@ -1,0 +1,82 @@
+{
+ "version": 1,
+ "round": "AWC-P04-B1-R2",
+ "artifact": "7af1aa2ed955dfc0599bfa4bd4c0501c3ebacefc9d143b2d4ed84f3bb84cc83b",
+ "checks": [
+  {
+   "criteria": [
+    "F1"
+   ],
+   "command": "cargo test --offline --lib -- channel_call_resume_cancel_races, 25 repeats (25/25 ok) on 6aea3eb4 (differs from 7af1aa2e only by a one-token needless_borrow fix in hand_off_through)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-F1-repeats.txt",
+     "sha256": "fd1f6ee01319fd99c6f0137cd4ad8707f99133f021a3cb3a427d86b552116003"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F1",
+    "F2",
+    "F3",
+    "channel_call_",
+    "message_",
+    "stack-budget"
+   ],
+   "command": "scripts/stack-budget.sh --offline -- channel_call_ message_ (716 passed, 1 failed: the pre-existing doop_agent_current_preparation_reaches_ready_before_model_io, format 7 vs 8) on 6aea3eb4",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R2-stack-budget.txt",
+     "sha256": "1049d089d45a13813ee6fed148e21f158715bf1d642e7d222e0261b736f0cc70"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0) on 7af1aa2e",
+   "fixture": "toolchain 1.95.0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R2-clippy.txt",
+     "sha256": "746c1f824d20ae96381cf8d3e59efe49119210b2b869faa87658018e67cf62a7"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt"
+   ],
+   "command": "cargo fmt --check (exit 0)",
+   "fixture": "toolchain stable",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R2-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-offline"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets (exit 0)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R2-sqlx.txt",
+     "sha256": "5052e53b09afb40a6b174050ba13a50501dae2c4e1e286685fb0be1b13d5677d"
+    }
+   ]
+  }
+ ]
+}

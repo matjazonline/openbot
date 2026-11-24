@@ -81,6 +81,11 @@ pub fn agent_action_target(
                 | crate::entities::agent_capability::AgentBuiltinTool::MemoryTimeline
                 | crate::entities::agent_capability::AgentBuiltinTool::MemoryDetails
                 | crate::entities::agent_capability::AgentBuiltinTool::SaveMemory => "memory",
+                crate::entities::agent_capability::AgentBuiltinTool::ChannelCall => {
+                    return Err(AppError::BadRequest(
+                        "Channel calls use the child runtime".into(),
+                    ));
+                }
             })?,
         },
         AgentBindingSource::Workflow { .. } => {

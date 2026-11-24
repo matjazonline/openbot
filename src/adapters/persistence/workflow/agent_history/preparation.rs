@@ -266,6 +266,15 @@ pub(super) async fn candidate_on(
         )
         .await?;
         prepared = prepared.with_scope_context(Some(scopes))?;
+        if prepared.calls_desks() {
+            let listing = super::super::channel_call_target::desk_listing_on(
+                tx,
+                claim.fence.scope,
+                crate::entities::agent_capability::AgentId::new(prepared.agent_id()),
+            )
+            .await?;
+            prepared = prepared.with_desk_listing(listing)?;
+        }
     }
     let context = if agent_history_eligible(facts.kind) {
         let action = ActionScope {

@@ -93,13 +93,13 @@ async fn authorize_call_on(
 }
 
 #[derive(sqlx::FromRow)]
-struct ParentContinuation {
-    deadline: chrono::DateTime<chrono::Utc>,
-    step_id: String,
-    continuation_count: i16,
+pub(super) struct ParentContinuation {
+    pub deadline: chrono::DateTime<chrono::Utc>,
+    pub step_id: String,
+    pub continuation_count: i16,
 }
 
-async fn parent_continuation_on(
+pub(super) async fn parent_continuation_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<ParentContinuation> {
@@ -222,7 +222,11 @@ pub(super) async fn call_on(
 
 /// The fenced attempt and job close with `child_parked`; the SQL completion guard requires this
 /// execution's waiting call wait for exactly this attempt (07-D2 §D2.5).
-async fn park_on(db: &mut PgConnection, fence: WorkflowFence, wait: Uuid) -> AppResult<()> {
+pub(super) async fn park_on(
+    db: &mut PgConnection,
+    fence: WorkflowFence,
+    wait: Uuid,
+) -> AppResult<()> {
     let scope = fence.scope;
     let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason='child_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0)
@@ -333,7 +337,21 @@ pub(super) async fn continue_call(
     wait: Uuid,
     child: Uuid,
 ) -> AppResult<WaitProgress> {
-    match call_result(db, scope, child).await? {
+    // A channel call's child answers through its record when the caller replays the call
+    // (agent-workflow-call AWC-P03-D1 D4): its output is never read here.
+    let channel_call: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_channel_calls WHERE company_id=$1 AND child_run_id=$2)",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(child)
+    .fetch_one(&mut *db)
+    .await?;
+    let result = if channel_call {
+        CallResult::Deliver(Value::Null)
+    } else {
+        call_result(db, scope, child).await?
+    };
+    match result {
         CallResult::InvalidOutput => {
             wait_commit::fail(db, scope, WaitFailureReason::InvalidOutput).await
         }

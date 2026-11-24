@@ -1,0 +1,76 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+error: redundant field names in struct initialization
+  --> src/adapters/http/routes/knowledge/scope_tests.rs:95:17
+   |
+95 |                 principal: principal,
+   |                 ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+   = note: `-D clippy::redundant-field-names` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::redundant_field_names)]`
+
+error: redundant field names in struct initialization
+   --> src/adapters/http/routes/knowledge/scope_tests.rs:125:21
+    |
+125 |                     principal: principal,
+    |                     ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: redundant field names in struct initialization
+  --> src/adapters/http/routes/knowledge/review_scope_tests.rs:22:17
+   |
+22 |                 principal: principal,
+   |                 ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: redundant field names in struct initialization
+  --> src/adapters/http/routes/ui_department_knowledge_tests.rs:28:17
+   |
+28 |                 principal: principal,
+   |                 ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: redundant field names in struct initialization
+   --> src/adapters/persistence/delegated_administration_tests.rs:687:17
+    |
+687 |                 principal: principal,
+    |                 ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: redundant field names in struct initialization
+  --> src/adapters/persistence/knowledge/scope_test_support.rs:48:17
+   |
+48 |                 role: role,
+   |                 ^^^^^^^^^^ help: replace it with: `role`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: redundant field names in struct initialization
+  --> src/adapters/persistence/workflow/knowledge_scope_fixture.rs:68:21
+   |
+68 |                     principal: principal,
+   |                     ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: redundant field names in struct initialization
+  --> src/adapters/persistence/workflow/run_scope_child_tests.rs:40:17
+   |
+40 |                 principal: principal,
+   |                 ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: redundant field names in struct initialization
+   --> src/adapters/persistence/workflow/run_scope_native_tests.rs:156:17
+    |
+156 |                 principal: principal,
+    |                 ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `principal`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_field_names
+
+error: could not compile `open_bots` (lib test) due to 9 previous errors

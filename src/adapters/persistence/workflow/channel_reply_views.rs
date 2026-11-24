@@ -198,7 +198,7 @@ pub(crate) async fn thread_runs(
     company: Uuid,
     thread: Uuid,
 ) -> AppResult<(Vec<Uuid>, bool)> {
-    let mut ids:Vec<Uuid>=sqlx::query_scalar("SELECT owner.run_id FROM channel_reply_runs AS owner JOIN channel_reply_contexts AS context ON context.company_id=owner.company_id AND context.intent_id=owner.intent_id JOIN workflow_runs AS run ON run.company_id=owner.company_id AND run.id=owner.run_id WHERE context.company_id=$1 AND context.thread_id=$2 ORDER BY run.created_at DESC,run.id DESC LIMIT 51")
+    let mut ids:Vec<Uuid>=sqlx::query_scalar("SELECT owner.run_id FROM channel_reply_owners AS owner JOIN workflow_runs AS run ON run.company_id=owner.company_id AND run.id=owner.run_id WHERE owner.company_id=$1 AND owner.thread_id=$2 ORDER BY run.created_at DESC,run.id DESC LIMIT 51")
         .bind(company).bind(thread).fetch_all(persistence.pool()).await?;
     let more = ids.len() > MAX_RESPONSE_OUTCOMES;
     ids.truncate(MAX_RESPONSE_OUTCOMES);

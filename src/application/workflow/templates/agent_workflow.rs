@@ -144,7 +144,7 @@ impl AgentWorkflow {
         if !tail.is_empty()
             && !tail
                 .last()
-                .is_some_and(|step| step.definition["type"] == "channel.no_reply")
+                .is_some_and(|step| ends_response(&step.definition))
         {
             chain.push(Link::base(
                 FINISH_RESPONSE_STEP,
@@ -233,7 +233,7 @@ impl AgentWorkflow {
             if !step.definition.get("type").is_some_and(Value::is_string) {
                 return Err(invalid(&at, "A custom step needs a type"));
             }
-            if step.definition["type"] != "channel.no_reply"
+            if !ends_response(&step.definition)
                 && let Some(routes) = step.definition.get("routes")
             {
                 reject_custom_end(routes, &format!("{at}/routes"))?;
@@ -439,11 +439,20 @@ fn reply_with(reply: &mut Map<String, Value>, answer: &str) -> Result<(), Diagno
     Ok(())
 }
 
+/// Whether a custom step is a terminal response step (`channel.no_reply`, `channel.deny` or
+/// `channel.hand_off`), the only custom steps that may end the native response.
+fn ends_response(definition: &Map<String, Value>) -> bool {
+    definition
+        .get("type")
+        .and_then(Value::as_str)
+        .is_some_and(|kind| crate::application::workflow::registry::RESPONSE_STEPS.contains(&kind))
+}
+
 fn reject_custom_end(routes: &Value, at: &str) -> Result<(), Diagnostic> {
     match routes {
         Value::String(target) if target == END_STEP => Err(invalid(
             at,
-            "Use a terminal channel.no_reply (Finish without reply) for intentional silence; custom steps cannot end the native response directly",
+            "End the native response with a terminal channel.no_reply (Finish without reply), channel.deny (Deny request) or channel.hand_off (Hand off to another run); other custom steps cannot end it directly",
         )),
         Value::Object(routes) => routes
             .values()

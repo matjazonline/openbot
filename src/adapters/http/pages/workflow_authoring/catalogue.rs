@@ -51,7 +51,9 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
                         <p class="text-xs font-semibold">Example</p><pre class="max-h-80 overflow-auto rounded-box bg-base-200 p-3 font-mono text-xs">{example}</pre>
                     </div></details></li>"#,
                 name = escape_html_text(entry.type_name),
-                label = if entry.type_name == "channel.no_reply" { "<span>Finish without reply · terminal business value</span> " } else { "" },
+                label = super::graph::response_step_label(entry.type_name)
+                    .map(|label| format!("<span>{label} · terminal business value</span> "))
+                    .unwrap_or_default(),
                 routes = escape_html_text(&routes),
                 control = escape_html_text(&control),
                 notes = escape_html_text(entry.notes),

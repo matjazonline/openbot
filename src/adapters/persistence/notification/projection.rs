@@ -114,7 +114,7 @@ async fn source_snapshot(
                       AND destination.delivery_id = delivery.id
                      LEFT JOIN channel_reply_decisions AS final_reply ON final_reply.company_id=delivery.company_id
                        AND final_reply.delivery_id=delivery.id AND final_reply.state='published'
-                     LEFT JOIN channel_reply_contexts AS context ON context.company_id=final_reply.company_id AND context.intent_id=final_reply.intent_id
+                     LEFT JOIN channel_reply_contexts AS context ON context.company_id=final_reply.company_id AND context.intent_id=final_reply.owner_id
                      JOIN workflow_runs AS run ON run.company_id=delivery.company_id AND run.id=COALESCE(destination.run_id,final_reply.run_id)
                      LEFT JOIN principals AS actor
                        ON actor.company_id = run.company_id AND actor.user_id = run.actor_id

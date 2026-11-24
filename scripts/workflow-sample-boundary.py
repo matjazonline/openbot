@@ -27,6 +27,11 @@ PURE = {
     'agent::McpErrorPolicy', 'agent::McpResultSource',
     # A scripted sample has no admitted department, so a role step is refused, not resolved.
     'roles::refuse_unresolved_sample_role',
+    # A scripted channel.call runs live's pure launch checks over its frozen target (AWC-P05-D2
+    # r2, D3). ChannelCallDispatch, ChannelCallToolCall and the snapshot builders stay out.
+    'channel_call::ChannelCallRequest', 'channel_call::ChannelCallError',
+    'channel_call::ChannelCallOutcome', 'channel_call::DeskFacts', 'channel_call::TargetDecision',
+    'channel_call::decide_target', 'channel_call::check_intake', 'channel_call::REVIEW_REJECTED',
 }
 EXTERNAL = {'serde', 'serde_json', 'uuid', 'chrono', 'sha2'}
 SAMPLE = 'crate::application::workflow::sample'

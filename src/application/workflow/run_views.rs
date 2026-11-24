@@ -107,6 +107,10 @@ pub struct RunView {
     /// Newest first.
     pub events: Vec<RunEvent>,
     pub events_truncated: bool,
+    /// This run's `channel.call`s, newest first, at most [`MAX_STEP_ITEMS`].
+    pub channel_calls: super::channel_call_views::ChannelCallPage,
+    /// The call this run answers, when it is a call child.
+    pub called_by: Option<super::channel_call_views::ChannelCallOrigin>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -222,6 +226,8 @@ pub struct StepView {
     pub receipts: Vec<Receipt>,
     pub attempts: Vec<Attempt>,
     pub children: Vec<ChildRun>,
+    /// This execution's `channel.call`s, newest first.
+    pub channel_calls: super::channel_call_views::ChannelCallPage,
     /// Any of the lists was cut at [`MAX_STEP_ITEMS`].
     pub truncated: bool,
 }
@@ -284,6 +290,10 @@ impl RunView {
             child.dependency = None;
         }
         self.calls = CallProvenancePage::default();
+        self.channel_calls.restrict();
+        if let Some(origin) = &mut self.called_by {
+            origin.desk_name.clear();
+        }
         self.input = Value::Null;
         self.params = Value::Null;
         self.detail.project(visibility);
@@ -300,6 +310,7 @@ impl StepView {
             child.dependency = None;
         }
         self.calls = CallProvenancePage::default();
+        self.channel_calls.restrict();
         self.frozen_inputs = None;
         self.committed_output = None;
         self.frozen_choice = None;

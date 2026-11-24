@@ -22,6 +22,9 @@ pub struct MessageTriggerInput {
     pub message: String,
     pub subject: String,
     pub sender: String,
+    /// A desk call's intake fields (agent-workflow-call 01 C.1), already validated against the
+    /// destination's intake. Mail, relays and correlated replies never carry them.
+    pub fields: Option<serde_json::Map<String, Value>>,
 }
 
 impl MessageTriggerInput {
@@ -37,16 +40,27 @@ impl MessageTriggerInput {
             message: truncate(body, MESSAGE_INPUT_BODY_BYTES).to_string(),
             subject: truncate(subject, MAX_SUBJECT_BYTES).to_string(),
             sender: truncate(sender, MESSAGE_INPUT_SENDER_BYTES).to_string(),
+            fields: None,
         }
     }
 
+    /// A desk call's input: the call's validated intake fields beside the canonical message.
+    pub fn with_fields(mut self, fields: Option<serde_json::Map<String, Value>>) -> Self {
+        self.fields = fields;
+        self
+    }
+
     pub fn to_value(&self) -> Value {
-        json!({
+        let mut value = json!({
             "source_message": self.source_message.as_uuid().to_string(),
             "message": self.message,
             "subject": self.subject,
             "sender": self.sender,
-        })
+        });
+        if let Some(fields) = &self.fields {
+            value["fields"] = Value::Object(fields.clone());
+        }
+        value
     }
 
     /// The instance configure/activate validate a message-triggered binding's input schema with.
@@ -60,7 +74,10 @@ impl MessageTriggerInput {
         .to_value()
     }
 
-    /// The registry-owned schema; a `message.reply` wait must declare exactly this payload.
+    /// The registry-owned schema; a `message.reply` wait must declare exactly this payload. It
+    /// has no `fields`: that is a responder's own declared intake (`properties.fields` of its
+    /// input schema), so a version using this schema verbatim declares none. A reply payload
+    /// never carries fields.
     pub fn schema() -> Value {
         json!({
             "type": "object",

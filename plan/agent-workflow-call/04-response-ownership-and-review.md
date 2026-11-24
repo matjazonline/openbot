@@ -65,8 +65,11 @@ tool result, sample preview, notification, run view, or logging path.
 ## Batch C — Thread trail on both desks
 
 A call must leave the same trail in the thread views as a message exchange would, or people
-supervising a desk lose sight of delegated work. Both writes happen in the transaction that settles
-the call; neither creates an outbound delivery or re-enters ingress.
+supervising a desk lose sight of delegated work. The caller's note is written in the transaction that
+settles the call. The destination reply is the call child's final reply, published by the existing
+final-reply publisher exactly once, like every desk reply. It may land after the caller has its
+answer, and a failed publication leaves the call's result unchanged (user decision, 2026-11-23,
+gate AWC-P04-D1 r2). Neither write creates an outbound delivery or re-enters ingress.
 
 1. Write the approved response into the call's destination thread as the child's reply message,
    `MessageRole::Agent` (`src/domain/entities/message.rs:43`), the same way the native `reply`

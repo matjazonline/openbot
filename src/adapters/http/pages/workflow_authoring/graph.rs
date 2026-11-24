@@ -216,9 +216,34 @@ fn graph_list(graph: &WorkflowGraph, marks: &BTreeMap<String, NodeMark>) -> Stri
 }
 
 fn step_kind_label(kind: &str) -> &str {
-    if kind == "channel.no_reply" {
-        "Finish without reply"
-    } else {
-        kind
+    response_step_label(kind).unwrap_or(kind)
+}
+
+/// The editor's name for a terminal channel-response step, shared by the graph and the step
+/// catalogue.
+pub(super) fn response_step_label(kind: &str) -> Option<&'static str> {
+    match kind {
+        "channel.no_reply" => Some("Finish without reply"),
+        "channel.deny" => Some("Deny request"),
+        "channel.hand_off" => Some("Hand off to another run"),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// C8: the editor names every terminal response step.
+    #[test]
+    fn channel_call_authoring_response_step_labels() {
+        assert_eq!(super::step_kind_label("channel.deny"), "Deny request");
+        assert_eq!(
+            super::step_kind_label("channel.hand_off"),
+            "Hand off to another run"
+        );
+        assert_eq!(
+            super::step_kind_label("channel.no_reply"),
+            "Finish without reply"
+        );
+        assert_eq!(super::step_kind_label("data.map"), "data.map");
     }
 }

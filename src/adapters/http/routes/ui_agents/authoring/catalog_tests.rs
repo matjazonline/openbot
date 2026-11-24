@@ -113,6 +113,7 @@ async fn autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder
     assert_eq!(
         names,
         [
+            "channel.call",
             "message.reply",
             "message.send",
             "read_escalation",

@@ -1,0 +1,56 @@
+{
+ "version": 1,
+ "round": "AWC-P06-A-R1",
+ "artifact": "d3bee2a425e9d3508223741ca231608e8c9336715dbece7ca497f5d061c8576f",
+ "checks": [
+  {
+   "criteria": [
+    "G1",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7",
+    "G8"
+   ],
+   "command": "cargo test --offline --locked --lib -- channel_call_ (119 passed)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/a-channel-call-tests.txt",
+     "sha256": "956f9ca60c3bdd588e2f8e24667b41aab26dd105055e35b6d96fc68997a86870"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget"
+   ],
+   "command": "bash scripts/stack-budget.sh --offline -- channel_call_ (119 passed at stock 2 MiB)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/a-stack-budget.txt",
+     "sha256": "3142fffe0b3e55a0b2ccf3bdd987e3d90b2b55c5294f601d7d6073b49ab0e605"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "clippy"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0); cargo fmt --check (clean)",
+   "fixture": "no database",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/a-clippy.txt",
+     "sha256": "bbdcaf81c295dcd932b649776f16e741b1400d26966b57e4718e7d96b8031780"
+    }
+   ]
+  }
+ ]
+}

@@ -495,6 +495,10 @@ impl RunViews for PostgresPersistence {
             reconciliations_truncated,
             events,
             events_truncated,
+            channel_calls: self
+                .channel_call_page(company, run, viewer, None, MAX_STEP_ITEMS)
+                .await?,
+            called_by: self.channel_call_origin(company, viewer, run).await?,
         };
         let levels = crate::adapters::persistence::view_visibility::run_levels_on(
             self.pool(),
@@ -573,6 +577,9 @@ impl RunViews for PostgresPersistence {
             receipts,
             attempts,
             children,
+            channel_calls: self
+                .channel_call_page(company, run, viewer, Some(execution), MAX_STEP_ITEMS)
+                .await?,
             truncated: calls_cut || receipts_cut || attempts_cut || children_cut,
         };
         let levels = crate::adapters::persistence::view_visibility::run_levels_on(

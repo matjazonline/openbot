@@ -9,7 +9,11 @@ pub(super) async fn create(
     command: &PreparedAdmission,
     source: &SourceKey,
 ) -> AppResult<()> {
-    let manifest = super::agent_manifest::capture_on(tx, command).await?;
+    let manifest = super::agent_manifest::capture_on(
+        tx,
+        super::agent_manifest::CaptureScope::admission(command),
+    )
+    .await?;
     let knowledge = super::knowledge::admission_levels_on(tx, command).await?;
     insert_run(
         tx,
@@ -63,7 +67,12 @@ pub(super) async fn create(
     )
     .await?;
     agent_history_sessions::capture(tx, command).await?;
-    super::run_scopes::capture_on(tx, command, &manifest).await?;
+    super::run_scopes::capture_on(
+        tx,
+        super::agent_manifest::CaptureScope::admission(command),
+        &manifest,
+    )
+    .await?;
     // Unit spend caps, from the run's write unit just captured (Plan07 02B.2): a refusal rolls
     // the whole admission back, so nothing above is written.
     crate::adapters::persistence::unit_budgets::check_admission_on(

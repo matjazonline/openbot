@@ -1,0 +1,10 @@
+test adapters::http::pages::workflow_runs::calls::tests::channel_call_views_section_draws_only_authorized_references ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5179 filtered out; finished in 0.00s
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (237.659833ms)
+✔ calls-from-agents block offers the desk id read-only, reachable by keyboard, and copyable with or without the clipboard API (395.35925ms)
+✔ a call lists its phase, review link and deadline, and a restricted viewer gets labels only (238.874459ms)
+ℹ tests 3
+ℹ pass 3
+ℹ fail 0
+browser exit 0
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 5173 filtered out; finished in 10.43s

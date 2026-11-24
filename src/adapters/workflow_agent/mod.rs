@@ -14,6 +14,7 @@ use crate::{
     application::workflow::{
         actions::{ModelToolCallId, RemoteDispatchObservation},
         agent::{AgentToolDispatch, AgentToolObservation, AgentToolTarget, PreparedTool},
+        channel_call::{ChannelCallDispatch, ChannelCallToolCall},
         escalation::tools::EscalationToolCall,
         http::HttpToolCall,
         knowledge::{KnowledgeToolCall, KnowledgeToolDispatch},
@@ -46,6 +47,9 @@ pub struct AgentActionTools {
     /// The memory tools (phase 05 E5), composed only while the memory service is configured;
     /// without them a published memory tool fails closed.
     memory: Option<Arc<dyn MemoryToolDispatch>>,
+    /// `channel.call` (agent-workflow-call 03); every production composition includes it, and
+    /// without it a frozen `channel.call` fails closed.
+    channel_call: Option<Arc<dyn ChannelCallDispatch>>,
 }
 impl AgentActionTools {
     pub fn new(http: Arc<HttpRuntime>, mcp: Arc<McpRuntime>, message: Arc<MessageRuntime>) -> Self {
@@ -58,7 +62,12 @@ impl AgentActionTools {
             escalation: None,
             knowledge: None,
             memory: None,
+            channel_call: None,
         }
+    }
+    pub fn with_channel_calls(mut self, channel_call: Arc<dyn ChannelCallDispatch>) -> Self {
+        self.channel_call = Some(channel_call);
+        self
     }
     pub fn with_workflow_tools(mut self, workflow: Arc<dyn WorkflowToolDispatch>) -> Self {
         self.workflow = Some(workflow);
@@ -100,6 +109,7 @@ enum ToolInvocation {
     Message(Box<MessageToolCall>),
     Knowledge(Box<KnowledgeToolCall>),
     Memory(Box<MemoryToolCall>),
+    ChannelCall(Box<ChannelCallToolCall>),
 }
 fn invocation(
     tool: &PreparedTool,
@@ -164,6 +174,16 @@ fn invocation(
             call,
             arguments,
         })),
+        AgentToolTarget::ChannelCall { .. } => {
+            ToolInvocation::ChannelCall(Box::new(ChannelCallToolCall {
+                origin: tool.origin,
+                call: ToolCallId::new(
+                    uuid::Uuid::parse_str(call.as_str())
+                        .map_err(|_| AppError::BadRequest("Invalid tool call".into()))?,
+                ),
+                arguments,
+            }))
+        }
         AgentToolTarget::Memory { tool: memory } => {
             ToolInvocation::Memory(Box::new(MemoryToolCall {
                 origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
@@ -230,6 +250,14 @@ impl AgentToolDispatch for AgentActionTools {
                         )
                     })?;
                     Box::pin(memory.call_memory_tool(fence, *call)).await
+                }
+                ToolInvocation::ChannelCall(call) => {
+                    let channel_call = self.channel_call.as_ref().ok_or_else(|| {
+                        AppError::ServiceUnavailable(
+                            "Channel calls are unavailable to this worker".into(),
+                        )
+                    })?;
+                    Box::pin(channel_call.call_channel(fence, *call)).await
                 }
             }
         }

@@ -23,7 +23,7 @@ use crate::domain::workflow::{
     Binding, ResourceName, Routes, StepId, TypeName, VersionId, WorkflowId,
 };
 pub(crate) use actions::action_approval_schema;
-pub(crate) use actions::message_tool_schemas;
+pub(crate) use actions::{message_content_schema, message_tool_schemas};
 pub(crate) use checks::InputCheck;
 pub use facts::{CatalogueFacts, ChildContract, ToolContract};
 pub use help::{AuthoringHelp, authoring_help};
@@ -55,7 +55,7 @@ pub const MAX_IDENTIFIER: usize = 128;
 pub const MAX_PATH: usize = 2048;
 pub const MAX_DEADLINE: usize = 64;
 pub const MAX_CORRELATION: usize = 256;
-pub const TYPES: [&str; 23] = [
+pub const TYPES: [&str; 25] = [
     "context.history",
     "memory.load",
     "memory.save",
@@ -69,6 +69,8 @@ pub const TYPES: [&str; 23] = [
     "data.map",
     "data.url",
     "channel.no_reply",
+    "channel.deny",
+    "channel.hand_off",
     "http.request",
     "tool.call",
     "mcp.call",
@@ -329,7 +331,7 @@ impl<'a> Registration<'a> {
                     .unwrap_or(self.parsed.locations[""]),
             ));
         }
-        if self.name() == "channel.no_reply"
+        if RESPONSE_STEPS.contains(&self.name())
             && !matches!(
                 self.parsed.definition.steps[self.id].routes,
                 Routes::Success(crate::domain::workflow::TransitionTarget::End)
@@ -338,7 +340,7 @@ impl<'a> Registration<'a> {
             let path = format!("/steps/{}/routes", self.id);
             return Err(Diagnostic::at(
                 "registry.terminal_route",
-                "channel.no_reply requires success routing to $end",
+                "This response step requires success routing to $end",
                 &path,
                 self.parsed
                     .locations
@@ -410,6 +412,10 @@ pub(super) const STATIC_PARAMS: StaticRefusal = StaticRefusal {
     code: "registry.static_params",
     message: "Child parameters must be literal or come from binding parameters",
 };
+
+/// Terminal steps that settle a channel response other than by projection (AWC-P04-D1 D2).
+pub(crate) const RESPONSE_STEPS: [&str; 3] =
+    ["channel.no_reply", "channel.deny", "channel.hand_off"];
 
 struct Contract {
     input: Value,

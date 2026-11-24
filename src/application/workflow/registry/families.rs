@@ -8,6 +8,22 @@ impl Registration<'_> {
                 text(super::super::data_url::MAX_URL_BYTES),
             )),
             "jev.evaluate" => self.jev(),
+            // A declined response: its reason and the version's result fields (AWC-P04-D1 D2).
+            "channel.deny" => {
+                let fields = embedded(self.result_fields(), "fields");
+                let reason = text(crate::application::transport::ingress::MAX_SUBJECT_BYTES);
+                Ok(contract(
+                    json!({"reason":reason.clone(),"fields":fields.clone()}),
+                    &["reason"],
+                    object(json!({"reason":reason,"fields":fields}), &["reason"]),
+                ))
+            }
+            // A response handed to a nested call this run made and consumed as `done`.
+            "channel.hand_off" => Ok(contract(
+                json!({"run_id":uuid()}),
+                &["run_id"],
+                object(json!({"run_id":uuid()}), &["run_id"]),
+            )),
             "context.history" => Ok(contract(
                 json!({"max_tokens":integer(MAX_CONTEXT_TOKENS)}),
                 &["max_tokens"],
@@ -288,4 +304,17 @@ fn finite_labels(schema: &Value) -> bool {
                         .and_then(Value::as_array)
                         .is_some_and(|required| required.contains(&json!(name)))
             }))
+}
+
+impl Registration<'_> {
+    /// The version's result fields (`output_schema.properties.fields`, p01 D3), or any object.
+    fn result_fields(&self) -> Value {
+        self.parsed
+            .definition
+            .output_schema
+            .as_ref()
+            .and_then(|schema| schema.pointer("/properties/fields"))
+            .cloned()
+            .unwrap_or_else(|| json!({"type":"object"}))
+    }
 }

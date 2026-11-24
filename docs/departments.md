@@ -131,16 +131,17 @@ attempt saw.
 The Agent Builder's `list_company_agents` tool names each agent's departments, roles and direct
 address and can list one department (`department` slug). It answers whoever manages a department,
 for the agents and departments they manage. The
-plan's intake schema for a member's desk arrives with `channel.call`; the directory does not carry
-one yet.
+directory carries no intake schema. An agent granted the `channel.call` built-in finds callable
+desks, with their declared intake, in that tool's description
+([Channel calls](workflow-operations.md#channel-calls)).
 
 ## Dispatch and escalation
 
 A lead hands work to a member, or escalates to the parent department, by sending a message to that
-desk's address. Today such a message is delivered as an outbound message on the target desk; it
-does not start the target desk's workflow, and a reply that comes back along the same trace is
-refused as a loop. Dispatch that starts the member's work and returns an answer waits for
-`channel.call` (agent-workflow-call).
+desk's address. Such a message is delivered as an outbound message on the target desk; it does not
+start the target desk's workflow, and a reply that comes back along the same trace is refused as a
+loop. To start the member's work and receive its answer in the same step, the lead's agent uses
+`channel.call` ([Channel calls](workflow-operations.md#channel-calls)).
 
 ## Escalation
 

@@ -79,16 +79,15 @@ async fn owned_agent_desk_on(
         return Err(missing());
     };
     let owned: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_reply_runs AS owned \
-         JOIN channel_reply_contexts AS source ON source.company_id=owned.company_id \
-           AND source.intent_id=owned.intent_id AND source.binding_id=owned.binding_id \
-           AND source.binding_revision=owned.binding_revision \
-         JOIN workflow_runs AS run ON run.company_id=owned.company_id AND run.id=owned.run_id \
-           AND run.binding_id=owned.binding_id AND run.binding_revision=owned.binding_revision \
-         WHERE owned.company_id=$1 AND owned.run_id=$2 AND source.actor_id=$3 \
+        // Either owner (AWC-P04-D1 D1): an ingress root, or a channel call's child on its desk thread.
+        "SELECT EXISTS(SELECT 1 FROM channel_reply_owners AS source \
+         JOIN workflow_runs AS run ON run.company_id=source.company_id AND run.id=source.run_id \
+           AND run.binding_id=source.binding_id AND run.binding_revision=source.binding_revision \
+         WHERE source.company_id=$1 AND source.run_id=$2 AND source.actor_id=$3 \
            AND run.actor_id=source.actor_id AND run.channel_id=$4 AND source.channel_id=run.channel_id \
            AND source.principal_id IS NULL AND run.principal_id IS NULL \
-           AND source.thread_id=run.thread_id AND run.thread_id=$5 AND run.parent_run_id IS NULL)")
+           AND source.thread_id=run.thread_id AND run.thread_id=$5 \
+           AND (run.parent_run_id IS NULL)=(source.owner_kind='ingress'))")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(actor.user_id())
         .bind(desk).bind(thread_id.as_uuid()).fetch_one(&mut *db).await?;
     if !owned {

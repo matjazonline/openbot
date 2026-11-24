@@ -205,6 +205,8 @@ fn assert_historical_html(
     let html =
         crate::adapters::http::pages::run_step_body(&crate::adapters::http::pages::StepBodyView {
             company_id: company.as_uuid(),
+            run: Uuid::new_v4(),
+            calls: &Default::default(),
             step: retained_step,
         });
     assert!(html.contains(&original_agent.revision_id.as_uuid().to_string()));

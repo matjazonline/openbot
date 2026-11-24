@@ -11,10 +11,14 @@ use crate::application::workflow::compiler::SourceDecoder;
 use crate::application::workflow::lifecycle::{
     DefinitionTarget, LifecycleError, check_draft, compile_bundle,
 };
-use crate::application::workflow::sample::{MAX_SAMPLE_BYTES, PreparedSample, SampleRequest};
+use crate::application::workflow::sample::{
+    FrozenCallTarget, FrozenResponder, MAX_CALL_TARGETS, MAX_SAMPLE_BYTES, PreparedSample,
+    SampleRequest,
+};
 use crate::application::workflow::sample_capture::SampleDefinitionCapture;
+use crate::entities::address::AddressTarget;
 use crate::entities::agent_capability::AgentId;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::{Duration, Instant};
 
 #[cfg(test)]
@@ -57,10 +61,16 @@ impl SampleDefinitionCapture for SampleCapture {
             let mut closure = Closure::new(target, deadline);
             closure.cache(root.clone())?;
             closure.capture_on(&mut tx, &root).await?;
+            let targets =
+                call_targets_on(&mut tx, target, &request.call_targets, &closure.agents).await?;
             let mut request = request;
             request.agents = closure.agents.into_values().collect();
-            let prepared =
-                PreparedSample::new(root, request, closure.workflows.into_values().collect())?;
+            let prepared = PreparedSample::new_with_targets(
+                root,
+                request,
+                closure.workflows.into_values().collect(),
+                targets,
+            )?;
             if Instant::now() >= deadline {
                 return Err(timeout());
             }
@@ -98,6 +108,99 @@ async fn authorize_on(
     )
     .await?;
     Ok(())
+}
+/// Freezes each declared `channel.call` target (gate AWC-P05-D2 r2, D3). The author must be
+/// able to read the desk's response settings (the authority of the desk's settings page);
+/// otherwise the capture fails with `NotFound`, as that page does. Reads only; writes nothing.
+async fn call_targets_on(
+    tx: &mut Transaction<'_, Postgres>,
+    target: DefinitionTarget,
+    desks: &[Uuid],
+    agents: &BTreeMap<AgentId, ResolvedAgentDefinition>,
+) -> AppResult<Vec<FrozenCallTarget>> {
+    use crate::application::workflow::channel_call::declared_fields;
+    use crate::application::workflow::publication::ToolKind;
+    if desks.len() > MAX_CALL_TARGETS {
+        return Err(AppError::BadRequest(
+            "A sample declares at most 10 call targets".into(),
+        ));
+    }
+    // The sample's agents that may call a desk at all.
+    let mut callers = Vec::new();
+    for (id, agent) in agents {
+        for tool in &agent.tools {
+            if crate::application::workflow::agent_contract::agent_action_snapshot(
+                target.company,
+                tool,
+            )?
+            .kind()
+                == ToolKind::ChannelCall
+            {
+                callers.push(*id);
+                break;
+            }
+        }
+    }
+    let mut frozen = Vec::with_capacity(desks.len());
+    for &desk in desks {
+        let inbox = RelatedAssociation::inbox(AddressTarget::Desk(desk));
+        super::management::authorize_association_on(tx, target.company, target.actor, inbox)
+            .await?;
+        let state = channel_call_target::desk_state_on(tx, target.company, desk)
+            .await?
+            .ok_or_else(missing)?;
+        let mut writable_agents = BTreeSet::new();
+        for &agent in &callers {
+            if channel_call_target::agent_writes_on(
+                tx,
+                target.company,
+                agent,
+                desk,
+                state.access_mode,
+            )
+            .await?
+            {
+                writable_agents.insert(agent);
+            }
+        }
+        let selected = state
+            .settings
+            .as_ref()
+            .and_then(|settings| settings.responder.as_ref());
+        let (responder, intake, result_fields) = match (&state.responder, selected) {
+            (Some(binding), Some(selected)) => {
+                let definition = binding
+                    .configuration
+                    .bundle()
+                    .compiled()
+                    .graph()
+                    .definition();
+                (
+                    Some(FrozenResponder {
+                        binding: selected.binding.as_uuid(),
+                        revision: selected.configuration_revision.get(),
+                    }),
+                    declared_fields(definition.input_schema.as_ref()).cloned(),
+                    declared_fields(definition.output_schema.as_ref()).cloned(),
+                )
+            }
+            _ => (None, None, None),
+        };
+        frozen.push(FrozenCallTarget {
+            desk,
+            enabled: state.enabled,
+            unit_archived: state.unit_archived,
+            responder,
+            writable_agents,
+            review_required: state
+                .settings
+                .as_ref()
+                .is_some_and(|settings| settings.approval_policy.is_some()),
+            intake,
+            result_fields,
+        });
+    }
+    Ok(frozen)
 }
 impl SampleCapture {
     async fn root_on(

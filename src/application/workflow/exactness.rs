@@ -33,9 +33,8 @@ pub enum StepAccounting {
 pub fn step_accounting(kind: &str) -> StepAccounting {
     match kind {
         // `data.url` only constructs a URL from inputs (no request), like `data.map`.
-        "data.map" | "data.url" | "decision.rule" | "channel.no_reply" | "wait.timer" => {
-            StepAccounting::Pure
-        }
+        "data.map" | "data.url" | "decision.rule" | "channel.no_reply" | "channel.deny"
+        | "channel.hand_off" | "wait.timer" => StepAccounting::Pure,
         "context.history" | "memory.load" => StepAccounting::RaisingRead,
         "agent.run" | "ai.classify" | "decision.agent" => StepAccounting::ModelStep,
         "message.send" | "message.reply" | "memory.save" => StepAccounting::Receipt,
@@ -118,7 +117,9 @@ pub fn tool_accounting(target: &AgentToolTarget) -> ToolAccounting {
         AgentToolTarget::Provisioning { .. } | AgentToolTarget::Escalation { .. } => {
             ToolAccounting::Configuration
         }
-        AgentToolTarget::Workflow { .. } => ToolAccounting::ChildControl,
+        AgentToolTarget::Workflow { .. } | AgentToolTarget::ChannelCall { .. } => {
+            ToolAccounting::ChildControl
+        }
         AgentToolTarget::Http { .. } | AgentToolTarget::Mcp { .. } => ToolAccounting::Unaccounted,
     }
 }

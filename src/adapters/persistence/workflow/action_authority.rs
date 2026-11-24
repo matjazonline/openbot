@@ -42,9 +42,9 @@ pub(super) fn prelock_on(
 #[path = "action_account_hints.rs"]
 mod account_hints;
 pub(super) use account_hints::{
-    AccountPrefix, ActorAccountHints, actor_hints_on, prelock_accounts_on,
-    prelock_accounts_with_locks_on, prelock_dispatch_on, prelock_live_on, prelock_message_on,
-    prelock_native_on, prelock_reply_on,
+    AccountPrefix, ActorAccountHints, CallAccountHint, actor_hints_on, prelock_accounts_on,
+    prelock_accounts_with_locks_on, prelock_channel_call_on, prelock_dispatch_on, prelock_live_on,
+    prelock_message_on, prelock_native_on, prelock_reply_on,
 };
 
 pub(super) enum RunPhase {

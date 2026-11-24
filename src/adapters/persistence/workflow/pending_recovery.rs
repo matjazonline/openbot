@@ -14,6 +14,10 @@ pub(super) enum PendingFailure {
     /// A listed decision reviewer cannot be assigned or given a provable notice. Never routed:
     /// a configuration failure is not presented as a business timeout (05-D2 §7.1, 05-D4 §2).
     ReviewerUnavailable,
+    /// A response step in a run with no response owner (AWC-P04-D1 r2 D2a).
+    ResponseStepUnowned,
+    /// A hand-off naming no call this run consumed as `done` (D7).
+    HandOffInvalid,
 }
 impl PendingFailure {
     fn code(self) -> &'static str {
@@ -26,6 +30,10 @@ impl PendingFailure {
             Self::RootBudgetExhausted => "workflow.root_budget_exhausted",
             Self::TokenRefused(reason) => reason.failure_code(),
             Self::ReviewerUnavailable => "decision.reviewer_unavailable",
+            Self::ResponseStepUnowned => {
+                crate::application::workflow::channel_call::RESPONSE_STEP_UNOWNED
+            }
+            Self::HandOffInvalid => crate::application::workflow::channel_call::HAND_OFF_INVALID,
         }
     }
 }
@@ -104,6 +112,8 @@ pub(super) async fn settle(
             PendingFailure::InvalidInput
                 | PendingFailure::InvalidOutput
                 | PendingFailure::AttemptsExhausted
+                | PendingFailure::ResponseStepUnowned
+                | PendingFailure::HandOffInvalid
         ) {
         route(db, scope).await?
     } else {
@@ -210,6 +220,11 @@ pub(super) async fn prepare_pure(
         }
         Ok(None) => return Err(invalid()),
     };
+    if let Some(failure) = response_step_refusal(db, scope, bundle, &activated, &completion).await?
+    {
+        settle(db, scope, failure).await?;
+        return Ok(Pending::Settled);
+    }
     if completion.target != TransitionTarget::End
         && activated.ordinal >= u64::try_from(max_steps).map_err(|_| invalid())?
     {
@@ -217,4 +232,42 @@ pub(super) async fn prepare_pure(
         return Ok(Pending::Settled);
     }
     Ok(Pending::Ready((activated, completion)))
+}
+
+/// A deny or hand-off finishes only a run that answers a message or call, and a hand-off only
+/// with a call this run consumed as `done`; both are judged before any output is committed
+/// (AWC-P04-D1 r2 D2a, D7).
+async fn response_step_refusal(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    bundle: &PublishedBundle,
+    activated: &ActivatedExecution,
+    completion: &crate::application::workflow::batch::PureCompletion,
+) -> AppResult<Option<PendingFailure>> {
+    let kind = bundle.compiled().graph().definition().steps[&activated.step]
+        .step_type
+        .as_str();
+    if !matches!(kind, "channel.deny" | "channel.hand_off") {
+        return Ok(None);
+    }
+    let owned: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM channel_reply_runs WHERE company_id=$1 AND run_id=$2)",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .fetch_one(&mut *db)
+    .await?;
+    if !owned {
+        return Ok(Some(PendingFailure::ResponseStepUnowned));
+    }
+    if kind == "channel.hand_off" {
+        let run = crate::application::workflow::channel_reply::handed_off_run(&completion.output)?;
+        if channel_call_results::handed_off_on(db, scope, run)
+            .await?
+            .is_none()
+        {
+            return Ok(Some(PendingFailure::HandOffInvalid));
+        }
+    }
+    Ok(None)
 }

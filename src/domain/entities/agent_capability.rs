@@ -88,6 +88,8 @@ pub enum AgentBuiltinTool {
     SaveMemory,
     ReadEscalation,
     RespondToEscalation,
+    /// Ask another desk and wait for its answer (agent-workflow-call).
+    ChannelCall,
 }
 impl AgentBuiltinTool {
     pub const fn name(self) -> &'static str {
@@ -104,6 +106,7 @@ impl AgentBuiltinTool {
             Self::SaveMemory => "save_memory",
             Self::ReadEscalation => "read_escalation",
             Self::RespondToEscalation => "respond_to_escalation",
+            Self::ChannelCall => "channel.call",
         }
     }
     pub fn parse(name: &str) -> Option<Self> {
@@ -120,6 +123,7 @@ impl AgentBuiltinTool {
             "save_memory" => Some(Self::SaveMemory),
             "read_escalation" => Some(Self::ReadEscalation),
             "respond_to_escalation" => Some(Self::RespondToEscalation),
+            "channel.call" => Some(Self::ChannelCall),
             _ => None,
         }
     }

@@ -76,6 +76,7 @@ async fn autonomous_agent_views_bound_agent_and_workflow_dependencies_with_expli
         graph_html: "",
         people: &std::collections::HashMap::new(),
         banner: None,
+        calls: &Default::default(),
     });
     assert!(html.contains("additional selections are omitted"));
     assert!(!html.contains("Retain this immutable instruction"));

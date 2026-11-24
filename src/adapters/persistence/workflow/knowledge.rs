@@ -34,7 +34,8 @@ pub(super) fn reader(company: CompanyId, fact: ReaderFact) -> AppResult<Option<A
         }
     }
 }
-fn audience(company: CompanyId, facts: Vec<ReaderFact>) -> AppResult<AccessLevel> {
+/// The human readers' levels; agent and system principals read nothing.
+fn human_readers(company: CompanyId, facts: Vec<ReaderFact>) -> AppResult<Vec<AccessLevel>> {
     if facts.len() > MAX_READER_FACTS {
         return Err(AppError::Internal(
             "Too many distinct stored reader facts".into(),
@@ -44,7 +45,7 @@ fn audience(company: CompanyId, facts: Vec<ReaderFact>) -> AppResult<AccessLevel
         .into_iter()
         .map(|fact| reader(company, fact))
         .collect::<AppResult<Vec<_>>>()?;
-    Ok(audience_level(readers.into_iter().flatten()))
+    Ok(readers.into_iter().flatten().collect())
 }
 pub(super) async fn thread_audience_on(
     db: &mut PgConnection,
@@ -54,6 +55,17 @@ pub(super) async fn thread_audience_on(
     let RelatedAssociation::Thread { target, thread_id } = association else {
         return Ok(AccessLevel::PUBLIC);
     };
+    Ok(audience_level(
+        thread_readers_on(db, company, target, thread_id).await?,
+    ))
+}
+/// The distinct human reader levels of one thread.
+async fn thread_readers_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    target: crate::entities::address::AddressTarget,
+    thread_id: crate::application::workflow::RelatedThreadId,
+) -> AppResult<Vec<AccessLevel>> {
     // One MVCC statement is the audience's freeze point. DISTINCT bounds allocation by
     // finite kind/role/level combinations, rather than the size of a thread's party list.
     let facts=sqlx::query_as::<_,ReaderFact>(
@@ -67,7 +79,7 @@ pub(super) async fn thread_audience_on(
            AND party.target_principal_id IS NOT DISTINCT FROM $5::uuid LIMIT $4")
         .bind(company.as_uuid()).bind(target.desk_id()).bind(thread_id.as_uuid()).bind((MAX_READER_FACTS+1) as i64).bind(target.principal_id().map(|id| id.as_uuid()))
         .fetch_all(db).await?;
-    audience(company, facts)
+    human_readers(company, facts)
 }
 pub(super) async fn actor_level_on(
     db: &mut PgConnection,
@@ -232,9 +244,38 @@ pub(crate) async fn destination_level_on(
         thread_id: destination.thread_id,
     })?;
     match association {
-        RelatedAssociation::Thread { .. } => thread_audience_on(db, company, association).await,
+        RelatedAssociation::Thread { target, thread_id } => {
+            // A channel call's child answers an agent on a fresh desk thread (AWC-P03 D5):
+            // agents do not lower its audience, so its ceiling bounds it unless a human reader
+            // on the thread reads lower. Any other thread is its lowest human reader.
+            let readers = thread_readers_on(db, company, target, thread_id).await?;
+            match call_ceiling_on(db, company, run).await? {
+                Some(ceiling) => Ok(AccessLevel::lowest(readers.into_iter().chain([ceiling]))),
+                None => Ok(audience_level(readers)),
+            }
+        }
         _ => actor_level_on(db, company, Some(destination.actor_id)).await,
     }
+}
+
+/// The stored ceiling of `run` when it is a recorded channel call's child.
+async fn call_ceiling_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+) -> AppResult<Option<AccessLevel>> {
+    let ceiling: Option<i16> = sqlx::query_scalar(
+        "SELECT child.knowledge_ceiling::smallint FROM workflow_channel_calls AS call \
+         JOIN workflow_runs AS child ON child.company_id=call.company_id AND child.id=call.child_run_id \
+         WHERE call.company_id=$1 AND call.child_run_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?;
+    ceiling
+        .map(|ceiling| AccessLevel::try_from(ceiling).map_err(|e| AppError::Internal(e.into())))
+        .transpose()
 }
 
 /// Commit a read's classification with its output. The caller must already hold its live
@@ -319,8 +360,8 @@ mod tests {
     fn knowledge_run_level_reader_facts_exclude_nonreaders_and_reject_malformed_authority() {
         let company = CompanyId::new(Uuid::new_v4());
         assert_eq!(
-            audience(company, vec![fact("agent"), fact("system")]).unwrap(),
-            AccessLevel::PUBLIC
+            human_readers(company, vec![fact("agent"), fact("system")]).unwrap(),
+            Vec::<AccessLevel>::new()
         );
         assert_eq!(
             reader(company, fact("external")).unwrap(),

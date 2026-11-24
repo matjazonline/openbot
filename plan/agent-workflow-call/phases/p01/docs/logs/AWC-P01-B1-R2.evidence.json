@@ -1,0 +1,95 @@
+{
+ "version": 1,
+ "round": "AWC-P01-B1-R2",
+ "artifact": "2ebbc0cd1c41a6241a85eb15f6a1bd508e826d40fd54e32f2079fd569ea1feaa",
+ "checks": [
+  {
+   "criteria": [
+    "F1",
+    "F3",
+    "01A",
+    "01B",
+    "01C"
+   ],
+   "command": "cargo test --locked --offline --lib channel_call_ (18 listed, 18 passed; includes DB test channel_call_contract_built_in_binding_is_stored_and_published_exactly)",
+   "fixture": "fresh scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test (recreated after the init-schema constraint edit), localhost:5432; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-R2-focused-list.txt",
+     "sha256": "c8459d2117cf85ee28d0dac72850a5749da12fc93635d17cbe2e837cbcff1ef7"
+    },
+    {
+     "path": "logs/AWC-P01-B1-R2-focused.txt",
+     "sha256": "aba606ee82b714f871022a76f44e891292122b33bf4d96f480d4ff6df8917ca4"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "affected-consumers",
+    "F1"
+   ],
+   "command": "cargo test --locked --offline --lib -- application::workflow:: adapters::persistence::agent_publication adapters::persistence::agent_authoring workflow_tool_ agent_preparation autonomous_agent_storage_manifest_ adapters::http::pages::workflow_authoring channel_reply_ message_reply --test-threads 4 (797 passed)",
+   "fixture": "fresh scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test (recreated after the init-schema constraint edit), localhost:5432; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-R2-affected.txt",
+     "sha256": "44d7c6db85dc62fc488e45cc6f7c2590828a7e967af570dad91305d574a9d500"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-metadata"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets",
+   "fixture": "fresh scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test (recreated after the init-schema constraint edit), localhost:5432; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-R2-sqlx-check.txt",
+     "sha256": "de8b95f35bf703e4f669eaf8d44d32cf2239da195839bc6412839fcd741b0683"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "reachability"
+   ],
+   "command": "cargo test --locked --offline --test source_modules",
+   "fixture": "fresh scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test (recreated after the init-schema constraint edit), localhost:5432; SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-R2-source-modules.txt",
+     "sha256": "d6a0006cc5754536f936694a5d376a0094d555f8eb4cb7e80d26cdc1e7a740d3"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "format"
+   ],
+   "command": "cargo fmt --all -- --check && git diff --check",
+   "fixture": "worktree",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P01-B1-R2-fmt.txt",
+     "sha256": "dd6ae0ee0cbdf3e81e653be52726c6cff8549eec5d4be3de6fd1eae6d1caa65a"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "01B-DB-controls"
+   ],
+   "command": "DB-backed authority controls",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "need the target read (p02) and launch (p03); notice AWC-C002"
+  }
+ ]
+}

@@ -170,6 +170,7 @@ pub(super) async fn supported_publication(
                 ToolKind::Escalation => builtin_escalation_tool(tool)?,
                 ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
                 ToolKind::Memory => builtin_memory_tool(tx, tool, check).await?,
+                ToolKind::ChannelCall => builtin_channel_call_tool(tool)?,
                 ToolKind::Http => {
                     http::registered_on(
                         tx,
@@ -228,6 +229,14 @@ pub(super) async fn builtin_memory_tool(
         ));
     }
     Ok(())
+}
+
+pub(super) fn builtin_channel_call_tool(tool: &ToolSnapshot) -> AppResult<()> {
+    if crate::application::workflow::channel_call::is_trusted_channel_call_snapshot(tool)? {
+        Ok(())
+    } else {
+        Err(missing())
+    }
 }
 
 pub(super) fn builtin_knowledge_tool(tool: &ToolSnapshot) -> AppResult<()> {

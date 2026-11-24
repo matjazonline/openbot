@@ -321,3 +321,31 @@ async fn autonomous_agent_publication_native_only_needs_no_hosted_connection() {
         "hosted execution must refuse a native-only revision"
     );
 }
+
+#[tokio::test]
+async fn channel_call_contract_built_in_binding_is_stored_and_published_exactly() {
+    let f = Fixture::new().await;
+    let binding = AgentToolBinding::builtin(AgentBuiltinTool::ChannelCall);
+    assert_eq!(binding.alias.as_str(), "channel.call");
+    f.update(AgentWrite {
+        tool_bindings: Some(vec![binding.clone()]),
+        ..write()
+    })
+    .await;
+    let revision = f.p.publish_agent(f.request("call").await).await.unwrap();
+    let tool = &revision.definition.tools[0];
+    assert_eq!(tool.binding.id, binding.id);
+    let (input, output) = crate::application::workflow::channel_call::channel_call_schemas();
+    assert_eq!(tool.input_schema, input);
+    assert_eq!(tool.output_schema, output);
+    let stored: (String, String) =
+        sqlx::query_as("SELECT builtin, alias FROM agent_capability_bindings WHERE id=$1")
+            .bind(binding.id.as_uuid())
+            .fetch_one(f.p.pool())
+            .await
+            .unwrap();
+    assert_eq!(
+        stored,
+        ("channel_call".to_owned(), "channel.call".to_owned())
+    );
+}

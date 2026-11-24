@@ -69,6 +69,11 @@ pub(super) async fn card(
         .authoring_reads()
         .channel_usage(super::company(company), channel)
         .await?;
+    let desk = ui
+        .engine
+        .authoring_reads()
+        .desk_call_facts(super::company(company), channel)
+        .await?;
     let response = pages::ChannelResponseSettingsView {
         company,
         channel,
@@ -76,6 +81,7 @@ pub(super) async fn card(
         bindings: &usage.bindings,
         draft,
         error,
+        desk,
     };
     Ok(pages::channel_bindings_card(&pages::ChannelBindingsCard {
         company_id: company,

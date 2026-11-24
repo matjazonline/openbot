@@ -29,6 +29,9 @@ A large database can exceed the query budget; collection failure is explicit, ne
 | `reconciliation_runs`, `unknown_actions` | Parked reconciliation runs; action states needing reconciliation or applied without a result. An in-flight possible dispatch is not counted as known uncertainty. |
 | `unknown_deliveries`, `delivered_last24h`, `dead_deliveries_last24h` | Delivery outcome unknown; accepted deliveries by delivered time; currently dead-lettered deliveries updated in the last 24 hours. Includes non-workflow mail handled by the shared delivery worker. Acceptance is not proof the recipient read the message. |
 | `model_reserved_tokens`, `model_charged_tokens_last24h` | Outstanding input/output reservations; actual usage where known, otherwise conservative reserved usage for calls requested in the last 24 hours. These can overlap. |
+| `channel_calls_open`, `channel_calls_past_deadline`, `channel_call_oldest_seconds` | `channel.call` waits still open; open ones past their deadline; age of the oldest call whose child is still working or whose caller has not yet consumed the answer. See [Channel calls](#channel-calls). |
+| `channel_calls_review_waiting`, `channel_calls_response_ready` | Call children waiting on the desk's final-reply review (a `decision.human` step inside the child is not counted); call children that succeeded but whose answer no caller has consumed yet. |
+| `channel_calls_child_stalled`, `channel_calls_caller_stalled` | Calls whose child, or whose resumed caller, has a job that is not progressing: processing past its lease, or due for more than five minutes. Check worker capacity and the stuck job before anything else. |
 | `model_reserved_estimated_usd`, `model_charged_estimated_usd_last24h`, `unpriced_model_calls` | Those amounts at current company/provider/model prices; unpriced calls in the same live/24-hour scope. Missing prices are excluded from the monetary sums, so a zero estimate is not free usage. Historical price changes affect estimates. This is not a bill; department spend caps (below) are enforced separately from their own counted totals. |
 
 Two budgets bound model work. A run's root budget caps its own activations, model calls,
@@ -212,7 +215,8 @@ from rejecting protected final publication, which refuses that final effect.
 success to `$end`. It suppresses only this run's automatic final reply. Business schemas still apply;
 null or empty business output is valid when its schema permits it. Earlier explicit messages remain.
 A child cannot suppress its parent's response. Native custom steps cannot route directly to `$end`
-unless they use this terminal type. Normal AfterReply work returns the saved reply afterward;
+unless they use a terminal response type: this one, `channel.deny` (**Deny request**) or
+`channel.hand_off` (**Hand off to another run**). Normal AfterReply work returns the saved reply afterward;
 composition refuses paths exceeding the unchanged activation budget.
 
 `message.ask` atomically posts a prompt and registers a human wait. Only a correlated reply from the
@@ -252,6 +256,119 @@ failed, retry, lease_lost, error. Existing delivery unknown/dead/retry and overd
 continues to apply. Never add message text, recipient lists or approval tokens to logs or labels.
 These changes require a fresh database using the sole initialization migration; no old rows are
 rewritten and there is no compatibility rollout.
+
+## Channel calls
+
+`channel.call` lets an agent ask another desk to do a piece of work and receive the answer as the
+tool's result, in the same agent step. It is an opt-in built-in: the agent's capabilities list
+offers it, and nothing grants it automatically. An agent without the binding is prepared without
+the tool and cannot invoke it. The call itself needs no approval; the destination desk's own final
+review applies.
+
+**Which desks.** The call names a desk by `channel_id`, and the desk's selected responder handles
+it with its own configuration. Launch admits a call only when all of these hold:
+
+- the calling agent may write to the desk: the desk is public, or the agent holds a `participate`
+  grant on a members-only desk;
+- the desk is enabled and its unit is not archived;
+- the desk has a selected, active, message-triggered responder;
+- the desk is not one the calling run's chain already answers (`channel_call.cycle`).
+
+Otherwise the call answers a typed error (`channel_call.target_unavailable`, `channel_call.cycle`,
+the intake errors) or a `denied` closure (`channel_call.desk_disabled`, `channel_call.no_responder`,
+`channel_call.destination_unavailable`). A principal's direct inbox is never a call target.
+
+**What the agent sees.** The tool's description lists the public desks launch would admit when the
+agent step is prepared: id, name and declared intake fields, at most 20 desks and 6 KiB. The list
+is frozen with the prepared step, so a resume or retry sees the same list, and launch still re-checks
+everything. A desk changed later is refused with the usual error. Members-only desks are never
+listed; agents call them by an id from their instructions. Nothing is listed while the run can
+answer an external correspondent: a customer's trigger message, a customer message on its thread,
+or a customer `source_message` in its input. A run inside a call subtree answers the calling agent,
+so it is internal. Sample runs list no desks. The desk's **Calls from agents** block, on its
+Automatic response card, shows whether agents can call it (and the first reason when not), the
+copyable desk id, the responder's label and whether a final review applies.
+
+**Outcomes.** The result's `closure` is `done` (the approved response), `handed_off` (the desk
+settled with `channel.hand_off`; the result names the nested run as `run_id` and carries its
+content), `denied` (with
+a code and reason, including `channel.denied` from `channel.deny`) or `no_reply`. Failures are typed
+errors: `workflow.child_failed`, `workflow.child_cancelled`, `channel_call.review_rejected`,
+`channel_call.review_expired`, `channel_call.revoked`, `channel_call.response_invalid`. A call
+child cannot ask a human (`message.ask` answers `channel_call.interactive_unsupported`), because
+its requester is an agent.
+
+**Revocation.** Authority is judged again when the result is consumed. If the grant was removed,
+the desk was disabled, the responder binding was deactivated, or the agent was republished without
+`channel.call` meanwhile, the call answers `channel_call.revoked` with no content, and the caller's
+level is not raised.
+
+**Retries and replay.** A worker restart or a safe retry replays the saved call from its record. It
+never starts a second child and never re-selects the responder: a responder chosen while the call
+waits does not affect it. Reusing a saved call id with other arguments answers
+`channel_call.invalid_input`. A result is consumed once; a replay returns the same receipt.
+
+**Cancellation.** Cancelling the calling run cascades to the call child, including one waiting for
+review. A cancelled caller cannot start a new child, and a late child result cannot resume it.
+
+**Approval.** The destination desk's final review policy, reviewers and deadline apply. Only the
+approved response becomes the tool result; reviewers approve or reject it. Rejection or expiry closes the call with
+`channel_call.review_rejected` or `channel_call.review_expired`. The review shows that approval
+returns content to a calling agent, not a message to a customer.
+
+**Limits.** Call children count against the calling tree's existing limits; past the continuation
+limit, the call answers `workflow.tool_limit`. An optional `deadline` must be earlier than the
+caller's deadline (`channel_call.deadline_invalid`). The child runs to the call's deadline, or else
+the caller's; expiry fails the child, and the caller sees `workflow.child_failed`. Call fields are
+bounded at 16 KiB, and a result larger than the tool-result bound answers `workflow.tool_result_too_large`.
+The child's content level joins the caller's when the result is consumed.
+
+**Retention.** The call record and its stored result belong to the calling run's execution and are
+deleted with it. A tree retires whole under the ordinary run retention. The messages a call leaves
+on the desk's thread, and the caller's note, stay with those threads.
+
+**Inspecting calls.** A calling run's page lists its calls (newest first, at most 50) under
+**Desk calls**, and each agent step lists its own. A row shows the call id, the desk, the child
+run, the child's own dependency scope, the deadline and the call's phase. It never shows the
+request, the fields or the answer. The phase comes from durable rows only:
+
+- **Settled** (with its closure and code): the caller consumed the answer and the result is stored.
+- **Child running**, or **Child stalled** when the child's job is not progressing.
+- **Awaiting final review**: the child waits on the desk's final-reply review, linked to the
+  decision when the viewer may open it. A human decision step inside the child shows as **Child waiting (decision)** instead.
+- **Response ready**: the child succeeded and the caller has not resumed yet. **Child failed** or
+  **Child cancelled** likewise wait for the caller to resume.
+- **Awaiting the caller**, or **Caller stalled**: the call's wait completed and the caller has not
+  consumed the answer.
+- **Closed without a stored result**: the caller consumed a `revoked` answer, or the caller ended
+  first.
+
+A child run's page says which call it answers. The links follow the viewer's access: a child or
+caller the viewer cannot read is named without a link, a desk the viewer cannot see is "a desk", and
+the responder is shown only to viewers who may read the desk's response settings. The child's
+provenance names its own dependency scope, selected when the call launched; ordinary children keep
+the root's. The counter `workflow_channel_call_outcomes_total{outcome}` counts dispatch
+observations (`launched`, `done`, `denied`, `handed_off`, `no_reply`, `refused`, `error`). It is a
+rate signal; find stuck calls from the gauges and phases.
+
+**Samples.** A sample may script `channel.call`. List the desks it may reach under the sample's
+call targets, at most 10. Capture freezes each desk's launch facts, responder, final-review
+setting, intake and result fields, and needs the author to be able to read the desk's response
+settings (otherwise the desk is not found). So a sample may target a members-only desk the author
+can manage, although the agent's list shows only public desks. The simulated call runs launch's
+checks over the frozen facts. A call refused at launch answers its typed error or `denied` closure,
+with no scripted output. For a desk with final review, the script sets `approval`: `true` returns
+the scripted answer and `false` returns `channel_call.review_rejected`. Otherwise the scripted
+`output` is the answer: a `done`, `handed_off`, `denied` or `no_reply` closure whose `fields` match
+the responder's declared result fields, or any object when it declares none. The report labels it
+"Simulated call result (author fixture)". A missing desk, review or answer stops the sample with
+`channel_call.sample_target_undeclared`, `channel_call.sample_review_undeclared` or
+`channel_call.sample_result_undeclared`. A sample does not simulate the call cycle check,
+destination admission and audience rules, the caller's level release, the tree's continuation
+limit, the desk unit's spend cap, the responder's workflow, or revocation at consumption.
+
+These checks run when a call launches and when its result is consumed. Startup does not validate
+grants, desks or responders.
 
 ## Agent memory tools
 

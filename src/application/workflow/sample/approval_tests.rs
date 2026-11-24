@@ -21,6 +21,7 @@ fn protected_request(
         ),
     ]);
     request.scripts[0].responses[0].tools = vec![ScriptedToolCall {
+        approval: None,
         name: name(tool.binding.alias.as_str()),
         input: json!({}),
         output,

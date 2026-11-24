@@ -1,0 +1,3 @@
+runtime boundary gate regression tests passed
+transport boundary check passed
+exit 0

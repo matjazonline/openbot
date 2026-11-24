@@ -136,8 +136,8 @@ async fn channel_reply_intent_schema_cross_tenant_links_and_duplicate_decisions_
         .execute(f.p.pool())
         .await
         .unwrap();
-    assert!(sqlx::query("INSERT INTO channel_reply_decisions(company_id,run_id,execution_id,intent_id,disposition,proposal_id,integrity,state) \
-        SELECT $3,run_id,execution_id,intent_id,disposition,proposal_id,integrity,state FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
+    assert!(sqlx::query("INSERT INTO channel_reply_decisions(company_id,run_id,execution_id,owner_id,disposition,proposal_id,integrity,state) \
+        SELECT $3,run_id,execution_id,owner_id,disposition,proposal_id,integrity,state FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
         .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).bind(other.target.company.as_uuid()).execute(f.p.pool()).await.is_err());
     assert!(sqlx::query("INSERT INTO channel_reply_decisions SELECT * FROM channel_reply_decisions WHERE company_id=$1 AND run_id=$2")
         .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).execute(f.p.pool()).await.is_err());
@@ -148,7 +148,7 @@ async fn channel_reply_intent_schema_cross_tenant_links_and_duplicate_decisions_
 async fn channel_reply_intent_schema_queued_root_cannot_forge_a_suppressed_decision() {
     let f = FinalFixture::new("data.map", false).await;
     let mut tx = f.p.pool().begin().await.unwrap();
-    sqlx::query("INSERT INTO channel_reply_decisions(company_id,run_id,execution_id,intent_id,disposition,state) VALUES($1,$2,$3,$4,'suppressed','suppressed')")
+    sqlx::query("INSERT INTO channel_reply_decisions(company_id,run_id,execution_id,owner_id,disposition,state) VALUES($1,$2,$3,$4,'suppressed','suppressed')")
         .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).bind(f.scope.execution.as_uuid()).bind(f.intent).execute(&mut *tx).await.unwrap();
     assert!(tx.commit().await.is_err());
     assert_eq!(f.state().await["decision"], Value::Null);

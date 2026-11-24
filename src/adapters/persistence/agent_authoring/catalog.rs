@@ -275,6 +275,8 @@ pub(super) fn builtins(memory_enabled: bool) -> AppResult<AgentToolPage> {
         AgentBuiltinTool::SearchKnowledge,
         AgentBuiltinTool::ReadEscalation,
         AgentBuiltinTool::RespondToEscalation,
+        // Opt-in for every agent; never granted automatically (gate AWC-P05-D1 D1).
+        AgentBuiltinTool::ChannelCall,
     ]
     .into_iter()
     .chain(memory.into_iter().filter(|_| memory_enabled))
@@ -301,6 +303,20 @@ fn page(items: Vec<AgentToolOption>, more: bool) -> AgentToolPage {
 #[cfg(test)]
 mod memory_tests {
     use super::*;
+
+    /// C1 (gate AWC-P05-D1 D1): `channel.call` is offered to every agent, memory or not; being
+    /// offered grants nothing.
+    #[test]
+    fn channel_call_authoring_catalogue_offers_opt_in() {
+        for enabled in [false, true] {
+            let page = builtins(enabled).unwrap();
+            assert!(page.items.iter().any(|item| item.choice
+                == AgentToolChoice::Builtin {
+                    tool: AgentBuiltinTool::ChannelCall
+                }
+                && item.name.as_str() == "channel.call"));
+        }
+    }
 
     /// The memory tools are offered only while the company has memory enabled (E5).
     #[test]

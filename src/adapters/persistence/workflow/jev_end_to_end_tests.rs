@@ -85,6 +85,8 @@ async fn assert_history(f: &Fixture, run: RunId, step_name: &str, output: &Value
     assert_eq!(view.model_calls[0].provider, "typesafe");
     let html = pages::run_step_body(&pages::StepBodyView {
         company_id: f.target.company.as_uuid(),
+        run: Uuid::new_v4(),
+        calls: &Default::default(),
         step: &view,
     });
     assert!(html.contains("typesafe") && html.contains("jev-1.14.0"));

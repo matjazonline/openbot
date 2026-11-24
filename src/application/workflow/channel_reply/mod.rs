@@ -1,6 +1,7 @@
 //! Channel response contracts. A frozen ingress snapshot is eligibility data;
 //! only its admitted root run owns an automatic final response.
 mod approval;
+mod closure;
 mod contract;
 pub mod examples;
 mod finalization;
@@ -16,6 +17,7 @@ pub use publisher::ChannelReplyPublisher;
 #[cfg(test)]
 mod origin_tests;
 pub use approval::{ReplyApprovalPolicy, ReplyReviewTimeout};
+pub use closure::{ReplyClosure, denial, handed_off_run};
 pub use contract::{ChannelReplyContract, ReplyReference, ReplyText};
 
 use super::WorkflowActor;

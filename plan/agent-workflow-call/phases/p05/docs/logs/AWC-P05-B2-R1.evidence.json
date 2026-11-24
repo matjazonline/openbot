@@ -1,0 +1,170 @@
+{
+ "version": 1,
+ "round": "AWC-P05-B2-R1",
+ "artifact": "24b290b23293e66b2e534d4dfbd2546ffd6f9fa180917d8859313890f48e9da4",
+ "checks": [
+  {
+   "criteria": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "F8",
+    "F9",
+    "affected"
+   ],
+   "command": "cargo test --offline --locked --lib -- channel_call sample workflows::ui::runs metrics run_view knowledge_view provenance autonomous_agent mcp_agent (run1: 399 passed, 1 failed metrics gauge count before its expectation update)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b2-affected-run1.txt",
+     "sha256": "4286d409301b6cc4c399f46956bb918c385e1e299becf8671ac3c99a5374b83e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "F8",
+    "F9",
+    "affected"
+   ],
+   "command": "cargo test --offline --locked --lib -- channel_call sample workflows::ui::runs metrics run_view knowledge_view provenance autonomous_agent mcp_agent (run2: 400 passed, 1 ignored)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-affected-run2.txt",
+     "sha256": "684f391cb6fd34eae07a718a7022caef9a50d414667ff63ed5537fc5b2b0b965"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget"
+   ],
+   "command": "scripts/stack-budget.sh --offline -- channel_call sample workflows::ui::runs metrics (215 passed)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-stack-budget.txt",
+     "sha256": "bdb06cb2c56b9a3d68f83f9c60354a3c75748e6d11254d33f5a774a6571d558e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0)",
+   "fixture": "toolchain 1.95.0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-clippy.txt",
+     "sha256": "bda558f72ae238939a16e2dd11b02b8834ae1881df02b50029575fc4e18899ad"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt"
+   ],
+   "command": "cargo fmt --check (exit 0)",
+   "fixture": "stable rustfmt",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "css"
+   ],
+   "command": "bash scripts/check-css.sh (exit 0, no asset change)",
+   "fixture": "node, tailwind/daisyUI from package lock",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-css.txt",
+     "sha256": "aa06b6fbcb83cbb41891a797a77e764cc35e6919c279711beb646e1962c95289"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets (exit 0)",
+   "fixture": "DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-sqlx.txt",
+     "sha256": "96a5a777ae22af5a46c041889e5354dc7c956c445e81e2a51d52762599ebaa08"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "source-modules"
+   ],
+   "command": "cargo test --offline --locked --test source_modules (8 passed)",
+   "fixture": "none",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-source-modules.txt",
+     "sha256": "e435a9a7ba29aebdc7e1d6a33dc39d4bacbb68735099fcbe1ed8b54ede403979"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "V11"
+   ],
+   "command": "python3 scripts/workflow-sample-boundary.py (passed; negative copy naming ChannelCallDispatch failed as expected, recorded in TASK)",
+   "fixture": "source tree",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-boundary.txt",
+     "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "V10",
+    "V2"
+   ],
+   "command": "node --test scripts/tests/workflow-runs.mjs scripts/tests/workflow-samples.mjs scripts/tests/channel-response-authoring.mjs scripts/tests/workflow-run-calls.mjs (18/18) with WORKFLOW_CALLS_BROWSER_FIXTURES from channel_call_views_section_draws_only_authorized_references",
+   "fixture": "playwright chromium; fixtures in the session scratchpad",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-browser.txt",
+     "sha256": "81b1078cf183bf62dc0a39cb5d1c3c3ae1ce49fa2f8666b7295ef0e65b72c624"
+    }
+   ]
+  }
+ ]
+}

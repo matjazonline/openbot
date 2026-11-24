@@ -108,6 +108,7 @@ impl ConfiguredBinding {
                 "A message trigger needs a channel or thread association",
             ));
         }
+        self.check_call_fields()?;
         self.bundle
             .compiled()
             .validate_input(&MessageTriggerInput::representative())
@@ -120,6 +121,54 @@ impl ConfiguredBinding {
                      (source_message, message, subject, sender)",
                 )
             })
+    }
+
+    /// A responder's declared intake and result fields (agent-workflow-call 01 C.1–C.2). Only a
+    /// message-triggered binding gives `fields` this meaning, so the bound applies here rather
+    /// than to every published version.
+    fn check_call_fields(&self) -> Result<(), compiler::Diagnostic> {
+        use super::channel_call::{check_fields_schema, declared_fields, fields_required};
+        let definition = self.bundle.compiled().graph().definition();
+        if fields_required(definition.input_schema.as_ref()) {
+            return Err(configuration_error(
+                &self.bundle,
+                "binding.intake_fields_must_be_optional",
+                "/input_schema/required",
+                "A desk's intake fields must be optional, because mail cannot supply them",
+            ));
+        }
+        struct Declared<'a> {
+            schema: Option<&'a Value>,
+            root: &'static str,
+            code: &'static str,
+        }
+        for declared in [
+            Declared {
+                schema: declared_fields(definition.input_schema.as_ref()),
+                root: "/input_schema/properties/fields",
+                code: "binding.intake_fields_invalid",
+            },
+            Declared {
+                schema: declared_fields(definition.output_schema.as_ref()),
+                root: "/output_schema/properties/fields",
+                code: "binding.result_fields_invalid",
+            },
+        ] {
+            let Some(schema) = declared.schema else {
+                continue;
+            };
+            if let Err((path, why)) = check_fields_schema(schema) {
+                let (root, code) = (declared.root, declared.code);
+                let path = format!("{root}{path}");
+                return Err(configuration_error(
+                    &self.bundle,
+                    code,
+                    &path,
+                    &format!("The field schema at {path} {why}"),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Recheck every selected resource against current trusted directory facts.

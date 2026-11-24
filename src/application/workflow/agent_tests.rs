@@ -88,7 +88,10 @@ fn doop_agent_mcp_error_policy_is_frozen_in_preparation_and_checkpoint_identity(
     .unwrap();
     let observe_spec = observe.spec(fence()).unwrap();
     let strict_spec = strict.spec(fence()).unwrap();
-    assert_eq!(strict_spec.prepared["version"], 8);
+    assert_eq!(
+        strict_spec.prepared["version"],
+        crate::application::workflow::agent::PREPARED_AGENT_VERSION
+    );
     assert_eq!(strict_spec.prepared["mcp_error_policy"], "fail_step");
     assert_eq!(observe_spec.prepared["mcp_error_policy"], "observe");
     assert_ne!(

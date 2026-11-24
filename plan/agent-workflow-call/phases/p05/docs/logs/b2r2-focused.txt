@@ -1,0 +1,51 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 00s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 38 tests
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_reports_a_cut_option_list ... ok
+test adapters::http::pages::workflow_runs::calls::tests::channel_call_views_section_draws_only_authorized_references ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_sends_no_wake_up_for_a_hidden_channel ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_refuses_plain_members_and_other_tenants ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_moves_a_finished_run_out_of_the_window_on_a_later_read ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_cut_column_links_to_the_list_with_its_scope ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_escapes_a_hostile_workflow_title ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_reconciles_a_change_before_subscribing_on_the_first_resync ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_refuses_another_tenants_ids ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_shows_six_columns_in_order_with_their_totals ... ok
+test adapters::http::routes::workflows::ui::runs::tests::every_runs_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_accepted_action_shows_its_receipt_and_cancel_names_it ... ok
+test adapters::http::routes::workflows::ui::runs::tests::a_run_with_a_child_shows_its_lineage_steps_and_controls_through_the_parent ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::an_unfinished_step_of_an_ended_run_reads_as_stopped ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::knowledge_view_run_pane_drops_input_parameter_and_action_payloads ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_opens_the_pane_answers_its_region_and_leaves_the_list_alone ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::a_redraw_repeats_its_keys_until_the_command_shows_on_the_page ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::controls_act_at_the_revision_seen_and_say_what_they_did ... ok
+test adapters::http::routes::workflows::ui::runs::tests::department_views_runs_department_scope_is_company_scoped ... ok
+test adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities ... ok
+test application::workflow::channel_call_views::tests::channel_call_views_outcome_labels ... ok
+test application::workflow::channel_call_views::tests::channel_call_views_phase ... ok
+test application::workflow::channel_call_views::tests::channel_call_views_phase_named_cases ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::a_lagging_stream_asks_every_view_to_read_again ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_ticks_while_access_holds_and_ends_when_it_is_lost ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_wakes_with_resync_first_and_names_only_visible_runs ... ok
+test adapters::http::routes::workflows::ui::runs::tests::other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_escaped ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_sample_capture ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_caller_and_child ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_dependency_scope ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_foreign_scope ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_metrics ... ok
+test adapters::http::routes::workflows::ui::runs::tests::the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_children ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_views_db_tests::channel_call_views_review_vs_stalled ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 5133 filtered out; finished in 27.35s
+

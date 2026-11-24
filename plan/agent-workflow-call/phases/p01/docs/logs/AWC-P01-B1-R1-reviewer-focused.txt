@@ -1,0 +1,30 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 40.29s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 17 tests
+test application::workflow::channel_call::tests::channel_call_authority_child_ceiling_is_the_lowest_of_three ... ok
+test application::workflow::channel_call::tests::channel_call_authority_target_checks_run_in_order_behind_the_write_rule ... ok
+test application::workflow::channel_call::tests::channel_call_authority_request_above_the_ceiling_is_refused ... ok
+test application::workflow::channel_call::tests::channel_call_intake_declared_fields_and_required_rule ... ok
+test application::workflow::channel_call::tests::channel_call_contract_accepts_exactly_the_documented_fields ... ok
+test application::workflow::channel_call::tests::channel_call_contract_refuses_identity_spoofing_and_unknown_fields ... ok
+test application::workflow::channel_call::tests::channel_call_contract_deadline_must_fall_before_the_runs ... ok
+test application::workflow::channel_call::tests::channel_call_intake_call_becomes_the_childs_message_input ... ok
+test application::workflow::channel_call::tests::channel_call_contract_bounds_content_in_bytes_at_char_boundaries ... ok
+test application::workflow::channel_call::tests::channel_call_intake_schema_bound_accepts_the_documented_types ... ok
+test application::workflow::channel_call::tests::channel_call_intake_schema_bound_names_the_failing_path ... ok
+test application::workflow::channel_call::tests::channel_call_contract_built_in_snapshot_is_exact_and_its_name_reserved ... ok
+test application::workflow::channel_call::tests::channel_call_contract_denied_reason_is_cut_and_oversized_results_are_refused ... ok
+test application::workflow::binding::tests::channel_call_intake_activation_refuses_required_or_unbounded_fields ... ok
+test application::workflow::channel_call::tests::channel_call_intake_mail_input_has_no_fields_and_a_call_input_reaches_input_fields ... ok
+test application::workflow::channel_call::tests::channel_call_intake_call_fields_are_checked_against_the_captured_intake ... ok
+test application::workflow::channel_call::tests::channel_call_contract_every_result_matches_the_trusted_output_schema ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 5057 filtered out; finished in 0.10s
+

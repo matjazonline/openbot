@@ -148,6 +148,8 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
             "decision.rule" => ("data", json!(3)),
             "decision.human" => ("deadline", json!("bad")),
             "data.map" | "channel.no_reply" => ("value", json!(3)),
+            "channel.deny" => ("reason", json!(3)),
+            "channel.hand_off" => ("run_id", json!("not-a-run")),
             "data.url" => ("segments", json!(vec!["x"; 17])),
             "http.request" => ("method", json!("BOGUS")),
             "local_agent.run" => ("profile_id", json!(3)),

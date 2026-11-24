@@ -1,0 +1,19 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 35.35s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 5 tests
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_competing_resumers ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_trail_agent_caller_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_automatic_done ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_consumed_once ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_trail_reply_and_note ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 5140 filtered out; finished in 10.46s
+
+exit=0

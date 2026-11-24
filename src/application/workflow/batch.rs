@@ -72,7 +72,12 @@ pub struct PureCompletion {
 pub(crate) fn is_pure_kind(kind: &str) -> bool {
     matches!(
         kind,
-        "data.map" | "data.url" | "decision.rule" | "channel.no_reply"
+        "data.map"
+            | "data.url"
+            | "decision.rule"
+            | "channel.no_reply"
+            | "channel.deny"
+            | "channel.hand_off"
     )
 }
 
@@ -110,6 +115,20 @@ pub fn execute_pure(
             activation.inputs.get("value").ok_or_else(invalid)?.clone(),
             RouteSelection::Success,
         ),
+        // The step's typed output, exactly as its contract validates it (AWC-P04-D1 D2).
+        "channel.deny" | "channel.hand_off" => (
+            Value::Object(
+                activation
+                    .inputs
+                    .as_object()
+                    .ok_or_else(invalid)?
+                    .iter()
+                    .filter(|(field, _)| ["reason", "fields", "run_id"].contains(&field.as_str()))
+                    .map(|(field, value)| (field.clone(), value.clone()))
+                    .collect(),
+            ),
+            RouteSelection::Success,
+        ),
         "decision.rule" => {
             let choice = activation.choice.clone().ok_or_else(invalid)?;
             let data = activation.inputs.get("data").ok_or_else(invalid)?;
@@ -139,7 +158,15 @@ pub(super) fn validate_completion(
     let target = select_route(compiled.graph(), &activation.step, &route)
         .map_err(|_| invalid())?
         .clone();
-    if target == TransitionTarget::End {
+    // A deny or hand-off ends the run with its own typed output, not a business output: the
+    // workflow's output schema describes `done` answers only (AWC-P04-D1 r2 D2, D2a).
+    let response_step = matches!(
+        compiled.graph().definition().steps[&activation.step]
+            .step_type
+            .as_str(),
+        "channel.deny" | "channel.hand_off"
+    );
+    if target == TransitionTarget::End && !response_step {
         compiled
             .validate_output(&output)
             .map_err(|e| AppError::BadRequest(e.message.into()))?;

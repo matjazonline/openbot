@@ -176,6 +176,22 @@ impl MessageActionPreparation for PostgresPersistence {
         };
         let message_kind = MessageKind::parse(&kind.0).ok_or_else(missing)?;
         let mut tx = begin_http(self).await?;
+        // A call's requester is an agent, which cannot answer a question: refuse before any
+        // route, intent or wait exists (AWC-P04-D1 r2 D8). This holds for the whole call
+        // subtree: a static child of the call child would otherwise ask the tree's root
+        // correspondent, across the call boundary (AWC-P04-B1-F3).
+        if message_kind == MessageKind::Ask {
+            let answers_call = super::channel_call_source::enclosing_call_source_on(
+                &mut tx,
+                scope.company,
+                scope.run,
+            )
+            .await?
+            .is_some();
+            if answers_call {
+                return Err(AppError::InteractiveUnsupported);
+            }
+        }
         let facts = facts(&mut tx, scope).await?;
         let mut inputs = frozen_inputs(&mut tx, &facts, claim, kind).await?;
         let question_approval =

@@ -89,6 +89,25 @@ impl Schema {
         local_constraints(&self.raw, &self.raw)
     }
 
+    /// Every failing instance path, in validation order and at most `limit` of them; empty when
+    /// the value is valid. The root is `""`.
+    pub fn failing_paths(&self, value: &Value, limit: usize) -> Vec<String> {
+        let mut paths = Vec::new();
+        if limit == 0 {
+            return paths;
+        }
+        for error in self.validator.iter_errors(value) {
+            let path = error.instance_path.to_string();
+            if !paths.contains(&path) {
+                paths.push(path);
+            }
+            if paths.len() == limit {
+                break;
+            }
+        }
+        paths
+    }
+
     pub fn object_possible(&self) -> bool {
         self.root_constraints().iter().all(|schema| {
             !known_empty(schema, &self.raw, 0, &mut BTreeSet::new())

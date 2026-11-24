@@ -141,6 +141,7 @@ impl Session {
             kind: effect_kind,
             input: activation.inputs.clone(),
             output,
+            label: None,
         })?;
         Ok(completion)
     }

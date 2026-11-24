@@ -323,3 +323,38 @@ pub(super) async fn workflow_tool_on(
         ToolCallOrigin::ChannelFinal(_) => Err(missing()),
     }
 }
+
+/// The `channel.call` origin the agent runtime claims, proven like a workflow tool's agent arm
+/// (gate AWC-P03-D1 r2 D1 step 4): the run's manifest selects the agent, the claimed binding is
+/// its trusted built-in `channel.call`, and the harness saved this call with these arguments.
+pub(super) async fn channel_call_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    actor: WorkflowActor,
+    bundle: &PublishedBundle,
+    origin: AgentToolOrigin,
+    call: crate::domain::workflow::ToolCallId,
+    arguments: &Value,
+) -> AppResult<ResolvedAgent> {
+    let selection = selected_on(db, scope, actor, bundle, origin).await?;
+    let tool = selection
+        .tools()
+        .iter()
+        .find(|tool| tool.binding.id == origin.binding)
+        .ok_or_else(missing)?;
+    let snapshot = agent_action_snapshot(scope.company, tool)?;
+    if !crate::application::workflow::channel_call::is_trusted_channel_call_snapshot(&snapshot)? {
+        return Err(missing());
+    }
+    let declared = AgentModelToolName::for_alias(&tool.binding.alias)?;
+    saved_call_on(
+        db,
+        scope,
+        origin,
+        &declared,
+        &ModelToolCallId::parse(call.as_uuid().to_string()).map_err(|_| invalid())?,
+        arguments,
+    )
+    .await?;
+    Ok(selection)
+}

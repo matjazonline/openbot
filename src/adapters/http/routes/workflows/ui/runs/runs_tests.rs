@@ -314,14 +314,14 @@ fn pane_links_without_sync(html: &str) -> (usize, usize) {
 }
 
 /// A page answer's HTML.
-async fn text(answer: AppResult<Response>) -> AppResult<String> {
+pub(super) async fn text(answer: AppResult<Response>) -> AppResult<String> {
     let bytes = axum::body::to_bytes(answer?.into_body(), 8 << 20)
         .await
         .unwrap();
     Ok(String::from_utf8(bytes.to_vec()).unwrap())
 }
 
-fn pane_query(company_id: Uuid, part: Option<PanePart>) -> Query<PaneQuery> {
+pub(super) fn pane_query(company_id: Uuid, part: Option<PanePart>) -> Query<PaneQuery> {
     Query(PaneQuery {
         company_id,
         part,
@@ -330,7 +330,7 @@ fn pane_query(company_id: Uuid, part: Option<PanePart>) -> Query<PaneQuery> {
 }
 
 /// The runs UI for `user` over `persistence` and its engine.
-fn ui_over(persistence: &PostgresPersistence, engine: &Engine, user: Uuid) -> Ui {
+pub(super) fn ui_over(persistence: &PostgresPersistence, engine: &Engine, user: Uuid) -> Ui {
     let shared = Arc::new(persistence.clone());
     let reads = super::super::test_reads(persistence);
     Ui {

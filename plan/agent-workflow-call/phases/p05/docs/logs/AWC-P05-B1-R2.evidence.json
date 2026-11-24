@@ -1,0 +1,168 @@
+{
+ "version": 1,
+ "round": "AWC-P05-B1-R2",
+ "artifact": "22fdcacd89aa94c2b7d60e432a336910df017210e970d3eb0ba0abd471ecba13",
+ "checks": [
+  {
+   "criteria": [
+    "F1",
+    "F2",
+    "C1",
+    "C2",
+    "C3",
+    "C3a",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "channel_call_authoring_",
+    "doop_agent_"
+   ],
+   "command": "cargo test --offline --lib -- channel_call_authoring_ doop_agent_ agent_history_preparation agent_history_contract (46 passed, 1 failed: known doop_agent_current_preparation_reaches_ready_before_model_io asserts version 7)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b1r2-focused.txt",
+     "sha256": "e0f4d70b5a126292ad68cc35aaa0a69af85a498ef50d8a0831a277a366622327"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget",
+    "F1",
+    "F2"
+   ],
+   "command": "scripts/stack-budget.sh --offline -- channel_call_authoring_ doop_agent_mcp_error_policy agent_history_contract_preparation (17 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1r2-stack-budget.txt",
+     "sha256": "4601b4b1f6d0d5bdafa9d1d80154dd2969c5429649cc220863db5ce639ff5133"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0)",
+   "fixture": "toolchain 1.95.0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1r2-clippy.txt",
+     "sha256": "e6d581857482236677a4a2c62ee33eb6e3249686a1d7821a2f3c990730395e21"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt"
+   ],
+   "command": "cargo fmt --check (exit 0)",
+   "fixture": "toolchain stable",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1r2-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C9",
+    "R1-reused"
+   ],
+   "command": "R1 affected suites, unchanged non-test code since R1 (802 passed, 1 known failure)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b1-affected-run2.full.txt",
+     "sha256": "471f9b9320439d62adede51f7925e9b79a22bcebce2dd62fe1736b498b306015"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget",
+    "R1-reused"
+   ],
+   "command": "R1 stack budget channel_call_ channel_reply_ agent_history workflow_tool (596 passed, 1 known failure)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b1-stack-budget.txt",
+     "sha256": "0314b756ebd84bdb95306d1195e2c492e87576bde80fe9cfd2cb7a72c997bcef"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C7",
+    "browser",
+    "R1-reused"
+   ],
+   "command": "node --test scripts/tests/channel-response-authoring.mjs (2 passed; unchanged since R1)",
+   "fixture": "Playwright chromium",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-browser.txt",
+     "sha256": "601ec9d1e989fc7de6e6240d066a5d33debc8d1c11102ffd8058ce442dfe76ae"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "css",
+    "R1-reused"
+   ],
+   "command": "bash scripts/check-css.sh (unchanged since R1)",
+   "fixture": "tailwindcss",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-css.txt",
+     "sha256": "f0da2835335f26bfb99ef0b08c227b321862aa8ee519827b34b49ffec42074c2"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-offline",
+    "R1-reused"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets (no SQL changed since R1)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-sqlx.txt",
+     "sha256": "b943ea41c0c08ae0d6a6b5f0b66d6b2771e8c8f048118e432bb2764e821df1f7"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "source_modules",
+    "R1-reused"
+   ],
+   "command": "cargo test --offline --locked --test source_modules (8 passed; no module changes since R1)",
+   "fixture": "toolchain stable",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-source-modules.txt",
+     "sha256": "6e0e3d1485f32e6834beac3e9bf7a26e2035bcebdbbbef427b7b68e17cfafe3b"
+    }
+   ]
+  }
+ ]
+}

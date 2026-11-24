@@ -1,0 +1,26 @@
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (820.316167ms)
+✔ calls-from-agents block offers the desk id read-only, reachable by keyboard, and copyable with or without the clipboard API (394.500583ms)
+✔ a call lists its phase, review link and deadline, and a restricted viewer gets labels only (801.150417ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (1735.362583ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (947.598542ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (660.949459ms)
+✔ board: two window reads completing out of order show the later choice (582.255625ms)
+✔ board: opening a run while a filter read is in flight keeps the chosen filters (1383.8415ms)
+✔ list: a wake-up during a filter read reads the new filter instead of undoing it (930.798834ms)
+✔ board: a filter change while a wake-up read is in flight wins (620.591583ms)
+✔ board: a burst of run events reads at most once per two seconds and shows the final state (7184.070583ms)
+✔ board: constant change still reads every two seconds and never starves (10891.584958ms)
+✔ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1351.199083ms)
+✔ board: reads slower than the interval never overlap and keep landing under constant change (12260.072625ms)
+✔ board: a run change during a filter read is read again after it, on the new leaf (5794.527541ms)
+✔ board: two quick filter changes do not leave the coalescer waiting for ever (2879.157041ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (1320.100584ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (191.542167ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47560.337167

@@ -243,3 +243,43 @@ fn channel_reply_authoring_custom_end_requires_terminal_no_reply() {
     assert_eq!(source["steps"]["silence"]["routes"]["success"], "$end");
     assert!(source["steps"].get("finish_response").is_none());
 }
+
+/// C8: every terminal response step may end the native response as its last custom step; the
+/// base adds no finishing projection after it, and any other custom end is still refused.
+#[test]
+fn channel_call_authoring_template_accepts_response_ends() {
+    for (kind, with) in [
+        (
+            "channel.deny",
+            json!({"reason":{"literal":"This desk does not handle refunds"}}),
+        ),
+        (
+            "channel.hand_off",
+            json!({"run_id":{"literal":"00000000-0000-0000-0000-000000000007"}}),
+        ),
+    ] {
+        let end = step(
+            json!({"id":"settle","slot":"after_reply","type":kind,"with":with,
+            "routes":{"success":"$end"}}),
+        );
+        let source = plain(&composed(&AgentWorkflow::base().with_steps(vec![end])));
+        assert_eq!(source["steps"]["settle"]["type"], kind);
+        assert_eq!(source["steps"]["settle"]["routes"]["success"], "$end");
+        assert!(source["steps"].get("finish_response").is_none(), "{kind}");
+    }
+    let mut custom = classify();
+    custom
+        .definition
+        .insert("routes".into(), json!({"success":"$end"}));
+    let error = AgentWorkflow::base()
+        .with_steps(vec![custom])
+        .compose(&WorkflowSourceDecoder, AGENT_BASE_SOURCE)
+        .unwrap_err();
+    for label in [
+        "Finish without reply",
+        "Deny request",
+        "Hand off to another run",
+    ] {
+        assert!(error.message.contains(label), "{}", error.message);
+    }
+}

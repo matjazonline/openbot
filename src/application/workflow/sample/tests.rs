@@ -4,6 +4,8 @@ use crate::application::workflow::{fixtures::Fixture, publication::*, registry};
 use crate::domain::workflow::{CompanyId, TypeName, VersionId};
 use serde_json::json;
 
+#[path = "channel_call_sample_tests.rs"]
+mod channel_call_sample_tests;
 #[path = "channel_reply_preview_tests.rs"]
 mod channel_reply_preview_tests;
 #[path = "channel_reply_terminal_tests.rs"]
@@ -165,6 +167,7 @@ fn request(scripts: Vec<StepScript>) -> SampleRequest {
     SampleRequest {
         response_contract: None,
         response_approval_policy: None,
+        call_targets: vec![],
         agents: vec![],
         input: json!({}),
         params: json!({}),
@@ -342,6 +345,7 @@ fn bounded_root_budget_and_external_kinds_never_fall_back() {
     let bundle = build(&raw, facts, vec![]);
     let mut req = request(vec![script(1, "start", vec![json!("done")])]);
     req.scripts[0].responses[0].tools = vec![ScriptedToolCall {
+        approval: None,
         name: name("knowledge.search"),
         input: json!({"query":"q"}),
         output: Some(json!([])),
@@ -393,6 +397,7 @@ fn descendants_cannot_replenish_root_budgets_and_report_size_is_bounded() {
         SampleRequest {
             response_contract: None,
             response_approval_policy: None,
+            call_targets: vec![],
             input: json!({"value":"x".repeat(8192)}),
             ..request(vec![])
         },

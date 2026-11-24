@@ -1,12 +1,14 @@
 # Plan coordination: 08-goals
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan08_ph1/plan/08-goals/COORDINATION.md
-- Writer: Claude Code session `plan08-ph1-51` (root/A of p02) in `/Users/mac02/orca/workspaces/openbot/plan08_ph1`. Ownership handoff 2026-11-21: previous writer /root session 01a1e095 (p01) stopped after its handoff; the user authorized continuing with p02 in this session.
-- Revision: 3
+- Writer: Claude Code session `1e84a7af` in `/Users/mac02/orca/workspaces/openbot/plan08_ph1`. Ownership handoff 2026-11-22: previous writer `plan08-ph1-51` (p02) finished and is idle; the user asked this session to continue plan 08. Earlier: /root session 01a1e095 (p01) to `plan08-ph1-51` on 2026-11-21.
+- Revision: 6
 
 ## Plan-wide instructions
 
 No additional instructions. Original plan documents and repository instructions apply. r3: p01 accepted and committed (`6c63f292`); origin/main with plans 04–07 merged at `73afd5a7`. p02 authorized 2026-11-21. User confirmed README proposals 2 (sponsor decider manages) and 3 (archive refuses open work) on 2026-11-21.
+
+r4 (2026-11-22): p02 accepted in phase and committed (`fe7791d3`), not integrated. p03 is blocked on `channel.call`, which no branch implements. The user chose to implement [agent-workflow-call](../agent-workflow-call/README.md) first, on this branch, then return to p03 (notice 08G-C001). README proposals 4 and 5 are still open and must be settled before p03 starts.
 
 ## Phase directory
 
@@ -17,4 +19,24 @@ No additional instructions. Original plan documents and repository instructions 
 
 ## Cross-phase notices
 
-None. No other phase is being implemented or assigned. Plan 02 is now present in integrated baseline `8fdb892b6e279ed0c09150e2336bbdc7462f877d`; previous prerequisite blocker resolved by externally updated task branch. No source integration performed by this phase.
+### 08G-C001 / r2
+- State: active (r2 2026-11-22: adds the consequences of agent-workflow-call gate AWC-P01-D1 r3)
+- Origin: coordination r4, user direction 2026-11-22
+- Targets: p03, p04
+- Instruction/change: p03 does not start until agent-workflow-call is accepted through its p06 (`plan/agent-workflow-call/COORDINATION.md`). That plan's gate AWC-P01-D1 decides that a call's child runs the destination binding as configured, with its own `run_as`; p03's trail and budget work builds on that. agent-workflow-call implements the call clause of 02B item 3 (an archived destination returns a `denied` closure with code `unit.archived`), which p02 left NOT EXERCISED. r2 consequences for p03: (a) until plan 11 supplies an allowance, a call's child reads public data only and a caller holding anything above level 0 cannot call (user, 2026-11-22); (b) a `denied` closure produced before launch (archived unit, unit spend cap, no responder) leaves no rows, so 03D's closure rollup counts only closures of launched calls unless p03 adds a record; (c) agent-workflow-call p03 extends p02's cancel-and-archive to cancel open call children on the archived desks, and will publish a notice here when it does.
+- Dependencies/order: blocks p03 entirely.
+- Evidence/review: none yet
+- Verification: p03 startup records agent-workflow-call's p06 acceptance identity.
+- Responses: p03 -> pending (r2)
+
+### 08G-C002 / r1
+- State: active (r6 2026-11-23)
+- Origin: agent-workflow-call p03 (gate `plan/agent-workflow-call/phases/p03/docs/logs/AWC-P03-D1-r1-decision.md` D6, accepted under AWC-P03-B1-R1-N1); required by agent-workflow-call notice AWC-C001 r4
+- Targets: p03, and any phase that changes cancel-and-archive (`department/archive.rs::archive_department_on`)
+- Instruction/change: p02's cancel-and-archive now also cancels recorded channel-call children (`workflow_channel_calls.child_run_id`) that run on the archived subtree's desks and whose caller's desk is outside the subtree (or absent). Roots are cancelled first, then those children; one `MAX_ARCHIVE_CANCELLATIONS` bound counts both. A cancelled call child wakes its caller, which receives `workflow.child_cancelled`. A caller on the subtree is cancelled with its own tree. Before this change an open call child made the archive non-cancellable.
+- Dependencies/order: in effect on branch `plan08_ph1` (uncommitted with agent-workflow-call p01–p03).
+- Evidence/review: `channel_call_resume_archive_cancels_call_child`; `unit_archive_` suite passing (agent-workflow-call `phases/p03/docs/logs/AWC-P03-B1-affected.txt`).
+- Verification: p03 keeps `channel_call_resume_archive_cancels_call_child` and the `unit_archive_` suite green.
+- Responses: p03 -> pending
+
+Earlier entries: No other phase is being implemented or assigned. Plan 02 is now present in integrated baseline `8fdb892b6e279ed0c09150e2336bbdc7462f877d`; previous prerequisite blocker resolved by externally updated task branch. No source integration performed by this phase.

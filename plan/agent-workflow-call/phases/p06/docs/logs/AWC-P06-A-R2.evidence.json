@@ -1,0 +1,102 @@
+{
+ "version": 1,
+ "round": "AWC-P06-A-R2",
+ "artifact": "c7fba3400cd27117204379ea11848105f5d96846018aa35d3b27a3bef9d97431",
+ "checks": [
+  {
+   "criteria": [
+    "G1",
+    "G2",
+    "G2-parent-suppression",
+    "G3-cycles",
+    "G4",
+    "G5",
+    "G6-pinning",
+    "G7-targets",
+    "G8"
+   ],
+   "command": "cargo test --offline --locked --lib -- channel_call_ (120 passed)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/a2-channel-call-tests.txt",
+     "sha256": "e8ab4dfa8770c5b668efb3c8764b619da5b4ba3b99ccd70e20a651c3a68edaac"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget"
+   ],
+   "command": "bash scripts/stack-budget.sh --offline -- channel_call_ (120 passed at stock 2 MiB)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/a2-stack-budget.txt",
+     "sha256": "6c446b046b7f03405a3fc8d32417fdc2bfedc05f0f61d8cb300b7fa76185b562"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "clippy",
+    "fmt"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0); cargo fmt --check (exit 0)",
+   "fixture": "no database",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/a2-clippy.txt",
+     "sha256": "4d9f64ea571bddfd698228c1c21d37f67c514ecc90452cd0894f523a0422f206"
+    },
+    {
+     "path": "logs/a2-fmt-check.txt",
+     "sha256": "e38302aef01b329ec6de7dbdcd03361300700f9cae380d6b90b871d975b748bf"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "G3-poison-wakeup"
+   ],
+   "command": "none (disposition, see TASK.md 'AWC-P06-A-R1 corrections')",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "no test poisons a call wait's wakeup; shared wait poll, malformed answers settle once (channel_call_resume_outcomes)",
+   "files": []
+  },
+  {
+   "criteria": [
+    "G3-depth-bound"
+   ],
+   "command": "none (disposition, see TASK.md 'AWC-P06-A-R1 corrections')",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "MAX_ANCESTRY=1000 fail-closed cap needs a forged 1000-run chain; tree limit tested at launch",
+   "files": []
+  },
+  {
+   "criteria": [
+    "G6-skill-resource-capture"
+   ],
+   "command": "none (disposition, see TASK.md 'AWC-P06-A-R1 corrections')",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "no call test holds a skill/resource; manifest capture is the kind-independent autonomous_agent_storage_manifest_ contract (final gate)",
+   "files": []
+  },
+  {
+   "criteria": [
+    "G7-resource-revocation"
+   ],
+   "command": "none (disposition, see TASK.md 'AWC-P06-A-R1 corrections')",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "no call test holds a resource; refused child admission leaves no rows (channel_call_launch_refusal_leaves_no_thread_or_message)",
+   "files": []
+  }
+ ]
+}

@@ -2,11 +2,30 @@ use super::*;
 use crate::application::workflow::history::{KIND, MAX_HISTORY_ITEMS};
 
 pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) -> AppResult<()> {
-    let RelatedAssociation::Thread { target, thread_id } = command.association() else {
+    capture_for(
+        db,
+        command.company_id(),
+        command.proposed_run_id(),
+        command.association(),
+        command.binding(),
+    )
+    .await
+}
+
+/// The history a run of `binding` on `association` sees: its thread's messages at the run's
+/// ceiling, frozen at admission. A channel call's child captures its fresh thread the same way
+/// (gate AWC-P03-D1 r1 D2).
+pub(super) async fn capture_for(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    association: RelatedAssociation,
+    binding: &crate::application::workflow::binding::ConfiguredBinding,
+) -> AppResult<()> {
+    let RelatedAssociation::Thread { target, thread_id } = association else {
         return Ok(());
     };
-    if !command
-        .binding()
+    if !binding
         .bundle()
         .compiled()
         .graph()
@@ -40,7 +59,7 @@ pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) 
            INSERT INTO workflow_history_snapshots (company_id,run_id,eligible_count) \
            SELECT $1,$2,eligible FROM counts RETURNING 1 \
          ) SELECT (SELECT count(*) FROM stored_members)+(SELECT count(*) FROM stored_count)",
-    ).bind(command.company_id().as_uuid()).bind(command.proposed_run_id().as_uuid())
+    ).bind(company.as_uuid()).bind(run.as_uuid())
         .bind(target.desk_id()).bind(thread_id.as_uuid()).bind(MAX_HISTORY_ITEMS as i64).bind(target.principal_id().map(|id| id.as_uuid()))
         .execute(db).await?;
     Ok(())

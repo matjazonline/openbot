@@ -1,0 +1,155 @@
+{
+ "version": 1,
+ "round": "AWC-P05-B1-R1",
+ "artifact": "fb860437a159df93045d7975ed0b3c2a6cc104a9958c21edb4cf9559f5e0fdfd",
+ "checks": [
+  {
+   "criteria": [
+    "C1",
+    "C2",
+    "C3",
+    "C3a",
+    "C3b",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "channel_call_authoring_"
+   ],
+   "command": "cargo test --offline --lib -- channel_call_authoring_ (13 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (reset after the version-9 schema edits); DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-focused.txt",
+     "sha256": "d8032a53472b0cd8ade6bb477ec26f9283ba1f91ac5980e859e0a5cdc0c56414"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C9",
+    "channel_call_",
+    "channel_reply_",
+    "agent_history",
+    "exactness",
+    "agent_publication",
+    "agent_authoring",
+    "workflow_tool",
+    "provisioning",
+    "workflow_authoring",
+    "templates",
+    "registry"
+   ],
+   "command": "cargo test --offline --lib -- channel_call_ channel_reply_ agent_history exactness agent_publication agent_authoring workflow_tool provisioning workflow_authoring catalogue templates channel_response channel_settings registry (802 passed, 1 failed: known doop_agent_current_preparation_reaches_ready_before_model_io asserts version 7; run before the C1 DB test was added and the test-only fmt reflow)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (reset after the version-9 schema edits); DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b1-affected-run2.full.txt",
+     "sha256": "471f9b9320439d62adede51f7925e9b79a22bcebce2dd62fe1736b498b306015"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget"
+   ],
+   "command": "scripts/stack-budget.sh --offline -- channel_call_ channel_reply_ agent_history workflow_tool (no overflow; 596 passed, 1 failed: the same known doop test; script: unrelated to the stack budget)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (reset after the version-9 schema edits); DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b1-stack-budget.txt",
+     "sha256": "0314b756ebd84bdb95306d1195e2c492e87576bde80fe9cfd2cb7a72c997bcef"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C7",
+    "browser"
+   ],
+   "command": "node --test scripts/tests/channel-response-authoring.mjs (2 passed)",
+   "fixture": "Playwright chromium, local http server",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-browser.txt",
+     "sha256": "601ec9d1e989fc7de6e6240d066a5d33debc8d1c11102ffd8058ce442dfe76ae"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0)",
+   "fixture": "toolchain 1.95.0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-clippy.txt",
+     "sha256": "7e8f42aed61c3be2e2adb3d25aa483bc5ddc9c0637e134cf7e1633a2a4ee7b4c"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt"
+   ],
+   "command": "cargo fmt --check (exit 0)",
+   "fixture": "toolchain stable",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "css"
+   ],
+   "command": "bash scripts/check-css.sh (exit 0)",
+   "fixture": "node_modules tailwindcss",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-css.txt",
+     "sha256": "f0da2835335f26bfb99ef0b08c227b321862aa8ee519827b34b49ffec42074c2"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-offline"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets (exit 0)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (reset after the version-9 schema edits); DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-sqlx.txt",
+     "sha256": "b943ea41c0c08ae0d6a6b5f0b66d6b2771e8c8f048118e432bb2764e821df1f7"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "source_modules"
+   ],
+   "command": "cargo test --offline --locked --test source_modules (8 passed)",
+   "fixture": "toolchain stable",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b1-source-modules.txt",
+     "sha256": "6e0e3d1485f32e6834beac3e9bf7a26e2035bcebdbbbef427b7b68e17cfafe3b"
+    }
+   ]
+  }
+ ]
+}

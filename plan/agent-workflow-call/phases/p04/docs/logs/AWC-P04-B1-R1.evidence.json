@@ -1,0 +1,146 @@
+{
+ "version": 1,
+ "round": "AWC-P04-B1-R1",
+ "artifact": "555771ee2d824f5a556e08cf1b7e1746528a754fadb9e8daeb1020911b2b0a7c",
+ "checks": [
+  {
+   "criteria": [
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "A5",
+    "A6",
+    "A7",
+    "A8",
+    "A9",
+    "A10",
+    "A11",
+    "B1",
+    "B2",
+    "B2a",
+    "B3",
+    "B4",
+    "B5",
+    "D7-F8",
+    "D2-mail-deny",
+    "stack-budget",
+    "ingress-regression"
+   ],
+   "command": "scripts/stack-budget.sh --offline -- channel_call_ channel_reply_ (RUST_MIN_STACK=2 MiB; 396 passed) on digest 555771ee\u20260a7c",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-stack-budget-try1.txt",
+     "sha256": "86058c2eba6852567baada5de6059c52baaa413b9571a9569512924208a3b0a2"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "affected-consumers",
+    "user-scope-walk",
+    "message-ask-refusal",
+    "decision-submission"
+   ],
+   "command": "cargo test --offline --lib -- memory_scope agent_history run_scope workflow_decision message_ (893 passed, 1 failed, 1 ignored; failure doop_agent_current_preparation_reaches_ready_before_model_io is pre-existing and unrelated: PREPARED_AGENT_VERSION=8 since 2edd0a73, recorded by p02/p03) on digest 555771ee\u20260a7c",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-affected-try2.txt",
+     "sha256": "cb5660748fd35f818455d6425736471c108f280162f9915fbc4ca14e16d40808"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "source-modules"
+   ],
+   "command": "cargo test --offline --locked --test source_modules (8 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-source-modules-try1.txt",
+     "sha256": "28738e9e6913520e2584c6d74512d507c80cd59906422e06bb3263e4e114305e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings (exit 101: 10 findings, all in files untouched by this branch, committed in 73afd5a7)",
+   "fixture": "toolchain 1.95.0 (CI pin)",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-clippy-1.95-try2.txt",
+     "sha256": "fb23184509fc4de62ef2bf271a975e7940b2a9eaefb78f246593401048025cb0"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0)",
+   "fixture": "toolchain 1.95.0 (CI pin)",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-clippy-1.95-try3.txt",
+     "sha256": "c09b400389e183195783120fc8ee46125c8d5dda9d2e66da68d24cc829d54c39"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-offline"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets (exit 0)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-sqlx-check-try1.txt",
+     "sha256": "850066afd9b7756b0bd456a24b2328e0c4bb4d10f2ad24a2a3d9e54c52534d90"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "A5",
+    "A6",
+    "A7",
+    "A8",
+    "A9",
+    "A10",
+    "A11",
+    "B1",
+    "B2",
+    "B2a",
+    "B3",
+    "B4",
+    "B5",
+    "D7-F8",
+    "D2-mail-deny"
+   ],
+   "command": "cargo test --offline --lib -- channel_call_ (80 passed; before the B3 clippy restructure, test-only)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432, migrated from the edited init schema; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-channel-call-try4.txt",
+     "sha256": "b8366b9ace752af279c485cbd1d1891c39c04d5cff778ee1464b4fe8f0fd9776"
+    }
+   ]
+  }
+ ]
+}

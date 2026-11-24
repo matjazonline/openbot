@@ -29,6 +29,10 @@ pub enum AppError {
         "{count} unfinished run(s) on this department's desks; cancel them or let them finish first"
     )]
     UnitArchiveOpenWork { count: i64, cancellable: bool },
+    /// `message.ask` in a run that answers a channel call: the requester is an agent and cannot
+    /// answer a question (agent-workflow-call AWC-P04-D1 r2 D8). Definite and terminal.
+    #[error("A run answering a channel call cannot ask its requester a question")]
+    InteractiveUnsupported,
     #[error("The destination cannot receive this run's content")]
     KnowledgeRelease {
         content: crate::entities::access_level::AccessLevel,

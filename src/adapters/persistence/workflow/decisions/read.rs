@@ -68,11 +68,22 @@ pub(super) async fn read_on(
     let choices = choices(tx, scope, context.binding_id, &step, subject).await?;
     let proposal = proposal(tx, company, decision, subject, &row.proposal).await?;
     let history = history::read(tx, scope, &context).await?;
-    let trigger_message = sqlx::query_scalar(
-        "SELECT intent.message_id FROM workflow_message_intent_bindings AS outcome \
-         JOIN workflow_message_intents AS intent ON (intent.company_id,intent.id)=(outcome.company_id,outcome.intent_id) \
-         WHERE outcome.company_id=$1 AND outcome.run_id=$2 LIMIT 1")
-        .bind(company.as_uuid()).bind(context.root_run_id).fetch_optional(&mut **tx).await?;
+    // Inside a call the source is the call's own request on the desk thread this view opens,
+    // not the caller tree's ingress on another desk (AWC-P04-B1-F4).
+    let trigger_message = match super::super::channel_call_source::enclosing_call_source_on(
+        tx,
+        company,
+        scope.run,
+    )
+    .await?
+    {
+        Some(source) => Some(source),
+        None => sqlx::query_scalar(
+            "SELECT intent.message_id FROM workflow_message_intent_bindings AS outcome \
+             JOIN workflow_message_intents AS intent ON (intent.company_id,intent.id)=(outcome.company_id,outcome.intent_id) \
+             WHERE outcome.company_id=$1 AND outcome.run_id=$2 LIMIT 1")
+            .bind(company.as_uuid()).bind(context.root_run_id).fetch_optional(&mut **tx).await?,
+    };
     let mut view = assemble(
         row,
         scope,

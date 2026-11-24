@@ -38,6 +38,8 @@ mod jev;
 mod reconciliations;
 mod tools;
 mod ui;
+#[cfg(test)]
+pub(crate) use ui::run_page_for_tests;
 
 /// A save carries a source of up to `MAX_SOURCE_BYTES` (256 KiB) as a JSON string, which escaping
 /// can grow up to six-fold; nothing else here comes close.

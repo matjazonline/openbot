@@ -269,6 +269,12 @@ fn compose_tools(
     );
     let dispatch = AgentActionTools::new(http.clone(), mcp.clone(), message.clone())
         .with_workflow_tools(Arc::new(persistence.clone()))
+        .with_channel_calls(Arc::new(
+            crate::application::workflow::channel_call_views::MonitoredChannelCalls::new(
+                Arc::new(persistence.clone()),
+                setup.monitoring.clone(),
+            ),
+        ))
         .with_provisioning(provisioning)
         .with_escalations(Arc::new(
             crate::adapters::workflow_escalation::EscalationRuntime::new(

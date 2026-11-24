@@ -10,6 +10,7 @@ pub struct SampleInputs {
     pub scripts: String,
     pub response_contract: String,
     pub response_approval_policy: String,
+    pub call_targets: String,
 }
 impl Default for SampleInputs {
     fn default() -> Self {
@@ -19,6 +20,7 @@ impl Default for SampleInputs {
             scripts: "[]".into(),
             response_contract: "null".into(),
             response_approval_policy: "null".into(),
+            call_targets: "[]".into(),
         }
     }
 }
@@ -51,6 +53,11 @@ pub fn workflow_sample(view: &SampleView<'_>) -> String {
             "response_approval_policy",
             "Sample final approval policy (JSON or null)",
             &view.inputs.response_approval_policy,
+        ),
+        (
+            "call_targets",
+            "Desks channel.call may reach (JSON array of desk ids, at most 10)",
+            &view.inputs.call_targets,
         ),
     ] {
         fields.push_str(&format!(r#"<label class="fieldset"><span class="fieldset-legend">{label}</span>

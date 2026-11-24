@@ -36,6 +36,20 @@ pub(super) async fn restore_on(
     // budget counts, so a department edited since replays as it was frozen (01DEP-P03-D11).
     let department: Option<DepartmentContext> =
         serde_json::from_value(saved["department"].clone()).map_err(|_| invalid())?;
+    // The saved desk list (gate AWC-P05-D1 r2 D2): a resume replays what the step was prepared
+    // with, never a fresh listing.
+    let saved_desks = saved["tools"].as_array().and_then(|tools| {
+        tools
+            .iter()
+            .find(|tool| tool["target"]["kind"] == "channel_call")
+            .map(|tool| tool["target"]["desks"].clone())
+    });
+    let prepared = match saved_desks {
+        Some(desks) => {
+            prepared.with_desk_listing(serde_json::from_value(desks).map_err(|_| invalid())?)?
+        }
+        None => prepared,
+    };
     let prepared = prepared
         .with_department(department)?
         .with_scope_context(

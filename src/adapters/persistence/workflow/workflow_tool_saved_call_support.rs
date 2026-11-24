@@ -41,6 +41,74 @@ impl ToolSetup {
     }
 }
 
+impl ToolSetup {
+    /// The pending `channel.call` the real driver saved for `claim`, saving one with
+    /// `arguments` first when the attempt has none. A claim holds one pending call, so a test
+    /// that needs another call takes another claim.
+    pub(in super::super) async fn channel_call(
+        &self,
+        arguments: &Value,
+        claim: &ClaimedWorkflow,
+    ) -> crate::application::workflow::channel_call::ChannelCallToolCall {
+        if let Some(call) = pending_channel_call(self, claim).await {
+            return call;
+        }
+        let llm = scripted_llm(vec![LlmTurn::tool_call(
+            CHANNEL_CALL_DECLARED,
+            arguments.clone(),
+        )])
+        .await;
+        register_scripted_agent_base_url(self.agent, &llm.base_url);
+        let runtime = WorkflowAgentRuntime::new(
+            ProviderRegistry::standard().unwrap(),
+            self.persistence().clone(),
+            SaveOnly,
+            None,
+            lease(),
+        );
+        let outcome = Box::pin(runtime.execute(&kind(), claim)).await;
+        assert!(
+            outcome.completed_result().is_err(),
+            "the saved call must remain pending"
+        );
+        assert_eq!(llm.finish().await.unwrap(), 1);
+        pending_channel_call(self, claim)
+            .await
+            .expect("the real driver saved this call")
+    }
+}
+
+/// The model-visible name of the built-in `channel.call`.
+pub(in super::super) const CHANNEL_CALL_DECLARED: &str = "channel__call";
+
+async fn pending_channel_call(
+    setup: &ToolSetup,
+    claim: &ClaimedWorkflow,
+) -> Option<crate::application::workflow::channel_call::ChannelCallToolCall> {
+    let scope = claim.fence.scope;
+    let saved: Option<Saved> = sqlx::query_as("SELECT id,checkpoint,workflow_prepared FROM task_harness_runs WHERE company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0)
+        .fetch_optional(setup.persistence().pool()).await.unwrap();
+    let saved = saved?;
+    let checkpoint =
+        crate::adapters::persistence::harness_checkpoint::decode(saved.id, saved.checkpoint)
+            .unwrap();
+    let pending = checkpoint.pending_call()?;
+    let tools: Vec<PreparedTool> =
+        serde_json::from_value(saved.workflow_prepared["tools"].clone()).unwrap();
+    let tool = tools
+        .iter()
+        .find(|tool| tool.declared.as_str() == pending.tool_id.as_str())
+        .unwrap();
+    Some(
+        crate::application::workflow::channel_call::ChannelCallToolCall {
+            origin: tool.origin,
+            call: ToolCallId::new(pending.invocation_id.0),
+            arguments: pending.arguments.clone(),
+        },
+    )
+}
+
 #[derive(sqlx::FromRow)]
 struct Saved {
     id: Uuid,

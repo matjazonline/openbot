@@ -50,6 +50,8 @@ pub struct RunPaneView<'a> {
     /// User names by id, for the actors of controls and history.
     pub people: &'a HashMap<Uuid, String>,
     pub banner: Option<RunBanner<'a>>,
+    /// What the viewer may follow from the run's channel calls.
+    pub calls: &'a super::CallAccess,
 }
 
 fn person(people: &HashMap<Uuid, String>, user: Uuid) -> String {
@@ -166,6 +168,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
                 <p class="mt-1 text-xs opacity-70">Run <span class="font-mono">{short}</span> · revision {revision} · started {created} · deadline {deadline}</p>
             </div>
             <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
+                {called_by}
                 {facts}
                 {response}
                 {dependencies}
@@ -176,6 +179,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
                 {waits}
                 {actions}
                 {children}
+                {channel_calls}
                 <section class="space-y-2"><details><summary class="cursor-pointer font-semibold">Input and parameters</summary>
                     <p class="mt-2 text-xs opacity-70">Input</p>{input}<p class="text-xs opacity-70">Parameters</p>{params}</details></section>
             </div>
@@ -196,7 +200,7 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
         revision = summary.revision,
         created = format_date_time(summary.created_at),
         deadline = format_date_time(summary.deadline),
-        dependencies = super::provenance::dependencies(run),
+        dependencies = super::provenance::dependencies(run, company_id, view.calls),
         facts = facts(view),
         response = run
             .response
@@ -217,6 +221,12 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
         waits = waits(view),
         actions = actions(view),
         children = children(view),
+        channel_calls = super::calls::channel_calls(company_id, id, &run.channel_calls, view.calls),
+        called_by = run
+            .called_by
+            .as_ref()
+            .map(|origin| super::calls::called_by(company_id, origin, view.calls))
+            .unwrap_or_default(),
         input = if run.payload_restricted {
             "<p>Restricted run content</p>".into()
         } else {

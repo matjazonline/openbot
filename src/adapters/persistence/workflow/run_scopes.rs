@@ -41,13 +41,13 @@ impl From<UnitRow> for ScopeUnit {
 
 pub(super) async fn capture_on(
     db: &mut PgConnection,
-    command: &PreparedAdmission,
+    scope: super::agent_manifest::CaptureScope<'_>,
     manifest: &DependencyManifest,
 ) -> AppResult<()> {
-    let company = command.company_id();
-    let run = command.proposed_run_id();
+    let company = scope.company;
+    let run = scope.scope_root;
     let root = root_on(db, company).await?;
-    let columns = association::association_columns(command.association());
+    let columns = association::association_columns(scope.association);
     let base_chain = chain_on(db, company, columns.channel_id, columns.principal_id).await?;
     let facts = ScopeRoleFacts {
         root: root.clone(),

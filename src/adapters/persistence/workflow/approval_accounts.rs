@@ -27,9 +27,8 @@ pub(super) async fn load_on(
     scope: ActionScope,
 ) -> AppResult<ApprovalAccounts> {
     let policy: Option<Value> = sqlx::query_scalar(
-        "SELECT context.approval_policy FROM channel_reply_runs AS owned \
-        JOIN channel_reply_contexts AS context USING(company_id,intent_id) \
-        WHERE owned.company_id=$1 AND owned.run_id=$2 AND context.approval_policy IS NOT NULL",
+        "SELECT owner.approval_policy FROM channel_reply_owners AS owner \
+        WHERE owner.company_id=$1 AND owner.run_id=$2 AND owner.approval_policy IS NOT NULL",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())

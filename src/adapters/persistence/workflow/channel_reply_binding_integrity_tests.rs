@@ -212,8 +212,8 @@ async fn channel_reply_binding_observer_run_cannot_replace_response_owner() {
     let observer_run = s.runs(observer).await[0];
     let mut tx = s.pool().begin().await.unwrap();
     let refused = sqlx::query(
-        "INSERT INTO channel_reply_runs(company_id,intent_id,run_id,binding_id,binding_revision) \
-        VALUES($1,$2,$3,$4,1)",
+        "INSERT INTO channel_reply_runs(company_id,owner_kind,intent_id,run_id,binding_id,binding_revision) \
+        VALUES($1,'ingress',$2,$3,$4,1)",
     )
     .bind(s.fixture.target.company.as_uuid())
     .bind(intent)

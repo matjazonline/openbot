@@ -81,16 +81,30 @@ exit status, relevant environment/prerequisites without credentials, and evidenc
 
 | Evidence | Status |
 | --- | --- |
-| Focused phase checks | Pending |
-| Native and custom channel round trips | Pending |
-| Competing dispatch/resume/review and crash recovery | Pending |
-| Authority, history, knowledge, and response isolation | Pending |
-| Formatting, offline compilation, clippy, and reachability | Pending |
-| Fresh migrations and SQLx metadata | Pending |
-| Database-backed full suite and network isolation | Pending |
-| Stack and lease regression budgets | Pending |
-| Browser, samples, and other applicable CI gates | Pending |
-| Operations docs, startup plan paths, and graph refresh | Pending |
+| Focused phase checks | Done. Each phase's focused checks are in its TASK.md. p06 Batch A: `cargo test --offline --locked --lib -- channel_call_` 120 passed (`phases/p06/docs/logs/a2-channel-call-tests.txt`); accepted at `c7fba340…7431` (Fable PASS AWC-P06-A-R2-N1). |
+| Native and custom channel round trips | Done, p06 G1–G2: `channel_call_integration_*`, including two desks in one execution and nested no-reply keeping the parent response (`phases/p06/docs/TASK.md`, Batch A). |
+| Competing dispatch/resume/review and crash recovery | Done in p03–p04 plus p06 G3–G6 (competing claimants, pinned while waiting, retention). In the full suite, `agent_history_e2e_process_crash_before_successor…` failed once under the 2 MiB load run and passed in every other run (main run, alone, and 7 runs at 2 MiB). It is kept as an **unresolved intermittent gap** (TASK.md B2.4). |
+| Authority, history, knowledge, and response isolation | Done: p06 G7–G8 (member caller, unavailable desks, demoted admin refused before model I/O, teardown). AWC-C005: in the full run, `memory_scope` 80/80, `run_scope` 4/4, `agent_history` 158/159. The one failure is the pre-existing version-7 test. |
+| Formatting, offline compilation, clippy, and reachability | Formatting, whitespace and offline compilation pass. Clippy with the scoped flags passes on 1.99.1 and 1.95.0; the CI command on stable **fails** on 9 pre-existing `redundant_field_names` errors in files this plan never changed (`phases/p06/docs/logs/b2-clippy.txt`). Reachability: `source_modules` 8 passed, `--bins` 6 passed (`phases/p06/docs/logs/b3-source-modules-bins.txt`). |
+| Fresh migrations and SQLx metadata | PASS on `check.sh`'s own fresh database: migrations, plus "SQLx metadata matches migrated schema" (`phases/p06/docs/logs/b-check-sh.txt`). |
+| Database-backed full suite and network isolation | Run under network isolation: 5146 passed, **4 failed**, 30 ignored (`phases/p06/docs/logs/b-check-sh.txt`). The four failures: `desk_wording` was a regression from this plan; it is fixed and now passes; The version-7 test is pre-existing (the base was already at 8); Two Doop tests timed out under load and pass when run alone. The Linux runner-control-plane isolation self-test is **unavailable** on macOS. |
+| Stack and lease regression budgets | Lease budget PASS (139). Stack budget run: 5147 passed, 3 failed, with no overflow. The failures are `desk_wording` (since fixed), the version-7 test and the intermittent crash test. Thresholds unchanged. |
+| Browser, samples, and other applicable CI gates | PASS: browser protocols (19), frontend protocols, sample boundary, transport boundary (rerun with `rg`), memory extracted service and journey (rerun on Python 3.13), memory integration. The calls and response browser checks pass after the rename. **Unavailable:** Docker images and managed Doop (no Docker); plugin package (needs Node v24.21.0 exactly); query statistics (the server does not preload `pg_stat_statements`); attribution extracted service (no `jsonschema` module). **Failing, unrelated by code path:** attribution SSO browser cookies. |
+| Operations docs, startup plan paths, and graph refresh | Done. `docs/workflow-operations.md` "Channel calls" section (p05; heading name corrected in p06). `trail build` exit 0 (`phases/p06/docs/logs/b2-trail-build.txt`). |
 
 Do not declare implementation complete while a required check is unavailable or an acceptance
 scenario remains unimplemented. State the precise blocker and retained evidence instead.
+
+**Status (2026-11-24):** implemented, reviewed and accepted in phase. Batch B review: Fable PASS AWC-P06-B-R2-N1 at digest
+`bc8b9841…764f`, manifest `phases/p06/docs/logs/AWC-P06-B-R2.evidence.json`. **Not declared complete** under the
+rule above. These checks remain:
+- **Unavailable on this machine:** Docker images, managed Doop, the plugin package, query statistics, the
+  attribution extracted service, and the Linux isolation self-test.
+- **Unresolved intermittent gap:** the agent-history crash test under load.
+
+Pre-existing failures are recorded separately:
+- the version-7 test;
+- clippy on stable;
+- attribution SSO.
+
+Running the unavailable gates in CI or on a machine with Docker closes the first group.

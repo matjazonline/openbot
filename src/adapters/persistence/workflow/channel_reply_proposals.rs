@@ -34,6 +34,8 @@ pub(super) struct NewProposal<'a> {
     pub document: &'a Value,
     pub completion: &'a PureCompletion,
     pub content: &'a Value,
+    pub closure: crate::application::workflow::channel_reply::ReplyClosure,
+    pub fields: Option<&'a Value>,
     pub route_snapshot: &'a Value,
     pub recipients: &'a [knowledge_release::MessageRecipient],
     pub action: &'a FrozenAction,
@@ -111,14 +113,15 @@ pub(super) async fn insert_on(db: &mut PgConnection, new: NewProposal<'_>) -> Ap
         ));
     }
     let invocation = Uuid::new_v4();
-    sqlx::query("INSERT INTO channel_reply_proposals(company_id,run_id,execution_id,id,intent_id,invocation_id,argument_digest,operation_digest,integrity,integrity_document, \
-        business_output,completion_route,content,recipients,approval_policy,approval_deadline,approval_decision_id,job_id,owner_kind,owner_attempt,owner_worker,owner_generation,owner_expiry,source_wait_id,continuation_count,route_snapshot) \
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(new.id).bind(new.root.intent_id)
+    sqlx::query("INSERT INTO channel_reply_proposals(company_id,run_id,execution_id,id,owner_id,invocation_id,argument_digest,operation_digest,integrity,integrity_document, \
+        business_output,completion_route,content,closure,handed_off_run_id,fields,recipients,approval_policy,approval_deadline,approval_decision_id,job_id,owner_kind,owner_attempt,owner_worker,owner_generation,owner_expiry,source_wait_id,continuation_count,route_snapshot) \
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$27,$28,$29,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(new.id).bind(new.root.owner_id)
         .bind(invocation).bind(new.action.argument_digest().as_str()).bind(new.action.operation_digest().as_str()).bind(new.integrity.as_hex()).bind(new.document)
         .bind(&new.completion.output).bind(route(new.completion)?).bind(new.content).bind(serde_json::to_value(new.recipients).map_err(|_|invalid())?)
         .bind(&new.root.approval_policy).bind(new.approval.map(|a|a.deadline)).bind(new.approval.map(|a|a.id)).bind(scope.job.0)
         .bind(owner.kind).bind(owner.attempt).bind(owner.worker).bind(owner.generation).bind(owner.expiry).bind(owner.wait).bind(i32::from(count)).bind(new.route_snapshot)
+        .bind(new.closure.as_str()).bind(new.closure.handed_off_run().map(|run|run.as_uuid())).bind(new.fields)
         .execute(&mut *db).await?;
     sqlx::query("INSERT INTO workflow_action_intents(company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision, \
         content_level_at_freeze,destination_level_at_freeze,origin_kind,reply_proposal_id,reply_integrity) \
@@ -177,7 +180,7 @@ pub(super) async fn resume_on(
     )
     .await?;
     Ok(PreparedFinal::Automatic {
-        intent: root.intent_id,
+        owner: root.owner_id,
         proposal: saved.id,
         integrity: saved.integrity,
     })

@@ -1,0 +1,84 @@
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.68s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 21 tests
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_consumed_once ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_ask_refused ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_automatic_done ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_deny_and_hand_off ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_no_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_owner_is_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_approve_releases ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_reject_and_expire ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_steps_require_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_projection_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_rejected_then_routed ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_archive_cancels_call_child ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_cancel_races ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_competing_resumers ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_destination_audience ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_restart_at_each_boundary ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_replay_never_reselects ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_scripted_agent_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_outcomes ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_revocation_races_consumption ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_revoked ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_consumed_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_consumed_once' (46738402) panicked at src/adapters/persistence/workflow/channel_call_support.rs:629:28:
+no code in {"child_run_id":"04cd6efb-5786-46c6-9fef-351a9c18aada","closure":"done","content":{"body":"Done","subject":"Status"}}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_ask_refused stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_ask_refused' (46738400) panicked at src/adapters/persistence/workflow/channel_call_response_tests.rs:585:5:
+assertion `left == right` failed
+  left: "message.rejected"
+ right: "channel_call.interactive_unsupported"
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_approve_releases stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_approve_releases' (46738540) panicked at src/adapters/persistence/workflow/channel_call_response_tests.rs:152:5:
+assertion `left == right` failed: the child waits for its final review
+  left: None
+ right: Some("decision")
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_reject_and_expire stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_reject_and_expire' (46738570) panicked at src/adapters/persistence/workflow/channel_call_response_tests.rs:152:5:
+assertion `left == right` failed: the child waits for its final review
+  left: None
+ right: Some("decision")
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_rejected_then_routed stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_rejected_then_routed' (46738618) panicked at src/adapters/persistence/workflow/channel_call_response_tests.rs:152:5:
+assertion `left == right` failed: the child waits for its final review
+  left: None
+ right: Some("decision")
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_outcomes stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_outcomes' (46738713) panicked at src/adapters/persistence/workflow/channel_call_support.rs:629:28:
+no code in {"child_run_id":"2c38909f-d7f0-4aa2-9aae-ddd788cdd8ed","closure":"done","content":{"body":"Done","subject":"Status"}}
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_ask_refused
+    adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_response_consumed_once
+    adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_approve_releases
+    adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_reject_and_expire
+    adapters::persistence::workflow::tests::message_tests::channel_call_response_tests::channel_call_review_rejected_then_routed
+    adapters::persistence::workflow::tests::message_tests::channel_call_resume_tests::channel_call_resume_outcomes
+
+test result: FAILED. 15 passed; 6 failed; 0 ignored; 0 measured; 5110 filtered out; finished in 22.03s
+
+error: test failed, to rerun pass `--lib`

@@ -12509,7 +12509,7 @@ CREATE TABLE public.agent_capability_bindings (
     CHECK(company_id IS NOT NULL OR kind='builtin'),
     CONSTRAINT agent_binding_target_shape CHECK (
         (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
-            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation')
+            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel_call')
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=1)
         OR (kind='http' AND http_connection_id IS NOT NULL AND operation_name IS NOT NULL
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=2)
@@ -12519,8 +12519,9 @@ CREATE TABLE public.agent_capability_bindings (
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)),
     CONSTRAINT agent_binding_reserved_alias CHECK (
         NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
-            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation'))
-        OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply' ELSE builtin END))
+            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel.call'))
+        OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply'
+            WHEN 'channel_call' THEN 'channel.call' ELSE builtin END))
 );
 CREATE TABLE public.agent_draft_bindings (
     company_id uuid,
@@ -12661,7 +12662,9 @@ CREATE TABLE public.run_dependency_manifests (
     root_run_id uuid NOT NULL,
     manifest_id uuid NOT NULL,
     PRIMARY KEY(company_id,run_id),
-    FOREIGN KEY(company_id,run_id,root_run_id) REFERENCES public.workflow_run_budgets(company_id,run_id,root_run_id)
+    -- Scope ownership is separate from tree lineage: `run_dependency_scope` admits a root, a
+    -- recorded channel call, or the parent's own scope (agent-workflow-call AWC-P02-D1 D2).
+    FOREIGN KEY(company_id,run_id) REFERENCES public.workflow_runs(company_id,id)
         ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY(company_id,manifest_id,root_run_id) REFERENCES public.agent_dependency_manifests(company_id,id,root_run_id)
         ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
@@ -13030,14 +13033,22 @@ CREATE TABLE public.channel_reply_contexts (
     CONSTRAINT channel_reply_contexts_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1)
 );
 
+-- A run's final response has exactly one owner: an ingress context (`intent_id`) or a channel call
+-- (`call_source_message_id`, agent-workflow-call gate AWC-P04-D1 r2 D1). `owner_id` is whichever is set.
 CREATE TABLE public.channel_reply_runs (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-    intent_id uuid NOT NULL,
+    owner_kind text NOT NULL CHECK (owner_kind IN ('ingress','call')),
+    intent_id uuid,
+    call_source_message_id uuid,
+    owner_id uuid GENERATED ALWAYS AS (COALESCE(intent_id,call_source_message_id)) STORED NOT NULL,
     run_id uuid NOT NULL,
     binding_id uuid NOT NULL,
     binding_revision bigint NOT NULL,
-    PRIMARY KEY (company_id,intent_id),
+    CHECK ((owner_kind='ingress' AND intent_id IS NOT NULL AND call_source_message_id IS NULL)
+        OR (owner_kind='call' AND call_source_message_id IS NOT NULL AND intent_id IS NULL)),
+    PRIMARY KEY (company_id,owner_id),
     UNIQUE (company_id,run_id),
+    UNIQUE (company_id,run_id,owner_id),
     FOREIGN KEY (company_id,intent_id,binding_id,binding_revision)
         REFERENCES public.channel_reply_contexts(company_id,intent_id,binding_id,binding_revision)
         DEFERRABLE INITIALLY DEFERRED,
@@ -13186,6 +13197,22 @@ BEGIN
         END IF;
         RETURN NEW;
     END IF;
+    IF NEW.owner_kind='call' THEN
+        -- The run is the record's child, on the record's desk thread, as the record's binding and run_as.
+        IF NOT EXISTS (
+            SELECT 1 FROM public.workflow_channel_calls AS call
+            JOIN public.workflow_runs AS run ON run.company_id=call.company_id AND run.id=call.child_run_id
+            WHERE call.company_id=NEW.company_id AND call.source_message_id=NEW.call_source_message_id
+                AND call.child_run_id=NEW.run_id
+                AND (NEW.binding_id,NEW.binding_revision)=(call.binding_id,call.binding_revision)
+                AND (run.binding_id,run.binding_revision,run.channel_id,run.thread_id,run.actor_id)
+                    =(call.binding_id,call.binding_revision,call.channel_id,call.thread_id,call.run_as_user_id)
+                AND run.principal_id IS NULL AND run.parent_run_id=call.run_id
+        ) THEN
+            RAISE EXCEPTION 'invalid channel response run ownership' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
     IF NOT EXISTS (
         SELECT 1 FROM public.channel_reply_contexts AS context
         JOIN public.workflow_runs AS run ON run.company_id=context.company_id AND run.id=NEW.run_id
@@ -13217,15 +13244,22 @@ CREATE TABLE public.channel_reply_proposals (
     run_id uuid NOT NULL,
     execution_id uuid NOT NULL,
     id uuid NOT NULL,
-    intent_id uuid NOT NULL,
+    owner_id uuid NOT NULL,
     invocation_id uuid NOT NULL,
     argument_digest text NOT NULL,
     operation_digest text NOT NULL,
     integrity text NOT NULL CHECK (integrity ~ '^[0-9a-f]{64}$'),
-    integrity_document jsonb NOT NULL CHECK (jsonb_typeof(integrity_document)='object' AND octet_length(integrity_document::text)<=1200000),
+    -- Output, content, routes and recipients as before, plus a call's result fields (AWC-P04 D2).
+    integrity_document jsonb NOT NULL CHECK (jsonb_typeof(integrity_document)='object' AND octet_length(integrity_document::text)<=1500000),
     business_output jsonb NOT NULL CHECK (octet_length(business_output::text)<=1048576),
     completion_route text NOT NULL CHECK (completion_route='success' OR completion_route LIKE 'choice:%'),
     content jsonb NOT NULL CHECK (jsonb_typeof(content)='object' AND octet_length(content::text)<=65536),
+    -- The response kind its terminal step fixed, approved with the content (AWC-P04-D1 D2).
+    closure text NOT NULL CHECK (closure IN ('done','denied','handed_off')),
+    handed_off_run_id uuid,
+    -- A call's typed result fields (null for mail, which never renders them). The writer refuses
+    -- fields over a tool result's 128 KiB, compactly encoded; this bound allows jsonb's spacing.
+    fields jsonb CHECK (fields IS NULL OR (jsonb_typeof(fields)='object' AND octet_length(fields::text)<=262144)),
     route_snapshot jsonb NOT NULL CHECK (jsonb_typeof(route_snapshot)='object' AND octet_length(route_snapshot::text)<=16384
         AND jsonb_typeof(route_snapshot->'targets')='array' AND jsonb_array_length(route_snapshot->'targets')=1
         AND (route_snapshot->'targets'->0->>'kind') IN ('reply_email','reply_internal')),
@@ -13263,10 +13297,14 @@ CREATE TABLE public.channel_reply_proposals (
         AND integrity_document->'route_snapshot'=route_snapshot
         AND integrity_document->'approval_policy'=COALESCE(approval_policy,'null'::jsonb)
         AND integrity_document->>'run'=run_id::text AND integrity_document->>'execution'=execution_id::text
-        AND integrity_document->>'proposal'=id::text AND integrity_document->>'intent'=intent_id::text) IS TRUE),
+        AND integrity_document->>'proposal'=id::text AND integrity_document->>'owner'=owner_id::text
+        AND integrity_document->>'closure'=closure
+        AND integrity_document->'handed_off_run_id'=COALESCE(to_jsonb(handed_off_run_id),'null'::jsonb)
+        AND integrity_document->'fields'=COALESCE(fields,'null'::jsonb)) IS TRUE),
+    CHECK ((closure='handed_off')=(handed_off_run_id IS NOT NULL)),
     CHECK ((integrity_document->>'approval_deadline')::timestamptz IS NOT DISTINCT FROM approval_deadline),
     FOREIGN KEY (company_id,run_id) REFERENCES public.channel_reply_runs(company_id,run_id) ON DELETE CASCADE,
-    FOREIGN KEY (company_id,intent_id) REFERENCES public.channel_reply_contexts(company_id,intent_id),
+    FOREIGN KEY (company_id,run_id,owner_id) REFERENCES public.channel_reply_runs(company_id,run_id,owner_id),
     FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
     FOREIGN KEY (company_id,execution_id,job_id) REFERENCES public.background_tasks(company_id,workflow_execution_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (job_id,owner_attempt) REFERENCES public.task_attempts(task_id,attempt_number) DEFERRABLE INITIALLY DEFERRED,
@@ -13324,7 +13362,7 @@ CREATE TABLE public.channel_reply_decisions (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     run_id uuid NOT NULL,
     execution_id uuid NOT NULL,
-    intent_id uuid NOT NULL,
+    owner_id uuid NOT NULL,
     disposition text NOT NULL CHECK (disposition IN ('automatic','suppressed')),
     proposal_id uuid,
     integrity text,
@@ -13342,7 +13380,7 @@ CREATE TABLE public.channel_reply_decisions (
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (company_id,run_id),
-    UNIQUE (company_id,intent_id),
+    UNIQUE (company_id,owner_id),
     UNIQUE (company_id,message_id),
     UNIQUE (company_id,delivery_id),
     CHECK ((disposition='suppressed' AND state='suppressed' AND num_nonnulls(proposal_id,integrity,message_id,delivery_id,diagnostic_code)=0 AND attempts=0)
@@ -13353,7 +13391,7 @@ CREATE TABLE public.channel_reply_decisions (
     CHECK ((state='failed')=(diagnostic_code IS NOT NULL)),
     CHECK (delivery_id IS NULL OR state='published'),
     FOREIGN KEY (company_id,run_id) REFERENCES public.channel_reply_runs(company_id,run_id) ON DELETE CASCADE,
-    FOREIGN KEY (company_id,intent_id) REFERENCES public.channel_reply_contexts(company_id,intent_id),
+    FOREIGN KEY (company_id,run_id,owner_id) REFERENCES public.channel_reply_runs(company_id,run_id,owner_id),
     FOREIGN KEY (company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
     FOREIGN KEY (company_id,run_id,execution_id,proposal_id,integrity)
         REFERENCES public.channel_reply_proposals(company_id,run_id,execution_id,id,integrity),
@@ -13404,10 +13442,18 @@ BEGIN
     SELECT * INTO STRICT job FROM public.background_tasks WHERE company_id=NEW.company_id AND id=NEW.job_id FOR UPDATE;
     IF run.state NOT IN ('queued','running') OR run.deadline<=clock_timestamp()
         OR job.workflow_execution_id<>NEW.execution_id OR job.continuation_count<>NEW.continuation_count
-        OR NOT EXISTS(SELECT 1 FROM public.channel_reply_runs WHERE company_id=NEW.company_id AND run_id=NEW.run_id AND intent_id=NEW.intent_id)
+        OR NOT EXISTS(SELECT 1 FROM public.channel_reply_runs WHERE company_id=NEW.company_id AND run_id=NEW.run_id AND owner_id=NEW.owner_id)
         OR EXISTS(SELECT 1 FROM public.workflow_executions WHERE company_id=NEW.company_id AND id=NEW.execution_id AND completed_at IS NOT NULL)
         OR (NEW.approval_deadline IS NOT NULL AND NEW.approval_deadline>run.deadline)
     THEN RAISE EXCEPTION 'channel response proposal lacks active root ownership' USING ERRCODE='23514'; END IF;
+    -- A hand-off answers with a nested call this run consumed as done (AWC-P04-D1 r2 D7).
+    IF NEW.closure='handed_off' AND NOT EXISTS(SELECT 1 FROM public.workflow_channel_call_results AS result
+        JOIN public.workflow_channel_calls AS call ON call.company_id=result.company_id AND call.run_id=result.run_id
+            AND call.execution_id=result.execution_id AND call.call_id=result.call_id
+        WHERE result.company_id=NEW.company_id AND result.run_id=NEW.run_id AND result.closure='done'
+            AND call.child_run_id=NEW.handed_off_run_id)
+    THEN RAISE EXCEPTION 'channel response hand-off names no consumed done call' USING ERRCODE='23514',
+        CONSTRAINT='channel_reply_proposal_hand_off'; END IF;
     IF NEW.owner_kind='pure' AND NOT (job.status='pending' AND job.worker_id IS NULL AND job.execution_generation IS NULL
         AND job.lock_expires_at IS NULL AND job.run_at<=clock_timestamp() AND job.retry_count<job.max_retries)
         OR NEW.owner_kind='fenced' AND NOT (job.status='processing' AND job.attempt_ordinal=NEW.owner_attempt
@@ -13439,8 +13485,8 @@ BEGIN
             RAISE EXCEPTION 'invalid initial channel response decision' USING ERRCODE='23514'; END IF;
         RETURN NEW;
     END IF;
-    IF ROW(NEW.company_id,NEW.run_id,NEW.execution_id,NEW.intent_id,NEW.disposition,NEW.proposal_id,NEW.integrity,NEW.created_at)
-        IS DISTINCT FROM ROW(OLD.company_id,OLD.run_id,OLD.execution_id,OLD.intent_id,OLD.disposition,OLD.proposal_id,OLD.integrity,OLD.created_at)
+    IF ROW(NEW.company_id,NEW.run_id,NEW.execution_id,NEW.owner_id,NEW.disposition,NEW.proposal_id,NEW.integrity,NEW.created_at)
+        IS DISTINCT FROM ROW(OLD.company_id,OLD.run_id,OLD.execution_id,OLD.owner_id,OLD.disposition,OLD.proposal_id,OLD.integrity,OLD.created_at)
         OR OLD.state IN ('suppressed','published','failed')
     THEN RAISE EXCEPTION 'channel response decision is immutable' USING ERRCODE='23514'; END IF;
     IF NEW.state='claimed' THEN
@@ -13483,7 +13529,7 @@ BEGIN
     IF NOT FOUND OR decision.execution_id IS DISTINCT FROM run.terminal_execution_id
         OR NOT EXISTS(SELECT 1 FROM public.workflow_executions WHERE company_id=tenant AND run_id=root AND id=decision.execution_id
             AND completed_at IS NOT NULL AND committed_route<>'final_error' AND route_target='$end' AND response_disposition=decision.disposition)
-        OR NOT EXISTS(SELECT 1 FROM public.channel_reply_runs WHERE company_id=tenant AND run_id=root AND intent_id=decision.intent_id)
+        OR NOT EXISTS(SELECT 1 FROM public.channel_reply_runs WHERE company_id=tenant AND run_id=root AND owner_id=decision.owner_id)
         OR (decision.disposition='automatic' AND NOT EXISTS(
             SELECT 1 FROM public.channel_reply_proposals AS proposal
             JOIN public.workflow_executions AS execution ON execution.company_id=proposal.company_id AND execution.id=proposal.execution_id
@@ -13508,7 +13554,7 @@ BEGIN
     IF NOT EXISTS(SELECT 1 FROM public.channel_reply_proposals WHERE company_id=NEW.company_id AND id=NEW.id) THEN RETURN NEW; END IF;
     IF NOT EXISTS (
         SELECT 1 FROM public.workflow_action_intents AS action
-        JOIN public.channel_reply_contexts AS context ON context.company_id=NEW.company_id AND context.intent_id=NEW.intent_id
+        JOIN public.channel_reply_owners AS context ON context.company_id=NEW.company_id AND context.run_id=NEW.run_id AND context.owner_id=NEW.owner_id
         JOIN public.workflow_runs AS run ON run.company_id=NEW.company_id AND run.id=NEW.run_id
         JOIN public.companies AS company ON company.id=run.company_id
         LEFT JOIN public.workflow_decisions AS approval ON approval.company_id=NEW.company_id AND approval.id=NEW.approval_decision_id
@@ -13595,7 +13641,7 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT EXISTS(
         SELECT 1 FROM public.channel_reply_decisions AS final
         JOIN public.channel_reply_proposals AS proposal ON proposal.company_id=final.company_id AND proposal.id=final.proposal_id
-        JOIN public.channel_reply_contexts AS context ON context.company_id=final.company_id AND context.intent_id=final.intent_id
+        JOIN public.channel_reply_owners AS context ON context.company_id=final.company_id AND context.run_id=final.run_id AND context.owner_id=final.owner_id
         JOIN public.workflow_runs AS run ON run.company_id=final.company_id AND run.id=final.run_id
         JOIN public.messages AS message ON message.company_id=final.company_id AND message.id=published_message
         JOIN public.thread_messages AS filed ON filed.company_id=message.company_id AND filed.message_id=message.id
@@ -14878,7 +14924,7 @@ RETURNS boolean LANGUAGE sql VOLATILE AS $$
         WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
             AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
             AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
-            AND checkpoint.workflow_prepared->>'version'='8'
+            AND checkpoint.workflow_prepared->>'version'='9'
             AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
                 OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
             AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
@@ -14950,7 +14996,7 @@ BEGIN
           AND execution.completed_at IS NULL FOR SHARE OF run NOWAIT;
     PERFORM 1 FROM public.agent_history_conversations WHERE company_id=owner.company_id
         AND id=owner.conversation_id AND active_exchange_id=owner.id FOR UPDATE;
-    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '8'
+    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '9'
         OR document->>'mcp_error_policy' NOT IN ('observe','fail_step')
         OR document->>'mcp_error_policy' IS DISTINCT FROM
             (CASE WHEN source.frozen_inputs ? 'mcp_error_policy'
@@ -19201,6 +19247,14 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
     )
     SELECT COALESCE(bool_and(public.workflow_message_author_matches(
         tenant,canonical,owner_run,origins.execution_id,origins.invocation_id)),false) FROM origins
+    -- A channel call's source message is authored by the calling agent's principal (AWC-P03-D1 D2).
+    UNION ALL
+    SELECT EXISTS(SELECT 1 FROM public.workflow_channel_calls AS call
+        JOIN public.messages AS message ON message.company_id=call.company_id AND message.id=call.source_message_id
+        JOIN public.principals AS author ON author.company_id=call.company_id AND author.id=message.author_principal_id
+        WHERE call.company_id=tenant AND call.source_message_id=canonical AND call.run_id=owner_run
+            AND author.kind='agent' AND author.agent_id=call.agent_id)
+    ORDER BY 1 DESC LIMIT 1
 $$;
 
 CREATE FUNCTION public.check_workflow_message_producer_seal() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -19213,7 +19267,9 @@ BEGIN
     IF producer IS NULL THEN RETURN NULL; END IF;
     IF NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=producer)
         OR (NOT EXISTS(SELECT 1 FROM public.workflow_message_destinations WHERE company_id=NEW.company_id AND message_id=owner AND run_id=producer)
-            AND NOT EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=NEW.company_id AND message_id=owner AND run_id=producer AND state='published')) THEN
+            AND NOT EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=NEW.company_id AND message_id=owner AND run_id=producer AND state='published')
+            -- A channel call's source message: its immutable invocation record (AWC-P03-D1 D2).
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_channel_calls WHERE company_id=NEW.company_id AND source_message_id=owner AND run_id=producer)) THEN
         RAISE EXCEPTION 'canonical workflow producer must prove its exact normalized output' USING ERRCODE='23514';
     END IF;
     IF NOT public.workflow_message_author_valid(NEW.company_id,owner,producer) THEN
@@ -20799,6 +20855,12 @@ BEGIN
         WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE NOWAIT;
     IF NOT FOUND THEN RAISE EXCEPTION 'scope seal has no run' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
     inherited := admitted.parent_run_id;
+    -- A channel-call child is admitted for its destination desk, not copied from its caller
+    -- (agent-workflow-call AWC-P02-D1 D1.2): its recorded invocation makes it a fresh seal.
+    IF EXISTS (SELECT 1 FROM public.workflow_channel_calls AS call
+        WHERE call.company_id=NEW.company_id AND call.child_run_id=NEW.run_id AND call.run_id=inherited) THEN
+        inherited := NULL;
+    END IF;
     IF admitted.native_mcp_call_id IS NOT NULL THEN
         SELECT session.workflow_run_id,principal.id INTO native_source,harness
         FROM public.native_mcp_calls AS call
@@ -20972,3 +21034,185 @@ BEGIN
 END $$;
 CREATE TRIGGER workflow_decision_information_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_decision_information_notices
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_decision_information();
+
+-- A channel call is one immutable invocation: the calling execution and saved call, the captured
+-- destination configuration, and the call child with its own dependency scope
+-- (agent-workflow-call AWC-P02-D1 D1). Call state lives in the child, wait and result rows.
+CREATE TABLE public.workflow_channel_calls (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    call_id uuid NOT NULL,
+    arguments_digest text NOT NULL CHECK (arguments_digest ~ '^[0-9a-f]{64}$'),
+    agent_manifest_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    agent_revision_id uuid NOT NULL,
+    agent_binding_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL CHECK (binding_revision>0),
+    settings_revision bigint NOT NULL CHECK (settings_revision>0),
+    contract jsonb NOT NULL CHECK (jsonb_typeof(contract)='object' AND octet_length(contract::text)<=16384
+        AND (contract->'format_version'='1'::jsonb) IS TRUE),
+    approval_policy jsonb CHECK (public.valid_channel_reply_approval(approval_policy)),
+    run_as_user_id uuid NOT NULL REFERENCES public.users(id),
+    child_run_id uuid NOT NULL,
+    scope_manifest_id uuid NOT NULL,
+    -- The call's fresh destination thread and its one canonical source message (AWC-P03-D1 D2).
+    -- NO ACTION: both outlive nothing that still needs them while the calling run exists.
+    thread_id uuid NOT NULL,
+    source_message_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,run_id,execution_id,call_id),
+    UNIQUE (company_id,child_run_id),
+    UNIQUE (company_id,source_message_id),
+    CONSTRAINT workflow_channel_call_thread_fk FOREIGN KEY (company_id,channel_id,thread_id)
+        REFERENCES public.threads(company_id,channel_id,id) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT workflow_channel_call_source_fk FOREIGN KEY (company_id,channel_id,thread_id,source_message_id)
+        REFERENCES public.thread_messages(company_id,channel_id,thread_id,message_id) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT workflow_channel_call_execution_fk FOREIGN KEY (company_id,run_id,execution_id)
+        REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    CONSTRAINT workflow_channel_call_caller_scope_fk FOREIGN KEY (company_id,run_id,agent_manifest_id)
+        REFERENCES public.run_dependency_manifests(company_id,run_id,manifest_id) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT workflow_channel_call_agent_fk FOREIGN KEY (company_id,agent_manifest_id,agent_id,agent_revision_id)
+        REFERENCES public.agent_manifest_revisions(company_id,manifest_id,agent_id,revision_id) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT workflow_channel_call_binding_fk FOREIGN KEY (company_id,channel_id,binding_id)
+        REFERENCES public.workflow_bindings(company_id,channel_id,id) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT workflow_channel_call_revision_fk FOREIGN KEY (company_id,binding_id,binding_revision)
+        REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT workflow_channel_call_child_fk FOREIGN KEY (company_id,child_run_id)
+        REFERENCES public.workflow_runs(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT workflow_channel_call_scope_fk FOREIGN KEY (company_id,child_run_id,scope_manifest_id)
+        REFERENCES public.run_dependency_manifests(company_id,run_id,manifest_id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE FUNCTION public.guard_workflow_channel_call() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'channel call invocation is immutable' USING ERRCODE='23514',CONSTRAINT='workflow_channel_call_immutable';
+END $$;
+CREATE TRIGGER workflow_channel_call_immutable BEFORE UPDATE OR DELETE ON public.workflow_channel_calls
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_channel_call();
+
+-- At commit the child is the recorded configuration's run in the caller's tree, and the recorded
+-- settings are still the desk's current ones (D1 insert guard).
+CREATE FUNCTION public.check_workflow_channel_call_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(
+        SELECT 1 FROM public.workflow_runs AS child
+        JOIN public.workflow_runs AS caller ON caller.company_id=child.company_id AND caller.id=NEW.run_id
+        JOIN public.workflow_run_budgets AS child_budget ON child_budget.company_id=child.company_id AND child_budget.run_id=child.id
+        JOIN public.workflow_run_budgets AS caller_budget ON caller_budget.company_id=caller.company_id AND caller_budget.run_id=caller.id
+        JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=NEW.company_id
+            AND configuration.binding_id=NEW.binding_id AND configuration.revision=NEW.binding_revision
+        JOIN public.channel_reply_settings AS settings ON settings.company_id=NEW.company_id AND settings.channel_id=NEW.channel_id
+        WHERE child.company_id=NEW.company_id AND child.id=NEW.child_run_id
+            AND child_budget.parent_run_id=NEW.run_id AND child_budget.root_run_id=caller_budget.root_run_id
+            AND child.parent_execution_id=NEW.execution_id
+            AND child.actor_id=NEW.run_as_user_id AND configuration.run_as_user_id=NEW.run_as_user_id
+            AND child.binding_id=NEW.binding_id AND child.binding_revision=NEW.binding_revision
+            AND child.channel_id=NEW.channel_id AND child.principal_id IS NULL AND child.thread_id=NEW.thread_id
+            AND child.delivery_policy=caller.delivery_policy
+            AND settings.revision=NEW.settings_revision AND settings.binding_id=NEW.binding_id
+            AND settings.binding_revision=NEW.binding_revision AND settings.contract=NEW.contract
+            AND settings.approval_policy IS NOT DISTINCT FROM NEW.approval_policy
+    ) THEN
+        RAISE EXCEPTION 'channel call child must be the recorded destination configuration in the caller''s tree'
+            USING ERRCODE='23514',CONSTRAINT='workflow_channel_call_snapshot';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_channel_call_snapshot AFTER INSERT ON public.workflow_channel_calls
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_channel_call_snapshot();
+
+-- The record, the caller's tool-call wait on its child and the saved call are one launch
+-- (AWC-P03-D1 D3): a plain FK cannot say it, because workflow-tool waits share these columns.
+CREATE FUNCTION public.check_workflow_channel_call_launch() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_waits AS wait
+        WHERE wait.company_id=NEW.company_id AND wait.run_id=NEW.run_id AND wait.execution_id=NEW.execution_id
+            AND wait.reason='child_run' AND wait.child_tool_call_id=NEW.call_id AND wait.child_run_id=NEW.child_run_id) THEN
+        RAISE EXCEPTION 'a channel call is launched by its caller''s tool-call wait on its child'
+            USING ERRCODE='23514',CONSTRAINT='workflow_channel_call_launch';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_channel_call_launch AFTER INSERT ON public.workflow_channel_calls
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_channel_call_launch();
+
+-- A call owns its child's final response (agent-workflow-call gate AWC-P04-D1 r2 D1).
+ALTER TABLE public.channel_reply_runs ADD CONSTRAINT channel_reply_run_call_fk
+    FOREIGN KEY (company_id,call_source_message_id) REFERENCES public.workflow_channel_calls(company_id,source_message_id)
+    DEFERRABLE INITIALLY DEFERRED;
+
+-- The facts every final-response reader needs, for either owner. A call's are its immutable record's;
+-- it has no ingress source document, so `source` is JSON null.
+CREATE VIEW public.channel_reply_owners AS
+    SELECT owned.company_id,owned.run_id,owned.owner_id,owned.owner_kind,owned.intent_id,owned.call_source_message_id,
+        context.message_id,context.channel_id,context.principal_id,context.thread_id,context.actor_id,
+        context.delivery_policy,context.binding_id,context.binding_revision,context.settings_revision,
+        context.approval_policy,context.contract,context.source
+    FROM public.channel_reply_runs AS owned
+    JOIN public.channel_reply_contexts AS context ON context.company_id=owned.company_id AND context.intent_id=owned.intent_id
+    WHERE owned.owner_kind='ingress'
+    UNION ALL
+    SELECT owned.company_id,owned.run_id,owned.owner_id,owned.owner_kind,NULL::uuid,owned.call_source_message_id,
+        call.source_message_id,call.channel_id,NULL::uuid,call.thread_id,call.run_as_user_id,
+        child.delivery_policy,call.binding_id,call.binding_revision,call.settings_revision,
+        call.approval_policy,call.contract,'null'::jsonb
+    FROM public.channel_reply_runs AS owned
+    JOIN public.workflow_channel_calls AS call ON call.company_id=owned.company_id AND call.source_message_id=owned.call_source_message_id
+    JOIN public.workflow_runs AS child ON child.company_id=call.company_id AND child.id=call.child_run_id
+    WHERE owned.owner_kind='call';
+
+-- The result a caller first disclosed for a call (gate AWC-P04-D1 r2 D7): later replays return it
+-- after the live-authority check, and `channel.hand_off` reads it. `revoked` is never stored.
+CREATE TABLE public.workflow_channel_call_results (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    call_id uuid NOT NULL,
+    closure text NOT NULL CHECK (closure IN ('done','denied','handed_off','no_reply','error')),
+    result jsonb NOT NULL CHECK (jsonb_typeof(result)='object' AND octet_length(result::text)<=262144),
+    content_level public.access_level NOT NULL,
+    content_exact boolean NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,run_id,execution_id,call_id),
+    CHECK ((closure='error')=(result ? 'error')),
+    FOREIGN KEY (company_id,run_id,execution_id,call_id)
+        REFERENCES public.workflow_channel_calls(company_id,run_id,execution_id,call_id) ON DELETE CASCADE
+);
+CREATE FUNCTION public.guard_workflow_channel_call_result() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'a disclosed channel call result is immutable' USING ERRCODE='23514',
+        CONSTRAINT='workflow_channel_call_result_immutable';
+END $$;
+CREATE TRIGGER workflow_channel_call_result_immutable BEFORE UPDATE ON public.workflow_channel_call_results
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_channel_call_result();
+
+COMMENT ON COLUMN public.run_dependency_manifests.root_run_id IS
+    'Scope root: the run that owns this manifest. A root run or a channel-call child owns its own; an ordinary child inherits its parent''s. Tree lineage and budgets are in workflow_run_budgets.';
+CREATE FUNCTION public.check_run_dependency_scope() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE parent uuid;
+BEGIN
+    SELECT parent_run_id INTO parent FROM public.workflow_run_budgets
+        WHERE company_id=NEW.company_id AND run_id=NEW.run_id;
+    IF FOUND THEN
+        IF NEW.run_id=NEW.root_run_id THEN
+            IF parent IS NULL OR EXISTS(SELECT 1 FROM public.workflow_channel_calls
+                WHERE company_id=NEW.company_id AND child_run_id=NEW.run_id AND scope_manifest_id=NEW.manifest_id) THEN
+                RETURN NULL;
+            END IF;
+        ELSIF parent IS NOT NULL AND EXISTS(SELECT 1 FROM public.run_dependency_manifests
+            WHERE company_id=NEW.company_id AND run_id=parent
+                AND root_run_id=NEW.root_run_id AND manifest_id=NEW.manifest_id) THEN
+            RETURN NULL;
+        END IF;
+    END IF;
+    RAISE EXCEPTION 'a dependency scope belongs to a root run, a recorded channel call, or the parent''s scope'
+        USING ERRCODE='23514',CONSTRAINT='run_dependency_scope';
+END $$;
+CREATE CONSTRAINT TRIGGER run_dependency_scope AFTER INSERT ON public.run_dependency_manifests
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_run_dependency_scope();

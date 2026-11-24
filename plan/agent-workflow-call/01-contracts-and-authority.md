@@ -25,8 +25,10 @@ weakening tool grants, channel access, or existing response approval.
    No successful `accepted` result while the child or its review is still pending. Do not expose
    unreviewed workflow output, hidden policy, credentials, or inaccessible channel metadata.
 4. Define errors for unavailable/unauthorized target, invalid input, dependency/recursion limit,
-   revoked authority, child failure, cancellation, deadline, rejected/expired review, and result
-   overflow. Ordinary domain failures reach the model as tool errors. Ownership loss is a worker
+   revoked authority, child failure, cancellation, deadline, rejected/expired review, result
+   overflow, and an answer the destination's reply contract cannot project
+   (`channel_call.response_invalid`, added by gate AWC-P03-D1 r2 after `workflow.child_cancelled`).
+   Ordinary domain failures reach the model as tool errors. Ownership loss is a worker
    lifecycle outcome, not a successful tool result or permission to repeat effects.
 5. Specify the shared input adapter: create canonical source facts from the caller, normalize
    body/subject with `MessageTriggerInput`, and validate the resulting value against the frozen

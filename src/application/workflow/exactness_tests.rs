@@ -20,6 +20,7 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
         AgentBuiltinTool::SaveMemory,
         AgentBuiltinTool::ReadEscalation,
         AgentBuiltinTool::RespondToEscalation,
+        AgentBuiltinTool::ChannelCall,
     ];
     for tool in all {
         match tool {
@@ -34,7 +35,8 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
             | AgentBuiltinTool::MemoryDetails
             | AgentBuiltinTool::SaveMemory
             | AgentBuiltinTool::ReadEscalation
-            | AgentBuiltinTool::RespondToEscalation => (),
+            | AgentBuiltinTool::RespondToEscalation
+            | AgentBuiltinTool::ChannelCall => (),
         }
     }
     all.to_vec()
@@ -92,6 +94,12 @@ fn every_target() -> Vec<(AgentToolTarget, ToolAccounting)> {
         };
         targets.push((AgentToolTarget::Memory { tool }, accounting));
     }
+    targets.push((
+        AgentToolTarget::ChannelCall {
+            desks: Default::default(),
+        },
+        ToolAccounting::ChildControl,
+    ));
     if let Ok(pin) = pin {
         targets.push((
             AgentToolTarget::Workflow { pin },
@@ -107,7 +115,8 @@ fn every_target() -> Vec<(AgentToolTarget, ToolAccounting)> {
             | AgentToolTarget::Provisioning { .. }
             | AgentToolTarget::Knowledge
             | AgentToolTarget::Memory { .. }
-            | AgentToolTarget::Workflow { .. } => (),
+            | AgentToolTarget::Workflow { .. }
+            | AgentToolTarget::ChannelCall { .. } => (),
         }
     }
     targets
@@ -129,6 +138,8 @@ fn memory_access_level_every_step_kind_and_tool_target_is_classified() {
         ("data.map", StepAccounting::Pure),
         ("data.url", StepAccounting::Pure),
         ("channel.no_reply", StepAccounting::Pure),
+        ("channel.deny", StepAccounting::Pure),
+        ("channel.hand_off", StepAccounting::Pure),
         ("http.request", StepAccounting::Unaccounted),
         ("tool.call", StepAccounting::Unaccounted),
         ("mcp.call", StepAccounting::Unaccounted),
@@ -157,10 +168,10 @@ fn memory_access_level_every_step_kind_and_tool_target_is_classified() {
     assert!(!step_output_exact("future.kind", &json!({})));
 
     let targets = every_target();
-    // Six single-sample variants, four memory tools, and both escalation operations.
+    // Seven single-sample variants, four memory tools, and both escalation operations.
     assert_eq!(
         targets.len(),
-        12,
+        13,
         "every AgentToolTarget variant has a sample"
     );
     for (target, accounting) in &targets {

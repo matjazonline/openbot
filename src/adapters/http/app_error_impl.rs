@@ -14,6 +14,7 @@ impl IntoResponse for AppError {
             AppError::ResourceOutsideUnit(_) => "resource_outside_unit",
             AppError::BudgetExhausted(_) => "budget_exhausted",
             AppError::UnitArchived => "unit_archived",
+            AppError::InteractiveUnsupported => "interactive_unsupported",
             AppError::UnitArchiveOpenWork { .. } => "unit_archive_open_work",
             AppError::KnowledgeRelease { .. } => "knowledge_release",
             AppError::Execution(_) => "execution",
@@ -49,6 +50,12 @@ impl IntoResponse for AppError {
                 StatusCode::CONFLICT,
                 axum::Json(serde_json::json!({"code":AppError::UNIT_ARCHIVED,
                     "error":AppError::UnitArchived.to_string()})),
+            ).into_response(),
+            AppError::InteractiveUnsupported => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({
+                    "code":crate::application::workflow::channel_call::INTERACTIVE_UNSUPPORTED,
+                    "error":AppError::InteractiveUnsupported.to_string()})),
             ).into_response(),
             AppError::UnitArchiveOpenWork { count, cancellable } => (
                 StatusCode::CONFLICT,

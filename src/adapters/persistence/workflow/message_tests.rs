@@ -19,6 +19,22 @@ mod agent_tests;
 mod authority_tests;
 #[path = "autonomous_agent_publication_workflow_tests.rs"]
 mod autonomous_agent_publication_workflow_tests;
+#[path = "channel_call_authoring_tests.rs"]
+mod channel_call_authoring_tests;
+#[path = "channel_call_integration_tests.rs"]
+mod channel_call_integration_tests;
+#[path = "channel_call_launch_tests.rs"]
+mod channel_call_launch_tests;
+#[path = "channel_call_response_tests.rs"]
+mod channel_call_response_tests;
+#[path = "channel_call_resume_tests.rs"]
+mod channel_call_resume_tests;
+#[path = "channel_call_snapshot_tests.rs"]
+mod channel_call_snapshot_tests;
+#[path = "channel_call_support.rs"]
+mod channel_call_support;
+#[path = "channel_call_views_db_tests.rs"]
+mod channel_call_views_db_tests;
 #[path = "message_delivery_tests.rs"]
 mod delivery_tests;
 #[path = "message_ingress_tests.rs"]

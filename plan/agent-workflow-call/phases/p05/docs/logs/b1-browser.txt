@@ -1,0 +1,10 @@
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (589.007375ms)
+✔ calls-from-agents block offers the desk id read-only, reachable by keyboard, and copyable with or without the clipboard API (301.808375ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1198.020375

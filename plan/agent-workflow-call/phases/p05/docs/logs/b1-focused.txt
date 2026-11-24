@@ -1,0 +1,26 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 46.00s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 13 tests
+test application::workflow::provisioning::tests::channel_call_authoring_builder_offers_response_steps ... ok
+test adapters::http::pages::workflow_authoring::graph::tests::channel_call_authoring_response_step_labels ... ok
+test adapters::persistence::agent_authoring::catalog::memory_tests::channel_call_authoring_catalogue_offers_opt_in ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_help_examples ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_intake_summary ... ok
+test adapters::http::pages::workflow_authoring::channel_response::tests::channel_call_authoring_desk_card ... ok
+test application::workflow::channel_call_listing::tests::channel_call_authoring_discovery_bounds ... ok
+test application::workflow::templates::agent_workflow::tests::channel_call_authoring_template_accepts_response_ends ... ok
+test adapters::persistence::agent_publication::tests::authoring::channel_call_authoring_catalogue_save_and_publish ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_ungranted_never_sees ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_frozen ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_omitted_for_external ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_authoring_tests::channel_call_authoring_discovery_lists_callable_public_desks ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 5145 filtered out; finished in 6.17s
+

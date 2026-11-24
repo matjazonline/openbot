@@ -86,6 +86,11 @@ impl PreparedTool {
                 }
                 AgentToolTarget::Memory { tool } => tool.description().into(),
                 AgentToolTarget::Escalation { tool } => tool.description().into(),
+                AgentToolTarget::ChannelCall { desks } => format!(
+                    "{} {}",
+                    super::super::channel_call::CHANNEL_CALL_DESCRIPTION,
+                    desks.render()
+                ),
                 _ => format!("Workflow tool {}", self.name),
             },
             parameters: self.input_schema.clone(),

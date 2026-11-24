@@ -1,0 +1,172 @@
+{
+ "version": 1,
+ "round": "AWC-P02-B1-R2",
+ "artifact": "0639c0f03d391ed087ddf434513e123753578451483602bd069fd989b3122112",
+ "checks": [
+  {
+   "criteria": [
+    "F1",
+    "F2",
+    "F3",
+    "V0",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "V10",
+    "V11",
+    "V12",
+    "V13",
+    "V14",
+    "V15",
+    "F8"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --locked --offline --lib channel_call_ -- --test-threads 4 (38 passed: R1's 36 plus participate_grant_opens_members_only_desk and archived_unit_declines)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (schema unchanged since R1's fresh migrate; R2 changed no SQL schema); SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-R2-focused.txt",
+     "sha256": "29cf4c7882a0c21df2bde485943f864d5b032ed9c139e9527de60a2141f6ac07"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F4",
+    "affected-consumers",
+    "child-writer-consumers"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --locked --offline --lib -- channel_call_ workflow_child workflow_tool_ autonomous_agent_children_ autonomous_agent_storage_manifest_ run_scope workflow_action_ message_send reply_ --test-threads 6 (827 passed, 1 failed: workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses, passes alone 3/3)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (schema unchanged since R1's fresh migrate; R2 changed no SQL schema); SQLX_OFFLINE=true",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-R2-affected.txt",
+     "sha256": "5e72a1b409312235dbda24a0fa805d8f3f004ffb7f6eeb2c181843810208e9b9"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F4",
+    "flake"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --locked --offline --lib -- workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses, three times alone (3/3 passed, ~115 s each)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (schema unchanged since R1's fresh migrate; R2 changed no SQL schema); SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-R2-bounds-rerun.txt",
+     "sha256": "618f9e6849bff2a021dc318af3f5170c909c0583fe6b886c338d6fb803a32714"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-metadata"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 cargo sqlx prepare --check -- --all-targets (exit 0)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (schema unchanged since R1's fresh migrate; R2 changed no SQL schema); SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-R2-sqlx-check.txt",
+     "sha256": "fc07ede7fba3f031049132ada1eac633ddbb14f59a346df73b4fbd4d50abdbde"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "SQLX_OFFLINE=true cargo clippy --offline --locked --all-targets -- -D warnings (exit 101: the same 9 redundant_field_names errors as R1, all in 8 test files unmodified since fe7791d3)",
+   "fixture": "worktree",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-R2-clippy.txt",
+     "sha256": "1edf3c1b575fdc9a2a84f16f99db097f76c948eda1aa7c4eac5d41529458baa4"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "format"
+   ],
+   "command": "cargo fmt --all -- --check && git diff --check (exit 0)",
+   "fixture": "worktree",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-R2-fmt.txt",
+     "sha256": "e38302aef01b329ec6de7dbdcd03361300700f9cae380d6b90b871d975b748bf"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "reachability"
+   ],
+   "command": "DATABASE_URL=postgres://localhost/openbot_awc_mac02 TEST_DATABASE_URL=postgres://localhost/openbot_awc_mac02_test SQLX_OFFLINE=true cargo test --locked --offline --test source_modules (8 passed)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432 (schema unchanged since R1's fresh migrate; R2 changed no SQL schema); SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P02-B1-R2-source-modules.txt",
+     "sha256": "b4d5f3cc99ce627abbaae16f6c6f3aa407483398965f72e89be26cf0f3d29f51"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "V3-fence"
+   ],
+   "command": "two claimants through the call_channel dispatch",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "p03 port (AWC-C003 r2)"
+  },
+  {
+   "criteria": [
+    "replay-dispatch"
+   ],
+   "command": "replay through the dispatch port",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "p03 (AWC-C003 r2)"
+  },
+  {
+   "criteria": [
+    "changed-arguments-saved-call"
+   ],
+   "command": "changed arguments on a real saved tool call",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "p03 (AWC-C003 r2)"
+  },
+  {
+   "criteria": [
+    "V2-other-binding-revision"
+   ],
+   "command": "forged record naming another revision of the selected binding",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "unforgeable: record immutable; channel_reply_settings guards refuse the needed settings states; V4 covers reconfiguration"
+  },
+  {
+   "criteria": [
+    "01B-DB-controls"
+   ],
+   "command": "DB-backed authority controls through launch",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "need launch (p03); notice AWC-C002"
+  }
+ ]
+}

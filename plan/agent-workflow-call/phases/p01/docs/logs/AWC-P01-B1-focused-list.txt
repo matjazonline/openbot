@@ -1,0 +1,17 @@
+application::workflow::binding::tests::channel_call_intake_activation_refuses_required_or_unbounded_fields: test
+application::workflow::channel_call::tests::channel_call_authority_child_ceiling_is_the_lowest_of_three: test
+application::workflow::channel_call::tests::channel_call_authority_request_above_the_ceiling_is_refused: test
+application::workflow::channel_call::tests::channel_call_authority_target_checks_run_in_order_behind_the_write_rule: test
+application::workflow::channel_call::tests::channel_call_contract_accepts_exactly_the_documented_fields: test
+application::workflow::channel_call::tests::channel_call_contract_bounds_content_in_bytes_at_char_boundaries: test
+application::workflow::channel_call::tests::channel_call_contract_built_in_snapshot_is_exact_and_its_name_reserved: test
+application::workflow::channel_call::tests::channel_call_contract_deadline_must_fall_before_the_runs: test
+application::workflow::channel_call::tests::channel_call_contract_denied_reason_is_cut_and_oversized_results_are_refused: test
+application::workflow::channel_call::tests::channel_call_contract_every_result_matches_the_trusted_output_schema: test
+application::workflow::channel_call::tests::channel_call_contract_refuses_identity_spoofing_and_unknown_fields: test
+application::workflow::channel_call::tests::channel_call_intake_call_becomes_the_childs_message_input: test
+application::workflow::channel_call::tests::channel_call_intake_call_fields_are_checked_against_the_captured_intake: test
+application::workflow::channel_call::tests::channel_call_intake_declared_fields_and_required_rule: test
+application::workflow::channel_call::tests::channel_call_intake_mail_input_has_no_fields_and_a_call_input_reaches_input_fields: test
+application::workflow::channel_call::tests::channel_call_intake_schema_bound_accepts_the_documented_types: test
+application::workflow::channel_call::tests::channel_call_intake_schema_bound_names_the_failing_path: test

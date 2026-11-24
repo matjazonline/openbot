@@ -113,6 +113,8 @@ fn values(name: &str) -> Value {
         }
         "data.map" | "channel.no_reply" => json!({"value":"hello","output_schema":schema}),
         "data.url" => json!({"origin":"https://example.test","segments":["c","canvas-a"]}),
+        "channel.deny" => json!({"reason":"This desk does not handle refunds"}),
+        "channel.hand_off" => json!({"run_id":"00000000-0000-0000-0000-000000000007"}),
         "http.request" => {
             json!({"connection":"service","method":"POST","path":"/messages","headers":{"Accept":"application/json"},"body":{"message":"hello"}})
         }

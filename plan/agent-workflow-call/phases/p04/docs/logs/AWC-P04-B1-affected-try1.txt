@@ -1,0 +1,60 @@
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_preparation_current_content_and_reserved_output_precede_history ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::memory_scope_tools_host_context_is_frozen_and_counts_before_history ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_accepts_schema_valid_empty_business_values ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_preflight_charges_all_schema_copies ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_rejects_nonterminal_and_choice_routes ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_retains_error_routing_and_typed_value ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_roundtrip_and_identity ... ok
+test application::workflow::registry::decision_tests::workflow_decision_digest_survives_jsonb_numeric_normalization ... ok
+test application::workflow::registry::runtime_tests::memory_scope_step_scope_must_be_a_literal ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_five_examples_compile_and_execute_without_production_effects ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_native_review_reject_completes_suppressed_and_edit_is_the_response ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_child_suppression_does_not_suppress_the_root ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_invalid_mapping_is_refused_and_question_approval_is_distinct ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_missing_human_script_has_typed_wait_preview ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_seals_mapping_and_policy_and_previews_output ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_suppression_skips_projection_for_valid_empty_values ... ok
+test application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_actual_agent_identity_separates_streams ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_exact_pair_limit_reports_only_recent_complete_suffix ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_model_only_step_has_no_logical_seed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_thread_audience_change_is_refused ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_repeated_calls_keep_exact_local_pairs_and_current_input_separate ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_oversized_newest_pair_stops_before_older_pair ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_absent_or_ambiguous_placement_is_readonly_root ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_chain_local_writes_and_only_the_acting_leads_direct_children ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_depth_cycle_chain_metadata_and_read_budget_fail_early ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_overlapping_report_and_chain_is_one_unit_with_both_relations ... ok
+test application::workflow::sample::tests::history_tests::agent_history_samples_same_agent_child_has_its_own_ephemeral_branch ... ok
+test application::workflow::templates::agent_workflow::tests::channel_reply_authoring_custom_end_requires_terminal_no_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_verification_revoked_before_entry ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_before_ack_and_reconstruction_consumes_once ... ok
+test application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_shutdown_bounds_stuck_known_settlement ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_competing_humans_have_one_winner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_ingress_consumes_before_ordinary_admission ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_two_live_runs_in_one_thread_stay_independent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_wrong_respondent_and_prompt_do_not_consume_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::memory_scope_a_manual_run_in_a_channel_has_no_user_scope ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::history_cascade::agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io' (46854900) panicked at src/adapters/persistence/workflow/agent_history_freeze_guard_tests.rs:435:5:
+assertion `left == right` failed
+  left: Number(8)
+ right: 7
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io
+
+test result: FAILED. 670 passed; 1 failed; 1 ignored; 0 measured; 4466 filtered out; finished in 497.32s
+
+error: test failed, to rerun pass `--lib`

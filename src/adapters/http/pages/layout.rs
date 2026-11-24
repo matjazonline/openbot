@@ -458,11 +458,18 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
             return true;
         }
 
+        // An input source copies its value. Without the clipboard API (or when it refuses), an
+        // input source is selected so it can be copied by hand.
         function copyTextFrom(button) {
             var source = document.getElementById(button.dataset.copyFrom);
             if (!source) return;
-            navigator.clipboard.writeText(source.textContent);
-            button.textContent = button.dataset.copiedLabel || 'Copied';
+            var isInput = source.tagName === 'INPUT';
+            var text = isInput ? source.value : source.textContent;
+            var selectSource = function () { if (isInput) { source.focus(); source.select(); } };
+            if (!navigator.clipboard) { selectSource(); return; }
+            navigator.clipboard.writeText(text).then(function () {
+                button.textContent = button.dataset.copiedLabel || 'Copied';
+            }, selectSource);
         }
 
         // Applied to the htmx fragment that carries a freshly generated system prompt, which

@@ -1,0 +1,39 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 06s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 12 tests
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_continuation_limit ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_history_is_the_fresh_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_competing_claimants_converge ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_guard_names_the_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_malformed_desk_answers_first ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_lease_expired_at_commit ... FAILED
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_origin_is_proven ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_parks_and_commits_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_review_desk_declines ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_two_targets_differ ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_refusal_leaves_no_thread_or_message ... ok
+test adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_shorter_deadline_fails_child ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_lease_expired_at_commit stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_lease_expired_at_commit' (46054337) panicked at src/adapters/persistence/workflow/channel_call_launch_tests.rs:518:5:
+assertion failed: s.p().claim_io(scope, WorkflowWorkerId(Uuid::new_v4()),
+                lease()).await.unwrap().is_some()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::channel_call_launch_tests::channel_call_launch_lease_expired_at_commit
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 5096 filtered out; finished in 11.30s
+
+error: test failed, to rerun pass `--lib`

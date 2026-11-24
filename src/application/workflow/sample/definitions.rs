@@ -40,6 +40,7 @@ struct ConfigurationIdentity<'a> {
     workflows: &'a [SampleWorkflowSelection],
     response_contract: &'a Option<super::super::channel_reply::ChannelReplyContract>,
     response_approval_policy: &'a Option<super::super::channel_reply::ReplyApprovalPolicy>,
+    call_targets: &'a BTreeMap<Uuid, FrozenCallTarget>,
 }
 
 pub struct PreparedSample {
@@ -50,13 +51,39 @@ pub struct PreparedSample {
     pub(super) configuration_hash: SampleConfigurationHash,
     pub(super) agent_selections: Vec<SampleAgentSelection>,
     pub(super) workflow_selections: Vec<SampleWorkflowSelection>,
+    pub(super) call_targets: BTreeMap<Uuid, FrozenCallTarget>,
 }
 impl PreparedSample {
+    /// A sample that declares no call targets.
     pub fn new(
+        root: Arc<PublishedBundle>,
+        request: SampleRequest,
+        extra: Vec<Arc<PublishedBundle>>,
+    ) -> AppResult<Self> {
+        Self::new_with_targets(root, request, extra, Vec::new())
+    }
+    /// A sample whose declared call targets capture froze, exactly one per declared desk.
+    pub fn new_with_targets(
         root: Arc<PublishedBundle>,
         mut request: SampleRequest,
         extra: Vec<Arc<PublishedBundle>>,
+        targets: Vec<FrozenCallTarget>,
     ) -> AppResult<Self> {
+        let declared: BTreeSet<Uuid> = request.call_targets.iter().copied().collect();
+        if request.call_targets.len() > MAX_CALL_TARGETS
+            || declared.len() != request.call_targets.len()
+        {
+            return Err(refused(
+                "A sample declares at most 10 distinct call targets",
+            ));
+        }
+        let call_targets: BTreeMap<Uuid, FrozenCallTarget> = targets
+            .into_iter()
+            .map(|target| (target.desk, target))
+            .collect();
+        if call_targets.keys().copied().collect::<BTreeSet<_>>() != declared {
+            return Err(refused("Each declared call target must be captured"));
+        }
         let bytes = serde_json::to_vec(&request).map_err(|_| refused("Invalid sample request"))?;
         if bytes.len() > MAX_SAMPLE_BYTES {
             return Err(refused(
@@ -106,12 +133,13 @@ impl PreparedSample {
             })
             .collect();
         let identity = serde_json::to_value(ConfigurationIdentity {
-            kind: "sample-only-v2",
+            kind: "sample-only-v3",
             company: root.company_id(),
             agents: &agent_selections,
             workflows: &workflow_selections,
             response_contract: &request.response_contract,
             response_approval_policy: &request.response_approval_policy,
+            call_targets: &call_targets,
         })
         .map_err(|_| refused("Invalid sample identity"))?;
         let configuration_hash = SampleConfigurationHash(format!(
@@ -128,6 +156,7 @@ impl PreparedSample {
             configuration_hash,
             agent_selections,
             workflow_selections,
+            call_targets,
         })
     }
 }

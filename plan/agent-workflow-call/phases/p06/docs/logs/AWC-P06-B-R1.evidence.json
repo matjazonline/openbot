@@ -1,0 +1,212 @@
+{
+ "version": 1,
+ "round": "AWC-P06-B-R1",
+ "artifact": "bc8b9841d9f9346152acdbd78e3a093597f554357b61c900e5639ed81486764f",
+ "checks": [
+  {
+   "criteria": [
+    "check.sh gates reported PASS: fmt",
+    "check.sh gates reported PASS: whitespace",
+    "check.sh gates reported PASS: offline-compile",
+    "check.sh gates reported PASS: migrations",
+    "check.sh gates reported PASS: sqlx-metadata",
+    "check.sh gates reported PASS: compile-tests",
+    "check.sh gates reported PASS: source-modules/conformance",
+    "check.sh gates reported PASS: browser-fixture-producers",
+    "check.sh gates reported PASS: browser-protocols-19",
+    "check.sh gates reported PASS: frontend-protocols",
+    "check.sh gates reported PASS: samples",
+    "check.sh gates reported PASS: lease-budget-139",
+    "check.sh gates reported PASS: memory-backup",
+    "check.sh gates reported PASS: memory-integration"
+   ],
+   "command": "DATABASE_URL=postgres://mac02@localhost:5432/postgres bash scripts/check.sh \u2014 overall exit 1; this entry covers only the gates its summary reports PASS; its FAIL gates are the separate FAIL/NOT EXERCISED entries",
+   "fixture": "check.sh-owned DB openbot_check_<uuid> (admin URL postgres://mac02@localhost:5432/postgres); focused reruns on scratch DB openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b-check-sh.txt",
+     "sha256": "d06877271f4dd8f178fc44d2cfa21ac2efdf25905fccddd4212ce4725f6a6b15"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "desk-wording-fix"
+   ],
+   "command": "cargo test --offline --locked --lib -- desk_wording workflow_runs channel_response <rerun filters> (19 passed, 1 failed = pre-existing version-7 test); fixture regen + node --test workflow-run-calls.mjs channel-response-authoring.mjs (3/3); cargo test -- channel_response workflow_runs::calls (7 passed)",
+   "fixture": "check.sh-owned DB openbot_check_<uuid> (admin URL postgres://mac02@localhost:5432/postgres); focused reruns on scratch DB openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-focused-rerun.txt",
+     "sha256": "f10265626eab8ec28aae5a5fd6caf621d2bde649b81b7acc92665b9db8cdc334"
+    },
+    {
+     "path": "logs/b2-browser-wording.txt",
+     "sha256": "2680f0a980679c70c44a64a24503308f6a1e92c4302ce7be4cc1c8e5b02822d2"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "db-suite-all-targets"
+   ],
+   "command": "scripts/test-network-isolation.sh cargo test --locked --offline --all-targets (inside check.sh): 5146 passed, 4 failed (desk_wording regression now fixed; version-7 pre-existing; 2 doop timing under load)",
+   "fixture": "check.sh-owned DB openbot_check_<uuid> (admin URL postgres://mac02@localhost:5432/postgres); focused reruns on scratch DB openbot_awc_mac02_test",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b-check-sh.txt",
+     "sha256": "d06877271f4dd8f178fc44d2cfa21ac2efdf25905fccddd4212ce4725f6a6b15"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget-full"
+   ],
+   "command": "scripts/stack-budget.sh --offline (inside check.sh): 5147 passed, 3 failed (desk_wording fixed; version-7 pre-existing; agent_history_e2e_process_crash intermittent, passed twice alone at 2 MiB)",
+   "fixture": "check.sh-owned DB openbot_check_<uuid> (admin URL postgres://mac02@localhost:5432/postgres); focused reruns on scratch DB openbot_awc_mac02_test",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b-check-sh.txt",
+     "sha256": "d06877271f4dd8f178fc44d2cfa21ac2efdf25905fccddd4212ce4725f6a6b15"
+    },
+    {
+     "path": "logs/b2-crash-stack-budget.txt",
+     "sha256": "a7eafeedb12cdedb5f1ec9443c5bc2415008f72a9403e261f74bd9bbcd7d21c2"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "clippy"
+   ],
+   "command": "cargo clippy --all-targets -D warnings -A clippy::redundant_field_names on rustc 1.99.1 (exit 0) and +1.95.0 with repo -A lints (exit 0); check.sh plain clippy on 1.99 fails on 9 pre-existing redundant_field_names in unchanged files",
+   "fixture": "no database",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-clippy.txt",
+     "sha256": "3d9822a14c176e3f372bce2572fedf17d08ba48270df4885eb1ecac4cb3e1cfb"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt-after-fix",
+    "graph-refresh"
+   ],
+   "command": "cargo fmt --all -- --check (exit 0); trail build (exit 0)",
+   "fixture": "no database",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-fmt-check.txt",
+     "sha256": "e38302aef01b329ec6de7dbdcd03361300700f9cae380d6b90b871d975b748bf"
+    },
+    {
+     "path": "logs/b2-trail-build.txt",
+     "sha256": "1294f8282580f85352b3a395f6a566026f981715252fcbd0b5b282c0a2e03cd0"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "transport-boundary",
+    "memory-extracted",
+    "memory-journey"
+   ],
+   "command": "scratchpad/env-gates.sh with rg, python3.13, node@24 on PATH (transport boundary PASS; memory extracted PASS; standalone journey PASS)",
+   "fixture": "memory test admin URL postgres://mac02@localhost:5432/postgres",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2-transport-boundary.txt",
+     "sha256": "bfcf4db34db287865951b365b947fbdf09b5dc2a117a5e796d8047bf8e27e13a"
+    },
+    {
+     "path": "logs/b2-env-gates.txt",
+     "sha256": "4d74e607a5009edfe29dffa5e46f2aeacc58ac73c67fa6b77f1b77dc1fc0830b"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "attribution-sso-browser"
+   ],
+   "command": "check_attribution_browser: own journeys 2/2 pass; openbot attribution_sso_browser_real_openbot_password_and_existing_session fails at 'independent secure cookies' (unrelated by code path)",
+   "fixture": "attribution admin URL postgres://mac02@localhost:5432/postgres",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/b2-env-gates.txt",
+     "sha256": "4d74e607a5009edfe29dffa5e46f2aeacc58ac73c67fa6b77f1b77dc1fc0830b"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "attribution-extracted"
+   ],
+   "command": "check_attribution_service: 120 tests pass, then verify.py needs python module jsonschema (not installed)",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "missing Python package jsonschema; not installed",
+   "files": [
+    {
+     "path": "logs/b2-env-gates.txt",
+     "sha256": "4d74e607a5009edfe29dffa5e46f2aeacc58ac73c67fa6b77f1b77dc1fc0830b"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "plugin-package"
+   ],
+   "command": "check_plugin_package",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "requires Node v24.21.0 exactly; machine has v26.13.1 and v24.22.3",
+   "files": [
+    {
+     "path": "logs/b-check-sh.txt",
+     "sha256": "d06877271f4dd8f178fc44d2cfa21ac2efdf25905fccddd4212ce4725f6a6b15"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "query-statistics"
+   ],
+   "command": "check_query_statistics",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "local server lacks shared_preload_libraries=pg_stat_statements; server settings not changed",
+   "files": [
+    {
+     "path": "logs/b-check-sh.txt",
+     "sha256": "d06877271f4dd8f178fc44d2cfa21ac2efdf25905fccddd4212ce4725f6a6b15"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "images",
+    "doop-managed"
+   ],
+   "command": "knowledge/memory/attribution image gates; check-doop.py",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "no Docker daemon; Doop also needs DOOP_TEST_UI_CHROME",
+   "files": [
+    {
+     "path": "logs/b-check-sh.txt",
+     "sha256": "d06877271f4dd8f178fc44d2cfa21ac2efdf25905fccddd4212ce4725f6a6b15"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,85 @@
+{
+ "version": 1,
+ "round": "AWC-P05-B2-R2",
+ "artifact": "905b73f8f75ac938e26cb397b96e61108afd5478c951deb7b393c8d8f23c8d5a",
+ "checks": [
+  {
+   "criteria": [
+    "F1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V8",
+    "V9",
+    "runs-routes"
+   ],
+   "command": "cargo test --offline --locked --lib -- channel_call_views workflows::ui::runs (38 passed)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2r2-focused.txt",
+     "sha256": "8caea8b67e01181999f47161c7bc99507c1eeb284b13685fe5782ffbf962f1dd"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "stack-budget"
+   ],
+   "command": "scripts/stack-budget.sh --offline -- channel_call_views workflows::ui::runs (38 passed)",
+   "fixture": "scratch DB openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02_test",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2r2-stack-budget.txt",
+     "sha256": "71e1dd58e89145a9d237aba3f268c1e28292125bdda6cf0e7298097e3ba6feb8"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0)",
+   "fixture": "toolchain 1.95.0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2r2-clippy.txt",
+     "sha256": "648ea006c2f8d3bd74479b4fdc01e9116a30cb2cf47943eca8b1a3949eb488c7"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt"
+   ],
+   "command": "cargo fmt --check (exit 0)",
+   "fixture": "stable rustfmt",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2r2-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F1",
+    "V10"
+   ],
+   "command": "node --test scripts/tests/workflow-run-calls.mjs (1/1) with regenerated WORKFLOW_CALLS_BROWSER_FIXTURES",
+   "fixture": "playwright chromium; fixtures in the session scratchpad",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/b2r2-browser.txt",
+     "sha256": "12d368698385c41e9c9413f60c5ccc09f31df7627c6c0945a5e9bfe871bfa960"
+    }
+   ]
+  }
+ ]
+}

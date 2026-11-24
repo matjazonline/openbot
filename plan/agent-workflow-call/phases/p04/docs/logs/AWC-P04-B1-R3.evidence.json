@@ -1,0 +1,69 @@
+{
+ "version": 1,
+ "round": "AWC-P04-B1-R3",
+ "artifact": "7b3f300c9f6f1de7a926f8b000d3a106beae939a26bd276470d74708b2f88a13",
+ "checks": [
+  {
+   "criteria": [
+    "F4",
+    "F3",
+    "F6",
+    "channel_call_",
+    "message_",
+    "decision-views",
+    "reviewed-delivery"
+   ],
+   "command": "cargo test --offline --lib -- channel_call_ message_ workflow_decision decision_ reviewed_delivery (798 passed, 1 failed: pre-existing doop_agent_current_preparation_reaches_ready_before_model_io, format 7 vs 8) on 7b3f300c",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R3-affected.txt",
+     "sha256": "72c6827dcaf4237b7f36423de2fea339cef7f4310db472a7885b00938dffd8d2"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "lint"
+   ],
+   "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool (exit 0)",
+   "fixture": "toolchain 1.95.0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R3-clippy.txt",
+     "sha256": "47b36809e483f6525a8658e0da8b64c538981e2507fa3e48531c7641986bb4a5"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "fmt"
+   ],
+   "command": "cargo fmt --check (exit 0)",
+   "fixture": "toolchain stable",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R3-fmt.txt",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "sqlx-offline"
+   ],
+   "command": "cargo sqlx prepare --check -- --all-targets (exit 0)",
+   "fixture": "scratch DBs openbot_awc_mac02 / openbot_awc_mac02_test on localhost:5432; DATABASE_URL=postgres://mac02@localhost:5432/openbot_awc_mac02",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/AWC-P04-B1-R3-sqlx.txt",
+     "sha256": "5f261074b5124a2871dfe94f0c4a8f1c5464699d5174884f921b74c11e4e5106"
+    }
+   ]
+  }
+ ]
+}

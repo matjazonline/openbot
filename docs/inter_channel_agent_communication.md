@@ -39,7 +39,9 @@ An email delivery to an internal address can therefore start the target's messag
 workflow. A `message.send` whose explicit destination kind is `channel` instead posts an outbound
 system note on that desk; it does not start the desk's bindings. Reply correlation offers a matching
 message to an already waiting run before ordinary admission. Sending a message does not by itself
-wait for or resume a caller; request/response dispatch remains the separate `channel.call` work.
+wait for or resume a caller. Request/response dispatch is the `channel.call` built-in: it starts the
+desk's selected responder and returns its answer to the calling agent step
+([Channel calls](workflow-operations.md#channel-calls)).
 
 Department context names the department, charter, role and nearby desk addresses; agent entries use
 their principal addresses. The context is frozen with the prepared run. Agent escalation notices

@@ -273,6 +273,28 @@ impl Fixture {
             .unwrap();
         version
     }
+    /// As `publish_workflow`, capturing the built-in step snapshots (messaging) its steps use, as
+    /// production publication does.
+    async fn publish_with_builtins(
+        &self,
+        workflow: WorkflowId,
+        mut source: serde_json::Value,
+    ) -> VersionId {
+        source["workflow_id"] = serde_json::json!(workflow.to_string());
+        let version = VersionId::new(Uuid::new_v4());
+        let service = DefinitionService::new(
+            Preflight,
+            self.persistence.clone(),
+            WorkflowSourceDecoder,
+            step_builtins::StepBuiltinPublicationDirectory {
+                persistence: self.persistence.clone(),
+            },
+        );
+        self.publish_source(&service, workflow, source.to_string(), version)
+            .await
+            .unwrap();
+        version
+    }
     /// Save `source` as the first draft of `workflow` and publish it as `version` through
     /// `service`, whose directory decides which dependencies the draft captures.
     async fn publish_source<C: PublicationDirectory>(
