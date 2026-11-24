@@ -900,3 +900,63 @@ async fn goal_rollup_status_tool_returns_the_rollup_and_refuses_without_a_goal()
         "This run's goal is no longer a goal"
     );
 }
+
+/// Plan08 p04 (the stand-in p03 left): an agent holding `goal.status` and the goal's lead role
+/// calls it from a real agent step on the goal's desk; the model is offered `goal__status`, and
+/// the tool result it reads next is the goal's status.
+#[tokio::test]
+async fn goal_rollup_status_tool_through_the_agent_runtime() {
+    use crate::entities::agent_capability::AgentBuiltinTool;
+    let s = Box::pin(CallSetup::with_tools(
+        destination(None),
+        &[AgentBuiltinTool::ChannelCall, AgentBuiltinTool::GoalStatus],
+    ))
+    .await;
+    let (goal, front) = goal_with_desk(&s, "launch").await;
+    sqlx::query(
+        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
+         SELECT $1, $2, 'lead', id FROM principals \
+          WHERE company_id = $1 AND agent_id = $3 AND kind = 'agent'",
+    )
+    .bind(s.company().as_uuid())
+    .bind(goal)
+    .bind(s.tool.agent)
+    .execute(s.pool())
+    .await
+    .unwrap();
+    let caller = s.claim_from(front, "status-runtime").await;
+    let mut llm = scripted_llm(vec![
+        LlmTurn::tool_call("goal__status", json!({})),
+        LlmTurn::text("\"read\""),
+    ])
+    .await;
+    register_scripted_agent_base_url(s.tool.agent, &llm.base_url);
+    let runtime = s.tool.runtime();
+    let WorkflowHandlerOutcome::Completed(Ok(_)) =
+        Box::pin(runtime.execute(&kind(), &caller)).await
+    else {
+        panic!("the agent reads its goal's status and finishes");
+    };
+    let first = llm.requests.recv().await.unwrap();
+    let offered: Vec<&str> = first["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|tool| tool["function"]["name"].as_str())
+        .collect();
+    assert!(offered.contains(&"goal__status"), "{offered:?}");
+    let second = llm.requests.recv().await.unwrap();
+    let answer = second["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["role"] == "tool")
+        .expect("the tool result");
+    let content: serde_json::Value =
+        serde_json::from_str(answer["content"].as_str().unwrap()).unwrap();
+    let status = &content["status"];
+    assert_eq!(status["goal"], goal.to_string(), "{content}");
+    assert_eq!(status["name"], "launch");
+    assert_eq!(status["runs_counted"], 1, "the calling run itself");
+    assert_eq!(status["units"][0]["running"], 1);
+}

@@ -12509,7 +12509,8 @@ CREATE TABLE public.agent_capability_bindings (
     CHECK(company_id IS NOT NULL OR kind='builtin'),
     CONSTRAINT agent_binding_target_shape CHECK (
         (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
-            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel_call')
+            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel_call',
+            'goal_status')
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=1)
         OR (kind='http' AND http_connection_id IS NOT NULL AND operation_name IS NOT NULL
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=2)
@@ -12519,9 +12520,10 @@ CREATE TABLE public.agent_capability_bindings (
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)),
     CONSTRAINT agent_binding_reserved_alias CHECK (
         NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
-            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel.call'))
+            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel.call',
+            'goal.status'))
         OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply'
-            WHEN 'channel_call' THEN 'channel.call' ELSE builtin END))
+            WHEN 'channel_call' THEN 'channel.call' WHEN 'goal_status' THEN 'goal.status' ELSE builtin END))
 );
 CREATE TABLE public.agent_draft_bindings (
     company_id uuid,

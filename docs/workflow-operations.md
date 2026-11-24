@@ -45,6 +45,12 @@ that serves a goal is then checked against the goal's total cap, which counts th
 every department: at or over it, the run is refused with `budget.goal_exhausted` (see
 [Goals](departments.md#goals)). Admitted runs are not stopped by a cap.
 
+A goal's work is followed from the company's **Goals** tab: each goal's open, waiting and failed runs
+and its spend against its total cap, and, once chosen, its status by department (see
+[Goals](departments.md#goals)). "Runs for this goal" opens the runs page and board filtered to the
+goal (`goal_id`, offered only for goals the viewer may see); the JSON run listing has no goal
+filter.
+
 Use the company Workflows/Runs page to filter failures/waits and open the exact run, execution,
 action and decision. The authenticated read API is
 `GET /api/companies/{company_id}/workflow-runs/{run_id}`; list runs under the same prefix at

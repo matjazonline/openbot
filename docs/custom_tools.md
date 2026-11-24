@@ -9,6 +9,10 @@ An agent can receive these tool sources:
 
 - Built-ins such as message send/reply and knowledge search, within the run's actual target and
   source-message authority.
+- Opt-in built-ins that nothing grants automatically: `channel.call` (ask another desk and wait for
+  its answer; see [Workflow operations](workflow-operations.md#channel-calls)) and `goal.status`
+  (read the status of the goal the calling run serves, for an agent holding the goal's lead or
+  sponsor role; it takes no arguments and never acts; see [Departments](departments.md#goals)).
 - Company HTTP and MCP operations, with an approved connection, reviewed operation and exact
   per-agent assignment. Discovery alone grants no execution authority.
 - Registered workflow tools, pinned to an immutable workflow version and parameter configuration.

@@ -39,6 +39,8 @@ mod channel_call_views_db_tests;
 mod delivery_tests;
 #[path = "goal_budget_tests.rs"]
 mod goal_budget_tests;
+#[path = "goal_rollup_cost_tests.rs"]
+mod goal_rollup_cost_tests;
 #[path = "goal_trail_tests.rs"]
 mod goal_trail_tests;
 #[path = "message_ingress_tests.rs"]

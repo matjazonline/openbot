@@ -184,23 +184,21 @@ impl ToolSetup {
         Box::pin(Self::bind_child(fixture, reviewer, child)).await
     }
 
-    /// As `new`, with the built-in `channel.call` granted to the agent too.
-    pub(super) async fn with_channel_call(child: Value) -> Self {
+    /// As `new`, with exactly `builtins` granted to the agent too.
+    pub(super) async fn with_builtins(
+        child: Value,
+        builtins: &[crate::entities::agent_capability::AgentBuiltinTool],
+    ) -> Self {
         let fixture = Fixture::new().await;
         let reviewer = member(&fixture, "admin").await;
         let child = fixture
             .publish_workflow(WorkflowId::new(Uuid::from_u128(CHILD)), child)
             .await;
-        let binding = crate::entities::agent_capability::AgentToolBinding::builtin(
-            crate::entities::agent_capability::AgentBuiltinTool::ChannelCall,
-        );
-        Box::pin(Self::bind_child_with(
-            fixture,
-            reviewer,
-            child,
-            vec![binding],
-        ))
-        .await
+        let bindings = builtins
+            .iter()
+            .map(|tool| crate::entities::agent_capability::AgentToolBinding::builtin(*tool))
+            .collect();
+        Box::pin(Self::bind_child_with(fixture, reviewer, child, bindings)).await
     }
 
     pub(super) async fn bind_child(fixture: Fixture, reviewer: Uuid, child: VersionId) -> Self {

@@ -1,0 +1,162 @@
+{
+ "version": 1,
+ "round": "08G-P04-B1-R2",
+ "artifact": "c081c405b668c034641caeac45ada2af93e98c1a88d6874c355f2634f4c3fc47",
+ "checks": [
+  {
+   "criteria": [
+    "04B-full-gate",
+    "fmt",
+    "patch-whitespace",
+    "offline-compile",
+    "migrations",
+    "sqlx-metadata",
+    "db-suite",
+    "stack-budget",
+    "lease-budget"
+   ],
+   "command": "CARGO_BUILD_JOBS=6 RUST_TEST_THREADS=8 DATABASE_URL=postgres://mac02@localhost:5432/postgres ./scripts/check.sh",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/08G-P04-final-check.txt",
+     "sha256": "bbc3b4e5951169e79fcb1559fe1ecfdc7aaa67d980c2736f53c1e6a5e9ff63cc"
+    }
+   ],
+   "note": "exit 1; per-gate dispositions in TASK 'Final gate': DB suite and stack budget fail only the pre-existing doop prepared-version test; environment gates rerun or UNAVAILABLE"
+  },
+  {
+   "criteria": [
+    "clippy"
+   ],
+   "command": "cargo clippy --locked --offline --all-targets -- -D warnings (after removing with_channel_call)",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/08G-P04-clippy-after-fix.txt",
+     "sha256": "1edf3c1b575fdc9a2a84f16f99db097f76c948eda1aa7c4eac5d41529458baa4"
+    }
+   ],
+   "note": "only the 9 pre-existing redundant_field_names lints from merge 73afd5a7"
+  },
+  {
+   "criteria": [
+    "goal.status-agent-runtime",
+    "goal-status-binding-check",
+    "04B-focused"
+   ],
+   "command": "cargo test --offline --locked --lib -- goal_ channel_call_ builtin exactness catalog",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P04-focused.txt",
+     "sha256": "6f8cb6c7524e924c269e78a2d6226b83762db1f53bf6b804ac2206b7712a3069"
+    },
+    {
+     "path": "logs/08G-P04-goal-status-runtime-2.txt",
+     "sha256": "f0c5e8f947d6dfe6944b7bfb2c7b36074df4a3647b422e2b1f21a2e85036e1a8"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "rollup-cost-at-limit"
+   ],
+   "command": "cargo test --offline --locked --lib -- --ignored --nocapture goal_rollup_cost_at_the_run_limit",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P04-rollup-cost.txt",
+     "sha256": "343ab58dc3d7d72c5f10b229e872dadc4861f09eb7de3e9bcac8d851c48ec16a"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "transport-boundary"
+   ],
+   "command": "PATH=<scratchpad rg shim>:$PATH scripts/tests/transport-boundary.sh && scripts/transport-boundary-check.sh",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P04-transport-boundary.txt",
+     "sha256": "932ef83352db73972ce3f17e52e16412e6ad3c300333802cf9da8e62f8ce7a87"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "query-statistics"
+   ],
+   "command": "check_query_statistics + cargo test --lib -- query_health on a private PG 18.7 cluster with pg_stat_statements (127.0.0.1:15482)",
+   "fixture": "private disposable cluster in the scratchpad",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P04-query-statistics.txt",
+     "sha256": "9304d489459775532433d2857d59229d5c7806537930e10abc7adbf0945a0562"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "memory-extracted",
+    "memory-journey",
+    "attribution-extracted"
+   ],
+   "command": "python3.13 first on PATH: services/memory/scripts/extracted-build.sh; standalone-journey.sh; check_attribution_service",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/08G-P04-python313-gates.txt",
+     "sha256": "c65ae8eef056503c29cf876e6189b7e43ee422d38fdd33cc0f0a5ae553be6776"
+    }
+   ],
+   "note": "memory suite and journey PASS; attribution 120 tests pass, then the contract check needs the jsonschema package (unavailable)"
+  },
+  {
+   "criteria": [
+    "graph-refresh"
+   ],
+   "command": "graft build",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/08G-P04-graph-build.txt",
+     "sha256": "6eb1e86d40ebf91b5f8395eb4ba6a1ccf177350a76b81581e3d722156abe2463"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "linux-network-isolation-scope",
+    "plugin-package-node-24.21.0",
+    "docker-images",
+    "managed-doop-chrome",
+    "attribution-contracts-jsonschema"
+   ],
+   "command": "none",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "NOT EXERCISED",
+   "files": [],
+   "reason": "Unavailable here: Linux-only scope test; Node 24.21.0 not installed (24.22.3/26); no Docker daemon; DOOP_TEST_UI_CHROME unset; jsonschema not installed for Python 3.13 (not installed without asking)"
+  },
+  {
+   "criteria": [
+    "goals-page-browser"
+   ],
+   "command": "none",
+   "fixture": "fresh check DB openbot_check_* (check.sh); scratch openbot_p08p03_mac02(_test) recreated after the CHECK edit and after the measurement; local macOS, PostgreSQL 18.7",
+   "status": "NOT EXERCISED",
+   "files": [],
+   "reason": "No browser script covers the department form or goals pages; HTTP route tests are the stand-in (as recorded in p03)"
+  }
+ ]
+}

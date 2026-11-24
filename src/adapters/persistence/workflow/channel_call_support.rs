@@ -77,7 +77,19 @@ impl CallSetup {
     }
 
     pub(super) async fn with(definition: Value) -> Self {
-        let tool = Box::pin(ToolSetup::with_channel_call(echo_child())).await;
+        Box::pin(Self::with_tools(
+            definition,
+            &[crate::entities::agent_capability::AgentBuiltinTool::ChannelCall],
+        ))
+        .await
+    }
+
+    /// The same setup, its agent holding `builtins` (Plan08 p04: `goal.status` beside the call).
+    pub(super) async fn with_tools(
+        definition: Value,
+        builtins: &[crate::entities::agent_capability::AgentBuiltinTool],
+    ) -> Self {
+        let tool = Box::pin(ToolSetup::with_builtins(echo_child(), builtins)).await;
         let desk = new_channel(&tool.fixture, "finance").await;
         // The desk sits in its own unit under the root; the caller's write unit is the root.
         let unit = tool

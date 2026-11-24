@@ -1,0 +1,394 @@
+diff --git a/docs/agent-builder-context.md b/docs/agent-builder-context.md
+index 9eddffe2..933fa253 100644
+--- a/docs/agent-builder-context.md
++++ b/docs/agent-builder-context.md
+@@ -19,6 +19,13 @@ The built-in `agent-builder` has `list_company_agents` and `create_agent_channel
+ - `list_company_agents` lists the company's agents and enabled models. Each agent names the departments it belongs to, with the roles it holds there (`departments: [{slug, name, roles}]`), and its own desk (`desk: {id, address}`, `null` once that desk was deleted). Pass `department` (a slug) to list only that department's members and role holders; an unknown slug is refused. Entries carry no intake schema: an agent granted the `channel.call` built-in sees the public desks it can call, with their intake, in that tool's description. See [departments](departments.md).
+ - `create_agent_channel` creates **one agent with its own desk**: a team desk at the agent's slug, answered through the shipped autonomous reply workflow. Name another address in `channel_slug` for a reviewed desk or one with custom steps; that desk is created beside the default one, never instead of it. `department` (a slug) places the agent there as a member, and `role: "lead"` makes it that department's lead; without `department`, the agent joins the requester's department when the requester belongs to exactly one.
+ 
++A goal is a department of the Goal kind, so `department` may name a goal's slug and `role: "lead"`
++makes the agent the goal's lead. The Builder has no department-creation tool: a person creates a
++goal on the Departments tab or with `POST /api/companies/{company_id}/departments` and `kind:
++"goal"` (see [departments](departments.md#goals)). Use a standing department for a lasting team and
++a goal for work with an end. A goal's planning agent needs the opt-in `goal.status` built-in, granted
++in **Agents**, to read the goal's status.
++
+ Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation needs explicit confirmation of the full specification. A library copy of Agent Builder, like every company agent, gets its own autonomous desk at its slug, where you converse with it.
+ 
+ Agent Builder has no workflow-draft, publication, or arbitrary desk-creation tool. It can propose workflow steps or YAML for the **Workflows** editor. Use that editor to save, validate, publish, bind, and activate a custom workflow. Report those actions as completed only after they succeed.
+diff --git a/docs/custom_tools.md b/docs/custom_tools.md
+index 4cb00b1f..663a1474 100644
+--- a/docs/custom_tools.md
++++ b/docs/custom_tools.md
+@@ -9,6 +9,10 @@ An agent can receive these tool sources:
+ 
+ - Built-ins such as message send/reply and knowledge search, within the run's actual target and
+   source-message authority.
++- Opt-in built-ins that nothing grants automatically: `channel.call` (ask another desk and wait for
++  its answer; see [Workflow operations](workflow-operations.md#channel-calls)) and `goal.status`
++  (read the status of the goal the calling run serves, for an agent holding the goal's lead or
++  sponsor role; it takes no arguments and never acts; see [Departments](departments.md#goals)).
+ - Company HTTP and MCP operations, with an approved connection, reviewed operation and exact
+   per-agent assignment. Discovery alone grants no execution authority.
+ - Registered workflow tools, pinned to an immutable workflow version and parameter configuration.
+diff --git a/docs/workflow-operations.md b/docs/workflow-operations.md
+index 8f2cbc9b..fa6a78f0 100644
+--- a/docs/workflow-operations.md
++++ b/docs/workflow-operations.md
+@@ -45,6 +45,12 @@ that serves a goal is then checked against the goal's total cap, which counts th
+ every department: at or over it, the run is refused with `budget.goal_exhausted` (see
+ [Goals](departments.md#goals)). Admitted runs are not stopped by a cap.
+ 
++A goal's work is followed from the company's **Goals** tab: each goal's open, waiting and failed runs
++and its spend against its total cap, and, once chosen, its status by department (see
++[Goals](departments.md#goals)). "Runs for this goal" opens the runs page and board filtered to the
++goal (`goal_id`, offered only for goals the viewer may see); the JSON run listing has no goal
++filter.
++
+ Use the company Workflows/Runs page to filter failures/waits and open the exact run, execution,
+ action and decision. The authenticated read API is
+ `GET /api/companies/{company_id}/workflow-runs/{run_id}`; list runs under the same prefix at
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 86dca138..fbb277ec 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -12509,7 +12509,8 @@ CREATE TABLE public.agent_capability_bindings (
+     CHECK(company_id IS NOT NULL OR kind='builtin'),
+     CONSTRAINT agent_binding_target_shape CHECK (
+         (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
+-            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel_call')
++            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel_call',
++            'goal_status')
+             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=1)
+         OR (kind='http' AND http_connection_id IS NOT NULL AND operation_name IS NOT NULL
+             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=2)
+@@ -12519,9 +12520,10 @@ CREATE TABLE public.agent_capability_bindings (
+             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)),
+     CONSTRAINT agent_binding_reserved_alias CHECK (
+         NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
+-            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel.call'))
++            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation','channel.call',
++            'goal.status'))
+         OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply'
+-            WHEN 'channel_call' THEN 'channel.call' ELSE builtin END))
++            WHEN 'channel_call' THEN 'channel.call' WHEN 'goal_status' THEN 'goal.status' ELSE builtin END))
+ );
+ CREATE TABLE public.agent_draft_bindings (
+     company_id uuid,
+diff --git a/plan/08-goals/04-integration-and-final-verification.md b/plan/08-goals/04-integration-and-final-verification.md
+index 81c9d0dc..4cf3a000 100644
+--- a/plan/08-goals/04-integration-and-final-verification.md
++++ b/plan/08-goals/04-integration-and-final-verification.md
+@@ -46,14 +46,20 @@ Name only behavior the code has.
+ 
+ | Evidence | Part 01 | Parts 02 and 03 |
+ | --- | --- | --- |
+-| Open proposals settled and recorded | Pending | Pending |
+-| 01 focused checks (sponsor, resolution, admission, escalation default, competing) | Pending | n/a |
+-| 02 focused checks (archive, refusals, runs, scopes, authority, competing) | n/a | Pending |
+-| 03 focused checks (unit, trail, budget, rollup, authorization, competing) | n/a | Pending |
+-| Formatting, offline compilation, clippy and reachability | Pending | Pending |
+-| Fresh migrations and SQLx metadata | Pending | Pending |
+-| Database-backed full suite and network isolation | Pending | Pending |
+-| Stack and lease budgets | Pending | Pending |
+-| Docs, startup plan paths and graph refresh | Pending | Pending |
++| Open proposals settled and recorded | In p01's records (`phases/p01/docs/`) | Settled: 2 and 3 on 2026-11-21, 4 and 5 on 2026-11-24 (README) |
++| 01 focused checks (sponsor, resolution, admission, escalation default, competing) | In p01's records | n/a |
++| 02 focused checks (archive, refusals, runs, scopes, authority, competing) | n/a | PASS in p02 (`fe7791d3`, `phases/p02/docs/`) |
++| 03 focused checks (unit, trail, budget, rollup, authorization, competing) | n/a | PASS in p03 B1 and B2 (`481b14cd`, `f1eb82dc`); `goal.status` through the agent runtime PASS in p04 |
++| Formatting, offline compilation, clippy and reachability | In p01's records | Formatting, patch whitespace, offline compilation and reachability PASS. Clippy FAIL on only the 9 `redundant_field_names` lints from merge `73afd5a7`, which predate this plan |
++| Fresh migrations and SQLx metadata | In p01's records | PASS |
++| Database-backed full suite and network isolation | In p01's records | 5195 passed, 1 pre-existing failure (doop prepared version 7 vs 8), run under macOS `sandbox-exec`. The Linux network-isolation scope is UNAVAILABLE locally (CI only) |
++| Stack and lease budgets | In p01's records | Stack: the same single pre-existing failure, no overflow. Lease PASS |
++| Docs, startup plan paths and graph refresh | In p01's records | 04A docs PASS; plan paths in `NO_BACKWARD_COMPATIBILITY_NOTES`; `graft build` PASS |
++
++Parts 02 and 03, final gate (p04, 2026-11-24, `phases/p04/docs/TASK.md`): unavailable here are the Node
++24.21.0 plugin package, the three Docker images, managed Doop (Chrome), the attribution contract check
++(`jsonschema`) and the Linux network-isolation scope. Attribution browser integration fails as it did before
++this plan. These are environment gaps, not defects found in this plan. The delivery is accepted in phase and
++is not declared complete until they run.
+ 
+ Do not declare a delivery complete while a required check is unavailable.
+diff --git a/plan/08-goals/COORDINATION.md b/plan/08-goals/COORDINATION.md
+index 47f688bc..f85aa9d6 100644
+--- a/plan/08-goals/COORDINATION.md
++++ b/plan/08-goals/COORDINATION.md
+@@ -22,6 +22,15 @@ only), `goal_spend`, `model_usage_calls`/`model_usage_history.goal_unit_id`, `wo
+ `schedule_runs` refusal `budget.goal_exhausted`, and the `goal.status` built-in. 08G-C002 is satisfied for p03: its
+ checks are in the B2 focused run. Open for p04: `goal.status` through the agent runtime is not yet exercised.
+ 
++r11 (2026-11-24): p04 started (root `1e84a7af`, records `phases/p04/docs/`). p04 changed one shared contract,
++fixing a p03 defect: `agent_tool_bindings` CHECKs now admit the builtin `goal_status` (alias `goal.status`);
++before this, no agent could be given the tool. Final gate running.
++
++r12 (2026-11-24): p04 final gate recorded (`phases/p04/docs/TASK.md` "Final gate"). No regression from Plan08
++remains: the DB suite and the stack budget each fail only the pre-existing doop prepared-version test. Clippy
++fails only on 9 pre-existing lints. The unavailable gates are listed in the 04 completion record. No new
++notice.
++
+ ## Phase directory
+ 
+ | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
+@@ -29,6 +38,7 @@ checks are in the B2 focused run. Open for p04: `goal.status` through the agent
+ | p01 | /root; resumed on integrated prerequisite (complete) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p01/docs/TASK.md; phases/p01/docs/HANDOFF.md |
+ | p02 | Claude Code `plan08-ph1-51` | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p02/docs/TASK.md; phases/p02/docs/HANDOFF.md |
+ | p03 | Claude Code `1e84a7af` (started 2026-11-24; B1 and B2 accepted in phase and committed; p03 complete in phase) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p03/docs/TASK.md; phases/p03/docs/HANDOFF.md |
++| p04 | Claude Code `1e84a7af` (started 2026-11-24; final gate) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p04/docs/TASK.md; phases/p04/docs/HANDOFF.md |
+ 
+ ## Cross-phase notices
+ 
+diff --git a/src/adapters/persistence/workflow/channel_call_support.rs b/src/adapters/persistence/workflow/channel_call_support.rs
+index e0cf31aa..2e1a645a 100644
+--- a/src/adapters/persistence/workflow/channel_call_support.rs
++++ b/src/adapters/persistence/workflow/channel_call_support.rs
+@@ -77,7 +77,19 @@ impl CallSetup {
+     }
+ 
+     pub(super) async fn with(definition: Value) -> Self {
+-        let tool = Box::pin(ToolSetup::with_channel_call(echo_child())).await;
++        Box::pin(Self::with_tools(
++            definition,
++            &[crate::entities::agent_capability::AgentBuiltinTool::ChannelCall],
++        ))
++        .await
++    }
++
++    /// The same setup, its agent holding `builtins` (Plan08 p04: `goal.status` beside the call).
++    pub(super) async fn with_tools(
++        definition: Value,
++        builtins: &[crate::entities::agent_capability::AgentBuiltinTool],
++    ) -> Self {
++        let tool = Box::pin(ToolSetup::with_builtins(echo_child(), builtins)).await;
+         let desk = new_channel(&tool.fixture, "finance").await;
+         // The desk sits in its own unit under the root; the caller's write unit is the root.
+         let unit = tool
+diff --git a/src/adapters/persistence/workflow/goal_budget_tests.rs b/src/adapters/persistence/workflow/goal_budget_tests.rs
+index 789123dd..dbe2e623 100644
+--- a/src/adapters/persistence/workflow/goal_budget_tests.rs
++++ b/src/adapters/persistence/workflow/goal_budget_tests.rs
+@@ -900,3 +900,63 @@ async fn goal_rollup_status_tool_returns_the_rollup_and_refuses_without_a_goal()
+         "This run's goal is no longer a goal"
+     );
+ }
++
++/// Plan08 p04 (the stand-in p03 left): an agent holding `goal.status` and the goal's lead role
++/// calls it from a real agent step on the goal's desk; the model is offered `goal__status`, and
++/// the tool result it reads next is the goal's status.
++#[tokio::test]
++async fn goal_rollup_status_tool_through_the_agent_runtime() {
++    use crate::entities::agent_capability::AgentBuiltinTool;
++    let s = Box::pin(CallSetup::with_tools(
++        destination(None),
++        &[AgentBuiltinTool::ChannelCall, AgentBuiltinTool::GoalStatus],
++    ))
++    .await;
++    let (goal, front) = goal_with_desk(&s, "launch").await;
++    sqlx::query(
++        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
++         SELECT $1, $2, 'lead', id FROM principals \
++          WHERE company_id = $1 AND agent_id = $3 AND kind = 'agent'",
++    )
++    .bind(s.company().as_uuid())
++    .bind(goal)
++    .bind(s.tool.agent)
++    .execute(s.pool())
++    .await
++    .unwrap();
++    let caller = s.claim_from(front, "status-runtime").await;
++    let mut llm = scripted_llm(vec![
++        LlmTurn::tool_call("goal__status", json!({})),
++        LlmTurn::text("\"read\""),
++    ])
++    .await;
++    register_scripted_agent_base_url(s.tool.agent, &llm.base_url);
++    let runtime = s.tool.runtime();
++    let WorkflowHandlerOutcome::Completed(Ok(_)) =
++        Box::pin(runtime.execute(&kind(), &caller)).await
++    else {
++        panic!("the agent reads its goal's status and finishes");
++    };
++    let first = llm.requests.recv().await.unwrap();
++    let offered: Vec<&str> = first["tools"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .filter_map(|tool| tool["function"]["name"].as_str())
++        .collect();
++    assert!(offered.contains(&"goal__status"), "{offered:?}");
++    let second = llm.requests.recv().await.unwrap();
++    let answer = second["messages"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .find(|message| message["role"] == "tool")
++        .expect("the tool result");
++    let content: serde_json::Value =
++        serde_json::from_str(answer["content"].as_str().unwrap()).unwrap();
++    let status = &content["status"];
++    assert_eq!(status["goal"], goal.to_string(), "{content}");
++    assert_eq!(status["name"], "launch");
++    assert_eq!(status["runs_counted"], 1, "the calling run itself");
++    assert_eq!(status["units"][0]["running"], 1);
++}
+diff --git a/src/adapters/persistence/workflow/message_tests.rs b/src/adapters/persistence/workflow/message_tests.rs
+index 4a9003db..430a9cbb 100644
+--- a/src/adapters/persistence/workflow/message_tests.rs
++++ b/src/adapters/persistence/workflow/message_tests.rs
+@@ -39,6 +39,8 @@ mod channel_call_views_db_tests;
+ mod delivery_tests;
+ #[path = "goal_budget_tests.rs"]
+ mod goal_budget_tests;
++#[path = "goal_rollup_cost_tests.rs"]
++mod goal_rollup_cost_tests;
+ #[path = "goal_trail_tests.rs"]
+ mod goal_trail_tests;
+ #[path = "message_ingress_tests.rs"]
+diff --git a/src/adapters/persistence/workflow/workflow_tool_support.rs b/src/adapters/persistence/workflow/workflow_tool_support.rs
+index 724111f9..6e834033 100644
+--- a/src/adapters/persistence/workflow/workflow_tool_support.rs
++++ b/src/adapters/persistence/workflow/workflow_tool_support.rs
+@@ -184,23 +184,21 @@ impl ToolSetup {
+         Box::pin(Self::bind_child(fixture, reviewer, child)).await
+     }
+ 
+-    /// As `new`, with the built-in `channel.call` granted to the agent too.
+-    pub(super) async fn with_channel_call(child: Value) -> Self {
++    /// As `new`, with exactly `builtins` granted to the agent too.
++    pub(super) async fn with_builtins(
++        child: Value,
++        builtins: &[crate::entities::agent_capability::AgentBuiltinTool],
++    ) -> Self {
+         let fixture = Fixture::new().await;
+         let reviewer = member(&fixture, "admin").await;
+         let child = fixture
+             .publish_workflow(WorkflowId::new(Uuid::from_u128(CHILD)), child)
+             .await;
+-        let binding = crate::entities::agent_capability::AgentToolBinding::builtin(
+-            crate::entities::agent_capability::AgentBuiltinTool::ChannelCall,
+-        );
+-        Box::pin(Self::bind_child_with(
+-            fixture,
+-            reviewer,
+-            child,
+-            vec![binding],
+-        ))
+-        .await
++        let bindings = builtins
++            .iter()
++            .map(|tool| crate::entities::agent_capability::AgentToolBinding::builtin(*tool))
++            .collect();
++        Box::pin(Self::bind_child_with(fixture, reviewer, child, bindings)).await
+     }
+ 
+     pub(super) async fn bind_child(fixture: Fixture, reviewer: Uuid, child: VersionId) -> Self {
+diff --git a/src/adapters/persistence/workflow/goal_rollup_cost_tests.rs b/src/adapters/persistence/workflow/goal_rollup_cost_tests.rs
+new file mode 100644
+index 00000000..3325f6d6
+--- /dev/null
++++ b/src/adapters/persistence/workflow/goal_rollup_cost_tests.rs
+@@ -0,0 +1,105 @@
++//! `goal_rollup_cost_` (Plan08 03D.1, measured in p04): the rollup's cost with more runs than
++//! `GOAL_ROLLUP_RUN_LIMIT`. Ignored: it writes 10,001 runs, so run it alone on a scratch database
++//! with `--ignored --nocapture` and read the timings and plan it prints.
++use super::channel_call_support::*;
++use super::goal_trail_tests::{goal_with_desk, try_admit};
++use super::*;
++use crate::adapters::persistence::department::goal_rollup::goal_rollup_on;
++use crate::application::ports::department::GOAL_ROLLUP_RUN_LIMIT;
++use crate::entities::department::DepartmentId;
++
++#[tokio::test]
++#[ignore = "measurement: writes 10,001 runs; run alone on a scratch database"]
++async fn goal_rollup_cost_at_the_run_limit() {
++    let s = CallSetup::new().await;
++    let (goal, front) = goal_with_desk(&s, "launch").await;
++    let association = RelatedAssociation::Channel(RelatedChannelId::new(front));
++    let AdmissionResult::Created(seed) =
++        try_admit(&s, association, "cost-seed", None).await.unwrap()
++    else {
++        panic!("the seed run is created");
++    };
++    // Clone the admitted run under new ids, one second apart, until the goal has one run more
++    // than the limit. Each clone carries the seed's goal, thread and association, and a copy of
++    // its root budget (the two reference each other, deferred, so one transaction writes both).
++    let clones: Vec<Uuid> = (0..GOAL_ROLLUP_RUN_LIMIT).map(|_| Uuid::new_v4()).collect();
++    let columns: String = sqlx::query_scalar(
++        "SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position) \
++           FROM information_schema.columns \
++          WHERE table_schema = 'public' AND table_name = 'workflow_runs' \
++            AND column_name NOT IN ('id', 'created_at') AND is_generated = 'NEVER'",
++    )
++    .fetch_one(s.pool())
++    .await
++    .unwrap();
++    let mut tx = s.pool().begin().await.unwrap();
++    sqlx::query(&format!(
++        "INSERT INTO workflow_runs (id, created_at, {columns}) \
++         SELECT clone.id, run.created_at - make_interval(secs => clone.n::double precision), \
++                {columns} \
++           FROM workflow_runs AS run CROSS JOIN unnest($3::uuid[]) WITH ORDINALITY AS clone(id, n) \
++          WHERE run.company_id = $1 AND run.id = $2"
++    ))
++    .bind(s.company().as_uuid())
++    .bind(seed.as_uuid())
++    .bind(&clones)
++    .execute(&mut *tx)
++    .await
++    .unwrap();
++    sqlx::query(
++        "INSERT INTO workflow_root_budgets \
++                (company_id, root_run_id, activations, model_calls, repetitions, token_policy) \
++         SELECT budget.company_id, clone.id, budget.activations, budget.model_calls, \
++                budget.repetitions, budget.token_policy \
++           FROM workflow_root_budgets AS budget CROSS JOIN unnest($3::uuid[]) AS clone(id) \
++          WHERE budget.company_id = $1 AND budget.root_run_id = $2",
++    )
++    .bind(s.company().as_uuid())
++    .bind(seed.as_uuid())
++    .bind(&clones)
++    .execute(&mut *tx)
++    .await
++    .unwrap();
++    tx.commit().await.unwrap();
++    sqlx::query("ANALYZE workflow_runs")
++        .execute(s.pool())
++        .await
++        .unwrap();
++    let mut db = s.pool().acquire().await.unwrap();
++    for attempt in 1..=3 {
++        let started = std::time::Instant::now();
++        let status = goal_rollup_on(
++            &mut db,
++            s.company(),
++            DepartmentId::new(goal),
++            GOAL_ROLLUP_RUN_LIMIT,
++        )
++        .await
++        .unwrap();
++        println!(
++            "rollup attempt {attempt}: {} ms",
++            started.elapsed().as_millis()
++        );
++        assert!(status.truncated);
++        assert_eq!(status.runs_counted, GOAL_ROLLUP_RUN_LIMIT);
++    }
++    let plan: Vec<String> = sqlx::query_scalar(
++        "EXPLAIN (ANALYZE, BUFFERS) \
++         SELECT run.id, \
++                COALESCE((SELECT scope.unit_id FROM workflow_run_scopes AS scope \
++                           WHERE scope.company_id = run.company_id AND scope.run_id = run.id \
++                             AND scope.acting_principal_id IS NULL AND scope.access = 'write' LIMIT 1), \
++                         (SELECT root.id FROM departments AS root \
++                           WHERE root.company_id = run.company_id AND root.is_root)) AS unit \
++           FROM workflow_runs AS run \
++          WHERE run.company_id = $1 AND run.goal_unit_id = $2 \
++          ORDER BY run.created_at DESC, run.id DESC LIMIT $3",
++    )
++    .bind(s.company().as_uuid())
++    .bind(goal)
++    .bind(GOAL_ROLLUP_RUN_LIMIT + 1)
++    .fetch_all(&mut *db)
++    .await
++    .unwrap();
++    println!("{}", plan.join("\n"));
++}

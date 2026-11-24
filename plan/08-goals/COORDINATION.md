@@ -22,6 +22,18 @@ only), `goal_spend`, `model_usage_calls`/`model_usage_history.goal_unit_id`, `wo
 `schedule_runs` refusal `budget.goal_exhausted`, and the `goal.status` built-in. 08G-C002 is satisfied for p03: its
 checks are in the B2 focused run. Open for p04: `goal.status` through the agent runtime is not yet exercised.
 
+r11 (2026-11-24): p04 started (root `1e84a7af`, records `phases/p04/docs/`). p04 changed one shared contract,
+fixing a p03 defect: `agent_tool_bindings` CHECKs now admit the builtin `goal_status` (alias `goal.status`);
+before this, no agent could be given the tool. Final gate running.
+
+r12 (2026-11-24): p04 final gate recorded (`phases/p04/docs/TASK.md` "Final gate"). No regression from Plan08
+remains: the DB suite and the stack budget each fail only the pre-existing doop prepared-version test. Clippy
+fails only on 9 pre-existing lints. The unavailable gates are listed in the 04 completion record. No new
+notice.
+
+r13 (2026-11-24): p04 is accepted in phase (B PASS 08G-P04-B1-R2-N1 at `c081c405…fc47`). Plan08 parts 02 and 03
+are accepted, but not declared complete while the gates unavailable here have not run (04 completion record).
+
 ## Phase directory
 
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
@@ -29,6 +41,7 @@ checks are in the B2 focused run. Open for p04: `goal.status` through the agent 
 | p01 | /root; resumed on integrated prerequisite (complete) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p01/docs/TASK.md; phases/p01/docs/HANDOFF.md |
 | p02 | Claude Code `plan08-ph1-51` | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p02/docs/TASK.md; phases/p02/docs/HANDOFF.md |
 | p03 | Claude Code `1e84a7af` (started 2026-11-24; B1 and B2 accepted in phase and committed; p03 complete in phase) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p03/docs/TASK.md; phases/p03/docs/HANDOFF.md |
+| p04 | Claude Code `1e84a7af` (accepted in phase 2026-11-24) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p04/docs/TASK.md; phases/p04/docs/HANDOFF.md |
 
 ## Cross-phase notices
 

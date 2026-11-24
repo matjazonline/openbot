@@ -1,0 +1,31 @@
+ openbot_check_query_probe 
+---------------------------
+                         1
+(1 row)
+
+query statistics gate exit 0
+Applied 20260817000000/migrate init schema (502.358125ms)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.90s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-252b86f5c60aba02)
+
+running 11 tests
+test adapters::http::pages::dashboard_query_health::tests::hidden_unavailable_and_available_are_distinct_states ... ok
+test adapters::persistence::database_query_health::tests::query_is_current_database_scoped_and_rankings_are_deterministic ... ok
+test adapters::persistence::database_query_health::tests::sql_text_is_bounded_again_at_the_adapter_boundary ... ok
+test application::services::database_query_health::tests::normalized_sql_is_bounded_by_bytes_on_a_character_boundary ... ok
+test application::services::database_query_health::tests::failures_are_cached_for_fifteen_seconds ... ok
+test application::services::database_query_health::tests::successes_are_cached_for_sixty_seconds_and_refresh_after_expiry ... ok
+test adapters::http::routes::ui_dashboard::tests::query_health_is_read_only_for_an_operator_in_system_scope ... ok
+test adapters::http::pages::dashboard_query_health::tests::deallocation_and_unsafe_logging_configuration_warn ... ok
+test adapters::http::pages::dashboard_query_health::tests::normalized_sql_is_escaped_and_truncation_is_visible ... ok
+test application::services::database_query_health::tests::concurrent_misses_share_one_refresh ... ok
+test adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 5216 filtered out; finished in 0.74s
+
+query_health tests exit 0

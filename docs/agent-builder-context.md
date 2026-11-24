@@ -19,6 +19,13 @@ The built-in `agent-builder` has `list_company_agents` and `create_agent_channel
 - `list_company_agents` lists the company's agents and enabled models. Each agent names the departments it belongs to, with the roles it holds there (`departments: [{slug, name, roles}]`), and its own desk (`desk: {id, address}`, `null` once that desk was deleted). Pass `department` (a slug) to list only that department's members and role holders; an unknown slug is refused. Entries carry no intake schema: an agent granted the `channel.call` built-in sees the public desks it can call, with their intake, in that tool's description. See [departments](departments.md).
 - `create_agent_channel` creates **one agent with its own desk**: a team desk at the agent's slug, answered through the shipped autonomous reply workflow. Name another address in `channel_slug` for a reviewed desk or one with custom steps; that desk is created beside the default one, never instead of it. `department` (a slug) places the agent there as a member, and `role: "lead"` makes it that department's lead; without `department`, the agent joins the requester's department when the requester belongs to exactly one.
 
+A goal is a department of the Goal kind, so `department` may name a goal's slug and `role: "lead"`
+makes the agent the goal's lead. The Builder has no department-creation tool: a person creates a
+goal on the Departments tab or with `POST /api/companies/{company_id}/departments` and `kind:
+"goal"` (see [departments](departments.md#goals)). Use a standing department for a lasting team and
+a goal for work with an end. A goal's planning agent needs the opt-in `goal.status` built-in, granted
+in **Agents**, to read the goal's status.
+
 Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation needs explicit confirmation of the full specification. A library copy of Agent Builder, like every company agent, gets its own autonomous desk at its slug, where you converse with it.
 
 Agent Builder has no workflow-draft, publication, or arbitrary desk-creation tool. It can propose workflow steps or YAML for the **Workflows** editor. Use that editor to save, validate, publish, bind, and activate a custom workflow. Report those actions as completed only after they succeed.

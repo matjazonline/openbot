@@ -46,14 +46,20 @@ Name only behavior the code has.
 
 | Evidence | Part 01 | Parts 02 and 03 |
 | --- | --- | --- |
-| Open proposals settled and recorded | Pending | Pending |
-| 01 focused checks (sponsor, resolution, admission, escalation default, competing) | Pending | n/a |
-| 02 focused checks (archive, refusals, runs, scopes, authority, competing) | n/a | Pending |
-| 03 focused checks (unit, trail, budget, rollup, authorization, competing) | n/a | Pending |
-| Formatting, offline compilation, clippy and reachability | Pending | Pending |
-| Fresh migrations and SQLx metadata | Pending | Pending |
-| Database-backed full suite and network isolation | Pending | Pending |
-| Stack and lease budgets | Pending | Pending |
-| Docs, startup plan paths and graph refresh | Pending | Pending |
+| Open proposals settled and recorded | In p01's records (`phases/p01/docs/`) | Settled: 2 and 3 on 2026-11-21, 4 and 5 on 2026-11-24 (README) |
+| 01 focused checks (sponsor, resolution, admission, escalation default, competing) | In p01's records | n/a |
+| 02 focused checks (archive, refusals, runs, scopes, authority, competing) | n/a | PASS in p02 (`fe7791d3`, `phases/p02/docs/`) |
+| 03 focused checks (unit, trail, budget, rollup, authorization, competing) | n/a | PASS in p03 B1 and B2 (`481b14cd`, `f1eb82dc`); `goal.status` through the agent runtime PASS in p04 |
+| Formatting, offline compilation, clippy and reachability | In p01's records | Formatting, patch whitespace, offline compilation and reachability PASS. Clippy FAIL on only the 9 `redundant_field_names` lints from merge `73afd5a7`, which predate this plan |
+| Fresh migrations and SQLx metadata | In p01's records | PASS |
+| Database-backed full suite and network isolation | In p01's records | 5195 passed, 1 pre-existing failure (doop prepared version: the test expects 7, the code is 9 since `358e662a`), run under macOS `sandbox-exec`. The Linux network-isolation scope is UNAVAILABLE locally (CI only) |
+| Stack and lease budgets | In p01's records | Stack: the same single pre-existing failure, no overflow. Lease PASS |
+| Docs, startup plan paths and graph refresh | In p01's records | 04A docs PASS; plan paths in `NO_BACKWARD_COMPATIBILITY_NOTES`; `graft build` PASS |
+
+Parts 02 and 03, final gate (p04, 2026-11-24, `phases/p04/docs/TASK.md`): unavailable here are the Node
+24.21.0 plugin package, the three Docker images, managed Doop (Chrome), the attribution contract check
+(`jsonschema`) and the Linux network-isolation scope. Attribution browser integration fails as it did before
+this plan. These are environment gaps, not defects found in this plan. The delivery is accepted in phase and
+is not declared complete until they run.
 
 Do not declare a delivery complete while a required check is unavailable.
