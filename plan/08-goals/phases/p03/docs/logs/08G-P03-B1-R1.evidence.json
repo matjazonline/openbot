@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "round": "08G-P03-B1-R1",
+  "artifact": "df55a3111d6577894597abbf0616b21036c593d695ff080367497f9da302f27b",
+  "checks": [
+    {
+      "criteria": [
+        "03A.1",
+        "03A.2",
+        "03A.3",
+        "03A.4",
+        "03A.5",
+        "03B.1",
+        "03B.2",
+        "03B.3",
+        "03B.4",
+        "03B.5",
+        "D1.3",
+        "D1.5"
+      ],
+      "command": "cargo test --offline --locked --lib -- goal_ department unit_archive channel_call_ run_scope admission workflow_sample fixture native_mcp thread",
+      "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx); local macOS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/b1-focused-tests.txt",
+          "sha256": "5fd40a8ae361b3f3c2baf7f67b88acb014c702e3a60a301e4bf4cf9b4a6891b8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.1",
+        "catalog-pins",
+        "03A.5"
+      ],
+      "command": "cargo test --offline --locked --lib -- legacy_runtime_schema reviewer_history_hint agent_history_metadata_capacity claim_sql_multiple_applicable goal_unit_sample schema",
+      "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx); local macOS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-catalog-tests.txt",
+          "sha256": "77b6dad545c52878484912ea39188ea7d63293904c964f79505e07e58d022fb8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "stack-budget"
+      ],
+      "command": "bash scripts/stack-budget.sh --offline -- goal_",
+      "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx); local macOS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-stack-budget.txt",
+          "sha256": "8f1039ae55324e1c0d7b2055d498037a1577ba069b0dcbac5037283c1b82c904"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sqlx-offline"
+      ],
+      "command": "cargo sqlx migrate run && SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh scratch database openbot_p08p03_mac02",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-sqlx-prepare.txt",
+          "sha256": "7d18b843015d07fdc9d2075b8d175b487e90db292376b2da1ef387f2615c36e5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool",
+      "fixture": "toolchain 1.95.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-clippy.txt",
+          "sha256": "d1d2fcdce4f401d1b0e9751d4defa553bc3c80da874f5e843dbbb77d19467561"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "format"
+      ],
+      "command": "cargo fmt --check",
+      "fixture": "local rustfmt",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-fmt.txt",
+          "sha256": "e6bd6a3dacc6926b69c2ff51d4aa3b25b570b5d7adef3f34f04d25a07e2106e1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03B.3 native workflow-session branch"
+      ],
+      "command": "none",
+      "fixture": "n/a",
+      "status": "NOT EXERCISED",
+      "reason": "No test drives a local-agent call from a workflow session; only the thread and desk branches of native_mcp::admit_on are exercised."
+    },
+    {
+      "criteria": [
+        "browser forms"
+      ],
+      "command": "none",
+      "fixture": "n/a",
+      "status": "NOT EXERCISED",
+      "reason": "No department-form browser script exists under scripts/tests; forms are covered by page and route tests only."
+    }
+  ]
+}

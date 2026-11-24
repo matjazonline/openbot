@@ -111,9 +111,26 @@ pub(in crate::adapters::persistence) async fn admit_on(
     )
     .map_err(|_| invalid())?;
     insert_call(db, owner, &broker, &prepared, call, run).await?;
+    // A workflow session's source run stands where a parent would; a conversation starts at its
+    // thread (Plan08 03B, gate D1 r2 F2).
+    let goal = super::goals::resolve_on(
+        db,
+        owner.company,
+        super::goals::GoalOrigin {
+            parent: match owner.source {
+                crate::domain::local_agents::SessionAssociation::Workflow { run_id } => {
+                    Some(RunId::new(run_id))
+                }
+                crate::domain::local_agents::SessionAssociation::Conversation { .. } => None,
+            },
+            ..super::goals::GoalOrigin::of(owner.association)
+        },
+    )
+    .await?;
     admission_write::insert_run(
         db,
         &admission_write::RunRow {
+            goal,
             knowledge: super::knowledge::stored_levels(
                 owner.ceiling.as_i16(),
                 owner.ceiling.as_i16(),

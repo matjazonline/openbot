@@ -1118,5 +1118,7 @@ mod ui_reads;
 mod archive_tests;
 #[path = "delegated_administration_tests.rs"]
 mod delegated_administration;
+#[path = "department_goal_tests.rs"]
+mod goal_units;
 #[path = "department_sponsor_tests.rs"]
 mod sponsors;

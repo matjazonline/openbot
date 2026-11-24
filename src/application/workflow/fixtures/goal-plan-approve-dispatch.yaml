@@ -1,0 +1,94 @@
+# A goal's procedure (Plan08 03A.5): the lead plans, the deciding sponsor approves, and the lead
+# dispatches the work to department desks. Dispatching needs the lead agent to hold the
+# `channel.call` tool; each call's child and thread then carry this run's goal.
+# Publish it once and bind it on each goal's desk.
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000003
+input_schema:
+  type: object
+  properties:
+    message: {type: string}
+    source_message: {type: string, maxLength: 128}
+    subject: {type: string, maxLength: 998}
+    sender: {type: string, maxLength: 320}
+  required: [message, source_message]
+  additionalProperties: false
+parameter_schema: {type: object, additionalProperties: false}
+output_schema:
+  type: object
+  properties: {body: {type: string, maxLength: 16384}}
+  required: [body]
+  additionalProperties: false
+resources: []
+entry: context
+steps:
+  context:
+    type: context.history
+    with:
+      max_tokens: {literal: 8000}
+    routes: {success: plan}
+  plan:
+    type: agent.run
+    with:
+      role: {literal: lead}
+      context:
+        object:
+          task: {literal: "Plan the work this goal needs: which departments do what, and in what order. Do not start it yet."}
+          untrusted_message: {ref: /input/message}
+          untrusted_subject: {default: {ref: /input/subject, value: {literal: ""}}}
+          untrusted_history: {ref: /steps/context/output}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: approve}
+  approve:
+    type: decision.human
+    with:
+      proposal: {ref: /steps/plan/output}
+      reviewers: {literal: [sponsor]}
+      deadline: {ref: /run/deadline}
+      data_schema: {literal: {type: "null"}}
+      feedback_required: {literal: []}
+    routes: {choices: {approve: dispatch, reject: rejected}}
+  dispatch:
+    type: agent.run
+    with:
+      role: {literal: lead}
+      context:
+        object:
+          task: {literal: "Carry out the approved plan: call each department's desk with its part, then report what each call returned."}
+          approved_plan: {ref: /steps/plan/output}
+          untrusted_message: {ref: /input/message}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: reply}
+  reply:
+    type: data.map
+    with:
+      value: {ref: /steps/dispatch/output}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: $end}
+  rejected:
+    type: channel.no_reply
+    with:
+      value: {literal: {body: ""}}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: $end}
+limits: {max_steps: 10, max_context_bytes: 65536}

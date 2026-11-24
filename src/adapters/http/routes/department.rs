@@ -65,6 +65,34 @@ pub struct DepartmentCreatePayload {
     /// The principal to hold the `lead` role from the start.
     pub lead: Option<Uuid>,
     pub escalation: Option<crate::entities::workflow_escalation::EscalationPolicy>,
+    /// `goal` makes a goal unit (Plan08 03A); absent means standing.
+    #[serde(default)]
+    pub kind: crate::entities::department::DepartmentKind,
+    /// A goal's target date, `YYYY-MM-DD`.
+    pub target_date: Option<chrono::NaiveDate>,
+    /// A goal's sponsors, in order; the first one decides.
+    #[serde(default)]
+    pub sponsors: Vec<Uuid>,
+}
+
+impl DepartmentCreatePayload {
+    /// The goal part of a create: only a goal takes a target date or sponsors.
+    fn goal(&self) -> AppResult<Option<crate::application::ports::department::GoalWrite>> {
+        use crate::entities::department::DepartmentKind;
+        match self.kind {
+            DepartmentKind::Goal => Ok(Some(crate::application::ports::department::GoalWrite {
+                target_date: self.target_date,
+                sponsors: self.sponsors.iter().copied().map(PrincipalId::new).collect(),
+            })),
+            DepartmentKind::Standing if self.target_date.is_some() || !self.sponsors.is_empty() => {
+                Err(AppError::BadRequest(
+                    "department.target_date_goal_only: only a goal takes a target date or sponsors."
+                        .into(),
+                ))
+            }
+            DepartmentKind::Standing => Ok(None),
+        }
+    }
 }
 
 /// Only the fields present change. `null` clears an optional field; for `parent_id` it makes the
@@ -81,6 +109,9 @@ pub struct DepartmentUpdatePayload {
     pub parent_id: Option<Option<Uuid>>,
     #[serde(default, deserialize_with = "present")]
     pub escalation: Option<Option<crate::entities::workflow_escalation::EscalationPolicy>>,
+    pub kind: Option<crate::entities::department::DepartmentKind>,
+    #[serde(default, deserialize_with = "present")]
+    pub target_date: Option<Option<chrono::NaiveDate>>,
 }
 
 /// A field that is present, even as `null`, is `Some`; an absent one stays `None` via `default`.
@@ -144,7 +175,9 @@ async fn create_department_json(
         .filter(|slug| !slug.is_empty())
         .map(String::from)
         .unwrap_or_else(|| crate::adapters::http::routes::channel::slugify(&payload.name));
+    let goal = payload.goal()?;
     let write = DepartmentWrite {
+        goal,
         name: payload.name,
         slug,
         description: payload.description,
@@ -188,6 +221,8 @@ async fn update_department_json(
     Json(payload): Json<DepartmentUpdatePayload>,
 ) -> AppResult<impl IntoResponse> {
     let edit = DepartmentEdit {
+        kind: payload.kind,
+        target_date: payload.target_date,
         escalation: payload.escalation,
         name: payload.name,
         slug: payload.slug,

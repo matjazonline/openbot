@@ -65,10 +65,12 @@ async fn open_work_on(
     units: &[Uuid],
 ) -> AppResult<OpenWorkCount> {
     Ok(sqlx::query_as(
+        // On the subtree's desks, or recorded against a goal in it wherever it runs (03B.5).
         "SELECT count(*) AS open, count(*) FILTER (WHERE run.native_mcp_call_id IS NOT NULL) AS native \
-           FROM workflow_runs AS run JOIN channels AS desk \
+           FROM workflow_runs AS run LEFT JOIN channels AS desk \
              ON desk.company_id = run.company_id AND desk.id = run.channel_id \
-          WHERE run.company_id = $1 AND desk.department_id = ANY($2) AND run.finished_at IS NULL",
+          WHERE run.company_id = $1 AND run.finished_at IS NULL \
+            AND (desk.department_id = ANY($2) OR run.goal_unit_id = ANY($2))",
     )
     .bind(company.as_uuid())
     .bind(units)
@@ -124,8 +126,61 @@ async fn supersede_routing_on(
     Ok(())
 }
 
-fn open_work(count: i64, cancellable: bool) -> AppError {
-    AppError::UnitArchiveOpenWork { count, cancellable }
+/// What cancel-and-archive cancels: the open roots on the subtree's desks, then the recorded
+/// channel-call children on them whose caller is elsewhere (agent-workflow-call p03 D6); a caller
+/// on the subtree is cancelled with its own tree. Roots go first, so a cascade locks a parent
+/// before its child. `$1` is the company and `$2` the subtree's units.
+const CANCEL_SET: &str = "SELECT run.id, 0 AS kind FROM workflow_runs AS run JOIN channels AS desk \
+       ON desk.company_id = run.company_id AND desk.id = run.channel_id \
+      WHERE run.company_id = $1 AND desk.department_id = ANY($2) \
+        AND run.finished_at IS NULL AND run.parent_run_id IS NULL \
+     UNION ALL \
+     SELECT child.id, 1 FROM workflow_channel_calls AS call \
+       JOIN workflow_runs AS child ON child.company_id = call.company_id AND child.id = call.child_run_id \
+       JOIN channels AS desk ON desk.company_id = child.company_id AND desk.id = child.channel_id \
+       JOIN workflow_runs AS caller ON caller.company_id = call.company_id AND caller.id = call.run_id \
+       LEFT JOIN channels AS caller_desk \
+         ON caller_desk.company_id = caller.company_id AND caller_desk.id = caller.channel_id \
+      WHERE call.company_id = $1 AND desk.department_id = ANY($2) AND child.finished_at IS NULL \
+        AND NOT COALESCE(caller_desk.department_id = ANY($2), false)";
+
+/// How many open runs recorded against a goal in the subtree run elsewhere with no ancestor, or
+/// themselves, in the whole cancel set: a Sales root admitted on a call thread that carries the
+/// goal, for one. Ancestry is walked by `parent_run_id` to depth 64; past it a run counts as
+/// uncovered.
+async fn uncovered_goal_runs_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    units: &[Uuid],
+) -> AppResult<i64> {
+    Ok(sqlx::query_scalar(&format!(
+        "WITH RECURSIVE cancelled AS ({CANCEL_SET}), \
+         elsewhere AS ( \
+           SELECT run.id FROM workflow_runs AS run LEFT JOIN channels AS desk \
+             ON desk.company_id = run.company_id AND desk.id = run.channel_id \
+            WHERE run.company_id = $1 AND run.goal_unit_id = ANY($2) AND run.finished_at IS NULL \
+              AND NOT COALESCE(desk.department_id = ANY($2), false)), \
+         up(start, id, depth) AS ( \
+           SELECT id, id, 0 FROM elsewhere \
+           UNION ALL \
+           SELECT up.start, run.parent_run_id, up.depth + 1 FROM up \
+             JOIN workflow_runs AS run ON run.company_id = $1 AND run.id = up.id \
+            WHERE run.parent_run_id IS NOT NULL AND up.depth < 64) \
+         SELECT count(*) FROM elsewhere WHERE NOT EXISTS ( \
+           SELECT 1 FROM up JOIN cancelled ON cancelled.id = up.id WHERE up.start = elsewhere.id)"
+    ))
+    .bind(company.as_uuid())
+    .bind(units)
+    .fetch_one(&mut **tx)
+    .await?)
+}
+
+fn open_work(count: i64, elsewhere: i64, cancellable: bool) -> AppError {
+    AppError::UnitArchiveOpenWork {
+        count,
+        elsewhere,
+        cancellable,
+    }
 }
 
 pub(crate) async fn archive_department_on(
@@ -154,33 +209,22 @@ pub(crate) async fn archive_department_on(
         // The roots on the subtree's desks, then the recorded channel-call children on them whose
         // caller is elsewhere (agent-workflow-call p03 D6): a caller on the subtree is cancelled
         // with its own tree. Roots go first, so a cascade locks a parent before its child.
-        let cancellable_runs: Vec<Uuid> = sqlx::query_scalar(
-            "SELECT id FROM ( \
-               SELECT run.id, 0 AS kind FROM workflow_runs AS run JOIN channels AS desk \
-                 ON desk.company_id = run.company_id AND desk.id = run.channel_id \
-                WHERE run.company_id = $1 AND desk.department_id = ANY($2) \
-                  AND run.finished_at IS NULL AND run.parent_run_id IS NULL \
-               UNION ALL \
-               SELECT child.id, 1 FROM workflow_channel_calls AS call \
-                 JOIN workflow_runs AS child ON child.company_id = call.company_id AND child.id = call.child_run_id \
-                 JOIN channels AS desk ON desk.company_id = child.company_id AND desk.id = child.channel_id \
-                 JOIN workflow_runs AS caller ON caller.company_id = call.company_id AND caller.id = call.run_id \
-                 LEFT JOIN channels AS caller_desk \
-                   ON caller_desk.company_id = caller.company_id AND caller_desk.id = caller.channel_id \
-                WHERE call.company_id = $1 AND desk.department_id = ANY($2) AND child.finished_at IS NULL \
-                  AND NOT COALESCE(caller_desk.department_id = ANY($2), false) \
-             ) AS cancellable ORDER BY kind, id LIMIT $3",
-        )
+        let cancellable_runs: Vec<Uuid> = sqlx::query_scalar(&format!(
+            "SELECT id FROM ({CANCEL_SET}) AS cancellable ORDER BY kind, id LIMIT $3"
+        ))
         .bind(company.as_uuid())
         .bind(&units)
         .bind(MAX_ARCHIVE_CANCELLATIONS + 1)
         .fetch_all(&mut **tx)
         .await?;
-        // A native MCP call is ended by its local agent, never by a department write.
-        let cancellable =
-            work.native == 0 && cancellable_runs.len() as i64 <= MAX_ARCHIVE_CANCELLATIONS;
+        // A native MCP call is ended by its local agent, never by a department write; a goal run
+        // elsewhere that no cancelled tree reaches belongs to its own department (D1 r2 F3).
+        let elsewhere = uncovered_goal_runs_on(tx, company, &units).await?;
+        let cancellable = work.native == 0
+            && cancellable_runs.len() as i64 <= MAX_ARCHIVE_CANCELLATIONS
+            && elsewhere == 0;
         if open == OpenWork::Refuse || !cancellable {
-            return Err(open_work(work.open, cancellable));
+            return Err(open_work(work.open, elsewhere, cancellable));
         }
         for run in cancellable_runs {
             crate::adapters::persistence::workflow::cancel_for_archive_on(
@@ -193,7 +237,7 @@ pub(crate) async fn archive_department_on(
         }
         let remaining = open_work_on(tx, company, &units).await?;
         if remaining.open > 0 {
-            return Err(open_work(remaining.open, false));
+            return Err(open_work(remaining.open, 0, false));
         }
     }
     // A placement in an archived unit places nothing (02C.4), so an archive moves its agents'

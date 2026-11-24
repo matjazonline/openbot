@@ -345,6 +345,7 @@ fn department(
         return Ok(None);
     };
     let mut write = DepartmentWrite {
+        goal: None,
         escalation: None,
         name: name.to_owned(),
         slug: slugify(name),

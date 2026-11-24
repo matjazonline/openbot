@@ -633,6 +633,7 @@ async fn bare_child(
     super::super::admission_write::insert_run(
         tx,
         &super::super::admission_write::RunRow {
+            goal: None,
             company: s.company(),
             knowledge: crate::entities::access_level::RunKnowledge::new(
                 crate::entities::access_level::AccessLevel::PUBLIC,

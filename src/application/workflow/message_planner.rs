@@ -228,6 +228,7 @@ impl EmailPlan {
                     purpose: DeliveryPurpose::WorkflowSend,
                     thread_id,
                     new_thread: Some(NewThread {
+                        goal_unit_id: None,
                         id: thread_id,
                         target: sender.target,
                         subject: content.subject().to_string(),
@@ -306,6 +307,7 @@ fn plan_channel(
         kind,
         destination_id,
         new_thread: Some(NewThread {
+            goal_unit_id: None,
             id: thread_id,
             target: crate::entities::address::AddressTarget::Desk(channel),
             subject: content.subject().to_string(),

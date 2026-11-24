@@ -15,6 +15,8 @@ use crate::use_cases::department::{DepartmentDetail, DepartmentView};
 
 fn department(company_id: Uuid, name: &str, slug: &str, parent: Option<&Department>) -> Department {
     Department {
+        kind: Default::default(),
+        target_date: None,
         is_root: false,
         escalation: None,
         archived: None,
@@ -1166,3 +1168,51 @@ fn department_sponsor_ui_lists_decider_controls_and_named_inherited_escalation()
 
 #[path = "department_archive_ui_tests.rs"]
 mod archive;
+
+/// Plan08 03A: the create form offers the kind, a target date and a deciding sponsor, and keeps
+/// what was typed when a goal create is refused.
+#[test]
+fn goal_unit_create_form_offers_kind_target_date_and_sponsor() {
+    let tree = tree();
+    let all = tree.all();
+    let closer = principal(PrincipalKind::Agent, "Closer", "closer");
+    let draft = DepartmentDraft {
+        name: "Launch X".into(),
+        slug: "launch-x".into(),
+        kind: "goal".into(),
+        target_date: "2027-03-31".into(),
+        sponsor: Some(closer.principal_id.as_uuid()),
+        ..DepartmentDraft::default()
+    };
+    let choices = vec![closer];
+    let html = section(
+        &tree,
+        &all,
+        DepartmentDetailPane::Create(&draft),
+        &choices,
+        true,
+        None,
+    );
+    let form = &html[html.find(r#"id="department-create""#).unwrap()..];
+    assert!(
+        form.contains(r#"<select class="select w-full" name="kind">"#),
+        "{form}"
+    );
+    assert!(form.contains(r#"<option value="goal" selected>Goal</option>"#));
+    assert!(form.contains(r#"type="date" name="target_date" value="2027-03-31""#));
+    assert!(form.contains(r#"name="sponsor""#));
+    assert!(form.contains("Deciding sponsor"));
+    let standing = DepartmentDraft {
+        name: "Sales".into(),
+        ..DepartmentDraft::default()
+    };
+    let html = section(
+        &tree,
+        &all,
+        DepartmentDetailPane::Create(&standing),
+        &[],
+        true,
+        None,
+    );
+    assert!(html.contains(r#"<option value="standing" selected>Standing department</option>"#));
+}

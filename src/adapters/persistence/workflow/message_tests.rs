@@ -37,6 +37,8 @@ mod channel_call_support;
 mod channel_call_views_db_tests;
 #[path = "message_delivery_tests.rs"]
 mod delivery_tests;
+#[path = "goal_trail_tests.rs"]
+mod goal_trail_tests;
 #[path = "message_ingress_tests.rs"]
 mod ingress_tests;
 #[path = "message_intent_tests.rs"]

@@ -15767,6 +15767,10 @@ CREATE TABLE public.departments (
     -- archives its subtree; a unit archived earlier keeps its own timestamp.
     archived_at timestamp with time zone,
     archived_by jsonb,
+    -- Plan08 03A: a goal is a unit with an end. Its definition of done is the charter; a target
+    -- date is allowed on a goal only, and the root is always standing.
+    kind text NOT NULL DEFAULT 'standing',
+    target_date date,
     CONSTRAINT departments_pkey PRIMARY KEY (id),
     CONSTRAINT departments_company_id_id_key UNIQUE (company_id, id),
     CONSTRAINT departments_company_slug_key UNIQUE (company_id, slug),
@@ -15784,7 +15788,10 @@ CREATE TABLE public.departments (
     CONSTRAINT departments_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
     CONSTRAINT departments_archive_shape CHECK (((archived_at IS NULL) = (archived_by IS NULL))
         AND (archived_by IS NULL OR public.valid_creation_provenance(archived_by))),
-    CONSTRAINT departments_root_archive CHECK (NOT (is_root AND archived_at IS NOT NULL))
+    CONSTRAINT departments_root_archive CHECK (NOT (is_root AND archived_at IS NOT NULL)),
+    CONSTRAINT departments_kind CHECK (kind IN ('standing', 'goal')),
+    CONSTRAINT departments_goal_target CHECK (kind = 'goal' OR target_date IS NULL),
+    CONSTRAINT departments_root_standing CHECK (NOT (is_root AND kind = 'goal'))
 );
 CREATE UNIQUE INDEX departments_one_root ON public.departments(company_id) WHERE is_root;
 CREATE INDEX departments_parent_idx ON public.departments USING btree (company_id, parent_id)
@@ -21216,3 +21223,50 @@ BEGIN
 END $$;
 CREATE CONSTRAINT TRIGGER run_dependency_scope AFTER INSERT ON public.run_dependency_manifests
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_run_dependency_scope();
+
+-- Plan08 03B: the goal trail. A run records the goal it serves, fixed at insert; a thread records
+-- one only when a channel call creates it for a calling run's goal (gate 08G-P03-D1 r2). Deleting a
+-- goal with recorded work is refused; a company teardown deletes runs and threads before its tree.
+ALTER TABLE public.workflow_runs ADD COLUMN goal_unit_id uuid;
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_goal_fk FOREIGN KEY (company_id, goal_unit_id)
+    REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX workflow_runs_goal_idx ON public.workflow_runs(company_id, goal_unit_id)
+    WHERE goal_unit_id IS NOT NULL;
+ALTER TABLE public.threads ADD COLUMN goal_unit_id uuid;
+ALTER TABLE public.threads ADD CONSTRAINT threads_goal_fk FOREIGN KEY (company_id, goal_unit_id)
+    REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX threads_goal_idx ON public.threads(company_id, goal_unit_id) WHERE goal_unit_id IS NOT NULL;
+
+-- A recorded goal names a live goal when it is written. The unit is share-locked here, so a kind
+-- change or an archive waits for the writer, or the writer sees its result (D1.5).
+CREATE FUNCTION public.guard_goal_unit_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE unit record;
+BEGIN
+    IF NEW.goal_unit_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+    SELECT kind, archived_at INTO unit FROM public.departments
+     WHERE company_id = NEW.company_id AND id = NEW.goal_unit_id FOR SHARE;
+    IF FOUND AND (unit.kind <> 'goal' OR unit.archived_at IS NOT NULL) THEN
+        RAISE EXCEPTION 'a recorded goal must be an active goal unit' USING ERRCODE = '23514',
+            CONSTRAINT = 'goal_unit_live';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_runs_goal_live BEFORE INSERT ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_insert();
+CREATE TRIGGER threads_goal_live BEFORE INSERT ON public.threads
+    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_insert();
+
+CREATE FUNCTION public.guard_goal_unit_fixed() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.goal_unit_id IS DISTINCT FROM OLD.goal_unit_id THEN
+        RAISE EXCEPTION 'a recorded goal is fixed when the row is written' USING ERRCODE = '23514',
+            CONSTRAINT = 'goal_unit_fixed';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_runs_goal_fixed BEFORE UPDATE OF goal_unit_id ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_fixed();
+CREATE TRIGGER threads_goal_fixed BEFORE UPDATE OF goal_unit_id ON public.threads
+    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_fixed();

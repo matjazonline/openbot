@@ -1,0 +1,7 @@
+base:   c7fbbbbe50827683aed89a15e1e18c551ddff809
+digest: a078b8caf6589f4b68f104ff572ff864ad8b9d31698a1f1531abede9c8fa9a99
+files:
+  plan/08-goals/03-goal-units-and-tracking.md
+  plan/08-goals/COORDINATION.md
+  plan/08-goals/README.md
+  plan/agent-workflow-call/phases/p06/docs/HANDOFF.md

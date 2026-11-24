@@ -379,6 +379,49 @@ desks; a department's manager sees the departments they manage, root managers al
 only root managers change prices. Its "Spend counted toward caps" section and the dashboard's
 "Spend by department" panel show each cap, the counted spend and what remains.
 
+## Goals
+
+A goal is a department with an end: a launch, a migration, a churn push. Choose **Goal** as the
+kind when creating it (or change the kind later, as the parent's manager). Apart from what is
+listed here, a goal is a department: it has its own desk, members, roles, memory, resources and
+caps. Its charter says when it is done, and an optional target date says when it should be. The
+root is always standing, and only a goal has a target date. The create form names one deciding
+sponsor; add more sponsors on the goal's Sponsors card. The JSON create takes the whole list.
+
+The recommended shape is one standing department for the people and agents who plan goals, with
+one goal under it per goal. The sample
+`src/application/workflow/fixtures/goal-plan-approve-dispatch.yaml` is a starting point for a
+goal's desk:
+- the lead plans;
+- the deciding sponsor approves with `decision.human`;
+- the lead dispatches the work to department desks with `channel.call`, which its agent must hold.
+
+Publish it once and bind it on each goal's desk.
+
+**The trail.** Every run done for a goal records it, in whatever department it runs. It is fixed
+when the run starts, and the model cannot set or change it. A run serves the first of these that
+is still an active goal:
+1. the goal of the run it reruns;
+2. its parent run's goal, for a child run; a local-agent call started from a workflow takes that
+   workflow run's goal;
+3. its thread's goal;
+4. the nearest goal at or above its desk.
+
+A `channel.call` from a goal's run records the goal on the thread it opens, so a later reply on
+that thread serves the goal too. A plain `message.send` thread records none. Once the goal is
+archived, or no longer a goal, new runs on its threads serve no goal and are admitted by their own
+department. What was recorded stays as it was.
+
+**Archiving a goal** counts its open runs everywhere, not only on its desks. Cancel-and-archive
+cancels the goal's own run trees, including their calls into other departments. A run elsewhere
+that started outside those trees can only be ended by its own department; for example, a Sales run
+admitted later on a call thread. While one is open, the archive is refused and says how many such
+runs there are in other departments.
+
+**A goal with recorded work cannot be deleted**, even after it becomes standing again. The refusal
+says to archive it instead. Deleting
+the company removes everything as before.
+
 ## Archive
 
 Archive a department that should stop working for now but whose history, knowledge and spend you
@@ -398,7 +441,8 @@ archives and restores; a department's own lead does not. While it is archived:
   and creating or moving a desk, document, skill or connection into it are refused with
   `unit.archived`. Deleting a desk, document or schedule, moving a desk, document, skill or
   connection out to an active department, disabling a schedule or binding, and deleting the
-  department itself still work, so an archived department can be emptied and deleted. A skill or
+  department itself still work, so an archived department can be emptied and deleted (unless it
+  has work recorded for it as a goal; see "Goals"). A skill or
   connection left in it can still be edited by its managers; nothing below can select it.
 - Its threads, runs, decisions and escalations stay readable under the desk grants that existed,
   and membership and roles in it grant that reading and nothing else. Its knowledge and memory are
@@ -424,7 +468,9 @@ into one), and desks, groups and run lists of past work name them "(archived)".
 
 The root cannot be deleted. A child department is deleted only when it owns no desks, knowledge
 documents, skills or connections, and has no child departments. Reassign or delete its desks,
-move or delete its documents and resources, and move or delete its children first. The refusal
+move or delete its documents and resources, and move or delete its children first. A department
+with runs or threads recorded for it as a goal is never deleted, even after it stops being a goal;
+archive it instead. The refusal
 says it still owns desks, or names the skills and connections it still owns; one for knowledge
 documents says only that the department is still referenced. Its members and role rows go with it; its memory namespace
 is retired through the durable lifecycle worker.
@@ -438,9 +484,9 @@ for someone outside the company.
 | Method and path | Does |
 | --- | --- |
 | `GET /departments` | Lists the active departments the caller can see; `?include_archived=true` adds archived ones. |
-| `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id), `escalation` (role/hops or null). |
+| `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id), `escalation` (role/hops or null), and for a goal `kind: "goal"`, `target_date` (`YYYY-MM-DD`) and `sponsors` (principal ids; the first decides). |
 | `GET /departments/{department_id}` | One department with its `members` and `roles`. |
-| `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for a child's `parent_id` selects the root. The root cannot be re-parented. |
+| `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for a child's `parent_id` selects the root. The root cannot be re-parented. `kind` (`standing` or `goal`) and `target_date` change a goal; a standing department refuses a target date, so turning a goal with a date into a standing department also sends `"target_date": null`. |
 | `DELETE /departments/{department_id}` | Deletes it (see "Delete"). |
 | `POST /departments/{department_id}/archive` | Archives it and every department below it (see "Archive"). Optional JSON `{ "cancel_open_runs": true }` cancels their unfinished runs first. |
 | `POST /departments/{department_id}/restore` | Restores that department alone; its parent must be active. |
@@ -448,10 +494,12 @@ for someone outside the company.
 | `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role. PUT requires JSON `{ "decider": false }` (`true` selects a sponsor decider); DELETE accepts `?successor={principal_id}` for sponsor handover. Reads include `decider` for every role holder. |
 
 Refusals: `409 Conflict` with `code` `unit.archived` for a write to an archived department, and
-`unit.archive_open_work` with `count` and `cancellable` for an archive with unfinished runs;
+`unit.archive_open_work` with `count`, `elsewhere` and `cancellable` for an archive with unfinished runs
+(`elsewhere` counts a goal's runs in other departments that only those departments can end);
 `409 Conflict` for a taken slug or a department that still owns desks, knowledge documents, skills or connections, or has children;
-`400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither
-a person nor an agent; `404 Not Found` for a principal or parent department that is not the
+`400 Bad Request` for a cycle, too deep a tree, one of the company's principals that is neither
+a person nor an agent, `department.target_date_goal_only`, `department.root_is_standing` or
+`department.sponsor_duplicate`; `409 Conflict` for deleting a department with work recorded for it as a goal; `404 Not Found` for a principal or parent department that is not the
 company's.
 
 

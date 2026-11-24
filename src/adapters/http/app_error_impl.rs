@@ -57,11 +57,11 @@ impl IntoResponse for AppError {
                     "code":crate::application::workflow::channel_call::INTERACTIVE_UNSUPPORTED,
                     "error":AppError::InteractiveUnsupported.to_string()})),
             ).into_response(),
-            AppError::UnitArchiveOpenWork { count, cancellable } => (
+            AppError::UnitArchiveOpenWork { count, elsewhere, cancellable } => (
                 StatusCode::CONFLICT,
                 axum::Json(serde_json::json!({"code":AppError::UNIT_ARCHIVE_OPEN_WORK,
-                    "error":AppError::UnitArchiveOpenWork { count, cancellable }.to_string(),
-                    "count":count,"cancellable":cancellable})),
+                    "error":AppError::UnitArchiveOpenWork { count, elsewhere, cancellable }.to_string(),
+                    "count":count,"elsewhere":elsewhere,"cancellable":cancellable})),
             ).into_response(),
             AppError::ResourceOutsideUnit(refusal) => (
                 StatusCode::BAD_REQUEST,

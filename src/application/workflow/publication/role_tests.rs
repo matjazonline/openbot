@@ -256,3 +256,49 @@ fn workflow_role_publication_preserves_whole_approval_pinned_principal_defaults_
         assert_eq!(&inputs.value()["approval"], expected);
     }
 }
+
+/// 08G-P03 03A.5: the goal sample compiles with the lead planning and dispatching and the
+/// sponsor role deciding, and names no agent of its own.
+#[test]
+fn goal_unit_sample_procedure_compiles() {
+    use crate::application::workflow::fixtures::Fixture;
+    let sample = Fixture::GoalPlanApproveDispatch;
+    let bundle = freeze(
+        decode(sample.source()).unwrap(),
+        company(),
+        sample.version_id(),
+        sample.snapshots(company()),
+        vec![],
+    )
+    .unwrap();
+    let mut roles: Vec<_> = bundle
+        .compiled()
+        .role_references()
+        .iter()
+        .map(|reference| {
+            (
+                reference.step.as_str().to_owned(),
+                reference.role,
+                reference.mode,
+            )
+        })
+        .collect();
+    roles.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_eq!(
+        roles,
+        vec![
+            (
+                "approve".to_owned(),
+                DepartmentRole::Sponsor,
+                RoleUseMode::People
+            ),
+            (
+                "dispatch".to_owned(),
+                DepartmentRole::Lead,
+                RoleUseMode::Tools
+            ),
+            ("plan".to_owned(), DepartmentRole::Lead, RoleUseMode::Tools),
+        ]
+    );
+    assert!(bundle.snapshots().agents.is_empty());
+}

@@ -76,6 +76,7 @@ pub(crate) mod escalations;
 mod fair_polling;
 mod fairness;
 pub(crate) mod follow_reviewers;
+mod goals;
 mod guard_failure;
 mod history_reader;
 pub mod http;

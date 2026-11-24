@@ -365,6 +365,9 @@ pub struct NewThread {
     pub id: Uuid,
     pub target: crate::entities::address::AddressTarget,
     pub subject: String,
+    /// The goal the thread records: set only for a channel call's thread, from the calling run's
+    /// goal (Plan08 03B.3); a `message.send` thread records none.
+    pub goal_unit_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone)]

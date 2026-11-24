@@ -1114,3 +1114,98 @@ async fn unit_archive_ui_routes_archive_restore_and_refuse_on_the_card() {
         .await;
     }
 }
+
+/// Plan08 03A: the form creates a goal with its target date and deciding sponsor, and an edit to
+/// standing drops the date the form still shows.
+#[tokio::test]
+async fn goal_unit_form_creates_a_goal_and_edits_it_back_to_standing() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let ws = || workspace(&f, &f.owner);
+    let company = f.company.id;
+    let sponsor = person(&f, &f.owner).await;
+    let created = create_department(
+        ws(),
+        Path(company),
+        Form(DepartmentFormData {
+            kind: Some("goal".into()),
+            target_date: Some("2027-03-31".into()),
+            sponsor: Some(sponsor.to_string()),
+            ..form("Launch X", "launch-x")
+        }),
+    )
+    .await
+    .unwrap();
+    let (status, _, html) = body(created).await;
+    assert_eq!(status, StatusCode::OK, "{html}");
+    let goal = f
+        .departments()
+        .list_departments(
+            f.owner.id,
+            company,
+            crate::entities::department::ArchivedUnits::Include,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|department| department.slug.as_str() == "launch-x")
+        .unwrap();
+    assert_eq!(goal.kind, crate::entities::department::DepartmentKind::Goal);
+    assert_eq!(goal.target_date.unwrap().to_string(), "2027-03-31");
+    let roles: Vec<(Uuid, bool)> = sqlx::query_as(
+        "SELECT principal_id, decider FROM department_roles WHERE department_id = $1 AND role = 'sponsor'",
+    )
+    .bind(goal.id.as_uuid())
+    .fetch_all(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(roles, vec![(sponsor, true)]);
+    update_department(
+        ws(),
+        Path((company, goal.id.as_uuid())),
+        Form(DepartmentFormData {
+            kind: Some("standing".into()),
+            target_date: Some("2027-03-31".into()),
+            ..form("Launch X", "launch-x")
+        }),
+    )
+    .await
+    .unwrap();
+    let stored = f
+        .departments()
+        .visible_department(f.owner.id, company, goal.id)
+        .await
+        .unwrap()
+        .department;
+    assert_eq!(
+        (stored.kind, stored.target_date),
+        (crate::entities::department::DepartmentKind::Standing, None)
+    );
+}
+
+/// Plan08 03B.5 (08G-P03-B1-F1): a goal's run elsewhere that cancel-and-archive cannot reach is
+/// described as such, not as too many runs here or below, and offers no cancel button.
+#[test]
+fn goal_unit_archive_refusal_names_runs_in_other_departments() {
+    let (form, message) = open_work_refusal(1, 1, false);
+    assert!(matches!(form, DepartmentForm::Archive));
+    assert_eq!(
+        message,
+        "1 run is still open for this goal, 1 in other departments that its own work did not start. Only those departments can end it; archive once they finish."
+    );
+    assert!(!message.contains("here or below"));
+    let (form, message) = open_work_refusal(3, 2, false);
+    assert!(matches!(form, DepartmentForm::Archive));
+    assert!(message.starts_with("3 runs are still open for this goal, 2 in other departments"));
+    assert!(message.contains("can end them"));
+    let (form, message) = open_work_refusal(2, 0, true);
+    assert!(matches!(form, DepartmentForm::ArchiveOpenWork));
+    assert_eq!(
+        message,
+        "2 runs are still open here or below. Cancel them to archive."
+    );
+    let (form, message) = open_work_refusal(65, 0, false);
+    assert!(matches!(form, DepartmentForm::Archive));
+    assert!(message.contains("more than can be cancelled at once"));
+}

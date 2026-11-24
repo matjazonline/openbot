@@ -1860,6 +1860,8 @@ mod tests {
     fn desk_departments() -> (DeskDepartments, [Uuid; 3], DepartmentId, DepartmentId) {
         use crate::entities::department::Department;
         let department = |name: &str, parent: Option<DepartmentId>| Department {
+            kind: Default::default(),
+            target_date: None,
             is_root: false,
             escalation: None,
             archived: None,

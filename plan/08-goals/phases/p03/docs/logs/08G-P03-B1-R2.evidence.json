@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "round": "08G-P03-B1-R2",
+  "artifact": "6caa7f19d63b49cfae39c91f042e35032ed05112664eba146469bd652d3b4e2b",
+  "checks": [
+    {
+      "criteria": [
+        "03A.1",
+        "03A.2",
+        "03A.3",
+        "03A.4",
+        "03A.5",
+        "03B.1",
+        "03B.2",
+        "03B.3",
+        "03B.4",
+        "03B.5",
+        "D1.3",
+        "D1.5",
+        "B1-F1",
+        "B1-F2",
+        "catalog-pins"
+      ],
+      "command": "cargo test --offline --locked --lib -- goal_ department unit_archive channel_call_ run_scope admission workflow_sample fixture native_mcp thread local_agent_mcp legacy_runtime_schema schema",
+      "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/b1-r2-focused-tests.txt",
+          "sha256": "cc8b687cd53499e820766c7c273f31eaa70d7386570ed47f4b7f6aa832723e36"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "stack-budget"
+      ],
+      "command": "bash scripts/stack-budget.sh --offline -- goal_",
+      "fixture": "scratch Postgres openbot_p08p03_mac02_test (tests), openbot_p08p03_mac02 (SQLx/clippy); local macOS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-r2-stack-budget.txt",
+          "sha256": "cf4267f25ce0a1b82d416a96d3cf2674011f86eeb204ea6979046b3726c4bb32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo +1.95.0 clippy --offline --locked --all-targets -- -D warnings -A clippy::redundant_field_names -A clippy::nonminimal_bool",
+      "fixture": "toolchain 1.95.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-r2-clippy.txt",
+          "sha256": "df4cf4737cc45995fddea8a200ea3d47e6758611b505babc4c5dfa90b22ed39e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "format"
+      ],
+      "command": "cargo fmt --check",
+      "fixture": "local rustfmt",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-r2-fmt.txt",
+          "sha256": "e6bd6a3dacc6926b69c2ff51d4aa3b25b570b5d7adef3f34f04d25a07e2106e1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "sqlx-offline"
+      ],
+      "command": "cargo sqlx migrate run && SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "fresh scratch database openbot_p08p03_mac02 (R1; the corrections add no sqlx macro queries)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/b1-sqlx-prepare.txt",
+          "sha256": "7d18b843015d07fdc9d2075b8d175b487e90db292376b2da1ef387f2615c36e5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "browser forms"
+      ],
+      "command": "none",
+      "fixture": "n/a",
+      "status": "NOT EXERCISED",
+      "reason": "No department-form browser script exists under scripts/tests; forms are covered by page and route tests only."
+    }
+  ]
+}

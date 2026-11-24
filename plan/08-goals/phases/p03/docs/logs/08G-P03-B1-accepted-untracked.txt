@@ -1,0 +1,6 @@
+?? src/adapters/persistence/department_goal_tests.rs
+?? src/adapters/persistence/workflow/goal_trail_tests.rs
+?? src/adapters/persistence/workflow/goals.rs
+?? src/application/workflow/fixtures/goal-plan-approve-dispatch.yaml
+?? src/application/workflow/goals.rs
+?? src/application/workflow/goals_tests.rs

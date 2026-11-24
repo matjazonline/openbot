@@ -369,6 +369,9 @@ struct DepartmentFormData {
     charter: Option<String>,
     parent_id: Option<String>,
     lead: Option<String>,
+    kind: Option<String>,
+    target_date: Option<String>,
+    sponsor: Option<String>,
 }
 
 impl DepartmentFormData {
@@ -380,6 +383,31 @@ impl DepartmentFormData {
             charter: self.charter.clone().unwrap_or_default(),
             parent_id: optional_id(self.parent_id.as_deref()).ok().flatten(),
             lead: optional_id(self.lead.as_deref()).ok().flatten(),
+            kind: self.kind.clone().unwrap_or_else(|| "standing".to_owned()),
+            target_date: self.target_date.clone().unwrap_or_default(),
+            sponsor: optional_id(self.sponsor.as_deref()).ok().flatten(),
+        }
+    }
+
+    /// The submitted kind; a form without the field (the root's) is standing.
+    fn kind(&self) -> AppResult<crate::entities::department::DepartmentKind> {
+        match self.kind.as_deref().map(str::trim) {
+            None | Some("") => Ok(crate::entities::department::DepartmentKind::Standing),
+            Some(value) => crate::entities::department::DepartmentKind::parse(value)
+                .ok_or_else(|| AppError::BadRequest("Choose standing or goal.".into())),
+        }
+    }
+
+    /// A goal's target date; the form ignores the date when standing is chosen (Plan08 03A.3).
+    fn target_date(&self) -> AppResult<Option<chrono::NaiveDate>> {
+        if self.kind()? != crate::entities::department::DepartmentKind::Goal {
+            return Ok(None);
+        }
+        match self.target_date.as_deref().map(str::trim) {
+            None | Some("") => Ok(None),
+            Some(value) => chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .map(Some)
+                .map_err(|_| AppError::BadRequest("Enter the target date as a date.".into())),
         }
     }
 
@@ -406,6 +434,18 @@ impl DepartmentFormData {
             charter: self.charter.clone(),
             parent_id: self.parent()?,
             created_by: None,
+            goal: match self.kind()? {
+                crate::entities::department::DepartmentKind::Goal => {
+                    Some(crate::application::ports::department::GoalWrite {
+                        target_date: self.target_date()?,
+                        sponsors: optional_id(self.sponsor.as_deref())?
+                            .map(PrincipalId::new)
+                            .into_iter()
+                            .collect(),
+                    })
+                }
+                crate::entities::department::DepartmentKind::Standing => None,
+            },
         })
     }
 
@@ -424,6 +464,8 @@ impl DepartmentFormData {
             description: Some(self.description.clone()),
             charter: Some(self.charter.clone()),
             parent_id: Some(self.parent()?),
+            kind: Some(self.kind()?),
+            target_date: Some(self.target_date()?),
         })
     }
 
@@ -652,21 +694,12 @@ async fn archive_department(
                 .saved(&access, Some(department), "Department archived.")
                 .await
         }
-        Err(AppError::UnitArchiveOpenWork { count, cancellable }) => {
-            let runs = if count == 1 { "run is" } else { "runs are" };
-            let (form, message) = if cancellable {
-                (
-                    DepartmentForm::ArchiveOpenWork,
-                    format!("{count} {runs} still open here or below. Cancel them to archive."),
-                )
-            } else {
-                (
-                    DepartmentForm::Archive,
-                    format!(
-                        "{count} {runs} still open here or below, more than can be cancelled at once. Let them finish or cancel some first."
-                    ),
-                )
-            };
+        Err(AppError::UnitArchiveOpenWork {
+            count,
+            elsewhere,
+            cancellable,
+        }) => {
+            let (form, message) = open_work_refusal(count, elsewhere, cancellable);
             workspace.refused(&access, selection(), form, message).await
         }
         Err(error) => {
@@ -679,6 +712,34 @@ async fn archive_department(
                 )
                 .await
         }
+    }
+}
+
+/// The archive card's form and wording for an open-work refusal. A goal's run in another
+/// department that its own work did not start is that department's to end, so it gets its own
+/// wording rather than the cancellation-bound one (Plan08 03B.5).
+fn open_work_refusal(count: i64, elsewhere: i64, cancellable: bool) -> (DepartmentForm, String) {
+    let runs = if count == 1 { "run is" } else { "runs are" };
+    if elsewhere > 0 {
+        let them = if elsewhere == 1 { "it" } else { "them" };
+        (
+            DepartmentForm::Archive,
+            format!(
+                "{count} {runs} still open for this goal, {elsewhere} in other departments that its own work did not start. Only those departments can end {them}; archive once they finish."
+            ),
+        )
+    } else if cancellable {
+        (
+            DepartmentForm::ArchiveOpenWork,
+            format!("{count} {runs} still open here or below. Cancel them to archive."),
+        )
+    } else {
+        (
+            DepartmentForm::Archive,
+            format!(
+                "{count} {runs} still open here or below, more than can be cancelled at once. Let them finish or cancel some first."
+            ),
+        )
     }
 }
 

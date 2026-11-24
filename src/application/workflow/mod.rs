@@ -32,6 +32,7 @@ pub mod decisions;
 pub mod escalation;
 pub mod exactness;
 pub mod fixtures;
+pub mod goals;
 pub mod guard;
 pub mod history;
 pub mod http;

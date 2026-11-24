@@ -116,6 +116,7 @@ async fn memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_
 
 fn department(slug: &str) -> DepartmentWrite {
     DepartmentWrite {
+        goal: None,
         name: slug.into(),
         slug: slug.into(),
         description: None,

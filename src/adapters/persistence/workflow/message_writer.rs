@@ -57,12 +57,13 @@ async fn create_thread_on(
     let Some(thread) = &destination.new_thread else {
         return Ok(());
     };
-    sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject, principal_id) VALUES ($1,$2,$3,$4,$5)")
+    sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject, principal_id, goal_unit_id) VALUES ($1,$2,$3,$4,$5,$6)")
         .bind(thread.id)
         .bind(company.as_uuid())
         .bind(thread.target.desk_id())
         .bind(&thread.subject)
         .bind(thread.target.principal_id().map(|id| id.as_uuid()))
+        .bind(thread.goal_unit_id)
         .execute(&mut *db)
         .await?;
     let mut participants = Vec::new();

@@ -191,6 +191,7 @@ async fn unit_archive_refuses_open_work_and_changes_nothing() {
             refused,
             Err(AppError::UnitArchiveOpenWork {
                 count: 1,
+                elsewhere: 0,
                 cancellable: true
             })
         ),
@@ -234,7 +235,7 @@ async fn unit_archive_cancel_refuses_past_its_bound_and_cancels_nothing() {
     assert!(
         matches!(
             refused,
-            Err(AppError::UnitArchiveOpenWork { count, cancellable: false }) if count == bound + 1
+            Err(AppError::UnitArchiveOpenWork { count, elsewhere: 0, cancellable: false }) if count == bound + 1
         ),
         "{refused:?}"
     );
@@ -586,4 +587,195 @@ async fn unit_archive_http_routes_refuse_open_work_cancel_on_request_and_restore
         assert!(body["department"]["archived"].is_null(), "{body}");
     }
     assert!(!a.archived().await);
+}
+
+/// Plan08 03B.5: the archived unit as a goal, with a desk outside its subtree whose thread carries
+/// the goal, as a channel call's thread does. Returns that desk and thread.
+async fn goal_elsewhere(a: &Archive) -> (Uuid, Uuid) {
+    sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
+        .bind(a.unit)
+        .execute(a.p().pool())
+        .await
+        .unwrap();
+    let sales = a.p().test_unit(a.company, "sales").await;
+    let desk = crate::adapters::persistence::test_support::create_channel(
+        a.p(),
+        a.company,
+        crate::application::ports::channel::ChannelWrite {
+            name: "Sales desk".into(),
+            slug: format!("sales-{}", Uuid::new_v4().simple()),
+            department_id: Some(DepartmentId::new(sales)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    let thread = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO threads (id, company_id, channel_id, subject, goal_unit_id) \
+         VALUES ($1, $2, $3, 'Asked for the goal', $4)",
+    )
+    .bind(thread)
+    .bind(a.company)
+    .bind(desk)
+    .bind(a.unit)
+    .execute(a.p().pool())
+    .await
+    .unwrap();
+    (desk, thread)
+}
+
+impl Archive {
+    /// A run on `thread` of `desk`, outside the archived subtree.
+    async fn prepare_on_thread(&self, desk: Uuid, thread: Uuid) -> PreparedAdmission {
+        let capture = Capture::default();
+        let mut request = self.request(self.f.binding.target.actor);
+        request.association = RelatedAssociation::Thread {
+            target: crate::entities::address::AddressTarget::Desk(desk),
+            thread_id: crate::application::workflow::RelatedThreadId::new(thread),
+        };
+        WorkflowService::new(
+            self.p().clone(),
+            capture.clone(),
+            NoRuntime,
+            NoRuntime,
+            Preflight,
+        )
+        .admit(request)
+        .await
+        .unwrap();
+        capture.0.lock().unwrap().take().unwrap()
+    }
+    async fn goal_of(&self, run: RunId) -> Option<Uuid> {
+        sqlx::query_scalar("SELECT goal_unit_id FROM workflow_runs WHERE id = $1")
+            .bind(run.as_uuid())
+            .fetch_one(self.p().pool())
+            .await
+            .unwrap()
+    }
+}
+
+/// A goal's open work includes a run elsewhere that serves it. A Sales root that no cancelled tree
+/// reaches is the Sales department's, so the archive refuses as not cancellable and cancels
+/// nothing (gate 08G-P03-D1 r2 D1.5, F3).
+#[tokio::test]
+async fn goal_trail_archive_counts_goal_runs_elsewhere() {
+    let a = Archive::new().await;
+    let (desk, thread) = goal_elsewhere(&a).await;
+    let command = a.prepare_on_thread(desk, thread).await;
+    a.p().admit(&command).await.unwrap();
+    let run = command.proposed_run_id();
+    assert_eq!(a.goal_of(run).await, Some(a.unit), "the thread's goal");
+    for open in [OpenWork::Refuse, OpenWork::Cancel] {
+        let refused = a.archive(open).await;
+        assert!(
+            matches!(
+                refused,
+                Err(AppError::UnitArchiveOpenWork {
+                    count: 1,
+                    elsewhere: 1,
+                    cancellable: false
+                })
+            ),
+            "{open:?}: {refused:?}"
+        );
+    }
+    // The JSON refusal names the run elsewhere, and its text does not blame this unit's desks.
+    let response =
+        axum::response::IntoResponse::into_response(a.archive(OpenWork::Cancel).await.unwrap_err());
+    assert_eq!(response.status(), axum::http::StatusCode::CONFLICT);
+    let body = axum::body::to_bytes(response.into_body(), 65536)
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(
+        (&body["count"], &body["elsewhere"], &body["cancellable"]),
+        (&1.into(), &1.into(), &false.into())
+    );
+    let text = body["error"].as_str().unwrap();
+    assert!(text.contains("in other departments"), "{text}");
+    assert!(!text.contains("on this department's desks"), "{text}");
+    assert!(!a.archived().await);
+    let state: String = sqlx::query_scalar("SELECT state FROM workflow_runs WHERE id = $1")
+        .bind(run.as_uuid())
+        .fetch_one(a.p().pool())
+        .await
+        .unwrap();
+    assert_eq!(state, "queued", "nothing was cancelled");
+}
+
+/// An archive racing an admission on a thread that carries the goal: either the archive is refused
+/// for the new run, or the run is admitted serving no goal. Never an archived goal with an open run
+/// recorded against it (D1.5). Each order is forced once, then both are released together twice.
+///
+/// A child of a goal run is not raced separately: its parent is open and already counted, so the
+/// archive refuses or cancels that tree whichever commits first (08G-P03-B1-F2).
+#[tokio::test]
+async fn goal_competing_archive_and_thread_admission() {
+    #[derive(Debug, Clone, Copy)]
+    enum Order {
+        AdmissionFirst,
+        ArchiveFirst,
+        Together,
+    }
+    for order in [
+        Order::AdmissionFirst,
+        Order::ArchiveFirst,
+        Order::Together,
+        Order::Together,
+    ] {
+        let a = Arc::new(Archive::new().await);
+        let (desk, thread) = goal_elsewhere(&a).await;
+        let prepared = a.prepare_on_thread(desk, thread).await;
+        let run = prepared.proposed_run_id();
+        let (admitted, archived) = match order {
+            Order::AdmissionFirst => {
+                let admitted = a.p().admit(&prepared).await;
+                (admitted, a.archive(OpenWork::Refuse).await)
+            }
+            Order::ArchiveFirst => {
+                let archived = a.archive(OpenWork::Refuse).await;
+                (a.p().admit(&prepared).await, archived)
+            }
+            Order::Together => {
+                let mut blocker = a.p().pool().begin().await.unwrap();
+                sqlx::query("SELECT 1 FROM companies WHERE id=$1 FOR NO KEY UPDATE")
+                    .bind(a.company)
+                    .execute(&mut *blocker)
+                    .await
+                    .unwrap();
+                let admission = tokio::spawn({
+                    let a = a.clone();
+                    async move { a.p().admit(&prepared).await }
+                });
+                let archive = tokio::spawn({
+                    let a = a.clone();
+                    async move { a.archive(OpenWork::Refuse).await }
+                });
+                wait_until_backends_are_blocked(a.p().pool(), 2).await;
+                blocker.commit().await.unwrap();
+                (admission.await.unwrap(), archive.await.unwrap())
+            }
+        };
+        admitted.expect("a Sales desk admits either way");
+        match (order, archived) {
+            (
+                Order::AdmissionFirst | Order::Together,
+                Err(AppError::UnitArchiveOpenWork { count: 1, .. }),
+            ) => {
+                assert!(!a.archived().await);
+                assert_eq!(a.goal_of(run).await, Some(a.unit));
+            }
+            (Order::ArchiveFirst | Order::Together, Ok(_)) => {
+                assert!(a.archived().await);
+                assert_eq!(
+                    a.goal_of(run).await,
+                    None,
+                    "an archived goal records no new run"
+                );
+            }
+            (order, outcome) => panic!("unexpected archive outcome for {order:?}: {outcome:?}"),
+        }
+    }
 }

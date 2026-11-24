@@ -459,6 +459,8 @@ mod tests {
     fn department_views_attention_groups_and_keeps_the_department() {
         use crate::entities::department::{Department, DepartmentId};
         let sales = Department {
+            kind: Default::default(),
+            target_date: None,
             is_root: false,
             escalation: None,
             archived: None,

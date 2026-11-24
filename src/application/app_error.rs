@@ -23,12 +23,16 @@ pub enum AppError {
     /// no configuration. Definite: restoring the unit is the only way the same write succeeds.
     #[error("This department is archived; restore it to change it or start work on its desks")]
     UnitArchived,
-    /// Archiving refused because runs on the subtree's desks are not finished (Plan08 02B.1).
-    /// `cancellable` is false when cancel-and-archive cannot end them in one write.
-    #[error(
-        "{count} unfinished run(s) on this department's desks; cancel them or let them finish first"
-    )]
-    UnitArchiveOpenWork { count: i64, cancellable: bool },
+    /// Archiving refused because runs on the subtree's desks, or serving a goal in it wherever they
+    /// run, are not finished (Plan08 02B.1, 03B.5). `cancellable` is false when cancel-and-archive
+    /// cannot end them in one write. `elsewhere` counts the goal runs in other departments that no
+    /// cancelled tree reaches: only their own departments can end them.
+    #[error("{}", open_work_text(*count, *elsewhere))]
+    UnitArchiveOpenWork {
+        count: i64,
+        elsewhere: i64,
+        cancellable: bool,
+    },
     /// `message.ask` in a run that answers a channel call: the requester is an agent and cannot
     /// answer a question (agent-workflow-call AWC-P04-D1 r2 D8). Definite and terminal.
     #[error("A run answering a channel call cannot ask its requester a question")]
@@ -277,5 +281,17 @@ impl AppError {
             Self::KnowledgeRelease { .. } => Some(KNOWLEDGE_AUDIENCE_BELOW_CONTENT),
             _ => None,
         }
+    }
+}
+
+fn open_work_text(count: i64, elsewhere: i64) -> String {
+    if elsewhere > 0 {
+        format!(
+            "{count} unfinished run(s) for this department, {elsewhere} of them serving its goal in other departments that only those departments can end"
+        )
+    } else {
+        format!(
+            "{count} unfinished run(s) on this department's desks; cancel them or let them finish first"
+        )
     }
 }

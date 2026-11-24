@@ -1,0 +1,37 @@
+running the test suite with a 2048 KiB thread stack
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.71s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-02d27053f1db6889)
+
+running 25 tests
+test adapters::http::pages::tests::department_ui::goal_unit_create_form_offers_kind_target_date_and_sponsor ... ok
+test adapters::http::routes::department::tests::goal_unit_json_create_and_edit_carry_kind_target_date_and_sponsors ... ok
+test adapters::http::routes::ui_departments::tests::goal_unit_form_creates_a_goal_and_edits_it_back_to_standing ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_root_cannot_be_goal ... ok
+test application::workflow::goals::tests::goal_of_archived_candidate_falls_through ... ok
+test application::workflow::goals::tests::goal_of_depth_bound_ignores_units_past_the_tree_limit ... ok
+test application::workflow::goals::tests::goal_of_nested_goals_pick_the_nearest ... ok
+test application::workflow::goals::tests::goal_of_non_goal_candidate_falls_through ... ok
+test application::workflow::goals::tests::goal_of_none_without_sources ... ok
+test application::workflow::goals::tests::goal_of_parent_wins_over_thread_and_desk ... ok
+test application::workflow::goals::tests::goal_of_rerun_comes_first ... ok
+test application::workflow::goals::tests::goal_of_rerun_falls_through_when_original_goal_closed ... ok
+test application::workflow::goals::tests::goal_of_thread_wins_over_desk ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_create_assigns_sponsors_in_one_transaction ... ok
+test application::workflow::publication::tests::role_tests::goal_unit_sample_procedure_compiles ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_target_date_on_standing_is_refused ... ok
+test adapters::persistence::department::tests::goal_units::goal_unit_kind_and_target_date_round_trip ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_column_is_immutable_and_goal_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::goal_trail_archive_counts_goal_runs_elsewhere ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_call_child_thread_reply_and_rerun_carry_the_goal ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_archive_cancels_goal_tree_with_call_child_elsewhere ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_inherited_child_carries_the_parent_goal ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::goal_trail_native_call_carries_the_thread_goal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::unit_archive_runs::goal_competing_archive_and_child_admission ... ok
+test adapters::persistence::workflow::tests::message_tests::goal_trail_tests::goal_trail_kind_change_keeps_history_and_admits_new_work ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 5180 filtered out; finished in 6.65s

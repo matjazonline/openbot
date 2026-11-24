@@ -521,9 +521,20 @@ async fn insert_child_on(
             call.actor.user_id(),
         ),
     };
+    // The parent's goal first, then the child's own thread and desk (Plan08 03B.2).
+    let goal = super::goals::resolve_on(
+        db,
+        scope.company,
+        super::goals::GoalOrigin {
+            parent: Some(scope.run),
+            ..super::goals::GoalOrigin::of(association)
+        },
+    )
+    .await?;
     admission_write::insert_run(
         db,
         &RunRow {
+            goal,
             company: scope.company,
             knowledge,
             content_exact,

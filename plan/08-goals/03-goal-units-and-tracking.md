@@ -70,8 +70,7 @@ cannot start work in a department. Continues in
    already admitted is not stopped.
 3. A refused child returns to its caller as a `denied` closure with that reason.
 
-Batch 03C applies only if proposal 4 of the [README](README.md) is confirmed. Without it a cap on
-a goal unit bounds the runs on the goal's own desks, as 07 defines for any unit.
+Batch 03C applies: the user confirmed proposal 4 of the [README](README.md) on 2026-11-24.
 
 ## Batch 03D Status and analysis
 

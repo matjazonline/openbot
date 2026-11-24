@@ -34,6 +34,16 @@ pub struct DepartmentWrite {
     pub escalation: Option<crate::entities::workflow_escalation::EscalationPolicy>,
     /// Set by the use case; persistence stores the system when it is absent.
     pub created_by: Option<CreationProvenance>,
+    /// `Some` creates a goal unit (Plan08 03A.4); `None` a standing one.
+    pub goal: Option<GoalWrite>,
+}
+
+/// What a new goal unit sets besides a department's fields: its target date and sponsors. The
+/// sponsors are assigned in the creating transaction; the first one decides.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GoalWrite {
+    pub target_date: Option<chrono::NaiveDate>,
+    pub sponsors: Vec<PrincipalId>,
 }
 
 /// One department edit: only the fields it sets change. A tri-state field is `None` to leave it,
@@ -48,6 +58,9 @@ pub struct DepartmentEdit {
     pub charter: Option<Option<String>>,
     pub parent_id: Option<Option<DepartmentId>>,
     pub escalation: Option<Option<crate::entities::workflow_escalation::EscalationPolicy>>,
+    /// Plan08 03A.3: a kind change rewrites no recorded goal.
+    pub kind: Option<crate::entities::department::DepartmentKind>,
+    pub target_date: Option<Option<chrono::NaiveDate>>,
 }
 
 /// What archiving does with runs on the subtree's desks that have not finished.

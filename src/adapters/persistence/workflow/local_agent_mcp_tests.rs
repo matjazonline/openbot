@@ -84,8 +84,18 @@ async fn originating() -> (Setup, NativeTurn) {
 }
 
 async fn originating_at(endpoint: &str) -> (Setup, NativeTurn) {
+    let s = Box::pin(configured(endpoint)).await;
+    Box::pin(originate(s, RelatedAssociation::Company)).await
+}
+
+async fn configured(endpoint: &str) -> Setup {
     let mut s = Box::pin(Setup::new()).await;
     configure(&mut s, endpoint).await;
+    s
+}
+
+/// The originating workflow run, parked on its native operation.
+async fn originate(mut s: Setup, association: RelatedAssociation) -> (Setup, NativeTurn) {
     let p = &s.fixture.persistence;
     let company = s.scope.company;
     let admin: Uuid = sqlx::query_scalar(
@@ -103,7 +113,7 @@ async fn originating_at(endpoint: &str) -> (Setup, NativeTurn) {
     .execute(p.pool())
     .await
     .unwrap();
-    let scope=s.activate(WorkflowActor::authenticated(admin).unwrap(),json!({"profile_id":{"literal":s.profile.id},"prompt":{"literal":"native workflow MCP"}}),RelatedAssociation::Company).await;
+    let scope=s.activate(WorkflowActor::authenticated(admin).unwrap(),json!({"profile_id":{"literal":s.profile.id},"prompt":{"literal":"native workflow MCP"}}),association).await;
     s.scope = scope;
     let claim = s.claim().await;
     s.park(&claim).await;
@@ -216,6 +226,88 @@ async fn native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and
         p.mcp_step_request(&claim, &WorkflowStepKind("mcp.call".into()))
             .await
             .is_ok()
+    );
+}
+
+/// Plan08 03B (gate D1 r2 F2, 08G-P03-B1-F2): a native call from a workflow session serves the
+/// originating run's goal, as a child serves its parent's. The desk moves to another goal after
+/// the run starts, so the desk chain would name a different goal than the source run.
+#[tokio::test]
+async fn goal_trail_native_workflow_session_call_carries_the_source_run_goal() {
+    let s = Box::pin(configured("http://127.0.0.1:9")).await;
+    let p = s.fixture.persistence.clone();
+    let company = s.scope.company.as_uuid();
+    let mut goals = Vec::new();
+    for slug in ["native-source-goal", "native-desk-goal"] {
+        let unit = p.test_unit(company, slug).await;
+        sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
+            .bind(unit)
+            .execute(p.pool())
+            .await
+            .unwrap();
+        goals.push(unit);
+    }
+    // The source run is admitted on a desk under the source goal.
+    let desk = crate::adapters::persistence::test_support::create_channel(
+        &p,
+        company,
+        crate::application::ports::channel::ChannelWrite {
+            name: "Goal desk".into(),
+            slug: format!("goal-desk-{}", Uuid::new_v4().simple()),
+            department_id: Some(crate::entities::department::DepartmentId::new(goals[0])),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    // Anyone in the company may start work on it, so the originating admin needs no grant.
+    sqlx::query("UPDATE channels SET access_mode = 'public' WHERE company_id = $1 AND id = $2")
+        .bind(company)
+        .bind(desk)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    let association =
+        RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(desk));
+    let (s, native) = Box::pin(originate(s, association)).await;
+    let run_goal = |run: Uuid| {
+        let p = p.clone();
+        async move {
+            sqlx::query_scalar::<_, Option<Uuid>>(
+                "SELECT goal_unit_id FROM workflow_runs WHERE company_id = $1 AND id = $2",
+            )
+            .bind(company)
+            .bind(run)
+            .fetch_one(p.pool())
+            .await
+            .unwrap()
+        }
+    };
+    assert_eq!(run_goal(s.scope.run.as_uuid()).await, Some(goals[0]));
+    sqlx::query("UPDATE channels SET department_id = $3 WHERE company_id = $1 AND id = $2")
+        .bind(company)
+        .bind(desk)
+        .bind(goals[1])
+        .execute(p.pool())
+        .await
+        .unwrap();
+    let response = p.native_mcp(&request(&s, &native)).await.unwrap();
+    let source: Uuid = sqlx::query_scalar(
+        "SELECT session.workflow_run_id FROM native_mcp_calls AS call JOIN local_agent_sessions AS session \
+           ON session.company_id = call.company_id AND session.id = call.session_id \
+          WHERE call.company_id = $1 AND call.run_id = $2",
+    )
+    .bind(company)
+    .bind(response.run_id.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(source, s.scope.run.as_uuid(), "a workflow session");
+    assert_eq!(
+        run_goal(response.run_id.as_uuid()).await,
+        Some(goals[0]),
+        "the source run's goal, not the desk's current one"
     );
 }
 

@@ -18,6 +18,9 @@ fn use_cases(f: &Fixture) -> Arc<DepartmentUseCases> {
 
 fn create_payload(name: &str) -> DepartmentCreatePayload {
     DepartmentCreatePayload {
+        kind: Default::default(),
+        sponsors: Vec::new(),
+        target_date: None,
         escalation: None,
         name: name.into(),
         slug: None,
@@ -417,5 +420,88 @@ async fn department_sponsor_json_carries_decider_and_round_trips_escalation_patc
             serde_json::json!({"escalation":{"notify":"sponsor","hops":3}})
         )
         .is_err()
+    );
+}
+
+/// Plan08 03A: the JSON create takes a goal's kind, target date and sponsors (the first decides),
+/// the response names them, an edit moves the date, and a standing create refuses goal fields.
+#[tokio::test]
+async fn goal_unit_json_create_and_edit_carry_kind_target_date_and_sponsors() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let departments = use_cases(&f);
+    let person: Uuid =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+            .bind(f.company.id)
+            .bind(f.owner.id)
+            .fetch_one(f.persistence.pool())
+            .await
+            .unwrap();
+    let payload: DepartmentCreatePayload = serde_json::from_value(serde_json::json!({
+        "name": "Launch X", "kind": "goal", "target_date": "2027-03-31", "sponsors": [person]
+    }))
+    .unwrap();
+    let response = create_department_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path(f.company.id),
+        Json(payload),
+    )
+    .await
+    .unwrap()
+    .into_response();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let bytes = axum::body::to_bytes(response.into_body(), 65536)
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(body["department"]["kind"], "goal");
+    assert_eq!(body["department"]["target_date"], "2027-03-31");
+    let id = DepartmentId::new(body["department"]["id"].as_str().unwrap().parse().unwrap());
+    let detail = departments
+        .visible_department(f.owner.id, f.company.id, id)
+        .await
+        .unwrap();
+    assert!(
+        detail
+            .roles
+            .iter()
+            .any(|role| role.role == DepartmentRole::Sponsor && role.decider),
+        "{:?}",
+        detail.roles
+    );
+    let payload: DepartmentUpdatePayload =
+        serde_json::from_value(serde_json::json!({"target_date": "2027-06-30"})).unwrap();
+    update_department_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path((f.company.id, id.as_uuid())),
+        Json(payload),
+    )
+    .await
+    .unwrap();
+    let stored = departments
+        .visible_department(f.owner.id, f.company.id, id)
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.department.target_date.unwrap().to_string(),
+        "2027-06-30"
+    );
+    let payload: DepartmentCreatePayload = serde_json::from_value(serde_json::json!({
+        "name": "Plain", "target_date": "2027-03-31"
+    }))
+    .unwrap();
+    let refused = create_department_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path(f.company.id),
+        Json(payload),
+    )
+    .await;
+    assert!(
+        matches!(&refused, Err(AppError::BadRequest(message)) if message.starts_with("department.target_date_goal_only")),
+        "a standing create refuses goal fields"
     );
 }

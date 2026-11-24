@@ -40,6 +40,8 @@ pub(super) async fn store_on(
     .fetch_one(&mut **tx)
     .await?;
     let thread = Uuid::new_v4();
+    // The thread carries the calling run's goal, so a later reply on it serves the same goal.
+    let goal = super::goals::for_thread_of_on(tx, caller.company, caller.run).await?;
     let message = MessageWrite::internal(
         thread,
         MessageAuthorWrite::Principal(author),
@@ -55,6 +57,7 @@ pub(super) async fn store_on(
         kind: DestinationKind::Channel,
         destination_id: desk,
         new_thread: Some(NewThread {
+            goal_unit_id: goal,
             id: thread,
             target: AddressTarget::Desk(desk),
             subject: request.content.subject().to_string(),

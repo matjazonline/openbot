@@ -15,6 +15,15 @@ pub(super) async fn create(
     )
     .await?;
     let knowledge = super::knowledge::admission_levels_on(tx, command).await?;
+    let goal = super::goals::resolve_on(
+        tx,
+        command.company_id(),
+        super::goals::GoalOrigin {
+            rerun_of: command.rerun_of(),
+            ..super::goals::GoalOrigin::of(command.association())
+        },
+    )
+    .await?;
     insert_run(
         tx,
         &RunRow {
@@ -33,6 +42,7 @@ pub(super) async fn create(
             rerun_of: command.rerun_of(),
             delivery_policy: command.delivery_policy(),
             native_mcp_call: None,
+            goal,
         },
     )
     .await?;
@@ -118,6 +128,8 @@ pub(super) struct RunRow<'a> {
     /// Admission's choice for a root; a runtime child inherits its parent's (p08 D1.7).
     pub delivery_policy: DeliveryPolicy,
     pub native_mcp_call: Option<crate::domain::local_agents::NativeMcpCallId>,
+    /// The goal the run serves, resolved by `goals::resolve_on` (Plan08 03B); fixed at insert.
+    pub goal: Option<crate::entities::department::DepartmentId>,
 }
 
 /// The deferred root-budget FK permits inserting the budget before its run; the run's
@@ -161,9 +173,10 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
-         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id, native_mcp_call_id) \
+         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id, native_mcp_call_id, \
+         goal_unit_id) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
-         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28, $29)",
+         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28, $29, $30)",
     ).bind(row.company.as_uuid()).bind(row.run.as_uuid())
         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(association.channel_id).bind(association.thread_id)
@@ -182,6 +195,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         .bind(row.binding.escalation().map(serde_json::to_value).transpose().map_err(|_| invalid())?)
         .bind(association.principal_id)
         .bind(row.native_mcp_call.map(crate::domain::local_agents::NativeMcpCallId::as_uuid))
+        .bind(row.goal.map(crate::entities::department::DepartmentId::as_uuid))
         .execute(db).await?;
     Ok(())
 }

@@ -456,9 +456,80 @@ async fn unit_archive_runs_native_mcp_refuses_on_an_archived_units_desk() {
             cancel,
             Err(AppError::UnitArchiveOpenWork {
                 count: 1,
+                elsewhere: 0,
                 cancellable: false
             })
         ),
         "{cancel:?}"
+    );
+}
+
+/// A native call on a conversation whose desk sits under a goal; with `stamp`, the conversation's
+/// thread also carries another goal, standing in for a thread a channel call created. Returns the
+/// goal the call's run recorded and the two goals.
+async fn native_goal(stamp: bool) -> (Option<Uuid>, Uuid, Uuid) {
+    let f = McpSetup::new().await;
+    let p = f.s.f.persistence.as_ref();
+    let company = f.s.f.company;
+    let mut goals = Vec::new();
+    for name in ["native-desk-goal", "native-thread-goal"] {
+        let unit = p.test_unit(company, name).await;
+        sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
+            .bind(unit)
+            .execute(p.pool())
+            .await
+            .unwrap();
+        goals.push(unit);
+    }
+    let desk: Uuid = sqlx::query_scalar(
+        "UPDATE channels SET department_id=$3 WHERE company_id=$1 \
+         AND id=(SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2) RETURNING id",
+    )
+    .bind(company)
+    .bind(f.s.conversation)
+    .bind(goals[0])
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    if stamp {
+        // A thread's goal is fixed at creation, so the test stamps it with triggers off for this
+        // one statement; the unit is a live goal of this company, as the guard would require.
+        let mut tx = p.pool().begin().await.unwrap();
+        sqlx::query("SET LOCAL session_replication_role = replica")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE threads SET goal_unit_id = $2 WHERE id = $1")
+            .bind(f.s.conversation)
+            .bind(goals[1])
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+    p.native_mcp(&f.request(json!({"query":"goal"})))
+        .await
+        .unwrap();
+    let recorded = sqlx::query_scalar(
+        "SELECT goal_unit_id FROM workflow_runs WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(desk)
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    (recorded, goals[0], goals[1])
+}
+
+/// Plan08 03B (gate D1 r2, F2): a native call is a run of its conversation. It serves the goal of
+/// its conversation's thread first, then the nearest goal above the conversation's desk.
+#[tokio::test]
+async fn goal_trail_native_call_carries_the_thread_goal() {
+    let (recorded, desk_goal, _) = native_goal(false).await;
+    assert_eq!(recorded, Some(desk_goal), "the desk's goal");
+    let (recorded, _, thread_goal) = native_goal(true).await;
+    assert_eq!(
+        recorded,
+        Some(thread_goal),
+        "the thread's goal wins over the desk's"
     );
 }

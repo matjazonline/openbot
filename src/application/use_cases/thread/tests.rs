@@ -2926,6 +2926,8 @@ fn use_cases_with_departments(
         .enumerate()
         .map(
             |(index, (name, parent))| crate::entities::department::Department {
+                kind: Default::default(),
+                target_date: None,
                 is_root: false,
                 escalation: None,
                 archived: None,

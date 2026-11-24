@@ -97,6 +97,7 @@ async fn insert(f: &AdmissionFixture, owner: NativeRun<'_>) -> ActivationRequest
     admission_write::insert_run(
         &mut tx,
         &RunRow {
+            goal: None,
             company,
             knowledge: levels.levels,
             content_exact: levels.exact,

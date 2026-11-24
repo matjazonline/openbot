@@ -1,0 +1,2177 @@
+diff --git a/docs/departments.md b/docs/departments.md
+index 298e60e7..43c15d34 100644
+--- a/docs/departments.md
++++ b/docs/departments.md
+@@ -379,6 +379,49 @@ desks; a department's manager sees the departments they manage, root managers al
+ only root managers change prices. Its "Spend counted toward caps" section and the dashboard's
+ "Spend by department" panel show each cap, the counted spend and what remains.
+ 
++## Goals
++
++A goal is a department with an end: a launch, a migration, a churn push. Choose **Goal** as the
++kind when creating it (or change the kind later, as the parent's manager). Apart from what is
++listed here, a goal is a department: it has its own desk, members, roles, memory, resources and
++caps. Its charter says when it is done, and an optional target date says when it should be. The
++root is always standing, and only a goal has a target date. The create form names one deciding
++sponsor; add more sponsors on the goal's Sponsors card. The JSON create takes the whole list.
++
++The recommended shape is one standing department for the people and agents who plan goals, with
++one goal under it per goal. The sample
++`src/application/workflow/fixtures/goal-plan-approve-dispatch.yaml` is a starting point for a
++goal's desk:
++- the lead plans;
++- the deciding sponsor approves with `decision.human`;
++- the lead dispatches the work to department desks with `channel.call`, which its agent must hold.
++
++Publish it once and bind it on each goal's desk.
++
++**The trail.** Every run done for a goal records it, in whatever department it runs. It is fixed
++when the run starts, and the model cannot set or change it. A run serves the first of these that
++is still an active goal:
++1. the goal of the run it reruns;
++2. its parent run's goal, for a child run; a local-agent call started from a workflow takes that
++   workflow run's goal;
++3. its thread's goal;
++4. the nearest goal at or above its desk.
++
++A `channel.call` from a goal's run records the goal on the thread it opens, so a later reply on
++that thread serves the goal too. A plain `message.send` thread records none. Once the goal is
++archived, or no longer a goal, new runs on its threads serve no goal and are admitted by their own
++department. What was recorded stays as it was.
++
++**Archiving a goal** counts its open runs everywhere, not only on its desks. Cancel-and-archive
++cancels the goal's own run trees, including their calls into other departments. A run elsewhere
++that started outside those trees can only be ended by its own department; for example, a Sales run
++admitted later on a call thread. While one is open, the archive is refused and says how many such
++runs there are in other departments.
++
++**A goal with recorded work cannot be deleted**, even after it becomes standing again. The refusal
++says to archive it instead. Deleting
++the company removes everything as before.
++
+ ## Archive
+ 
+ Archive a department that should stop working for now but whose history, knowledge and spend you
+@@ -398,7 +441,8 @@ archives and restores; a department's own lead does not. While it is archived:
+   and creating or moving a desk, document, skill or connection into it are refused with
+   `unit.archived`. Deleting a desk, document or schedule, moving a desk, document, skill or
+   connection out to an active department, disabling a schedule or binding, and deleting the
+-  department itself still work, so an archived department can be emptied and deleted. A skill or
++  department itself still work, so an archived department can be emptied and deleted (unless it
++  has work recorded for it as a goal; see "Goals"). A skill or
+   connection left in it can still be edited by its managers; nothing below can select it.
+ - Its threads, runs, decisions and escalations stay readable under the desk grants that existed,
+   and membership and roles in it grant that reading and nothing else. Its knowledge and memory are
+@@ -424,7 +468,9 @@ into one), and desks, groups and run lists of past work name them "(archived)".
+ 
+ The root cannot be deleted. A child department is deleted only when it owns no desks, knowledge
+ documents, skills or connections, and has no child departments. Reassign or delete its desks,
+-move or delete its documents and resources, and move or delete its children first. The refusal
++move or delete its documents and resources, and move or delete its children first. A department
++with runs or threads recorded for it as a goal is never deleted, even after it stops being a goal;
++archive it instead. The refusal
+ says it still owns desks, or names the skills and connections it still owns; one for knowledge
+ documents says only that the department is still referenced. Its members and role rows go with it; its memory namespace
+ is retired through the durable lifecycle worker.
+@@ -438,9 +484,9 @@ for someone outside the company.
+ | Method and path | Does |
+ | --- | --- |
+ | `GET /departments` | Lists the active departments the caller can see; `?include_archived=true` adds archived ones. |
+-| `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id), `escalation` (role/hops or null). |
++| `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id), `escalation` (role/hops or null), and for a goal `kind: "goal"`, `target_date` (`YYYY-MM-DD`) and `sponsors` (principal ids; the first decides). |
+ | `GET /departments/{department_id}` | One department with its `members` and `roles`. |
+-| `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for a child's `parent_id` selects the root. The root cannot be re-parented. |
++| `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for a child's `parent_id` selects the root. The root cannot be re-parented. `kind` (`standing` or `goal`) and `target_date` change a goal; a standing department refuses a target date, so turning a goal with a date into a standing department also sends `"target_date": null`. |
+ | `DELETE /departments/{department_id}` | Deletes it (see "Delete"). |
+ | `POST /departments/{department_id}/archive` | Archives it and every department below it (see "Archive"). Optional JSON `{ "cancel_open_runs": true }` cancels their unfinished runs first. |
+ | `POST /departments/{department_id}/restore` | Restores that department alone; its parent must be active. |
+@@ -448,10 +494,12 @@ for someone outside the company.
+ | `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role. PUT requires JSON `{ "decider": false }` (`true` selects a sponsor decider); DELETE accepts `?successor={principal_id}` for sponsor handover. Reads include `decider` for every role holder. |
+ 
+ Refusals: `409 Conflict` with `code` `unit.archived` for a write to an archived department, and
+-`unit.archive_open_work` with `count` and `cancellable` for an archive with unfinished runs;
++`unit.archive_open_work` with `count`, `elsewhere` and `cancellable` for an archive with unfinished runs
++(`elsewhere` counts a goal's runs in other departments that only those departments can end);
+ `409 Conflict` for a taken slug or a department that still owns desks, knowledge documents, skills or connections, or has children;
+-`400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither
+-a person nor an agent; `404 Not Found` for a principal or parent department that is not the
++`400 Bad Request` for a cycle, too deep a tree, one of the company's principals that is neither
++a person nor an agent, `department.target_date_goal_only`, `department.root_is_standing` or
++`department.sponsor_duplicate`; `409 Conflict` for deleting a department with work recorded for it as a goal; `404 Not Found` for a principal or parent department that is not the
+ company's.
+ 
+ 
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 51e1dd17..66ffb64c 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -15767,6 +15767,10 @@ CREATE TABLE public.departments (
+     -- archives its subtree; a unit archived earlier keeps its own timestamp.
+     archived_at timestamp with time zone,
+     archived_by jsonb,
++    -- Plan08 03A: a goal is a unit with an end. Its definition of done is the charter; a target
++    -- date is allowed on a goal only, and the root is always standing.
++    kind text NOT NULL DEFAULT 'standing',
++    target_date date,
+     CONSTRAINT departments_pkey PRIMARY KEY (id),
+     CONSTRAINT departments_company_id_id_key UNIQUE (company_id, id),
+     CONSTRAINT departments_company_slug_key UNIQUE (company_id, slug),
+@@ -15784,7 +15788,10 @@ CREATE TABLE public.departments (
+     CONSTRAINT departments_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
+     CONSTRAINT departments_archive_shape CHECK (((archived_at IS NULL) = (archived_by IS NULL))
+         AND (archived_by IS NULL OR public.valid_creation_provenance(archived_by))),
+-    CONSTRAINT departments_root_archive CHECK (NOT (is_root AND archived_at IS NOT NULL))
++    CONSTRAINT departments_root_archive CHECK (NOT (is_root AND archived_at IS NOT NULL)),
++    CONSTRAINT departments_kind CHECK (kind IN ('standing', 'goal')),
++    CONSTRAINT departments_goal_target CHECK (kind = 'goal' OR target_date IS NULL),
++    CONSTRAINT departments_root_standing CHECK (NOT (is_root AND kind = 'goal'))
+ );
+ CREATE UNIQUE INDEX departments_one_root ON public.departments(company_id) WHERE is_root;
+ CREATE INDEX departments_parent_idx ON public.departments USING btree (company_id, parent_id)
+@@ -21216,3 +21223,50 @@ BEGIN
+ END $$;
+ CREATE CONSTRAINT TRIGGER run_dependency_scope AFTER INSERT ON public.run_dependency_manifests
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_run_dependency_scope();
++
++-- Plan08 03B: the goal trail. A run records the goal it serves, fixed at insert; a thread records
++-- one only when a channel call creates it for a calling run's goal (gate 08G-P03-D1 r2). Deleting a
++-- goal with recorded work is refused; a company teardown deletes runs and threads before its tree.
++ALTER TABLE public.workflow_runs ADD COLUMN goal_unit_id uuid;
++ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_goal_fk FOREIGN KEY (company_id, goal_unit_id)
++    REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
++CREATE INDEX workflow_runs_goal_idx ON public.workflow_runs(company_id, goal_unit_id)
++    WHERE goal_unit_id IS NOT NULL;
++ALTER TABLE public.threads ADD COLUMN goal_unit_id uuid;
++ALTER TABLE public.threads ADD CONSTRAINT threads_goal_fk FOREIGN KEY (company_id, goal_unit_id)
++    REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
++CREATE INDEX threads_goal_idx ON public.threads(company_id, goal_unit_id) WHERE goal_unit_id IS NOT NULL;
++
++-- A recorded goal names a live goal when it is written. The unit is share-locked here, so a kind
++-- change or an archive waits for the writer, or the writer sees its result (D1.5).
++CREATE FUNCTION public.guard_goal_unit_insert() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE unit record;
++BEGIN
++    IF NEW.goal_unit_id IS NULL THEN
++        RETURN NEW;
++    END IF;
++    SELECT kind, archived_at INTO unit FROM public.departments
++     WHERE company_id = NEW.company_id AND id = NEW.goal_unit_id FOR SHARE;
++    IF FOUND AND (unit.kind <> 'goal' OR unit.archived_at IS NOT NULL) THEN
++        RAISE EXCEPTION 'a recorded goal must be an active goal unit' USING ERRCODE = '23514',
++            CONSTRAINT = 'goal_unit_live';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_runs_goal_live BEFORE INSERT ON public.workflow_runs
++    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_insert();
++CREATE TRIGGER threads_goal_live BEFORE INSERT ON public.threads
++    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_insert();
++
++CREATE FUNCTION public.guard_goal_unit_fixed() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NEW.goal_unit_id IS DISTINCT FROM OLD.goal_unit_id THEN
++        RAISE EXCEPTION 'a recorded goal is fixed when the row is written' USING ERRCODE = '23514',
++            CONSTRAINT = 'goal_unit_fixed';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_runs_goal_fixed BEFORE UPDATE OF goal_unit_id ON public.workflow_runs
++    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_fixed();
++CREATE TRIGGER threads_goal_fixed BEFORE UPDATE OF goal_unit_id ON public.threads
++    FOR EACH ROW EXECUTE FUNCTION public.guard_goal_unit_fixed();
+diff --git a/plan/08-goals/03-goal-units-and-tracking.md b/plan/08-goals/03-goal-units-and-tracking.md
+index 946cacb8..99504d39 100644
+--- a/plan/08-goals/03-goal-units-and-tracking.md
++++ b/plan/08-goals/03-goal-units-and-tracking.md
+@@ -70,8 +70,7 @@ cannot start work in a department. Continues in
+    already admitted is not stopped.
+ 3. A refused child returns to its caller as a `denied` closure with that reason.
+ 
+-Batch 03C applies only if proposal 4 of the [README](README.md) is confirmed. Without it a cap on
+-a goal unit bounds the runs on the goal's own desks, as 07 defines for any unit.
++Batch 03C applies: the user confirmed proposal 4 of the [README](README.md) on 2026-11-24.
+ 
+ ## Batch 03D Status and analysis
+ 
+diff --git a/plan/08-goals/COORDINATION.md b/plan/08-goals/COORDINATION.md
+index cbda8951..898120b5 100644
+--- a/plan/08-goals/COORDINATION.md
++++ b/plan/08-goals/COORDINATION.md
+@@ -2,7 +2,7 @@
+ 
+ - Authority: /Users/mac02/orca/workspaces/openbot/plan08_ph1/plan/08-goals/COORDINATION.md
+ - Writer: Claude Code session `1e84a7af` in `/Users/mac02/orca/workspaces/openbot/plan08_ph1`. Ownership handoff 2026-11-22: previous writer `plan08-ph1-51` (p02) finished and is idle; the user asked this session to continue plan 08. Earlier: /root session 01a1e095 (p01) to `plan08-ph1-51` on 2026-11-21.
+-- Revision: 6
++- Revision: 8
+ 
+ ## Plan-wide instructions
+ 
+@@ -10,12 +10,17 @@ No additional instructions. Original plan documents and repository instructions
+ 
+ r4 (2026-11-22): p02 accepted in phase and committed (`fe7791d3`), not integrated. p03 is blocked on `channel.call`, which no branch implements. The user chose to implement [agent-workflow-call](../agent-workflow-call/README.md) first, on this branch, then return to p03 (notice 08G-C001). README proposals 4 and 5 are still open and must be settled before p03 starts.
+ 
++r7 (2026-11-24): the user confirmed README proposals 4 (a goal's budget counts the work done for it anywhere, so Batch 03C applies) and 5 (a goal with recorded work cannot be deleted, only archived). agent-workflow-call is accepted in phase through p06 and committed (`358e662a`, learnings `c7fbbbbe`). Its completion record lists gates unavailable on this machine and one intermittent gap; it is not declared complete. p03 may start once it records that acceptance identity per 08G-C001. Proposal 1 was built by p01 (`workflow.role_wrong_kind`).
++
++r8 (2026-11-24): p03 started (root `1e84a7af`, workflow implement-opus-reviewed-2_4). Batches: B1 = 03A+03B, B2 = 03C+03D. 08G-C001 is satisfied and 08G-C002 acknowledged for p03.
++
+ ## Phase directory
+ 
+ | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
+ | --- | --- | --- | --- |
+ | p01 | /root; resumed on integrated prerequisite (complete) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p01/docs/TASK.md; phases/p01/docs/HANDOFF.md |
+ | p02 | Claude Code `plan08-ph1-51` | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p02/docs/TASK.md; phases/p02/docs/HANDOFF.md |
++| p03 | Claude Code `1e84a7af` (started 2026-11-24; gate 08G-P03-D1 r1 under review) | /Users/mac02/orca/workspaces/openbot/plan08_ph1 | phases/p03/docs/TASK.md; phases/p03/docs/HANDOFF.md |
+ 
+ ## Cross-phase notices
+ 
+@@ -27,7 +32,7 @@ r4 (2026-11-22): p02 accepted in phase and committed (`fe7791d3`), not integrate
+ - Dependencies/order: blocks p03 entirely.
+ - Evidence/review: none yet
+ - Verification: p03 startup records agent-workflow-call's p06 acceptance identity.
+-- Responses: p03 -> pending (r2)
++- Responses: p03 -> satisfied r8 (agent-workflow-call p06 accepted in phase at `bc8b9841…764f`, committed `358e662a`)
+ 
+ ### 08G-C002 / r1
+ - State: active (r6 2026-11-23)
+@@ -37,6 +42,6 @@ r4 (2026-11-22): p02 accepted in phase and committed (`fe7791d3`), not integrate
+ - Dependencies/order: in effect on branch `plan08_ph1` (uncommitted with agent-workflow-call p01–p03).
+ - Evidence/review: `channel_call_resume_archive_cancels_call_child`; `unit_archive_` suite passing (agent-workflow-call `phases/p03/docs/logs/AWC-P03-B1-affected.txt`).
+ - Verification: p03 keeps `channel_call_resume_archive_cancels_call_child` and the `unit_archive_` suite green.
+-- Responses: p03 -> pending
++- Responses: p03 -> acknowledged r8 (gate 08G-P03-D1 D1.5 builds the goal open-work count on it)
+ 
+ Earlier entries: No other phase is being implemented or assigned. Plan 02 is now present in integrated baseline `8fdb892b6e279ed0c09150e2336bbdc7462f877d`; previous prerequisite blocker resolved by externally updated task branch. No source integration performed by this phase.
+diff --git a/plan/08-goals/README.md b/plan/08-goals/README.md
+index 15a7b36c..5f381842 100644
+--- a/plan/08-goals/README.md
++++ b/plan/08-goals/README.md
+@@ -64,7 +64,8 @@ department only may sit under that department instead of under the goals office.
+ 
+ ## Proposed here, confirm before implementation
+ 
+-These were raised in the design discussion and not ruled on.
++These were raised in the design discussion. The user confirmed 2 and 3 on 2026-11-21, and 4 and 5
++on 2026-11-24. Proposal 1 is built by p01 (01, item 3: `workflow.role_wrong_kind`).
+ 
+ 1. **The step decides what the decider must be.** `decision.human` with `role: sponsor` needs a
+    person decider and refuses admission otherwise (`workflow.role_wrong_kind`), because a human
+diff --git a/plan/agent-workflow-call/phases/p06/docs/HANDOFF.md b/plan/agent-workflow-call/phases/p06/docs/HANDOFF.md
+index f17a39c1..e4492713 100644
+--- a/plan/agent-workflow-call/phases/p06/docs/HANDOFF.md
++++ b/plan/agent-workflow-call/phases/p06/docs/HANDOFF.md
+@@ -29,7 +29,8 @@
+    - The plan is not declared complete. The unavailable gates and the crash-test gap are listed in doc 06.
+ 2. Return to Plan08 p03 after settling Plan08 README proposals 4 and 5 with the user.
+ 
+-## Pending with the user
++## Settled with the user (2026-11-24)
+ 
+-- Commit authorization; the trail learning y/n; dropping the scratch DBs; Plan08 README proposals 4 and 5 before
+-  Plan08 p03.
++- Committed as `358e662a`, with the learnings in `c7fbbbbe`.
++- Scratch databases `openbot_awc_mac02` and `openbot_awc_mac02_test` were dropped.
++- Plan08 README proposals 4 and 5 were confirmed (Plan08 COORDINATION r7).
+diff --git a/src/adapters/http/app_error_impl.rs b/src/adapters/http/app_error_impl.rs
+index 07e66a22..106606b4 100644
+--- a/src/adapters/http/app_error_impl.rs
++++ b/src/adapters/http/app_error_impl.rs
+@@ -57,11 +57,11 @@ impl IntoResponse for AppError {
+                     "code":crate::application::workflow::channel_call::INTERACTIVE_UNSUPPORTED,
+                     "error":AppError::InteractiveUnsupported.to_string()})),
+             ).into_response(),
+-            AppError::UnitArchiveOpenWork { count, cancellable } => (
++            AppError::UnitArchiveOpenWork { count, elsewhere, cancellable } => (
+                 StatusCode::CONFLICT,
+                 axum::Json(serde_json::json!({"code":AppError::UNIT_ARCHIVE_OPEN_WORK,
+-                    "error":AppError::UnitArchiveOpenWork { count, cancellable }.to_string(),
+-                    "count":count,"cancellable":cancellable})),
++                    "error":AppError::UnitArchiveOpenWork { count, elsewhere, cancellable }.to_string(),
++                    "count":count,"elsewhere":elsewhere,"cancellable":cancellable})),
+             ).into_response(),
+             AppError::ResourceOutsideUnit(refusal) => (
+                 StatusCode::BAD_REQUEST,
+diff --git a/src/adapters/http/pages/attention.rs b/src/adapters/http/pages/attention.rs
+index c8e561c0..da12020b 100644
+--- a/src/adapters/http/pages/attention.rs
++++ b/src/adapters/http/pages/attention.rs
+@@ -459,6 +459,8 @@ mod tests {
+     fn department_views_attention_groups_and_keeps_the_department() {
+         use crate::entities::department::{Department, DepartmentId};
+         let sales = Department {
++            kind: Default::default(),
++            target_date: None,
+             is_root: false,
+             escalation: None,
+             archived: None,
+diff --git a/src/adapters/http/pages/company_departments.rs b/src/adapters/http/pages/company_departments.rs
+index 013b4f8b..45c5a5fa 100644
+--- a/src/adapters/http/pages/company_departments.rs
++++ b/src/adapters/http/pages/company_departments.rs
+@@ -24,6 +24,11 @@ pub struct DepartmentDraft {
+     pub parent_id: Option<Uuid>,
+     /// Create only: who leads the new department.
+     pub lead: Option<Uuid>,
++    /// `standing` or `goal` (Plan08 03A), and a goal's target date as typed (`YYYY-MM-DD`).
++    pub kind: String,
++    pub target_date: String,
++    /// Create only: a new goal's deciding sponsor.
++    pub sponsor: Option<Uuid>,
+ }
+ 
+ impl DepartmentDraft {
+@@ -35,6 +40,12 @@ impl DepartmentDraft {
+             charter: department.charter.clone().unwrap_or_default(),
+             parent_id: department.parent_id.map(DepartmentId::as_uuid),
+             lead: None,
++            kind: department.kind.as_str().to_owned(),
++            target_date: department
++                .target_date
++                .map(|date| date.to_string())
++                .unwrap_or_default(),
++            sponsor: None,
+         }
+     }
+ }
+@@ -341,6 +352,9 @@ fn create_form(section: &DepartmentSection<'_>, draft: &DepartmentDraft) -> Stri
+             <label class="form-control"><span class="label text-xs opacity-70">Lead</span>
+                 <select class="select w-full" name="lead">{lead_options}</select>
+                 <span class="label text-xs opacity-60">An agent lead answers the department's desk; a person lead or none leaves it a plain team desk.</span>{cut}</label>
++            <label class="form-control"><span class="label text-xs opacity-70">Deciding sponsor</span>
++                <select class="select w-full" name="sponsor">{sponsor_options}</select>
++                <span class="label text-xs opacity-60">For a goal: who approves its work. Add more sponsors on the goal once it exists.</span></label>
+             <div class="flex items-center gap-3 border-t border-base-300 pt-4">
+                 {submit}
+                 <button type="button" class="btn btn-ghost"
+@@ -353,6 +367,7 @@ fn create_form(section: &DepartmentSection<'_>, draft: &DepartmentDraft) -> Stri
+         error = section.error_for(DepartmentForm::Create),
+         fields = department_fields(section, draft, None),
+         lead_options = principal_options(section.choices, draft.lead, "No lead"),
++        sponsor_options = principal_options(section.choices, draft.sponsor, "No sponsor"),
+         cut = choices_cut_note(section),
+         submit = busy_submit_button("Create department"),
+         cancel = section_endpoint(company_id, ""),
+@@ -413,7 +428,24 @@ fn department_fields(
+             <label class="form-control"><span class="label text-xs opacity-70">Charter</span>
+                 <textarea class="textarea min-h-32 w-full" name="charter" maxlength="{max_charter}">{charter}</textarea>
+                 <span class="label text-xs opacity-60">What the department is for. Its agents read it when they answer on its desks. At most {max_charter} bytes.</span></label>
+-            {parent_field}"##,
++            {parent_field}{kind_field}"##,
++        // A goal is a unit with an end (Plan08 03A); the root is always standing.
++        kind_field = if is_root {
++            String::new()
++        } else {
++            format!(
++                r#"<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
++                <label class="form-control"><span class="label text-xs opacity-70">Kind</span>
++                    <select class="select w-full" name="kind"><option value="standing"{standing}>Standing department</option><option value="goal"{goal}>Goal</option></select></label>
++                <label class="form-control"><span class="label text-xs opacity-70">Target date</span>
++                    <input class="input w-full" type="date" name="target_date" value="{target_date}"></label>
++            </div>
++            <p class="text-xs opacity-60">A goal records every run done for it, in any department. Its charter says when it is done; the target date applies to a goal only.</p>"#,
++                standing = if draft.kind == "goal" { "" } else { " selected" },
++                goal = if draft.kind == "goal" { " selected" } else { "" },
++                target_date = escape_html_attr(&draft.target_date),
++            )
++        },
+         // The new department's desk is created at its slug. Editing the slug later does not move
+         // the desk (01DEP-P03-D8), so the edit form says where its address is changed instead.
+         slug_help = match editing {
+diff --git a/src/adapters/http/pages/dashboard.rs b/src/adapters/http/pages/dashboard.rs
+index 18575ba3..49be52d2 100644
+--- a/src/adapters/http/pages/dashboard.rs
++++ b/src/adapters/http/pages/dashboard.rs
+@@ -1860,6 +1860,8 @@ mod tests {
+     fn desk_departments() -> (DeskDepartments, [Uuid; 3], DepartmentId, DepartmentId) {
+         use crate::entities::department::Department;
+         let department = |name: &str, parent: Option<DepartmentId>| Department {
++            kind: Default::default(),
++            target_date: None,
+             is_root: false,
+             escalation: None,
+             archived: None,
+diff --git a/src/adapters/http/pages/department_ui_tests.rs b/src/adapters/http/pages/department_ui_tests.rs
+index 6cf0e847..db2b3206 100644
+--- a/src/adapters/http/pages/department_ui_tests.rs
++++ b/src/adapters/http/pages/department_ui_tests.rs
+@@ -15,6 +15,8 @@ use crate::use_cases::department::{DepartmentDetail, DepartmentView};
+ 
+ fn department(company_id: Uuid, name: &str, slug: &str, parent: Option<&Department>) -> Department {
+     Department {
++        kind: Default::default(),
++        target_date: None,
+         is_root: false,
+         escalation: None,
+         archived: None,
+@@ -1166,3 +1168,51 @@ fn department_sponsor_ui_lists_decider_controls_and_named_inherited_escalation()
+ 
+ #[path = "department_archive_ui_tests.rs"]
+ mod archive;
++
++/// Plan08 03A: the create form offers the kind, a target date and a deciding sponsor, and keeps
++/// what was typed when a goal create is refused.
++#[test]
++fn goal_unit_create_form_offers_kind_target_date_and_sponsor() {
++    let tree = tree();
++    let all = tree.all();
++    let closer = principal(PrincipalKind::Agent, "Closer", "closer");
++    let draft = DepartmentDraft {
++        name: "Launch X".into(),
++        slug: "launch-x".into(),
++        kind: "goal".into(),
++        target_date: "2027-03-31".into(),
++        sponsor: Some(closer.principal_id.as_uuid()),
++        ..DepartmentDraft::default()
++    };
++    let choices = vec![closer];
++    let html = section(
++        &tree,
++        &all,
++        DepartmentDetailPane::Create(&draft),
++        &choices,
++        true,
++        None,
++    );
++    let form = &html[html.find(r#"id="department-create""#).unwrap()..];
++    assert!(
++        form.contains(r#"<select class="select w-full" name="kind">"#),
++        "{form}"
++    );
++    assert!(form.contains(r#"<option value="goal" selected>Goal</option>"#));
++    assert!(form.contains(r#"type="date" name="target_date" value="2027-03-31""#));
++    assert!(form.contains(r#"name="sponsor""#));
++    assert!(form.contains("Deciding sponsor"));
++    let standing = DepartmentDraft {
++        name: "Sales".into(),
++        ..DepartmentDraft::default()
++    };
++    let html = section(
++        &tree,
++        &all,
++        DepartmentDetailPane::Create(&standing),
++        &[],
++        true,
++        None,
++    );
++    assert!(html.contains(r#"<option value="standing" selected>Standing department</option>"#));
++}
+diff --git a/src/adapters/http/routes/department.rs b/src/adapters/http/routes/department.rs
+index 6036dfb6..d9abdc9d 100644
+--- a/src/adapters/http/routes/department.rs
++++ b/src/adapters/http/routes/department.rs
+@@ -65,6 +65,34 @@ pub struct DepartmentCreatePayload {
+     /// The principal to hold the `lead` role from the start.
+     pub lead: Option<Uuid>,
+     pub escalation: Option<crate::entities::workflow_escalation::EscalationPolicy>,
++    /// `goal` makes a goal unit (Plan08 03A); absent means standing.
++    #[serde(default)]
++    pub kind: crate::entities::department::DepartmentKind,
++    /// A goal's target date, `YYYY-MM-DD`.
++    pub target_date: Option<chrono::NaiveDate>,
++    /// A goal's sponsors, in order; the first one decides.
++    #[serde(default)]
++    pub sponsors: Vec<Uuid>,
++}
++
++impl DepartmentCreatePayload {
++    /// The goal part of a create: only a goal takes a target date or sponsors.
++    fn goal(&self) -> AppResult<Option<crate::application::ports::department::GoalWrite>> {
++        use crate::entities::department::DepartmentKind;
++        match self.kind {
++            DepartmentKind::Goal => Ok(Some(crate::application::ports::department::GoalWrite {
++                target_date: self.target_date,
++                sponsors: self.sponsors.iter().copied().map(PrincipalId::new).collect(),
++            })),
++            DepartmentKind::Standing if self.target_date.is_some() || !self.sponsors.is_empty() => {
++                Err(AppError::BadRequest(
++                    "department.target_date_goal_only: only a goal takes a target date or sponsors."
++                        .into(),
++                ))
++            }
++            DepartmentKind::Standing => Ok(None),
++        }
++    }
+ }
+ 
+ /// Only the fields present change. `null` clears an optional field; for `parent_id` it makes the
+@@ -81,6 +109,9 @@ pub struct DepartmentUpdatePayload {
+     pub parent_id: Option<Option<Uuid>>,
+     #[serde(default, deserialize_with = "present")]
+     pub escalation: Option<Option<crate::entities::workflow_escalation::EscalationPolicy>>,
++    pub kind: Option<crate::entities::department::DepartmentKind>,
++    #[serde(default, deserialize_with = "present")]
++    pub target_date: Option<Option<chrono::NaiveDate>>,
+ }
+ 
+ /// A field that is present, even as `null`, is `Some`; an absent one stays `None` via `default`.
+@@ -144,7 +175,9 @@ async fn create_department_json(
+         .filter(|slug| !slug.is_empty())
+         .map(String::from)
+         .unwrap_or_else(|| crate::adapters::http::routes::channel::slugify(&payload.name));
++    let goal = payload.goal()?;
+     let write = DepartmentWrite {
++        goal,
+         name: payload.name,
+         slug,
+         description: payload.description,
+@@ -188,6 +221,8 @@ async fn update_department_json(
+     Json(payload): Json<DepartmentUpdatePayload>,
+ ) -> AppResult<impl IntoResponse> {
+     let edit = DepartmentEdit {
++        kind: payload.kind,
++        target_date: payload.target_date,
+         escalation: payload.escalation,
+         name: payload.name,
+         slug: payload.slug,
+diff --git a/src/adapters/http/routes/department_tests.rs b/src/adapters/http/routes/department_tests.rs
+index bfd398ee..66d6aa5a 100644
+--- a/src/adapters/http/routes/department_tests.rs
++++ b/src/adapters/http/routes/department_tests.rs
+@@ -18,6 +18,9 @@ fn use_cases(f: &Fixture) -> Arc<DepartmentUseCases> {
+ 
+ fn create_payload(name: &str) -> DepartmentCreatePayload {
+     DepartmentCreatePayload {
++        kind: Default::default(),
++        sponsors: Vec::new(),
++        target_date: None,
+         escalation: None,
+         name: name.into(),
+         slug: None,
+@@ -419,3 +422,86 @@ async fn department_sponsor_json_carries_decider_and_round_trips_escalation_patc
+         .is_err()
+     );
+ }
++
++/// Plan08 03A: the JSON create takes a goal's kind, target date and sponsors (the first decides),
++/// the response names them, an edit moves the date, and a standing create refuses goal fields.
++#[tokio::test]
++async fn goal_unit_json_create_and_edit_carry_kind_target_date_and_sponsors() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let departments = use_cases(&f);
++    let person: Uuid =
++        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
++            .bind(f.company.id)
++            .bind(f.owner.id)
++            .fetch_one(f.persistence.pool())
++            .await
++            .unwrap();
++    let payload: DepartmentCreatePayload = serde_json::from_value(serde_json::json!({
++        "name": "Launch X", "kind": "goal", "target_date": "2027-03-31", "sponsors": [person]
++    }))
++    .unwrap();
++    let response = create_department_json(
++        State(departments.clone()),
++        Fixture::auth(&f.owner),
++        Path(f.company.id),
++        Json(payload),
++    )
++    .await
++    .unwrap()
++    .into_response();
++    assert_eq!(response.status(), StatusCode::CREATED);
++    let bytes = axum::body::to_bytes(response.into_body(), 65536)
++        .await
++        .unwrap();
++    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
++    assert_eq!(body["department"]["kind"], "goal");
++    assert_eq!(body["department"]["target_date"], "2027-03-31");
++    let id = DepartmentId::new(body["department"]["id"].as_str().unwrap().parse().unwrap());
++    let detail = departments
++        .visible_department(f.owner.id, f.company.id, id)
++        .await
++        .unwrap();
++    assert!(
++        detail
++            .roles
++            .iter()
++            .any(|role| role.role == DepartmentRole::Sponsor && role.decider),
++        "{:?}",
++        detail.roles
++    );
++    let payload: DepartmentUpdatePayload =
++        serde_json::from_value(serde_json::json!({"target_date": "2027-06-30"})).unwrap();
++    update_department_json(
++        State(departments.clone()),
++        Fixture::auth(&f.owner),
++        Path((f.company.id, id.as_uuid())),
++        Json(payload),
++    )
++    .await
++    .unwrap();
++    let stored = departments
++        .visible_department(f.owner.id, f.company.id, id)
++        .await
++        .unwrap();
++    assert_eq!(
++        stored.department.target_date.unwrap().to_string(),
++        "2027-06-30"
++    );
++    let payload: DepartmentCreatePayload = serde_json::from_value(serde_json::json!({
++        "name": "Plain", "target_date": "2027-03-31"
++    }))
++    .unwrap();
++    let refused = create_department_json(
++        State(departments.clone()),
++        Fixture::auth(&f.owner),
++        Path(f.company.id),
++        Json(payload),
++    )
++    .await;
++    assert!(
++        matches!(&refused, Err(AppError::BadRequest(message)) if message.starts_with("department.target_date_goal_only")),
++        "a standing create refuses goal fields"
++    );
++}
+diff --git a/src/adapters/http/routes/ui_departments.rs b/src/adapters/http/routes/ui_departments.rs
+index f494bf80..26b505cb 100644
+--- a/src/adapters/http/routes/ui_departments.rs
++++ b/src/adapters/http/routes/ui_departments.rs
+@@ -369,6 +369,9 @@ struct DepartmentFormData {
+     charter: Option<String>,
+     parent_id: Option<String>,
+     lead: Option<String>,
++    kind: Option<String>,
++    target_date: Option<String>,
++    sponsor: Option<String>,
+ }
+ 
+ impl DepartmentFormData {
+@@ -380,6 +383,31 @@ impl DepartmentFormData {
+             charter: self.charter.clone().unwrap_or_default(),
+             parent_id: optional_id(self.parent_id.as_deref()).ok().flatten(),
+             lead: optional_id(self.lead.as_deref()).ok().flatten(),
++            kind: self.kind.clone().unwrap_or_else(|| "standing".to_owned()),
++            target_date: self.target_date.clone().unwrap_or_default(),
++            sponsor: optional_id(self.sponsor.as_deref()).ok().flatten(),
++        }
++    }
++
++    /// The submitted kind; a form without the field (the root's) is standing.
++    fn kind(&self) -> AppResult<crate::entities::department::DepartmentKind> {
++        match self.kind.as_deref().map(str::trim) {
++            None | Some("") => Ok(crate::entities::department::DepartmentKind::Standing),
++            Some(value) => crate::entities::department::DepartmentKind::parse(value)
++                .ok_or_else(|| AppError::BadRequest("Choose standing or goal.".into())),
++        }
++    }
++
++    /// A goal's target date; the form ignores the date when standing is chosen (Plan08 03A.3).
++    fn target_date(&self) -> AppResult<Option<chrono::NaiveDate>> {
++        if self.kind()? != crate::entities::department::DepartmentKind::Goal {
++            return Ok(None);
++        }
++        match self.target_date.as_deref().map(str::trim) {
++            None | Some("") => Ok(None),
++            Some(value) => chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
++                .map(Some)
++                .map_err(|_| AppError::BadRequest("Enter the target date as a date.".into())),
+         }
+     }
+ 
+@@ -406,6 +434,18 @@ impl DepartmentFormData {
+             charter: self.charter.clone(),
+             parent_id: self.parent()?,
+             created_by: None,
++            goal: match self.kind()? {
++                crate::entities::department::DepartmentKind::Goal => {
++                    Some(crate::application::ports::department::GoalWrite {
++                        target_date: self.target_date()?,
++                        sponsors: optional_id(self.sponsor.as_deref())?
++                            .map(PrincipalId::new)
++                            .into_iter()
++                            .collect(),
++                    })
++                }
++                crate::entities::department::DepartmentKind::Standing => None,
++            },
+         })
+     }
+ 
+@@ -424,6 +464,8 @@ impl DepartmentFormData {
+             description: Some(self.description.clone()),
+             charter: Some(self.charter.clone()),
+             parent_id: Some(self.parent()?),
++            kind: Some(self.kind()?),
++            target_date: Some(self.target_date()?),
+         })
+     }
+ 
+@@ -652,21 +694,12 @@ async fn archive_department(
+                 .saved(&access, Some(department), "Department archived.")
+                 .await
+         }
+-        Err(AppError::UnitArchiveOpenWork { count, cancellable }) => {
+-            let runs = if count == 1 { "run is" } else { "runs are" };
+-            let (form, message) = if cancellable {
+-                (
+-                    DepartmentForm::ArchiveOpenWork,
+-                    format!("{count} {runs} still open here or below. Cancel them to archive."),
+-                )
+-            } else {
+-                (
+-                    DepartmentForm::Archive,
+-                    format!(
+-                        "{count} {runs} still open here or below, more than can be cancelled at once. Let them finish or cancel some first."
+-                    ),
+-                )
+-            };
++        Err(AppError::UnitArchiveOpenWork {
++            count,
++            elsewhere,
++            cancellable,
++        }) => {
++            let (form, message) = open_work_refusal(count, elsewhere, cancellable);
+             workspace.refused(&access, selection(), form, message).await
+         }
+         Err(error) => {
+@@ -682,6 +715,34 @@ async fn archive_department(
+     }
+ }
+ 
++/// The archive card's form and wording for an open-work refusal. A goal's run in another
++/// department that its own work did not start is that department's to end, so it gets its own
++/// wording rather than the cancellation-bound one (Plan08 03B.5).
++fn open_work_refusal(count: i64, elsewhere: i64, cancellable: bool) -> (DepartmentForm, String) {
++    let runs = if count == 1 { "run is" } else { "runs are" };
++    if elsewhere > 0 {
++        let them = if elsewhere == 1 { "it" } else { "them" };
++        (
++            DepartmentForm::Archive,
++            format!(
++                "{count} {runs} still open for this goal, {elsewhere} in other departments that its own work did not start. Only those departments can end {them}; archive once they finish."
++            ),
++        )
++    } else if cancellable {
++        (
++            DepartmentForm::ArchiveOpenWork,
++            format!("{count} {runs} still open here or below. Cancel them to archive."),
++        )
++    } else {
++        (
++            DepartmentForm::Archive,
++            format!(
++                "{count} {runs} still open here or below, more than can be cancelled at once. Let them finish or cancel some first."
++            ),
++        )
++    }
++}
++
+ async fn restore_department(
+     workspace: Workspace,
+     Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+diff --git a/src/adapters/http/routes/ui_departments_tests.rs b/src/adapters/http/routes/ui_departments_tests.rs
+index 4aefbe1e..10f64320 100644
+--- a/src/adapters/http/routes/ui_departments_tests.rs
++++ b/src/adapters/http/routes/ui_departments_tests.rs
+@@ -1114,3 +1114,98 @@ async fn unit_archive_ui_routes_archive_restore_and_refuse_on_the_card() {
+         .await;
+     }
+ }
++
++/// Plan08 03A: the form creates a goal with its target date and deciding sponsor, and an edit to
++/// standing drops the date the form still shows.
++#[tokio::test]
++async fn goal_unit_form_creates_a_goal_and_edits_it_back_to_standing() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let ws = || workspace(&f, &f.owner);
++    let company = f.company.id;
++    let sponsor = person(&f, &f.owner).await;
++    let created = create_department(
++        ws(),
++        Path(company),
++        Form(DepartmentFormData {
++            kind: Some("goal".into()),
++            target_date: Some("2027-03-31".into()),
++            sponsor: Some(sponsor.to_string()),
++            ..form("Launch X", "launch-x")
++        }),
++    )
++    .await
++    .unwrap();
++    let (status, _, html) = body(created).await;
++    assert_eq!(status, StatusCode::OK, "{html}");
++    let goal = f
++        .departments()
++        .list_departments(
++            f.owner.id,
++            company,
++            crate::entities::department::ArchivedUnits::Include,
++        )
++        .await
++        .unwrap()
++        .into_iter()
++        .find(|department| department.slug.as_str() == "launch-x")
++        .unwrap();
++    assert_eq!(goal.kind, crate::entities::department::DepartmentKind::Goal);
++    assert_eq!(goal.target_date.unwrap().to_string(), "2027-03-31");
++    let roles: Vec<(Uuid, bool)> = sqlx::query_as(
++        "SELECT principal_id, decider FROM department_roles WHERE department_id = $1 AND role = 'sponsor'",
++    )
++    .bind(goal.id.as_uuid())
++    .fetch_all(f.persistence.pool())
++    .await
++    .unwrap();
++    assert_eq!(roles, vec![(sponsor, true)]);
++    update_department(
++        ws(),
++        Path((company, goal.id.as_uuid())),
++        Form(DepartmentFormData {
++            kind: Some("standing".into()),
++            target_date: Some("2027-03-31".into()),
++            ..form("Launch X", "launch-x")
++        }),
++    )
++    .await
++    .unwrap();
++    let stored = f
++        .departments()
++        .visible_department(f.owner.id, company, goal.id)
++        .await
++        .unwrap()
++        .department;
++    assert_eq!(
++        (stored.kind, stored.target_date),
++        (crate::entities::department::DepartmentKind::Standing, None)
++    );
++}
++
++/// Plan08 03B.5 (08G-P03-B1-F1): a goal's run elsewhere that cancel-and-archive cannot reach is
++/// described as such, not as too many runs here or below, and offers no cancel button.
++#[test]
++fn goal_unit_archive_refusal_names_runs_in_other_departments() {
++    let (form, message) = open_work_refusal(1, 1, false);
++    assert!(matches!(form, DepartmentForm::Archive));
++    assert_eq!(
++        message,
++        "1 run is still open for this goal, 1 in other departments that its own work did not start. Only those departments can end it; archive once they finish."
++    );
++    assert!(!message.contains("here or below"));
++    let (form, message) = open_work_refusal(3, 2, false);
++    assert!(matches!(form, DepartmentForm::Archive));
++    assert!(message.starts_with("3 runs are still open for this goal, 2 in other departments"));
++    assert!(message.contains("can end them"));
++    let (form, message) = open_work_refusal(2, 0, true);
++    assert!(matches!(form, DepartmentForm::ArchiveOpenWork));
++    assert_eq!(
++        message,
++        "2 runs are still open here or below. Cancel them to archive."
++    );
++    let (form, message) = open_work_refusal(65, 0, false);
++    assert!(matches!(form, DepartmentForm::Archive));
++    assert!(message.contains("more than can be cancelled at once"));
++}
+diff --git a/src/adapters/persistence/department.rs b/src/adapters/persistence/department.rs
+index c802dda5..c39179f9 100644
+--- a/src/adapters/persistence/department.rs
++++ b/src/adapters/persistence/department.rs
+@@ -38,8 +38,9 @@ use crate::application::workflow::WorkflowActor;
+ use crate::domain::workflow::CompanyId;
+ use crate::entities::creation::CreationProvenance;
+ use crate::entities::department::{
+-    ArchivedUnits, Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
+-    DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,
++    ArchivedUnits, Department, DepartmentDesk, DepartmentId, DepartmentKind, DepartmentMember,
++    DepartmentPrincipal, DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,
++    MAX_DEPARTMENT_DEPTH,
+ };
+ use crate::entities::participant::PrincipalKind;
+ use crate::entities::transport::PrincipalId;
+@@ -126,7 +127,8 @@ fn principal_choices(
+ const DEPARTMENT_COLUMNS: &str = "department.id, department.company_id, department.name, \
+      department.slug::text AS slug, department.description, department.charter, \
+      department.parent_id, department.is_root, department.created_by, department.created_at, \
+-     department.escalation, department.archived_at, department.archived_by";
++     department.escalation, department.archived_at, department.archived_by, department.kind, \
++     department.target_date";
+ 
+ #[derive(sqlx::FromRow)]
+ struct DepartmentDb {
+@@ -142,6 +144,8 @@ struct DepartmentDb {
+     escalation: Option<serde_json::Value>,
+     archived_at: Option<DateTime<Utc>>,
+     archived_by: Option<serde_json::Value>,
++    kind: String,
++    target_date: Option<chrono::NaiveDate>,
+     created_at: DateTime<Utc>,
+ }
+ 
+@@ -192,6 +196,10 @@ impl TryFrom<DepartmentDb> for Department {
+                     )));
+                 }
+             },
++            kind: crate::entities::department::DepartmentKind::parse(&db.kind).ok_or_else(
++                || AppError::Internal(format!("Invalid departments.kind for {}", db.id)),
++            )?,
++            target_date: db.target_date,
+             created_at: db.created_at,
+         })
+     }
+diff --git a/src/adapters/persistence/department/archive.rs b/src/adapters/persistence/department/archive.rs
+index 6e80c4a2..9c06b7fb 100644
+--- a/src/adapters/persistence/department/archive.rs
++++ b/src/adapters/persistence/department/archive.rs
+@@ -65,10 +65,12 @@ async fn open_work_on(
+     units: &[Uuid],
+ ) -> AppResult<OpenWorkCount> {
+     Ok(sqlx::query_as(
++        // On the subtree's desks, or recorded against a goal in it wherever it runs (03B.5).
+         "SELECT count(*) AS open, count(*) FILTER (WHERE run.native_mcp_call_id IS NOT NULL) AS native \
+-           FROM workflow_runs AS run JOIN channels AS desk \
++           FROM workflow_runs AS run LEFT JOIN channels AS desk \
+              ON desk.company_id = run.company_id AND desk.id = run.channel_id \
+-          WHERE run.company_id = $1 AND desk.department_id = ANY($2) AND run.finished_at IS NULL",
++          WHERE run.company_id = $1 AND run.finished_at IS NULL \
++            AND (desk.department_id = ANY($2) OR run.goal_unit_id = ANY($2))",
+     )
+     .bind(company.as_uuid())
+     .bind(units)
+@@ -124,8 +126,61 @@ async fn supersede_routing_on(
+     Ok(())
+ }
+ 
+-fn open_work(count: i64, cancellable: bool) -> AppError {
+-    AppError::UnitArchiveOpenWork { count, cancellable }
++/// What cancel-and-archive cancels: the open roots on the subtree's desks, then the recorded
++/// channel-call children on them whose caller is elsewhere (agent-workflow-call p03 D6); a caller
++/// on the subtree is cancelled with its own tree. Roots go first, so a cascade locks a parent
++/// before its child. `$1` is the company and `$2` the subtree's units.
++const CANCEL_SET: &str = "SELECT run.id, 0 AS kind FROM workflow_runs AS run JOIN channels AS desk \
++       ON desk.company_id = run.company_id AND desk.id = run.channel_id \
++      WHERE run.company_id = $1 AND desk.department_id = ANY($2) \
++        AND run.finished_at IS NULL AND run.parent_run_id IS NULL \
++     UNION ALL \
++     SELECT child.id, 1 FROM workflow_channel_calls AS call \
++       JOIN workflow_runs AS child ON child.company_id = call.company_id AND child.id = call.child_run_id \
++       JOIN channels AS desk ON desk.company_id = child.company_id AND desk.id = child.channel_id \
++       JOIN workflow_runs AS caller ON caller.company_id = call.company_id AND caller.id = call.run_id \
++       LEFT JOIN channels AS caller_desk \
++         ON caller_desk.company_id = caller.company_id AND caller_desk.id = caller.channel_id \
++      WHERE call.company_id = $1 AND desk.department_id = ANY($2) AND child.finished_at IS NULL \
++        AND NOT COALESCE(caller_desk.department_id = ANY($2), false)";
++
++/// How many open runs recorded against a goal in the subtree run elsewhere with no ancestor, or
++/// themselves, in the whole cancel set: a Sales root admitted on a call thread that carries the
++/// goal, for one. Ancestry is walked by `parent_run_id` to depth 64; past it a run counts as
++/// uncovered.
++async fn uncovered_goal_runs_on(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    units: &[Uuid],
++) -> AppResult<i64> {
++    Ok(sqlx::query_scalar(&format!(
++        "WITH RECURSIVE cancelled AS ({CANCEL_SET}), \
++         elsewhere AS ( \
++           SELECT run.id FROM workflow_runs AS run LEFT JOIN channels AS desk \
++             ON desk.company_id = run.company_id AND desk.id = run.channel_id \
++            WHERE run.company_id = $1 AND run.goal_unit_id = ANY($2) AND run.finished_at IS NULL \
++              AND NOT COALESCE(desk.department_id = ANY($2), false)), \
++         up(start, id, depth) AS ( \
++           SELECT id, id, 0 FROM elsewhere \
++           UNION ALL \
++           SELECT up.start, run.parent_run_id, up.depth + 1 FROM up \
++             JOIN workflow_runs AS run ON run.company_id = $1 AND run.id = up.id \
++            WHERE run.parent_run_id IS NOT NULL AND up.depth < 64) \
++         SELECT count(*) FROM elsewhere WHERE NOT EXISTS ( \
++           SELECT 1 FROM up JOIN cancelled ON cancelled.id = up.id WHERE up.start = elsewhere.id)"
++    ))
++    .bind(company.as_uuid())
++    .bind(units)
++    .fetch_one(&mut **tx)
++    .await?)
++}
++
++fn open_work(count: i64, elsewhere: i64, cancellable: bool) -> AppError {
++    AppError::UnitArchiveOpenWork {
++        count,
++        elsewhere,
++        cancellable,
++    }
+ }
+ 
+ pub(crate) async fn archive_department_on(
+@@ -154,33 +209,22 @@ pub(crate) async fn archive_department_on(
+         // The roots on the subtree's desks, then the recorded channel-call children on them whose
+         // caller is elsewhere (agent-workflow-call p03 D6): a caller on the subtree is cancelled
+         // with its own tree. Roots go first, so a cascade locks a parent before its child.
+-        let cancellable_runs: Vec<Uuid> = sqlx::query_scalar(
+-            "SELECT id FROM ( \
+-               SELECT run.id, 0 AS kind FROM workflow_runs AS run JOIN channels AS desk \
+-                 ON desk.company_id = run.company_id AND desk.id = run.channel_id \
+-                WHERE run.company_id = $1 AND desk.department_id = ANY($2) \
+-                  AND run.finished_at IS NULL AND run.parent_run_id IS NULL \
+-               UNION ALL \
+-               SELECT child.id, 1 FROM workflow_channel_calls AS call \
+-                 JOIN workflow_runs AS child ON child.company_id = call.company_id AND child.id = call.child_run_id \
+-                 JOIN channels AS desk ON desk.company_id = child.company_id AND desk.id = child.channel_id \
+-                 JOIN workflow_runs AS caller ON caller.company_id = call.company_id AND caller.id = call.run_id \
+-                 LEFT JOIN channels AS caller_desk \
+-                   ON caller_desk.company_id = caller.company_id AND caller_desk.id = caller.channel_id \
+-                WHERE call.company_id = $1 AND desk.department_id = ANY($2) AND child.finished_at IS NULL \
+-                  AND NOT COALESCE(caller_desk.department_id = ANY($2), false) \
+-             ) AS cancellable ORDER BY kind, id LIMIT $3",
+-        )
++        let cancellable_runs: Vec<Uuid> = sqlx::query_scalar(&format!(
++            "SELECT id FROM ({CANCEL_SET}) AS cancellable ORDER BY kind, id LIMIT $3"
++        ))
+         .bind(company.as_uuid())
+         .bind(&units)
+         .bind(MAX_ARCHIVE_CANCELLATIONS + 1)
+         .fetch_all(&mut **tx)
+         .await?;
+-        // A native MCP call is ended by its local agent, never by a department write.
+-        let cancellable =
+-            work.native == 0 && cancellable_runs.len() as i64 <= MAX_ARCHIVE_CANCELLATIONS;
++        // A native MCP call is ended by its local agent, never by a department write; a goal run
++        // elsewhere that no cancelled tree reaches belongs to its own department (D1 r2 F3).
++        let elsewhere = uncovered_goal_runs_on(tx, company, &units).await?;
++        let cancellable = work.native == 0
++            && cancellable_runs.len() as i64 <= MAX_ARCHIVE_CANCELLATIONS
++            && elsewhere == 0;
+         if open == OpenWork::Refuse || !cancellable {
+-            return Err(open_work(work.open, cancellable));
++            return Err(open_work(work.open, elsewhere, cancellable));
+         }
+         for run in cancellable_runs {
+             crate::adapters::persistence::workflow::cancel_for_archive_on(
+@@ -193,7 +237,7 @@ pub(crate) async fn archive_department_on(
+         }
+         let remaining = open_work_on(tx, company, &units).await?;
+         if remaining.open > 0 {
+-            return Err(open_work(remaining.open, false));
++            return Err(open_work(remaining.open, 0, false));
+         }
+     }
+     // A placement in an archived unit places nothing (02C.4), so an archive moves its agents'
+diff --git a/src/adapters/persistence/department/lifecycle.rs b/src/adapters/persistence/department/lifecycle.rs
+index efbdfc92..b682139a 100644
+--- a/src/adapters/persistence/department/lifecycle.rs
++++ b/src/adapters/persistence/department/lifecycle.rs
+@@ -72,6 +72,24 @@ pub(crate) async fn create_department_with_id_on(
+         )
+         .await?;
+     }
++    // A goal's sponsors, in the creating transaction (Plan08 03A.4): the first one decides.
++    if let Some(goal) = &write.goal {
++        for (index, sponsor) in goal.sponsors.iter().enumerate() {
++            assign_department_role_on(
++                tx,
++                templates,
++                company,
++                actor,
++                department.id,
++                DepartmentRoleAssignment {
++                    role: DepartmentRole::Sponsor,
++                    principal: *sponsor,
++                    decider: index == 0,
++                },
++            )
++            .await?;
++        }
++    }
+     // Boxed: an agent lead's desk descends into template compilation and publication.
+     Box::pin(provision_department_desk_on(
+         tx,
+@@ -101,8 +119,9 @@ async fn insert_department_on(
+     .map_err(|error| AppError::Internal(error.to_string()))?;
+     let department = sqlx::query_as::<_, DepartmentDb>(&format!(
+         "INSERT INTO departments AS department \
+-             (id, company_id, name, slug, description, charter, parent_id, created_by, escalation) \
+-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING {DEPARTMENT_COLUMNS}"
++             (id, company_id, name, slug, description, charter, parent_id, created_by, escalation, \
++              kind, target_date) \
++         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING {DEPARTMENT_COLUMNS}"
+     ))
+     .bind(id.as_uuid())
+     .bind(company.as_uuid())
+@@ -119,6 +138,14 @@ async fn insert_department_on(
+             .transpose()
+             .map_err(|error| AppError::Internal(error.to_string()))?,
+     )
++    .bind(
++        match write.goal {
++            Some(_) => DepartmentKind::Goal,
++            None => DepartmentKind::Standing,
++        }
++        .as_str(),
++    )
++    .bind(write.goal.as_ref().and_then(|goal| goal.target_date))
+     .fetch_one(&mut **tx)
+     .await
+     .map_err(|error| slug_conflict(error, &write.slug))?;
+@@ -170,6 +197,9 @@ pub(crate) async fn update_department_on(
+         })
+     };
+     let escalation = edit.escalation.unwrap_or(current.escalation);
++    let kind = edit.kind.unwrap_or(current.kind);
++    let target_date = edit.target_date.unwrap_or(current.target_date);
++    unit_kind_shape(current.is_root, kind, target_date)?;
+     if parent_id != current.parent_id
+         && let Some(parent) = parent_id
+     {
+@@ -178,7 +208,8 @@ pub(crate) async fn update_department_on(
+     }
+     let updated = sqlx::query_as::<_, DepartmentDb>(&format!(
+         "UPDATE departments AS department \
+-            SET name = $3, slug = $4, description = $5, charter = $6, parent_id = $7, escalation = $8 \
++            SET name = $3, slug = $4, description = $5, charter = $6, parent_id = $7, escalation = $8, \
++                kind = $9, target_date = $10 \
+           WHERE department.company_id = $1 AND department.id = $2 \
+          RETURNING {DEPARTMENT_COLUMNS}"
+     ))
+@@ -190,6 +221,8 @@ pub(crate) async fn update_department_on(
+     .bind(&charter)
+     .bind(parent_id.map(DepartmentId::as_uuid))
+     .bind(escalation.map(serde_json::to_value).transpose().map_err(|error| AppError::Internal(error.to_string()))?)
++    .bind(kind.as_str())
++    .bind(target_date)
+     .fetch_one(&mut **tx)
+     .await
+     .map_err(|error| slug_conflict(error, &slug))?;
+@@ -236,6 +269,21 @@ async fn guard_department_delete_on(
+             current.name
+         )));
+     }
++    // A goal with recorded work keeps it (Plan08 03B.1); the foreign keys refuse the same.
++    let recorded_goal: bool = sqlx::query_scalar(
++        "SELECT EXISTS (SELECT 1 FROM workflow_runs WHERE company_id = $1 AND goal_unit_id = $2) \
++             OR EXISTS (SELECT 1 FROM threads WHERE company_id = $1 AND goal_unit_id = $2)",
++    )
++    .bind(company.as_uuid())
++    .bind(department.as_uuid())
++    .fetch_one(&mut **tx)
++    .await?;
++    if recorded_goal {
++        return Err(AppError::Conflict(format!(
++            "Department '{}' has work recorded for it as a goal and cannot be deleted. Archive it instead.",
++            current.name
++        )));
++    }
+     let owns_desks: bool = sqlx::query_scalar(
+         "SELECT EXISTS (SELECT 1 FROM channels AS desk \
+                          WHERE desk.company_id = $1 AND desk.department_id = $2)",
+@@ -341,3 +389,23 @@ pub(super) fn delete_error(error: sqlx::Error) -> AppError {
+         AppError::from(error)
+     }
+ }
++
++/// A unit's kind and target date (Plan08 03A.1, 03A.3): the root is standing, and only a goal
++/// carries a target date. The schema checks the same; this gives the refusal a name.
++pub(crate) fn unit_kind_shape(
++    is_root: bool,
++    kind: DepartmentKind,
++    target_date: Option<chrono::NaiveDate>,
++) -> AppResult<()> {
++    if is_root && kind == DepartmentKind::Goal {
++        return Err(AppError::BadRequest(
++            "department.root_is_standing: the company root cannot be a goal.".into(),
++        ));
++    }
++    if kind == DepartmentKind::Standing && target_date.is_some() {
++        return Err(AppError::BadRequest(
++            "department.target_date_goal_only: only a goal has a target date.".into(),
++        ));
++    }
++    Ok(())
++}
+diff --git a/src/adapters/persistence/department_tests.rs b/src/adapters/persistence/department_tests.rs
+index 9288445a..b9607e30 100644
+--- a/src/adapters/persistence/department_tests.rs
++++ b/src/adapters/persistence/department_tests.rs
+@@ -1118,5 +1118,7 @@ mod ui_reads;
+ mod archive_tests;
+ #[path = "delegated_administration_tests.rs"]
+ mod delegated_administration;
++#[path = "department_goal_tests.rs"]
++mod goal_units;
+ #[path = "department_sponsor_tests.rs"]
+ mod sponsors;
+diff --git a/src/adapters/persistence/local_agents/management/native_mcp_tests.rs b/src/adapters/persistence/local_agents/management/native_mcp_tests.rs
+index 3f0938ea..f9adcd76 100644
+--- a/src/adapters/persistence/local_agents/management/native_mcp_tests.rs
++++ b/src/adapters/persistence/local_agents/management/native_mcp_tests.rs
+@@ -456,9 +456,80 @@ async fn unit_archive_runs_native_mcp_refuses_on_an_archived_units_desk() {
+             cancel,
+             Err(AppError::UnitArchiveOpenWork {
+                 count: 1,
++                elsewhere: 0,
+                 cancellable: false
+             })
+         ),
+         "{cancel:?}"
+     );
+ }
++
++/// A native call on a conversation whose desk sits under a goal; with `stamp`, the conversation's
++/// thread also carries another goal, standing in for a thread a channel call created. Returns the
++/// goal the call's run recorded and the two goals.
++async fn native_goal(stamp: bool) -> (Option<Uuid>, Uuid, Uuid) {
++    let f = McpSetup::new().await;
++    let p = f.s.f.persistence.as_ref();
++    let company = f.s.f.company;
++    let mut goals = Vec::new();
++    for name in ["native-desk-goal", "native-thread-goal"] {
++        let unit = p.test_unit(company, name).await;
++        sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
++            .bind(unit)
++            .execute(p.pool())
++            .await
++            .unwrap();
++        goals.push(unit);
++    }
++    let desk: Uuid = sqlx::query_scalar(
++        "UPDATE channels SET department_id=$3 WHERE company_id=$1 \
++         AND id=(SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2) RETURNING id",
++    )
++    .bind(company)
++    .bind(f.s.conversation)
++    .bind(goals[0])
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    if stamp {
++        // A thread's goal is fixed at creation, so the test stamps it with triggers off for this
++        // one statement; the unit is a live goal of this company, as the guard would require.
++        let mut tx = p.pool().begin().await.unwrap();
++        sqlx::query("SET LOCAL session_replication_role = replica")
++            .execute(&mut *tx)
++            .await
++            .unwrap();
++        sqlx::query("UPDATE threads SET goal_unit_id = $2 WHERE id = $1")
++            .bind(f.s.conversation)
++            .bind(goals[1])
++            .execute(&mut *tx)
++            .await
++            .unwrap();
++        tx.commit().await.unwrap();
++    }
++    p.native_mcp(&f.request(json!({"query":"goal"})))
++        .await
++        .unwrap();
++    let recorded = sqlx::query_scalar(
++        "SELECT goal_unit_id FROM workflow_runs WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 1",
++    )
++    .bind(desk)
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    (recorded, goals[0], goals[1])
++}
++
++/// Plan08 03B (gate D1 r2, F2): a native call is a run of its conversation. It serves the goal of
++/// its conversation's thread first, then the nearest goal above the conversation's desk.
++#[tokio::test]
++async fn goal_trail_native_call_carries_the_thread_goal() {
++    let (recorded, desk_goal, _) = native_goal(false).await;
++    assert_eq!(recorded, Some(desk_goal), "the desk's goal");
++    let (recorded, _, thread_goal) = native_goal(true).await;
++    assert_eq!(
++        recorded,
++        Some(thread_goal),
++        "the thread's goal wins over the desk's"
++    );
++}
+diff --git a/src/adapters/persistence/memory/scope_owner_tests.rs b/src/adapters/persistence/memory/scope_owner_tests.rs
+index 2ecb3bb9..594cbf96 100644
+--- a/src/adapters/persistence/memory/scope_owner_tests.rs
++++ b/src/adapters/persistence/memory/scope_owner_tests.rs
+@@ -116,6 +116,7 @@ async fn memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_
+ 
+ fn department(slug: &str) -> DepartmentWrite {
+     DepartmentWrite {
++        goal: None,
+         name: slug.into(),
+         slug: slug.into(),
+         description: None,
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs b/src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs
+index 003033ae..9ec62de7 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs
+@@ -118,6 +118,7 @@ pub(super) async fn capture_catalog(f: &AdmissionFixture) -> Value {
+             "workflow_run_revision",
+             "workflow_run_snapshot_immutable",
+             "workflow_runs_active_unit",
++            "workflow_runs_goal_fixed",
+             "workflow_runs_preserve_association"
+         ]
+     );
+diff --git a/src/adapters/persistence/workflow/admission_write.rs b/src/adapters/persistence/workflow/admission_write.rs
+index 316997f3..2e78f8eb 100644
+--- a/src/adapters/persistence/workflow/admission_write.rs
++++ b/src/adapters/persistence/workflow/admission_write.rs
+@@ -15,6 +15,15 @@ pub(super) async fn create(
+     )
+     .await?;
+     let knowledge = super::knowledge::admission_levels_on(tx, command).await?;
++    let goal = super::goals::resolve_on(
++        tx,
++        command.company_id(),
++        super::goals::GoalOrigin {
++            rerun_of: command.rerun_of(),
++            ..super::goals::GoalOrigin::of(command.association())
++        },
++    )
++    .await?;
+     insert_run(
+         tx,
+         &RunRow {
+@@ -33,6 +42,7 @@ pub(super) async fn create(
+             rerun_of: command.rerun_of(),
+             delivery_policy: command.delivery_policy(),
+             native_mcp_call: None,
++            goal,
+         },
+     )
+     .await?;
+@@ -118,6 +128,8 @@ pub(super) struct RunRow<'a> {
+     /// Admission's choice for a root; a runtime child inherits its parent's (p08 D1.7).
+     pub delivery_policy: DeliveryPolicy,
+     pub native_mcp_call: Option<crate::domain::local_agents::NativeMcpCallId>,
++    /// The goal the run serves, resolved by `goals::resolve_on` (Plan08 03B); fixed at insert.
++    pub goal: Option<crate::entities::department::DepartmentId>,
+ }
+ 
+ /// The deferred root-budget FK permits inserting the budget before its run; the run's
+@@ -161,9 +173,10 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
+         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
+          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
+          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
+-         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id, native_mcp_call_id) \
++         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id, native_mcp_call_id, \
++         goal_unit_id) \
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
+-         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28, $29)",
++         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28, $29, $30)",
+     ).bind(row.company.as_uuid()).bind(row.run.as_uuid())
+         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
+         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(association.channel_id).bind(association.thread_id)
+@@ -182,6 +195,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
+         .bind(row.binding.escalation().map(serde_json::to_value).transpose().map_err(|_| invalid())?)
+         .bind(association.principal_id)
+         .bind(row.native_mcp_call.map(crate::domain::local_agents::NativeMcpCallId::as_uuid))
++        .bind(row.goal.map(crate::entities::department::DepartmentId::as_uuid))
+         .execute(db).await?;
+     Ok(())
+ }
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_storage_native_runs.rs b/src/adapters/persistence/workflow/autonomous_agent_storage_native_runs.rs
+index bd28fc5e..43065133 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_storage_native_runs.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_storage_native_runs.rs
+@@ -97,6 +97,7 @@ async fn insert(f: &AdmissionFixture, owner: NativeRun<'_>) -> ActivationRequest
+     admission_write::insert_run(
+         &mut tx,
+         &RunRow {
++            goal: None,
+             company,
+             knowledge: levels.levels,
+             content_exact: levels.exact,
+diff --git a/src/adapters/persistence/workflow/channel_call_snapshot_tests.rs b/src/adapters/persistence/workflow/channel_call_snapshot_tests.rs
+index f1bd7e99..d3195d7e 100644
+--- a/src/adapters/persistence/workflow/channel_call_snapshot_tests.rs
++++ b/src/adapters/persistence/workflow/channel_call_snapshot_tests.rs
+@@ -633,6 +633,7 @@ async fn bare_child(
+     super::super::admission_write::insert_run(
+         tx,
+         &super::super::admission_write::RunRow {
++            goal: None,
+             company: s.company(),
+             knowledge: crate::entities::access_level::RunKnowledge::new(
+                 crate::entities::access_level::AccessLevel::PUBLIC,
+diff --git a/src/adapters/persistence/workflow/channel_call_source.rs b/src/adapters/persistence/workflow/channel_call_source.rs
+index 4c31fb8a..a768e417 100644
+--- a/src/adapters/persistence/workflow/channel_call_source.rs
++++ b/src/adapters/persistence/workflow/channel_call_source.rs
+@@ -40,6 +40,8 @@ pub(super) async fn store_on(
+     .fetch_one(&mut **tx)
+     .await?;
+     let thread = Uuid::new_v4();
++    // The thread carries the calling run's goal, so a later reply on it serves the same goal.
++    let goal = super::goals::for_thread_of_on(tx, caller.company, caller.run).await?;
+     let message = MessageWrite::internal(
+         thread,
+         MessageAuthorWrite::Principal(author),
+@@ -55,6 +57,7 @@ pub(super) async fn store_on(
+         kind: DestinationKind::Channel,
+         destination_id: desk,
+         new_thread: Some(NewThread {
++            goal_unit_id: goal,
+             id: thread,
+             target: AddressTarget::Desk(desk),
+             subject: request.content.subject().to_string(),
+diff --git a/src/adapters/persistence/workflow/children.rs b/src/adapters/persistence/workflow/children.rs
+index 7bd38f76..cd0441b7 100644
+--- a/src/adapters/persistence/workflow/children.rs
++++ b/src/adapters/persistence/workflow/children.rs
+@@ -521,9 +521,20 @@ async fn insert_child_on(
+             call.actor.user_id(),
+         ),
+     };
++    // The parent's goal first, then the child's own thread and desk (Plan08 03B.2).
++    let goal = super::goals::resolve_on(
++        db,
++        scope.company,
++        super::goals::GoalOrigin {
++            parent: Some(scope.run),
++            ..super::goals::GoalOrigin::of(association)
++        },
++    )
++    .await?;
+     admission_write::insert_run(
+         db,
+         &RunRow {
++            goal,
+             company: scope.company,
+             knowledge,
+             content_exact,
+diff --git a/src/adapters/persistence/workflow/local_agent_mcp_tests.rs b/src/adapters/persistence/workflow/local_agent_mcp_tests.rs
+index 842d8d86..cf9e22fc 100644
+--- a/src/adapters/persistence/workflow/local_agent_mcp_tests.rs
++++ b/src/adapters/persistence/workflow/local_agent_mcp_tests.rs
+@@ -84,8 +84,18 @@ async fn originating() -> (Setup, NativeTurn) {
+ }
+ 
+ async fn originating_at(endpoint: &str) -> (Setup, NativeTurn) {
++    let s = Box::pin(configured(endpoint)).await;
++    Box::pin(originate(s, RelatedAssociation::Company)).await
++}
++
++async fn configured(endpoint: &str) -> Setup {
+     let mut s = Box::pin(Setup::new()).await;
+     configure(&mut s, endpoint).await;
++    s
++}
++
++/// The originating workflow run, parked on its native operation.
++async fn originate(mut s: Setup, association: RelatedAssociation) -> (Setup, NativeTurn) {
+     let p = &s.fixture.persistence;
+     let company = s.scope.company;
+     let admin: Uuid = sqlx::query_scalar(
+@@ -103,7 +113,7 @@ async fn originating_at(endpoint: &str) -> (Setup, NativeTurn) {
+     .execute(p.pool())
+     .await
+     .unwrap();
+-    let scope=s.activate(WorkflowActor::authenticated(admin).unwrap(),json!({"profile_id":{"literal":s.profile.id},"prompt":{"literal":"native workflow MCP"}}),RelatedAssociation::Company).await;
++    let scope=s.activate(WorkflowActor::authenticated(admin).unwrap(),json!({"profile_id":{"literal":s.profile.id},"prompt":{"literal":"native workflow MCP"}}),association).await;
+     s.scope = scope;
+     let claim = s.claim().await;
+     s.park(&claim).await;
+@@ -219,6 +229,88 @@ async fn native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and
+     );
+ }
+ 
++/// Plan08 03B (gate D1 r2 F2, 08G-P03-B1-F2): a native call from a workflow session serves the
++/// originating run's goal, as a child serves its parent's. The desk moves to another goal after
++/// the run starts, so the desk chain would name a different goal than the source run.
++#[tokio::test]
++async fn goal_trail_native_workflow_session_call_carries_the_source_run_goal() {
++    let s = Box::pin(configured("http://127.0.0.1:9")).await;
++    let p = s.fixture.persistence.clone();
++    let company = s.scope.company.as_uuid();
++    let mut goals = Vec::new();
++    for slug in ["native-source-goal", "native-desk-goal"] {
++        let unit = p.test_unit(company, slug).await;
++        sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
++            .bind(unit)
++            .execute(p.pool())
++            .await
++            .unwrap();
++        goals.push(unit);
++    }
++    // The source run is admitted on a desk under the source goal.
++    let desk = crate::adapters::persistence::test_support::create_channel(
++        &p,
++        company,
++        crate::application::ports::channel::ChannelWrite {
++            name: "Goal desk".into(),
++            slug: format!("goal-desk-{}", Uuid::new_v4().simple()),
++            department_id: Some(crate::entities::department::DepartmentId::new(goals[0])),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap()
++    .id;
++    // Anyone in the company may start work on it, so the originating admin needs no grant.
++    sqlx::query("UPDATE channels SET access_mode = 'public' WHERE company_id = $1 AND id = $2")
++        .bind(company)
++        .bind(desk)
++        .execute(p.pool())
++        .await
++        .unwrap();
++    let association =
++        RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(desk));
++    let (s, native) = Box::pin(originate(s, association)).await;
++    let run_goal = |run: Uuid| {
++        let p = p.clone();
++        async move {
++            sqlx::query_scalar::<_, Option<Uuid>>(
++                "SELECT goal_unit_id FROM workflow_runs WHERE company_id = $1 AND id = $2",
++            )
++            .bind(company)
++            .bind(run)
++            .fetch_one(p.pool())
++            .await
++            .unwrap()
++        }
++    };
++    assert_eq!(run_goal(s.scope.run.as_uuid()).await, Some(goals[0]));
++    sqlx::query("UPDATE channels SET department_id = $3 WHERE company_id = $1 AND id = $2")
++        .bind(company)
++        .bind(desk)
++        .bind(goals[1])
++        .execute(p.pool())
++        .await
++        .unwrap();
++    let response = p.native_mcp(&request(&s, &native)).await.unwrap();
++    let source: Uuid = sqlx::query_scalar(
++        "SELECT session.workflow_run_id FROM native_mcp_calls AS call JOIN local_agent_sessions AS session \
++           ON session.company_id = call.company_id AND session.id = call.session_id \
++          WHERE call.company_id = $1 AND call.run_id = $2",
++    )
++    .bind(company)
++    .bind(response.run_id.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    assert_eq!(source, s.scope.run.as_uuid(), "a workflow session");
++    assert_eq!(
++        run_goal(response.run_id.as_uuid()).await,
++        Some(goals[0]),
++        "the source run's goal, not the desk's current one"
++    );
++}
++
+ async fn assert_unavailable_memory(s: &Setup, run: RunId) {
+     let p = &s.fixture.persistence;
+     let company = s.scope.company;
+diff --git a/src/adapters/persistence/workflow/message_tests.rs b/src/adapters/persistence/workflow/message_tests.rs
+index 817fd82d..88a1ae0c 100644
+--- a/src/adapters/persistence/workflow/message_tests.rs
++++ b/src/adapters/persistence/workflow/message_tests.rs
+@@ -37,6 +37,8 @@ mod channel_call_support;
+ mod channel_call_views_db_tests;
+ #[path = "message_delivery_tests.rs"]
+ mod delivery_tests;
++#[path = "goal_trail_tests.rs"]
++mod goal_trail_tests;
+ #[path = "message_ingress_tests.rs"]
+ mod ingress_tests;
+ #[path = "message_intent_tests.rs"]
+diff --git a/src/adapters/persistence/workflow/message_writer.rs b/src/adapters/persistence/workflow/message_writer.rs
+index 3fa98451..c8307a1a 100644
+--- a/src/adapters/persistence/workflow/message_writer.rs
++++ b/src/adapters/persistence/workflow/message_writer.rs
+@@ -57,12 +57,13 @@ async fn create_thread_on(
+     let Some(thread) = &destination.new_thread else {
+         return Ok(());
+     };
+-    sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject, principal_id) VALUES ($1,$2,$3,$4,$5)")
++    sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject, principal_id, goal_unit_id) VALUES ($1,$2,$3,$4,$5,$6)")
+         .bind(thread.id)
+         .bind(company.as_uuid())
+         .bind(thread.target.desk_id())
+         .bind(&thread.subject)
+         .bind(thread.target.principal_id().map(|id| id.as_uuid()))
++        .bind(thread.goal_unit_id)
+         .execute(&mut *db)
+         .await?;
+     let mut participants = Vec::new();
+diff --git a/src/adapters/persistence/workflow/mod.rs b/src/adapters/persistence/workflow/mod.rs
+index dc6cc369..551051e2 100644
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -76,6 +76,7 @@ pub(crate) mod escalations;
+ mod fair_polling;
+ mod fairness;
+ pub(crate) mod follow_reviewers;
++mod goals;
+ mod guard_failure;
+ mod history_reader;
+ pub mod http;
+diff --git a/src/adapters/persistence/workflow/native_mcp/mod.rs b/src/adapters/persistence/workflow/native_mcp/mod.rs
+index 629e1403..05643893 100644
+--- a/src/adapters/persistence/workflow/native_mcp/mod.rs
++++ b/src/adapters/persistence/workflow/native_mcp/mod.rs
+@@ -111,9 +111,26 @@ pub(in crate::adapters::persistence) async fn admit_on(
+     )
+     .map_err(|_| invalid())?;
+     insert_call(db, owner, &broker, &prepared, call, run).await?;
++    // A workflow session's source run stands where a parent would; a conversation starts at its
++    // thread (Plan08 03B, gate D1 r2 F2).
++    let goal = super::goals::resolve_on(
++        db,
++        owner.company,
++        super::goals::GoalOrigin {
++            parent: match owner.source {
++                crate::domain::local_agents::SessionAssociation::Workflow { run_id } => {
++                    Some(RunId::new(run_id))
++                }
++                crate::domain::local_agents::SessionAssociation::Conversation { .. } => None,
++            },
++            ..super::goals::GoalOrigin::of(owner.association)
++        },
++    )
++    .await?;
+     admission_write::insert_run(
+         db,
+         &admission_write::RunRow {
++            goal,
+             knowledge: super::knowledge::stored_levels(
+                 owner.ceiling.as_i16(),
+                 owner.ceiling.as_i16(),
+diff --git a/src/adapters/persistence/workflow/unit_archive_runs_tests.rs b/src/adapters/persistence/workflow/unit_archive_runs_tests.rs
+index 9fdcef9a..8cd42c46 100644
+--- a/src/adapters/persistence/workflow/unit_archive_runs_tests.rs
++++ b/src/adapters/persistence/workflow/unit_archive_runs_tests.rs
+@@ -191,6 +191,7 @@ async fn unit_archive_refuses_open_work_and_changes_nothing() {
+             refused,
+             Err(AppError::UnitArchiveOpenWork {
+                 count: 1,
++                elsewhere: 0,
+                 cancellable: true
+             })
+         ),
+@@ -234,7 +235,7 @@ async fn unit_archive_cancel_refuses_past_its_bound_and_cancels_nothing() {
+     assert!(
+         matches!(
+             refused,
+-            Err(AppError::UnitArchiveOpenWork { count, cancellable: false }) if count == bound + 1
++            Err(AppError::UnitArchiveOpenWork { count, elsewhere: 0, cancellable: false }) if count == bound + 1
+         ),
+         "{refused:?}"
+     );
+@@ -587,3 +588,194 @@ async fn unit_archive_http_routes_refuse_open_work_cancel_on_request_and_restore
+     }
+     assert!(!a.archived().await);
+ }
++
++/// Plan08 03B.5: the archived unit as a goal, with a desk outside its subtree whose thread carries
++/// the goal, as a channel call's thread does. Returns that desk and thread.
++async fn goal_elsewhere(a: &Archive) -> (Uuid, Uuid) {
++    sqlx::query("UPDATE departments SET kind = 'goal' WHERE id = $1")
++        .bind(a.unit)
++        .execute(a.p().pool())
++        .await
++        .unwrap();
++    let sales = a.p().test_unit(a.company, "sales").await;
++    let desk = crate::adapters::persistence::test_support::create_channel(
++        a.p(),
++        a.company,
++        crate::application::ports::channel::ChannelWrite {
++            name: "Sales desk".into(),
++            slug: format!("sales-{}", Uuid::new_v4().simple()),
++            department_id: Some(DepartmentId::new(sales)),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap()
++    .id;
++    let thread = Uuid::new_v4();
++    sqlx::query(
++        "INSERT INTO threads (id, company_id, channel_id, subject, goal_unit_id) \
++         VALUES ($1, $2, $3, 'Asked for the goal', $4)",
++    )
++    .bind(thread)
++    .bind(a.company)
++    .bind(desk)
++    .bind(a.unit)
++    .execute(a.p().pool())
++    .await
++    .unwrap();
++    (desk, thread)
++}
++
++impl Archive {
++    /// A run on `thread` of `desk`, outside the archived subtree.
++    async fn prepare_on_thread(&self, desk: Uuid, thread: Uuid) -> PreparedAdmission {
++        let capture = Capture::default();
++        let mut request = self.request(self.f.binding.target.actor);
++        request.association = RelatedAssociation::Thread {
++            target: crate::entities::address::AddressTarget::Desk(desk),
++            thread_id: crate::application::workflow::RelatedThreadId::new(thread),
++        };
++        WorkflowService::new(
++            self.p().clone(),
++            capture.clone(),
++            NoRuntime,
++            NoRuntime,
++            Preflight,
++        )
++        .admit(request)
++        .await
++        .unwrap();
++        capture.0.lock().unwrap().take().unwrap()
++    }
++    async fn goal_of(&self, run: RunId) -> Option<Uuid> {
++        sqlx::query_scalar("SELECT goal_unit_id FROM workflow_runs WHERE id = $1")
++            .bind(run.as_uuid())
++            .fetch_one(self.p().pool())
++            .await
++            .unwrap()
++    }
++}
++
++/// A goal's open work includes a run elsewhere that serves it. A Sales root that no cancelled tree
++/// reaches is the Sales department's, so the archive refuses as not cancellable and cancels
++/// nothing (gate 08G-P03-D1 r2 D1.5, F3).
++#[tokio::test]
++async fn goal_trail_archive_counts_goal_runs_elsewhere() {
++    let a = Archive::new().await;
++    let (desk, thread) = goal_elsewhere(&a).await;
++    let command = a.prepare_on_thread(desk, thread).await;
++    a.p().admit(&command).await.unwrap();
++    let run = command.proposed_run_id();
++    assert_eq!(a.goal_of(run).await, Some(a.unit), "the thread's goal");
++    for open in [OpenWork::Refuse, OpenWork::Cancel] {
++        let refused = a.archive(open).await;
++        assert!(
++            matches!(
++                refused,
++                Err(AppError::UnitArchiveOpenWork {
++                    count: 1,
++                    elsewhere: 1,
++                    cancellable: false
++                })
++            ),
++            "{open:?}: {refused:?}"
++        );
++    }
++    // The JSON refusal names the run elsewhere, and its text does not blame this unit's desks.
++    let response =
++        axum::response::IntoResponse::into_response(a.archive(OpenWork::Cancel).await.unwrap_err());
++    assert_eq!(response.status(), axum::http::StatusCode::CONFLICT);
++    let body = axum::body::to_bytes(response.into_body(), 65536)
++        .await
++        .unwrap();
++    let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
++    assert_eq!(
++        (&body["count"], &body["elsewhere"], &body["cancellable"]),
++        (&1.into(), &1.into(), &false.into())
++    );
++    let text = body["error"].as_str().unwrap();
++    assert!(text.contains("in other departments"), "{text}");
++    assert!(!text.contains("on this department's desks"), "{text}");
++    assert!(!a.archived().await);
++    let state: String = sqlx::query_scalar("SELECT state FROM workflow_runs WHERE id = $1")
++        .bind(run.as_uuid())
++        .fetch_one(a.p().pool())
++        .await
++        .unwrap();
++    assert_eq!(state, "queued", "nothing was cancelled");
++}
++
++/// An archive racing an admission on a thread that carries the goal: either the archive is refused
++/// for the new run, or the run is admitted serving no goal. Never an archived goal with an open run
++/// recorded against it (D1.5). Each order is forced once, then both are released together twice.
++///
++/// A child of a goal run is not raced separately: its parent is open and already counted, so the
++/// archive refuses or cancels that tree whichever commits first (08G-P03-B1-F2).
++#[tokio::test]
++async fn goal_competing_archive_and_thread_admission() {
++    #[derive(Debug, Clone, Copy)]
++    enum Order {
++        AdmissionFirst,
++        ArchiveFirst,
++        Together,
++    }
++    for order in [
++        Order::AdmissionFirst,
++        Order::ArchiveFirst,
++        Order::Together,
++        Order::Together,
++    ] {
++        let a = Arc::new(Archive::new().await);
++        let (desk, thread) = goal_elsewhere(&a).await;
++        let prepared = a.prepare_on_thread(desk, thread).await;
++        let run = prepared.proposed_run_id();
++        let (admitted, archived) = match order {
++            Order::AdmissionFirst => {
++                let admitted = a.p().admit(&prepared).await;
++                (admitted, a.archive(OpenWork::Refuse).await)
++            }
++            Order::ArchiveFirst => {
++                let archived = a.archive(OpenWork::Refuse).await;
++                (a.p().admit(&prepared).await, archived)
++            }
++            Order::Together => {
++                let mut blocker = a.p().pool().begin().await.unwrap();
++                sqlx::query("SELECT 1 FROM companies WHERE id=$1 FOR NO KEY UPDATE")
++                    .bind(a.company)
++                    .execute(&mut *blocker)
++                    .await
++                    .unwrap();
++                let admission = tokio::spawn({
++                    let a = a.clone();
++                    async move { a.p().admit(&prepared).await }
++                });
++                let archive = tokio::spawn({
++                    let a = a.clone();
++                    async move { a.archive(OpenWork::Refuse).await }
++                });
++                wait_until_backends_are_blocked(a.p().pool(), 2).await;
++                blocker.commit().await.unwrap();
++                (admission.await.unwrap(), archive.await.unwrap())
++            }
++        };
++        admitted.expect("a Sales desk admits either way");
++        match (order, archived) {
++            (
++                Order::AdmissionFirst | Order::Together,
++                Err(AppError::UnitArchiveOpenWork { count: 1, .. }),
++            ) => {
++                assert!(!a.archived().await);
++                assert_eq!(a.goal_of(run).await, Some(a.unit));
++            }
++            (Order::ArchiveFirst | Order::Together, Ok(_)) => {
++                assert!(a.archived().await);
++                assert_eq!(
++                    a.goal_of(run).await,
++                    None,
++                    "an archived goal records no new run"
++                );
++            }
++            (order, outcome) => panic!("unexpected archive outcome for {order:?}: {outcome:?}"),
++        }
++    }
++}
+diff --git a/src/application/app_error.rs b/src/application/app_error.rs
+index 0c8cdafc..67dcffb8 100644
+--- a/src/application/app_error.rs
++++ b/src/application/app_error.rs
+@@ -23,12 +23,16 @@ pub enum AppError {
+     /// no configuration. Definite: restoring the unit is the only way the same write succeeds.
+     #[error("This department is archived; restore it to change it or start work on its desks")]
+     UnitArchived,
+-    /// Archiving refused because runs on the subtree's desks are not finished (Plan08 02B.1).
+-    /// `cancellable` is false when cancel-and-archive cannot end them in one write.
+-    #[error(
+-        "{count} unfinished run(s) on this department's desks; cancel them or let them finish first"
+-    )]
+-    UnitArchiveOpenWork { count: i64, cancellable: bool },
++    /// Archiving refused because runs on the subtree's desks, or serving a goal in it wherever they
++    /// run, are not finished (Plan08 02B.1, 03B.5). `cancellable` is false when cancel-and-archive
++    /// cannot end them in one write. `elsewhere` counts the goal runs in other departments that no
++    /// cancelled tree reaches: only their own departments can end them.
++    #[error("{}", open_work_text(*count, *elsewhere))]
++    UnitArchiveOpenWork {
++        count: i64,
++        elsewhere: i64,
++        cancellable: bool,
++    },
+     /// `message.ask` in a run that answers a channel call: the requester is an agent and cannot
+     /// answer a question (agent-workflow-call AWC-P04-D1 r2 D8). Definite and terminal.
+     #[error("A run answering a channel call cannot ask its requester a question")]
+@@ -279,3 +283,15 @@ impl AppError {
+         }
+     }
+ }
++
++fn open_work_text(count: i64, elsewhere: i64) -> String {
++    if elsewhere > 0 {
++        format!(
++            "{count} unfinished run(s) for this department, {elsewhere} of them serving its goal in other departments that only those departments can end"
++        )
++    } else {
++        format!(
++            "{count} unfinished run(s) on this department's desks; cancel them or let them finish first"
++        )
++    }
++}
+diff --git a/src/application/ports/department.rs b/src/application/ports/department.rs
+index 8b9c975f..67afd19a 100644
+--- a/src/application/ports/department.rs
++++ b/src/application/ports/department.rs
+@@ -34,6 +34,16 @@ pub struct DepartmentWrite {
+     pub escalation: Option<crate::entities::workflow_escalation::EscalationPolicy>,
+     /// Set by the use case; persistence stores the system when it is absent.
+     pub created_by: Option<CreationProvenance>,
++    /// `Some` creates a goal unit (Plan08 03A.4); `None` a standing one.
++    pub goal: Option<GoalWrite>,
++}
++
++/// What a new goal unit sets besides a department's fields: its target date and sponsors. The
++/// sponsors are assigned in the creating transaction; the first one decides.
++#[derive(Debug, Clone, Default, PartialEq, Eq)]
++pub struct GoalWrite {
++    pub target_date: Option<chrono::NaiveDate>,
++    pub sponsors: Vec<PrincipalId>,
+ }
+ 
+ /// One department edit: only the fields it sets change. A tri-state field is `None` to leave it,
+@@ -48,6 +58,9 @@ pub struct DepartmentEdit {
+     pub charter: Option<Option<String>>,
+     pub parent_id: Option<Option<DepartmentId>>,
+     pub escalation: Option<Option<crate::entities::workflow_escalation::EscalationPolicy>>,
++    /// Plan08 03A.3: a kind change rewrites no recorded goal.
++    pub kind: Option<crate::entities::department::DepartmentKind>,
++    pub target_date: Option<Option<chrono::NaiveDate>>,
+ }
+ 
+ /// What archiving does with runs on the subtree's desks that have not finished.
+diff --git a/src/application/use_cases/department.rs b/src/application/use_cases/department.rs
+index 93e04325..5131ec5b 100644
+--- a/src/application/use_cases/department.rs
++++ b/src/application/use_cases/department.rs
+@@ -92,6 +92,14 @@ impl DepartmentWrite {
+         self.slug = normalized_slug(&self.slug)?;
+         self.description = normalized_text(self.description.take());
+         self.charter = normalized_charter(self.charter.take())?;
++        if let Some(goal) = &self.goal {
++            let mut seen = std::collections::HashSet::new();
++            if !goal.sponsors.iter().all(|sponsor| seen.insert(*sponsor)) {
++                return Err(AppError::BadRequest(
++                    "department.sponsor_duplicate: name each sponsor once.".into(),
++                ));
++            }
++        }
+         Ok(())
+     }
+ }
+diff --git a/src/application/use_cases/onboarding.rs b/src/application/use_cases/onboarding.rs
+index d88cec59..adbec0f6 100644
+--- a/src/application/use_cases/onboarding.rs
++++ b/src/application/use_cases/onboarding.rs
+@@ -345,6 +345,7 @@ fn department(
+         return Ok(None);
+     };
+     let mut write = DepartmentWrite {
++        goal: None,
+         escalation: None,
+         name: name.to_owned(),
+         slug: slugify(name),
+diff --git a/src/application/use_cases/thread/tests.rs b/src/application/use_cases/thread/tests.rs
+index bdeb5d25..111f1248 100644
+--- a/src/application/use_cases/thread/tests.rs
++++ b/src/application/use_cases/thread/tests.rs
+@@ -2926,6 +2926,8 @@ fn use_cases_with_departments(
+         .enumerate()
+         .map(
+             |(index, (name, parent))| crate::entities::department::Department {
++                kind: Default::default(),
++                target_date: None,
+                 is_root: false,
+                 escalation: None,
+                 archived: None,
+diff --git a/src/application/workflow/fixtures/mod.rs b/src/application/workflow/fixtures/mod.rs
+index a40cd32b..2382c5be 100644
+--- a/src/application/workflow/fixtures/mod.rs
++++ b/src/application/workflow/fixtures/mod.rs
+@@ -24,9 +24,10 @@ pub enum Fixture {
+     DepartmentLead,
+     RoleLeadResponse,
+     RoleSponsorApproval,
++    GoalPlanApproveDispatch,
+ }
+ 
+-pub const ALL: [Fixture; 10] = [
++pub const ALL: [Fixture; 11] = [
+     Fixture::ReviewedSupport,
+     Fixture::AutonomousResponse,
+     Fixture::TriageRouting,
+@@ -37,6 +38,7 @@ pub const ALL: [Fixture; 10] = [
+     Fixture::DepartmentLead,
+     Fixture::RoleLeadResponse,
+     Fixture::RoleSponsorApproval,
++    Fixture::GoalPlanApproveDispatch,
+ ];
+ 
+ impl Fixture {
+@@ -52,6 +54,7 @@ impl Fixture {
+             Self::DepartmentLead => include_str!("department-lead.yaml"),
+             Self::RoleLeadResponse => include_str!("role-lead-response.yaml"),
+             Self::RoleSponsorApproval => include_str!("role-sponsor-approval.yaml"),
++            Self::GoalPlanApproveDispatch => include_str!("goal-plan-approve-dispatch.yaml"),
+         }
+     }
+ 
+@@ -67,6 +70,7 @@ impl Fixture {
+             Self::DepartmentLead => 108,
+             Self::RoleLeadResponse => 109,
+             Self::RoleSponsorApproval => 110,
++            Self::GoalPlanApproveDispatch => 111,
+         };
+         VersionId::new(Uuid::from_u128(suffix))
+     }
+@@ -78,7 +82,9 @@ impl Fixture {
+     /// Caller chooses the test tenant. These synthetic facts never confer authority.
+     pub fn snapshots(self, company: CompanyId) -> DependencySnapshots {
+         match self {
+-            Self::RoleLeadResponse | Self::RoleSponsorApproval => DependencySnapshots::default(),
++            Self::RoleLeadResponse | Self::RoleSponsorApproval | Self::GoalPlanApproveDispatch => {
++                DependencySnapshots::default()
++            }
+             Self::ReviewedSupport
+             | Self::AutonomousResponse
+             | Self::RepeatedHumanRevision
+@@ -110,7 +116,10 @@ fn agent_snapshots(fixture: Fixture, company: CompanyId) -> DependencySnapshots
+         ],
+         Fixture::RepeatedHumanRevision => &[("specialist", AgentUseMode::Tools)],
+         Fixture::DepartmentLead => &[("lead", AgentUseMode::Tools)],
+-        Fixture::McpLookup | Fixture::RoleLeadResponse | Fixture::RoleSponsorApproval => &[],
++        Fixture::McpLookup
++        | Fixture::RoleLeadResponse
++        | Fixture::RoleSponsorApproval
++        | Fixture::GoalPlanApproveDispatch => &[],
+     };
+     let key = match fixture {
+         Fixture::DepartmentLead => "lead",
+diff --git a/src/application/workflow/message.rs b/src/application/workflow/message.rs
+index 45610043..8dd8777b 100644
+--- a/src/application/workflow/message.rs
++++ b/src/application/workflow/message.rs
+@@ -365,6 +365,9 @@ pub struct NewThread {
+     pub id: Uuid,
+     pub target: crate::entities::address::AddressTarget,
+     pub subject: String,
++    /// The goal the thread records: set only for a channel call's thread, from the calling run's
++    /// goal (Plan08 03B.3); a `message.send` thread records none.
++    pub goal_unit_id: Option<Uuid>,
+ }
+ 
+ #[derive(Debug, Clone)]
+diff --git a/src/application/workflow/message_planner.rs b/src/application/workflow/message_planner.rs
+index c389705f..1211aa77 100644
+--- a/src/application/workflow/message_planner.rs
++++ b/src/application/workflow/message_planner.rs
+@@ -228,6 +228,7 @@ impl EmailPlan {
+                     purpose: DeliveryPurpose::WorkflowSend,
+                     thread_id,
+                     new_thread: Some(NewThread {
++                        goal_unit_id: None,
+                         id: thread_id,
+                         target: sender.target,
+                         subject: content.subject().to_string(),
+@@ -306,6 +307,7 @@ fn plan_channel(
+         kind,
+         destination_id,
+         new_thread: Some(NewThread {
++            goal_unit_id: None,
+             id: thread_id,
+             target: crate::entities::address::AddressTarget::Desk(channel),
+             subject: content.subject().to_string(),
+diff --git a/src/application/workflow/mod.rs b/src/application/workflow/mod.rs
+index c57efd88..92cf8dad 100644
+--- a/src/application/workflow/mod.rs
++++ b/src/application/workflow/mod.rs
+@@ -32,6 +32,7 @@ pub mod decisions;
+ pub mod escalation;
+ pub mod exactness;
+ pub mod fixtures;
++pub mod goals;
+ pub mod guard;
+ pub mod history;
+ pub mod http;
+diff --git a/src/application/workflow/publication/role_tests.rs b/src/application/workflow/publication/role_tests.rs
+index 68345e3d..5bee15f5 100644
+--- a/src/application/workflow/publication/role_tests.rs
++++ b/src/application/workflow/publication/role_tests.rs
+@@ -256,3 +256,49 @@ fn workflow_role_publication_preserves_whole_approval_pinned_principal_defaults_
+         assert_eq!(&inputs.value()["approval"], expected);
+     }
+ }
++
++/// 08G-P03 03A.5: the goal sample compiles with the lead planning and dispatching and the
++/// sponsor role deciding, and names no agent of its own.
++#[test]
++fn goal_unit_sample_procedure_compiles() {
++    use crate::application::workflow::fixtures::Fixture;
++    let sample = Fixture::GoalPlanApproveDispatch;
++    let bundle = freeze(
++        decode(sample.source()).unwrap(),
++        company(),
++        sample.version_id(),
++        sample.snapshots(company()),
++        vec![],
++    )
++    .unwrap();
++    let mut roles: Vec<_> = bundle
++        .compiled()
++        .role_references()
++        .iter()
++        .map(|reference| {
++            (
++                reference.step.as_str().to_owned(),
++                reference.role,
++                reference.mode,
++            )
++        })
++        .collect();
++    roles.sort_by(|a, b| a.0.cmp(&b.0));
++    assert_eq!(
++        roles,
++        vec![
++            (
++                "approve".to_owned(),
++                DepartmentRole::Sponsor,
++                RoleUseMode::People
++            ),
++            (
++                "dispatch".to_owned(),
++                DepartmentRole::Lead,
++                RoleUseMode::Tools
++            ),
++            ("plan".to_owned(), DepartmentRole::Lead, RoleUseMode::Tools),
++        ]
++    );
++    assert!(bundle.snapshots().agents.is_empty());
++}
+diff --git a/src/domain/entities/department.rs b/src/domain/entities/department.rs
+index 6bc3ad28..7b6a5f70 100644
+--- a/src/domain/entities/department.rs
++++ b/src/domain/entities/department.rs
+@@ -6,7 +6,7 @@
+ 
+ use std::{fmt, str::FromStr};
+ 
+-use chrono::{DateTime, Utc};
++use chrono::{DateTime, NaiveDate, Utc};
+ use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
+ 
+@@ -41,6 +41,9 @@ pub struct Department {
+     /// Set while the unit is archived (Plan08 02A): it admits no work and accepts no
+     /// configuration, and everything it held stays readable.
+     pub archived: Option<UnitArchive>,
++    /// Standing work or a goal (Plan08 03A). Only a goal may carry a target date.
++    pub kind: DepartmentKind,
++    pub target_date: Option<NaiveDate>,
+     pub created_by: CreationProvenance,
+     pub created_at: DateTime<Utc>,
+ }
+@@ -81,6 +84,33 @@ pub struct UnitArchive {
+     pub by: CreationProvenance,
+ }
+ 
++/// What a unit is for (Plan08 03A): standing work, or a goal that ends. A goal is otherwise a
++/// department; what it adds is a target date and the trail of runs done on its behalf.
++#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum DepartmentKind {
++    #[default]
++    Standing,
++    Goal,
++}
++
++impl DepartmentKind {
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Standing => "standing",
++            Self::Goal => "goal",
++        }
++    }
++
++    pub fn parse(value: &str) -> Option<Self> {
++        match value {
++            "standing" => Some(Self::Standing),
++            "goal" => Some(Self::Goal),
++            _ => None,
++        }
++    }
++}
++
+ /// A role a principal holds in a department. Owner and admin are confined to the company root.
+ /// Lead and owner have at most one holder; reviewer, sponsor and admin may have several. Sponsor
+ /// selects one deciding holder.

@@ -92,6 +92,14 @@ impl DepartmentWrite {
         self.slug = normalized_slug(&self.slug)?;
         self.description = normalized_text(self.description.take());
         self.charter = normalized_charter(self.charter.take())?;
+        if let Some(goal) = &self.goal {
+            let mut seen = std::collections::HashSet::new();
+            if !goal.sponsors.iter().all(|sponsor| seen.insert(*sponsor)) {
+                return Err(AppError::BadRequest(
+                    "department.sponsor_duplicate: name each sponsor once.".into(),
+                ));
+            }
+        }
         Ok(())
     }
 }

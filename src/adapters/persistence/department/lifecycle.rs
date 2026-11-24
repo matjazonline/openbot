@@ -72,6 +72,24 @@ pub(crate) async fn create_department_with_id_on(
         )
         .await?;
     }
+    // A goal's sponsors, in the creating transaction (Plan08 03A.4): the first one decides.
+    if let Some(goal) = &write.goal {
+        for (index, sponsor) in goal.sponsors.iter().enumerate() {
+            assign_department_role_on(
+                tx,
+                templates,
+                company,
+                actor,
+                department.id,
+                DepartmentRoleAssignment {
+                    role: DepartmentRole::Sponsor,
+                    principal: *sponsor,
+                    decider: index == 0,
+                },
+            )
+            .await?;
+        }
+    }
     // Boxed: an agent lead's desk descends into template compilation and publication.
     Box::pin(provision_department_desk_on(
         tx,
@@ -101,8 +119,9 @@ async fn insert_department_on(
     .map_err(|error| AppError::Internal(error.to_string()))?;
     let department = sqlx::query_as::<_, DepartmentDb>(&format!(
         "INSERT INTO departments AS department \
-             (id, company_id, name, slug, description, charter, parent_id, created_by, escalation) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING {DEPARTMENT_COLUMNS}"
+             (id, company_id, name, slug, description, charter, parent_id, created_by, escalation, \
+              kind, target_date) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING {DEPARTMENT_COLUMNS}"
     ))
     .bind(id.as_uuid())
     .bind(company.as_uuid())
@@ -119,6 +138,14 @@ async fn insert_department_on(
             .transpose()
             .map_err(|error| AppError::Internal(error.to_string()))?,
     )
+    .bind(
+        match write.goal {
+            Some(_) => DepartmentKind::Goal,
+            None => DepartmentKind::Standing,
+        }
+        .as_str(),
+    )
+    .bind(write.goal.as_ref().and_then(|goal| goal.target_date))
     .fetch_one(&mut **tx)
     .await
     .map_err(|error| slug_conflict(error, &write.slug))?;
@@ -170,6 +197,9 @@ pub(crate) async fn update_department_on(
         })
     };
     let escalation = edit.escalation.unwrap_or(current.escalation);
+    let kind = edit.kind.unwrap_or(current.kind);
+    let target_date = edit.target_date.unwrap_or(current.target_date);
+    unit_kind_shape(current.is_root, kind, target_date)?;
     if parent_id != current.parent_id
         && let Some(parent) = parent_id
     {
@@ -178,7 +208,8 @@ pub(crate) async fn update_department_on(
     }
     let updated = sqlx::query_as::<_, DepartmentDb>(&format!(
         "UPDATE departments AS department \
-            SET name = $3, slug = $4, description = $5, charter = $6, parent_id = $7, escalation = $8 \
+            SET name = $3, slug = $4, description = $5, charter = $6, parent_id = $7, escalation = $8, \
+                kind = $9, target_date = $10 \
           WHERE department.company_id = $1 AND department.id = $2 \
          RETURNING {DEPARTMENT_COLUMNS}"
     ))
@@ -190,6 +221,8 @@ pub(crate) async fn update_department_on(
     .bind(&charter)
     .bind(parent_id.map(DepartmentId::as_uuid))
     .bind(escalation.map(serde_json::to_value).transpose().map_err(|error| AppError::Internal(error.to_string()))?)
+    .bind(kind.as_str())
+    .bind(target_date)
     .fetch_one(&mut **tx)
     .await
     .map_err(|error| slug_conflict(error, &slug))?;
@@ -233,6 +266,21 @@ async fn guard_department_delete_on(
     if has_children {
         return Err(AppError::Conflict(format!(
             "Department '{}' still has child departments. Move or delete them first.",
+            current.name
+        )));
+    }
+    // A goal with recorded work keeps it (Plan08 03B.1); the foreign keys refuse the same.
+    let recorded_goal: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM workflow_runs WHERE company_id = $1 AND goal_unit_id = $2) \
+             OR EXISTS (SELECT 1 FROM threads WHERE company_id = $1 AND goal_unit_id = $2)",
+    )
+    .bind(company.as_uuid())
+    .bind(department.as_uuid())
+    .fetch_one(&mut **tx)
+    .await?;
+    if recorded_goal {
+        return Err(AppError::Conflict(format!(
+            "Department '{}' has work recorded for it as a goal and cannot be deleted. Archive it instead.",
             current.name
         )));
     }
@@ -340,4 +388,24 @@ pub(super) fn delete_error(error: sqlx::Error) -> AppError {
     } else {
         AppError::from(error)
     }
+}
+
+/// A unit's kind and target date (Plan08 03A.1, 03A.3): the root is standing, and only a goal
+/// carries a target date. The schema checks the same; this gives the refusal a name.
+pub(crate) fn unit_kind_shape(
+    is_root: bool,
+    kind: DepartmentKind,
+    target_date: Option<chrono::NaiveDate>,
+) -> AppResult<()> {
+    if is_root && kind == DepartmentKind::Goal {
+        return Err(AppError::BadRequest(
+            "department.root_is_standing: the company root cannot be a goal.".into(),
+        ));
+    }
+    if kind == DepartmentKind::Standing && target_date.is_some() {
+        return Err(AppError::BadRequest(
+            "department.target_date_goal_only: only a goal has a target date.".into(),
+        ));
+    }
+    Ok(())
 }

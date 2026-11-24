@@ -6,7 +6,7 @@
 
 use std::{fmt, str::FromStr};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -41,6 +41,9 @@ pub struct Department {
     /// Set while the unit is archived (Plan08 02A): it admits no work and accepts no
     /// configuration, and everything it held stays readable.
     pub archived: Option<UnitArchive>,
+    /// Standing work or a goal (Plan08 03A). Only a goal may carry a target date.
+    pub kind: DepartmentKind,
+    pub target_date: Option<NaiveDate>,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
 }
@@ -79,6 +82,33 @@ impl ArchivedUnits {
 pub struct UnitArchive {
     pub at: DateTime<Utc>,
     pub by: CreationProvenance,
+}
+
+/// What a unit is for (Plan08 03A): standing work, or a goal that ends. A goal is otherwise a
+/// department; what it adds is a target date and the trail of runs done on its behalf.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DepartmentKind {
+    #[default]
+    Standing,
+    Goal,
+}
+
+impl DepartmentKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Standing => "standing",
+            Self::Goal => "goal",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "standing" => Some(Self::Standing),
+            "goal" => Some(Self::Goal),
+            _ => None,
+        }
+    }
 }
 
 /// A role a principal holds in a department. Owner and admin are confined to the company root.

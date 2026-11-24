@@ -38,8 +38,9 @@ use crate::application::workflow::WorkflowActor;
 use crate::domain::workflow::CompanyId;
 use crate::entities::creation::CreationProvenance;
 use crate::entities::department::{
-    ArchivedUnits, Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
-    DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,
+    ArchivedUnits, Department, DepartmentDesk, DepartmentId, DepartmentKind, DepartmentMember,
+    DepartmentPrincipal, DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,
+    MAX_DEPARTMENT_DEPTH,
 };
 use crate::entities::participant::PrincipalKind;
 use crate::entities::transport::PrincipalId;
@@ -126,7 +127,8 @@ fn principal_choices(
 const DEPARTMENT_COLUMNS: &str = "department.id, department.company_id, department.name, \
      department.slug::text AS slug, department.description, department.charter, \
      department.parent_id, department.is_root, department.created_by, department.created_at, \
-     department.escalation, department.archived_at, department.archived_by";
+     department.escalation, department.archived_at, department.archived_by, department.kind, \
+     department.target_date";
 
 #[derive(sqlx::FromRow)]
 struct DepartmentDb {
@@ -142,6 +144,8 @@ struct DepartmentDb {
     escalation: Option<serde_json::Value>,
     archived_at: Option<DateTime<Utc>>,
     archived_by: Option<serde_json::Value>,
+    kind: String,
+    target_date: Option<chrono::NaiveDate>,
     created_at: DateTime<Utc>,
 }
 
@@ -192,6 +196,10 @@ impl TryFrom<DepartmentDb> for Department {
                     )));
                 }
             },
+            kind: crate::entities::department::DepartmentKind::parse(&db.kind).ok_or_else(
+                || AppError::Internal(format!("Invalid departments.kind for {}", db.id)),
+            )?,
+            target_date: db.target_date,
             created_at: db.created_at,
         })
     }

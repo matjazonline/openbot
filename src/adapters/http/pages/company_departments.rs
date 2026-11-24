@@ -24,6 +24,11 @@ pub struct DepartmentDraft {
     pub parent_id: Option<Uuid>,
     /// Create only: who leads the new department.
     pub lead: Option<Uuid>,
+    /// `standing` or `goal` (Plan08 03A), and a goal's target date as typed (`YYYY-MM-DD`).
+    pub kind: String,
+    pub target_date: String,
+    /// Create only: a new goal's deciding sponsor.
+    pub sponsor: Option<Uuid>,
 }
 
 impl DepartmentDraft {
@@ -35,6 +40,12 @@ impl DepartmentDraft {
             charter: department.charter.clone().unwrap_or_default(),
             parent_id: department.parent_id.map(DepartmentId::as_uuid),
             lead: None,
+            kind: department.kind.as_str().to_owned(),
+            target_date: department
+                .target_date
+                .map(|date| date.to_string())
+                .unwrap_or_default(),
+            sponsor: None,
         }
     }
 }
@@ -341,6 +352,9 @@ fn create_form(section: &DepartmentSection<'_>, draft: &DepartmentDraft) -> Stri
             <label class="form-control"><span class="label text-xs opacity-70">Lead</span>
                 <select class="select w-full" name="lead">{lead_options}</select>
                 <span class="label text-xs opacity-60">An agent lead answers the department's desk; a person lead or none leaves it a plain team desk.</span>{cut}</label>
+            <label class="form-control"><span class="label text-xs opacity-70">Deciding sponsor</span>
+                <select class="select w-full" name="sponsor">{sponsor_options}</select>
+                <span class="label text-xs opacity-60">For a goal: who approves its work. Add more sponsors on the goal once it exists.</span></label>
             <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                 {submit}
                 <button type="button" class="btn btn-ghost"
@@ -353,6 +367,7 @@ fn create_form(section: &DepartmentSection<'_>, draft: &DepartmentDraft) -> Stri
         error = section.error_for(DepartmentForm::Create),
         fields = department_fields(section, draft, None),
         lead_options = principal_options(section.choices, draft.lead, "No lead"),
+        sponsor_options = principal_options(section.choices, draft.sponsor, "No sponsor"),
         cut = choices_cut_note(section),
         submit = busy_submit_button("Create department"),
         cancel = section_endpoint(company_id, ""),
@@ -413,7 +428,24 @@ fn department_fields(
             <label class="form-control"><span class="label text-xs opacity-70">Charter</span>
                 <textarea class="textarea min-h-32 w-full" name="charter" maxlength="{max_charter}">{charter}</textarea>
                 <span class="label text-xs opacity-60">What the department is for. Its agents read it when they answer on its desks. At most {max_charter} bytes.</span></label>
-            {parent_field}"##,
+            {parent_field}{kind_field}"##,
+        // A goal is a unit with an end (Plan08 03A); the root is always standing.
+        kind_field = if is_root {
+            String::new()
+        } else {
+            format!(
+                r#"<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <label class="form-control"><span class="label text-xs opacity-70">Kind</span>
+                    <select class="select w-full" name="kind"><option value="standing"{standing}>Standing department</option><option value="goal"{goal}>Goal</option></select></label>
+                <label class="form-control"><span class="label text-xs opacity-70">Target date</span>
+                    <input class="input w-full" type="date" name="target_date" value="{target_date}"></label>
+            </div>
+            <p class="text-xs opacity-60">A goal records every run done for it, in any department. Its charter says when it is done; the target date applies to a goal only.</p>"#,
+                standing = if draft.kind == "goal" { "" } else { " selected" },
+                goal = if draft.kind == "goal" { " selected" } else { "" },
+                target_date = escape_html_attr(&draft.target_date),
+            )
+        },
         // The new department's desk is created at its slug. Editing the slug later does not move
         // the desk (01DEP-P03-D8), so the edit form says where its address is changed instead.
         slug_help = match editing {

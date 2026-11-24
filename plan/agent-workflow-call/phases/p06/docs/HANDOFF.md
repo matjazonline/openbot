@@ -29,7 +29,8 @@
    - The plan is not declared complete. The unavailable gates and the crash-test gap are listed in doc 06.
 2. Return to Plan08 p03 after settling Plan08 README proposals 4 and 5 with the user.
 
-## Pending with the user
+## Settled with the user (2026-11-24)
 
-- Commit authorization; the trail learning y/n; dropping the scratch DBs; Plan08 README proposals 4 and 5 before
-  Plan08 p03.
+- Committed as `358e662a`, with the learnings in `c7fbbbbe`.
+- Scratch databases `openbot_awc_mac02` and `openbot_awc_mac02_test` were dropped.
+- Plan08 README proposals 4 and 5 were confirmed (Plan08 COORDINATION r7).

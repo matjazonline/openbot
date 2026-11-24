@@ -64,7 +64,8 @@ department only may sit under that department instead of under the goals office.
 
 ## Proposed here, confirm before implementation
 
-These were raised in the design discussion and not ruled on.
+These were raised in the design discussion. The user confirmed 2 and 3 on 2026-11-21, and 4 and 5
+on 2026-11-24. Proposal 1 is built by p01 (01, item 3: `workflow.role_wrong_kind`).
 
 1. **The step decides what the decider must be.** `decision.human` with `role: sponsor` needs a
    person decider and refuses admission otherwise (`workflow.role_wrong_kind`), because a human
