@@ -15,14 +15,16 @@ erased, a deleted company's data is removed, and the whole service passes its fu
 1. Add two required configuration keys, validated at startup like the existing retention keys and
    documented in the service README and `config.env.example`:
    - `ATTRIBUTION_ACTIVITY_RETENTION_DAYS`: an activity is removed this many days after
-     `occurred_at`.
+     `occurred_at`. Stage-history rows follow the same lifetime, counted from `changed_at`; an
+     enrollment's current stage is unaffected, so the flow of an old cohort shrinks as its history
+     expires.
    - `ATTRIBUTION_PROFILE_IDLE_RETENTION_DAYS`: a profile with no activity and no update for this
      many days is erased. It must be at least the activity retention.
    Their values are the deployment owner's decision (D3). The verification values are not policy.
 2. Extend the existing maintenance worker; do not add a second scheduler. Keep its bounds: a
    limited number of tenants per pass, at most 100 rows per tenant transaction, the existing SQL
    and batch deadlines, and fair scheduling so one large tenant cannot starve the others.
-3. Erasing a profile removes its identifiers, tags, enrollments and activities, then the profile,
+3. Erasing a profile removes its identifiers, tags, enrollments, stage history and activities, then the profile,
    in bounded batches. Suppression entries stay. Its unsubscribe tokens are deleted unless the
    address is suppressed, so an old unsubscribe link then shows the not-valid page. Its prospect
    links lose their `profile_id` and become ordinary links of their ad, so their clicks remain
@@ -36,7 +38,8 @@ erased, a deleted company's data is removed, and the whole service passes its fu
 6. Confirm the tenant purge added in phase 01 covers every table from phases 01–05 in dependency
    order, and that a suspended or deleted company is refused on every new route.
 
-Focused checks: `attribution_profile_retention_` for exact cutoffs, idle detection, erasure that
+Focused checks: `attribution_profile_retention_` for exact cutoffs, stage history
+expiring without changing current stages, idle detection, erasure that
 competes with a resolve, an activity write and an enrollment for the same profile, interruption
 and restart mid-erasure, suppression surviving erasure, and a poison tenant not blocking others;
 `attribution_profile_lifecycle_` for suspended and deleted companies on every new route and for
@@ -47,7 +50,7 @@ purge completeness.
 1. Update the service README: the new routes, scopes, configuration keys and the startup
    validation they actually have. Name only keys the application reads.
 2. Add a short guide beside WEBSITE.md and REPORTING.md covering the model, the rule language,
-   contactability, unsubscribe links and their email headers, prospect links and the scanner
+   the campaign flow and how it counts, contactability, unsubscribe links and their email headers, prospect links and the scanner
    rule, safe retries with `activity_key`, and the statement that the service records
    outreach and does not send it.
 3. Update the OpenAPI contract and examples for every new route, error and bound, and extend

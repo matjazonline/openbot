@@ -29,7 +29,9 @@ transaction as the activity that causes it.
 5. The caller either names the variant or asks the service to assign one. Assignment picks
    uniformly at random among the campaign's enabled ads and is frozen: a later enable, disable or
    repeat request never changes it. A campaign with no enabled ad yields no variant.
-6. `GET /v1/enrollments` filters by campaign, stage, variant and profile, with bounded pagination.
+6. `GET /v1/enrollments` filters by campaign, `stage` (where the enrollment is now),
+   `entered_stage` (a stage it has ever entered, from the history in 03B), variant and profile,
+   with bounded pagination.
 
 Focused checks: `attribution_enrollments_` for stage-list validation, final stages, refusal to
 declare `stopped`, refused removal, foreign campaign, profile and ad, idempotent repeats, a
@@ -60,6 +62,18 @@ ad.
    maintenance worker does the same in bounded batches. Contactability is correct at once in
    both cases; the stage only keeps stopped profiles out of "who to contact next" lists. Lifting
    the entry reopens nothing.
+7. Keep a stage history. Add `attribution_enrollment_stage_changes`, scoped by company and store:
+   the enrollment, its campaign and profile, `from_stage` and `to_stage` (either may be empty, for
+   an enrollment with no stage), `changed_at` from the database clock, and `cause`: `enrollment`,
+   `activity` (with the activity id), `manual` (with the actor) or `suppression`. Write one row in
+   the same transaction as every stage change, under the enrollment lock: on creation, on
+   movement by an activity, on a manual change, and when a do-not-contact entry or maintenance
+   stops an enrollment. A replayed, earlier or refused move writes nothing; decide that by
+   comparing the locked row's old and new stage, not from an upsert's affected-row count, which
+   reports a row even when nothing changed. Rows are append-only
+   and leave only through retention or erasure
+   ([06](06-retention-erasure-and-final-verification.md)). Index them by campaign and time for
+   the campaign flow in [05](05-segments-and-activity-analytics.md).
 
 Focused checks: `attribution_enrollments_stage_` for forward-only movement, final stages and
 `stopped` that activities cannot leave, out-of-order and replayed activities, implicit
@@ -68,8 +82,11 @@ stopping enrollments in its own transaction, and a domain entry stopped by maint
 many profiles. With competing claimants: activities for one enrollment that carry different
 stages, asserting the result is the latest in list order regardless of arrival order; and a
 do-not-contact entry racing an activity for the same enrollment, ending at `stopped` unless the
-activity reached a final stage first.
+activity reached a final stage first. And `attribution_enrollments_history_`: every path that
+changes a stage writes exactly one row, an unchanged stage writes none, and each enrollment's rows
+form an unbroken chain (each `from_stage` equals the previous `to_stage`) ending at its current
+stage, including after the competing cases above.
 
-Completion: campaign funnels can be declared and each profile's place in them is consistent
-under competing writers. Record commands, counts and results here; regenerate SQLx metadata;
+Completion: campaign funnels can be declared, and each profile's place in them is consistent
+under competing writers, with a complete history of how it got there. Record commands, counts and results here; regenerate SQLx metadata;
 update the contract. Full-suite gate: [06](06-retention-erasure-and-final-verification.md).

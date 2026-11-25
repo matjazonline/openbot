@@ -8,7 +8,8 @@
 
 Depends on [04](04-prospect-links-and-unsubscribe.md). A saved rule selects profiles by attributes, tags,
 activities and stage. Counts, rates and funnels over activities can be grouped by variant and
-limited to a segment, and the dashboard shows profiles, timelines and these reports.
+limited to a segment, a campaign's flow from stage to stage can be read and drawn, and the
+dashboard shows profiles, timelines and these reports.
 
 ## Batch 05A — Segment rules and evaluation
 
@@ -64,27 +65,52 @@ representative three-leaf rule on the pilot volume.
    Start with indexed queries and inspect plans; add pre-aggregation only on measured need.
 7. `GET /v1/activity-analytics/export` returns the same rows as CSV, with the existing 10,000-row
    refusal and spreadsheet-formula protection.
+8. Add `GET /v1/campaigns/{id}/flow`, with the same permissions and query conventions. It is a
+   cohort view: the enrollments that entered the campaign within the interval, optionally limited
+   to one variant or to a segment (evaluated now). From the stage history it returns, for each
+   stage in list order followed by the final stages and `stopped`: how many enrollments ever
+   entered it, how many are there now, and the median days spent there, separately for stays
+   that ended and for stays still waiting; and every observed move between two stages with its
+   count and its share of those who entered the stage it left. An enrollment that enters a stage
+   twice counts once as entered and adds each stay to the time measures; backward moves appear
+   as their own arrows. Enrollments that never had a stage are counted on their own. The answer
+   is bounded by the stage limit, so it is not paginated.
 
 Focused checks: `attribution_activity_analytics_` against a fixed ledger with two variants, a
 segment, zero-denominator groups, out-of-order activities, time zone and daylight-saving
 boundaries and a foreign segment id. Reconcile every figure with independently computed totals.
+`attribution_campaign_flow_` against a fixed history with skipped stages, a backward manual
+move, a re-entered stage, final stages, `stopped`, two variants, a segment filter, enrollments
+with no stage, waiting stays, and interval and time-zone boundaries; reconcile every count,
+share and median by hand, and capture the query plan.
 
 ## Batch 05C — Dashboard pages
 
 1. Add to the service's own frontend: a profile list with identifier, tag and segment filters; a
    profile page with attributes, tags, enrollments and the activity timeline; activity types;
    segments with their count; and a campaign page with stage counts and the per-variant report.
-2. Follow the existing pages: ordinary refresh and filter navigation, CSRF on every write, escaped
+2. Add a campaign flow page drawn from the flow route: stages left to right, final stages and
+   `stopped` at the end, arrows labelled with counts and shares, and under each stage the waiting
+   count and median days. Filters choose the entry period, one variant or two side by side, and
+   a segment. Clicking a stage lists its enrollments, now there or ever entered, and each opens
+   the profile's timeline. The same numbers are offered as a table, which screen readers and
+   narrow screens use; on a phone the stages stack vertically.
+3. Add an optional `automation_link` to campaigns: an HTTPS URL whose origin is the configured
+   `ATTRIBUTION_OPENBOT_ORIGIN`, at most 2,048 bytes, such as Openbot's runs board filtered to
+   the campaign's workflow. The campaign page shows it as a plain navigation link; the service
+   never fetches it.
+4. Follow the existing pages: ordinary refresh and filter navigation, CSRF on every write, escaped
    output, keyboard focus, empty and error states. Attribute values, properties and tag text are
    untrusted and must render as text.
-3. Hide controls the user's permission does not allow, and enforce the same rule on the server.
-4. Add the browser journey to `scripts/verify.py` beside the existing three, and to the CI
+5. Hide controls the user's permission does not allow, and enforce the same rule on the server.
+6. Add the browser journey to `scripts/verify.py` beside the existing three, and to the CI
    workflow and the root runner wherever they list browser prefixes.
 
 Focused checks: `attribution_profiles_browser_` for role-based controls, a script-bearing
-attribute and tag rendered as text, tenant switching, and agreement between the pages and the API
-fixtures.
+attribute and tag rendered as text, tenant switching, agreement between the pages and the API
+fixtures, the flow page and its table view matching the flow fixture, keyboard access to the
+stage drill-down, and an automation link on another origin refused.
 
-Completion: a person can find a group of profiles, read what happened with each and compare
-variants. Record commands, counts, results and query plans here; update the contract and
+Completion: a person can find a group of profiles, read what happened with each, compare
+variants, and see how a campaign flows from stage to stage. Record commands, counts, results and query plans here; update the contract and
 REPORTING.md. Full-suite gate: [06](06-retention-erasure-and-final-verification.md).

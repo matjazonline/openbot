@@ -47,7 +47,8 @@ A local-business outreach run, with every write made through a store-scoped serv
    forward in the same transaction that stores them. A recipient who unsubscribes is stopped for
    every agent at once.
 5. A person or agent reads a segment ("Ljubljana, score under 50, visited the preview in the
-   last 14 days, not booked") and the per-variant rates for the campaign.
+   last 14 days, not booked"), the per-variant rates for the campaign, and its flow from stage to
+   stage.
 
 The service records and reports. It does not run the steps, send messages, or host preview sites.
 
@@ -61,6 +62,7 @@ The service records and reports. It does not run the steps, send messages, or ho
 | Activity type | A declared kind of happening: its name, channel, direction and property types | Everything; a store declares its own |
 | Activity | One append-only row: this type happened to this profile at this time | The properties |
 | Enrollment | A profile's place in a campaign: variant and stage | The campaign's stage list and its final stages |
+| Stage change | One append-only row per stage move: from, to, when and why | — |
 | Segment | A saved rule over attributes, tags, activities and enrollments, evaluated on demand | The rule |
 | Suppression | A do-not-contact entry keyed by identifier; it outlives the profile | — |
 | Unsubscribe link | A link for one email address or phone number that records a do-not-contact entry | — |
@@ -158,9 +160,9 @@ Implement in order. Each phase depends on the ones before it.
 | --- | --- |
 | [01 — Profiles, identifiers and tags](01-profiles-identifiers-and-tags.md) | Records, resolve-or-create, tags, suppression, key scopes |
 | [02 — Activity types and activities](02-activity-types-and-activities.md) | Type registry, append-only activity log, timeline |
-| [03 — Stages and enrollments](03-stages-and-enrollments.md) | Campaign stage lists, final stages, enrollment, variant assignment, stage movement, stopping |
+| [03 — Stages and enrollments](03-stages-and-enrollments.md) | Campaign stage lists, final stages, enrollment, variant assignment, stage movement, stopping, stage history |
 | [04 — Prospect links and unsubscribe](04-prospect-links-and-unsubscribe.md) | Unsubscribe links, the opt-in store setting, prospect links and scanner filtering |
-| [05 — Segments and activity analytics](05-segments-and-activity-analytics.md) | Rule language, evaluation, metrics, funnels, dashboard pages |
+| [05 — Segments and activity analytics](05-segments-and-activity-analytics.md) | Rule language, evaluation, metrics, funnels, campaign flow, dashboard pages |
 | [06 — Retention, erasure and final verification](06-retention-erasure-and-final-verification.md) | Lifetimes, export, erasure, tenant purge, docs, full gate |
 
 ## Verification discipline
